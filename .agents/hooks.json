@@ -38,6 +38,20 @@
           }
         ]
       }
+    ],
+    "PostInvocation": [
+      {
+        "type": "command",
+        "command": "python3 ../scripts/hooks/agy_hook_adapter.py post-invocation",
+        "timeout": 5
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "python3 ../scripts/hooks/agy_hook_adapter.py stop",
+        "timeout": 5
+      }
     ]
   }
 }

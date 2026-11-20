@@ -3,7 +3,6 @@
   "exclude": [
     "build",
     "website",
-    ".claude/worktrees",
     "**/__pycache__",
     "**/node_modules"
   ],

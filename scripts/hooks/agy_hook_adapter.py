@@ -3,10 +3,12 @@
 
 Translates Antigravity camelCase hook JSON on stdin into the repository's existing
 guard scripts and emits Antigravity JSON decisions on stdout:
-  - session-start -> {"injectSteps": [{"systemMessage": {"systemMessage": ...}}]}
-  - pre-command   -> {"decision": "allow"|"ask"|"deny", "reason": ...}
-  - pre-edit      -> {"decision": "allow"|"deny", "reason": ...}
-  - pre-mcp       -> {"decision": "allow"|"ask"|"deny", "reason": ...}
+  - session-start   -> {"injectSteps": [{"systemMessage": {"systemMessage": ...}}]}
+  - pre-command     -> {"decision": "allow"|"ask"|"force_ask"|"deny", "reason": ...}
+  - pre-edit        -> {"decision": "allow"|"deny", "reason": ...}
+  - pre-mcp         -> {"decision": "allow"|"ask"|"force_ask"|"deny", "reason": ...}
+  - post-invocation -> {"injectSteps": [...], "terminationBehavior": ""} | {}
+  - stop            -> {"decision": "continue", "reason": ...} | {}
 
 Hooks run under the host's bare `python3` (often macOS system Python 3.9): keep this
 module and its imports compatible with Python 3.9. Never execute or persist tool input.
@@ -22,11 +24,21 @@ import subprocess
 import sys
 
 HOOK_DIR = Path(__file__).resolve().parent
+SCRIPTS_DIR = HOOK_DIR.parent
 ROOT = HOOK_DIR.parents[1]
 sys.path.insert(0, str(HOOK_DIR))
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+try:
+    import active_workers  # noqa: E402
+except ImportError:
+    active_workers = None  # type: ignore[assignment]
+import agent_guard  # noqa: E402
 import agent_hook_input as adapter  # noqa: E402
 import connector_write_guard  # noqa: E402
 import git_commands  # noqa: E402
+
+DECISION_RANK = {"allow": 0, "ask": 1, "force_ask": 2, "deny": 3}
 
 SIM_TOOL_PATTERN = re.compile(
     r"(?:^|__)(?:.*_sims?(?:_[^_].*)?|.*_sim" + r"ulator.*|sim" + r"ulator_.*|simctl.*)(?:$|__)"
@@ -43,8 +55,9 @@ AXIOM_DENY_AGENTS = frozenset({
     "test-runner",
     "test-debugger",
 })
-HF_ASK_SUBCOMMANDS = frozenset({
-    "download", "upload", "repos", "cp", "sync", "buckets", "jobs", "sandbox",
+HF_ASK_SUBCOMMANDS = frozenset({"download"})
+HF_FORCE_ASK_SUBCOMMANDS = frozenset({
+    "upload", "repos", "cp", "sync", "buckets", "jobs", "sandbox",
     "endpoints", "webhooks", "discussions", "collections", "spaces",
     "extensions", "skills", "update",
 })
@@ -125,26 +138,95 @@ def _git_subcommand_and_args(args: list[str]) -> tuple[str, list[str]]:
     return args[index], args[index + 1:]
 
 
+def _merge_decision(current: tuple[str, str], candidate: tuple[str, str]) -> tuple[str, str]:
+    if DECISION_RANK[candidate[0]] > DECISION_RANK[current[0]]:
+        return candidate
+    return current
+
+
+def _sync_worker_lease(event: str, payload: dict, cwd: Path) -> None:
+    """Best-effort host-wide worker lease registration for Antigravity sessions and worktree workers."""
+    if active_workers is None:
+        return
+    if os.environ.get("PYTEST_CURRENT_TEST") and not os.environ.get("QVOICE_WORKER_DIRECTORY"):
+        return
+    session_id = str(payload.get("conversationId") or "").strip()
+    if not session_id:
+        return
+    in_worktree = cwd.is_absolute() and adapter.linked_worktree(cwd)
+    worker_payload: dict[str, str] | None = None
+    if event == "session-start":
+        if in_worktree:
+            worker_payload = {"hook_event_name": "SubagentStart", "session_id": session_id, "agent_id": str(cwd)}
+        else:
+            worker_payload = {"hook_event_name": "SessionStart", "session_id": session_id}
+    elif event in ("pre-command", "pre-edit"):
+        if in_worktree:
+            worker_payload = {"hook_event_name": "SubagentStart", "session_id": session_id, "agent_id": str(cwd)}
+    elif event == "stop":
+        if in_worktree and payload.get("fullyIdle") is True:
+            worker_payload = {"hook_event_name": "SubagentStop", "session_id": session_id, "agent_id": str(cwd)}
+    if worker_payload is None:
+        return
+    try:
+        active_workers.lifecycle(worker_payload)
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+        pass
+
+
+def _check_agent_guard(internal: dict, cwd: Path, root: Path) -> str:
+    """Run agent_guard in-process for linked worktrees and subagent payloads (fail-open on parser errors)."""
+    if not internal.get("agent_id") and not (cwd.is_absolute() and adapter.linked_worktree(cwd)):
+        return ""
+    tool_input = internal.get("tool_input")
+    try:
+        if internal.get("tool_name") == "Bash":
+            command = tool_input.get("command", "") if isinstance(tool_input, dict) else ""
+            if not isinstance(command, str):
+                return ""
+            reason = (
+                agent_guard.git_violation(command, cwd if cwd.is_absolute() else root)
+                or agent_guard.command_violation(command)
+                or agent_guard.roadmap_write_violation(command)
+            )
+        elif internal.get("tool_name") in adapter.EDIT_PATH_KEYS:
+            reason = agent_guard.edit_violation(internal, root)
+        else:
+            return ""
+    except Exception:  # noqa: BLE001 - matches agent_guard.main() fail-open parser boundary
+        return ""
+    if not reason:
+        return ""
+    return (
+        f"agent guard: BLOCKED — {reason} ({agent_guard.RULE}).\n"
+        "Agents and side sessions (any call from a linked worktree) report back to the lead, which works "
+        "in the main checkout and owns native builds, measured lanes, pushes, the roadmap and the "
+        "checkpoint."
+    )
+
+
 def command_policy_decision(command: str, depth: int = 0) -> tuple[str, str]:
-    """Return ('deny'|'ask'|'allow', reason) for authorization-bound shell commands."""
+    """Return ('deny'|'force_ask'|'ask'|'allow', reason) for authorization-bound shell commands."""
     if depth > 3 or not command.strip():
         return "allow", ""
     stripped, bodies = adapter.shell_fed_bodies(command)
-    ask_reason = ""
+    best: tuple[str, str] = ("allow", "")
     for body in bodies:
-        decision, reason = command_policy_decision(body, depth + 1)
-        if decision == "deny":
-            return "deny", reason
-        if decision == "ask" and not ask_reason:
-            ask_reason = reason
+        decision = command_policy_decision(body, depth + 1)
+        if decision[0] == "deny":
+            return decision
+        best = _merge_decision(best, decision)
 
     for words in adapter._simple_commands(stripped):
         while words and (
             words[0].rsplit("/", 1)[-1] in adapter.WRAPPERS | git_commands.TRANSPARENT_PREFIXES
             or git_commands.ASSIGNMENT.match(words[0])
         ):
-            if words[0].rsplit("/", 1)[-1] == "sudo" and not ask_reason:
-                ask_reason = "Privileged command (`sudo`) requires explicit maintainer confirmation."
+            if words[0].rsplit("/", 1)[-1] == "sudo":
+                best = _merge_decision(
+                    best,
+                    ("force_ask", "Privileged command (`sudo`) requires explicit maintainer confirmation."),
+                )
             words = words[1:]
         if not words:
             continue
@@ -156,11 +238,10 @@ def command_policy_decision(command: str, depth: int = 0) -> tuple[str, str]:
         if name in git_commands.SHELLS:
             script_idx = adapter._shell_script_index(args)
             if script_idx >= 0:
-                decision, reason = command_policy_decision(args[script_idx], depth + 1)
-                if decision == "deny":
-                    return "deny", reason
-                if decision == "ask" and not ask_reason:
-                    ask_reason = reason
+                decision = command_policy_decision(args[script_idx], depth + 1)
+                if decision[0] == "deny":
+                    return decision
+                best = _merge_decision(best, decision)
                 continue
             if not operands:
                 continue
@@ -175,8 +256,10 @@ def command_policy_decision(command: str, depth: int = 0) -> tuple[str, str]:
             if "-m" in args:
                 m_idx = args.index("-m")
                 if m_idx + 1 < len(args) and args[m_idx + 1] == "pip" and "install" in args[m_idx + 2:]:
-                    if not ask_reason:
-                        ask_reason = "Package installation (`python -m pip install`) requires explicit authorization (AGENTS.md: Specific authorization)."
+                    best = _merge_decision(
+                        best,
+                        ("ask", "Package installation (`python -m pip install`) requires explicit authorization (AGENTS.md: Specific authorization)."),
+                    )
                     continue
             raw_head = operands[0]
             words = args[args.index(operands[0]):]
@@ -191,105 +274,113 @@ def command_policy_decision(command: str, depth: int = 0) -> tuple[str, str]:
         if name == "hf" and operands[:2] == ["auth", "token"]:
             return "deny", "`hf auth token` prints stored credentials and is denied (AGENTS.md: Privacy)."
 
-        # Explicit ask rules for external writes, destructive git, installs, and downloads.
-        reason = _check_ask_command(raw_head, name, args, operands)
-        if reason and not ask_reason:
-            ask_reason = reason
+        # Explicit ask / force_ask rules for external writes, destructive git, installs, and downloads.
+        best = _merge_decision(best, _check_ask_command(raw_head, name, args, operands))
 
-    if ask_reason:
-        return "ask", ask_reason
-    return "allow", ""
+    return best
 
 
-def _check_ask_command(raw_head: str, name: str, args: list[str], operands: list[str]) -> str:
+def _check_ask_command(raw_head: str, name: str, args: list[str], operands: list[str]) -> tuple[str, str]:
     if name == "git":
         sub, sub_args = _git_subcommand_and_args(args)
         if sub == "push":
-            return "Pushing requires an explicit maintainer request (AGENTS.md: Main is the only published branch)."
+            return "force_ask", "Pushing requires an explicit maintainer request (AGENTS.md: Main is the only published branch)."
         if sub == "reset" and "--hard" in sub_args:
-            return "`git reset --hard` discards local work; confirm before running."
+            return "force_ask", "`git reset --hard` discards local work; confirm before running."
         if sub == "restore":
-            return "`git restore` discards uncommitted changes; confirm before running."
+            return "ask", "`git restore` discards uncommitted changes; confirm before running."
         if sub == "checkout" and "--" in sub_args:
-            return "`git checkout --` discards uncommitted changes; confirm before running."
+            return "ask", "`git checkout --` discards uncommitted changes; confirm before running."
         if sub == "clean":
-            return "`git clean` deletes untracked files; confirm before running."
+            return "force_ask", "`git clean` deletes untracked files; confirm before running."
         if sub == "branch" and "-D" in sub_args:
-            return "`git branch -D` force-deletes a branch; confirm before running."
+            return "force_ask", "`git branch -D` force-deletes a branch; confirm before running."
         if sub == "worktree" and sub_args[:1] == ["remove"] and ("--force" in sub_args or "-f" in sub_args):
-            return "`git worktree remove --force` may discard unintegrated work; confirm before running."
+            return "force_ask", "`git worktree remove --force` may discard unintegrated work; confirm before running."
         if sub == "config" and "--global" in sub_args:
-            return "`git config --global` modifies host settings (AGENTS.md: Specific authorization)."
-        return ""
+            return "force_ask", "`git config --global` modifies host settings (AGENTS.md: Specific authorization)."
+        return "allow", ""
 
+    if _matches_repo_script(raw_head, "scripts/ios_candidate_tag.py"):
+        if "--dry-run" in args or "--help" in args or "-h" in args:
+            return "allow", ""
+        return (
+            "force_ask",
+            "`scripts/ios_candidate_tag.py` signs and pushes a TestFlight candidate tag; confirm before running (AGENTS.md: Main is the only published branch).",
+        )
     if _matches_repo_script(raw_head, "scripts/macos_test.sh") and operands[:2] in (["models", "install"], ["models", "ensure"]):
-        return "Model download/install requires explicit maintainer authorization (AGENTS.md: Specific authorization)."
+        return "ask", "Model download/install requires explicit maintainer authorization (AGENTS.md: Specific authorization)."
     if _matches_repo_script(raw_head, "scripts/ui_test.sh") and "model-download" in operands:
-        return "Model-download UI lane requires explicit maintainer authorization (AGENTS.md: Specific authorization)."
+        return "ask", "Model-download UI lane requires explicit maintainer authorization (AGENTS.md: Specific authorization)."
     if _matches_repo_script(raw_head, "scripts/clean_build_caches.sh"):
-        return "`scripts/clean_build_caches.sh` removes build caches; confirm before running."
+        return "ask", "`scripts/clean_build_caches.sh` removes build caches; confirm before running."
     if _matches_repo_script(raw_head, "scripts/install_pinned_tools.sh"):
-        return "`scripts/install_pinned_tools.sh` downloads and installs host tools; confirm before running."
+        return "ask", "`scripts/install_pinned_tools.sh` downloads and installs host tools; confirm before running."
     if _matches_repo_script(raw_head, "scripts/publish_benchmark_history.py"):
-        return "Publishing benchmark history requires explicit authorization (AGENTS.md: Specific authorization)."
+        return "force_ask", "Publishing benchmark history requires explicit authorization (AGENTS.md: Specific authorization)."
     if _matches_repo_script(raw_head, "scripts/benchmark_history.py") and "record" in operands:
-        return "Recording benchmark history requires explicit authorization (AGENTS.md: Specific authorization)."
+        return "force_ask", "Recording benchmark history requires explicit authorization (AGENTS.md: Specific authorization)."
     if _matches_repo_script(raw_head, "scripts/ci/failure_issue.py"):
-        return "`scripts/ci/failure_issue.py` files or comments on GitHub issues; confirm before running."
+        return "force_ask", "`scripts/ci/failure_issue.py` files or comments on GitHub issues; confirm before running."
 
     if name == "gh" and operands:
         if operands[:2] == ["workflow", "run"]:
-            return "`gh workflow run` dispatches CI externally; confirm before running."
+            return "force_ask", "`gh workflow run` dispatches CI externally; confirm before running."
         if operands[0] == "pr" and len(operands) >= 2 and operands[1] in GH_PR_ASK:
-            return f"`gh pr {operands[1]}` writes to GitHub; confirm before running."
+            return "force_ask", f"`gh pr {operands[1]}` writes to GitHub; confirm before running."
         if operands[:2] == ["issue", "create"]:
-            return "`gh issue create` writes to GitHub; confirm before running."
+            return "force_ask", "`gh issue create` writes to GitHub; confirm before running."
         if operands[0] == "api":
             for index, token in enumerate(args):
                 if token in ("-X", "--method") and index + 1 < len(args):
                     if args[index + 1].upper() in GH_API_WRITE_METHODS:
-                        return f"`gh api {token} {args[index + 1]}` writes to GitHub; confirm before running."
+                        return "force_ask", f"`gh api {token} {args[index + 1]}` writes to GitHub; confirm before running."
                 elif token.startswith("--method="):
                     if token.split("=", 1)[1].upper() in GH_API_WRITE_METHODS:
-                        return f"`gh api {token}` writes to GitHub; confirm before running."
+                        return "force_ask", f"`gh api {token}` writes to GitHub; confirm before running."
                 elif token.startswith("-X") and len(token) > 2:
                     if token[2:].upper() in GH_API_WRITE_METHODS:
-                        return f"`gh api {token}` writes to GitHub; confirm before running."
-        return ""
+                        return "force_ask", f"`gh api {token}` writes to GitHub; confirm before running."
+        return "allow", ""
 
     if name == "brew" and operands[:1] in (["install"], ["upgrade"]):
-        return f"`brew {operands[0]}` modifies host packages; confirm before running."
+        return "ask", f"`brew {operands[0]}` modifies host packages; confirm before running."
     if name in ("pip", "pip3") and operands[:1] == ["install"]:
-        return f"`{name} install` modifies Python packages; confirm before running."
+        return "ask", f"`{name} install` modifies Python packages; confirm before running."
     if name == "npm" and "install" in operands:
-        return "`npm install` modifies dependencies; confirm before running."
+        return "ask", "`npm install` modifies dependencies; confirm before running."
     if name == "swift" and operands[:2] == ["package", "update"]:
-        return "`swift package update` repins Swift packages (AGENTS.md: Specific authorization)."
+        return "ask", "`swift package update` repins Swift packages (AGENTS.md: Specific authorization)."
 
     if name == "hf" and operands:
         if operands[0] in HF_ASK_SUBCOMMANDS:
-            return f"`hf {operands[0]}` downloads or writes via Hugging Face; confirm before running."
+            return "ask", f"`hf {operands[0]}` downloads via Hugging Face; confirm before running."
+        if operands[0] in HF_FORCE_ASK_SUBCOMMANDS:
+            return "force_ask", f"`hf {operands[0]}` writes or runs jobs via Hugging Face; confirm before running."
         if operands[0] == "auth" and len(operands) >= 2 and operands[1] in HF_AUTH_ASK:
-            return f"`hf auth {operands[1]}` modifies Hugging Face credentials; confirm before running."
+            return "force_ask", f"`hf auth {operands[1]}` modifies Hugging Face credentials; confirm before running."
         if operands[0] == "cache" and len(operands) >= 2 and operands[1] in HF_CACHE_ASK:
-            return f"`hf cache {operands[1]}` modifies the Hugging Face cache; confirm before running."
-        return ""
-    if name == "huggingface-cli" and operands[:1] in (["download"], ["upload"]):
-        return f"`huggingface-cli {operands[0]}` transfers Hugging Face artifacts; confirm before running."
+            return "force_ask", f"`hf cache {operands[1]}` modifies the Hugging Face cache; confirm before running."
+        return "allow", ""
+    if name == "huggingface-cli" and operands[:1] == ["download"]:
+        return "ask", "`huggingface-cli download` transfers Hugging Face artifacts; confirm before running."
+    if name == "huggingface-cli" and operands[:1] == ["upload"]:
+        return "force_ask", "`huggingface-cli upload` uploads Hugging Face artifacts; confirm before running."
 
     if name == "defaults" and operands[:1] == ["write"]:
-        return "`defaults write` modifies macOS user defaults (AGENTS.md: Specific authorization)."
+        return "force_ask", "`defaults write` modifies macOS user defaults (AGENTS.md: Specific authorization)."
     if name == "xcode-select" and any(flag in ("-s", "--switch") for flag in args):
-        return "`xcode-select` changes host Xcode selection (AGENTS.md: Specific authorization)."
+        return "force_ask", "`xcode-select` changes host Xcode selection (AGENTS.md: Specific authorization)."
     if name == "vercel" and not (set(args) <= {"--help", "-h", "--version", "-v"}):
-        return "`vercel` CLI actions require explicit maintainer confirmation (AGENTS.md: Specific authorization)."
+        return "force_ask", "`vercel` CLI actions require explicit maintainer confirmation (AGENTS.md: Specific authorization)."
     if name == "asc" and not (set(args) <= {"--help", "-h", "version", "--version"}):
-        return "`asc` CLI actions require explicit maintainer confirmation (AGENTS.md: Specific authorization)."
-    return ""
+        return "force_ask", "`asc` CLI actions require explicit maintainer confirmation (AGENTS.md: Specific authorization)."
+    return "allow", ""
 
 
 def handle_session_start(payload: dict, root: Path) -> dict:
     cwd = _resolve_cwd(payload, root)
+    _sync_worker_lease("session-start", payload, cwd)
     try:
         result = subprocess.run(
             ["bash", str(HOOK_DIR / "session_start.sh")],
@@ -319,6 +410,7 @@ def handle_pre_command(payload: dict, root: Path) -> dict:
     if not isinstance(command, str) or not command.strip():
         return {"decision": "allow"}
     cwd = _resolve_cwd(payload, root)
+    _sync_worker_lease("pre-command", payload, cwd)
     internal = {
         "hook_event_name": "PreToolUse",
         "tool_name": "Bash",
@@ -327,7 +419,7 @@ def handle_pre_command(payload: dict, root: Path) -> dict:
     }
 
     advisories: list[str] = []
-    for script_name in ("policy_guard.sh", "commit_lint.sh", "agent_guard.py"):
+    for script_name in ("policy_guard.sh", "commit_lint.sh"):
         result = _run_guard(script_name, internal, cwd, root)
         if result.returncode != 0:
             reason = (result.stderr or result.stdout or f"{script_name} blocked this command").strip()
@@ -341,12 +433,16 @@ def handle_pre_command(payload: dict, root: Path) -> dict:
             except ValueError:
                 pass
 
+    agent_block = _check_agent_guard(internal, cwd, root)
+    if agent_block:
+        return {"decision": "deny", "reason": agent_block}
+
     decision, reason = command_policy_decision(command)
     if decision == "deny":
         return {"decision": "deny", "reason": reason}
-    if decision == "ask":
+    if decision in ("ask", "force_ask"):
         combined = f"{reason}\n" + "\n".join(advisories) if advisories else reason
-        return {"decision": "ask", "reason": combined}
+        return {"decision": decision, "reason": combined}
     if advisories:
         return {"decision": "allow", "reason": "\n".join(advisories)}
     return {"decision": "allow"}
@@ -365,17 +461,20 @@ def handle_pre_edit(payload: dict, root: Path) -> dict:
         return {"decision": "deny", "reason": f"file guard: {tool_name} missing Path"}
     mapped = "Write" if tool_name == "write_file" else "Edit"
     cwd = _resolve_cwd(payload, root)
+    _sync_worker_lease("pre-edit", payload, cwd)
     internal = {
         "hook_event_name": "PreToolUse",
         "tool_name": mapped,
         "tool_input": {"file_path": path},
         "cwd": str(cwd),
     }
-    for script_name in ("generated_file_guard.sh", "agent_guard.py"):
-        result = _run_guard(script_name, internal, cwd, root)
-        if result.returncode != 0:
-            reason = (result.stderr or result.stdout or f"{script_name} blocked this edit").strip()
-            return {"decision": "deny", "reason": reason}
+    result = _run_guard("generated_file_guard.sh", internal, cwd, root)
+    if result.returncode != 0:
+        reason = (result.stderr or result.stdout or "generated_file_guard.sh blocked this edit").strip()
+        return {"decision": "deny", "reason": reason}
+    agent_block = _check_agent_guard(internal, cwd, root)
+    if agent_block:
+        return {"decision": "deny", "reason": agent_block}
     return {"decision": "allow"}
 
 
@@ -453,7 +552,7 @@ def handle_pre_mcp(payload: dict, root: Path) -> dict:
                     ),
                 }
 
-    # 5. Hugging Face Space/generation tools ask.
+    # 5. Hugging Face Space/generation tools force_ask (never cached by Always Allow).
     if server_lower == "huggingface" and (tool_lower == "dynamic_space" or tool_lower.startswith("gr")):
         if in_worktree:
             return {
@@ -461,11 +560,11 @@ def handle_pre_mcp(payload: dict, root: Path) -> dict:
                 "reason": f"Subagents never invoke `{server}:{tool}` outside their worktree (AGENTS.md).",
             }
         return {
-            "decision": "ask",
+            "decision": "force_ask",
             "reason": f"`{server}:{tool}` runs a remote Hugging Face Space; confirm before running (AGENTS.md: Specific authorization).",
         }
 
-    # 6. GitHub connector writes ask under any server name (and deny in worktrees).
+    # 6. GitHub connector writes force_ask under any server name (and deny in worktrees).
     gh_write = connector_write_guard.github_write(canonical)
     if gh_write:
         if in_worktree:
@@ -474,11 +573,120 @@ def handle_pre_mcp(payload: dict, root: Path) -> dict:
                 "reason": f"`{gh_write}` writes to GitHub; subagents never write outside their worktree (AGENTS.md).",
             }
         return {
-            "decision": "ask",
+            "decision": "force_ask",
             "reason": f"`{gh_write}` writes to GitHub through MCP (AGENTS.md: Specific authorization). Approve only an explicitly requested write.",
         }
 
     return {"decision": "allow"}
+
+
+def handle_post_invocation(payload: dict, root: Path) -> dict:
+    """Inject concise, zero-noise drift advisories on the main checkout when derived files lag."""
+    cwd = _resolve_cwd(payload, root)
+    if cwd.is_absolute() and adapter.linked_worktree(cwd):
+        return {}
+    try:
+        status = subprocess.run(
+            ["git", "-C", str(root), "status", "--porcelain=v1", "--untracked-files=all"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    if status.returncode != 0 or not status.stdout:
+        return {}
+
+    pbxproj_dirty = False
+    swift_membership_changed = False
+    roadmap_json_dirty = False
+    roadmap_md_dirty = False
+
+    for line in status.stdout.splitlines():
+        if len(line) < 4:
+            continue
+        code = line[:2]
+        path = line[3:].strip()
+        if " -> " in path:
+            path = path.split(" -> ", 1)[1].strip()
+        path = path.strip('"')
+        if path == "QwenVoice.xcodeproj/project.pbxproj":
+            pbxproj_dirty = True
+        elif path.endswith(".swift") and (path.startswith("Sources/") or path.startswith("Tests/")):
+            if any(flag in ("A", "D", "R", "?") for flag in code):
+                swift_membership_changed = True
+        elif path in ("config/roadmap.json", "config/roadmap-archive.json"):
+            roadmap_json_dirty = True
+        elif path == "docs/ROADMAP.md":
+            roadmap_md_dirty = True
+
+    advisories: list[str] = []
+    if swift_membership_changed and not pbxproj_dirty:
+        advisories.append(
+            "Vocello drift notice: Swift file membership under Sources/ or Tests/ changed without updating "
+            "QwenVoice.xcodeproj/project.pbxproj. Run `./scripts/regenerate_project.sh --fast` before building or committing."
+        )
+    if roadmap_json_dirty and not roadmap_md_dirty:
+        roadmap_script = root / "scripts/roadmap.py"
+        drifted = True
+        if roadmap_script.is_file():
+            try:
+                check = subprocess.run(
+                    ["python3", str(roadmap_script), "--root", str(root), "render", "--check"],
+                    capture_output=True,
+                    text=True,
+                    timeout=3,
+                    check=False,
+                )
+                drifted = check.returncode != 0
+            except (OSError, subprocess.SubprocessError):
+                drifted = True
+        if drifted:
+            advisories.append(
+                "Vocello drift notice: config/roadmap*.json changed without regenerating docs/ROADMAP.md. "
+                "Run `python3 scripts/roadmap.py render` (or use `roadmap.py set|note|close`)."
+            )
+
+    if not advisories:
+        return {}
+    return {
+        "injectSteps": [{"systemMessage": {"systemMessage": "\n".join(advisories)}}],
+        "terminationBehavior": "",
+    }
+
+
+def handle_stop(payload: dict, root: Path) -> dict:
+    """Release linked-worktree worker leases and catch staged whitespace/conflict errors once per turn."""
+    cwd = _resolve_cwd(payload, root)
+    _sync_worker_lease("stop", payload, cwd)
+    if cwd.is_absolute() and adapter.linked_worktree(cwd):
+        return {}
+    if (
+        payload.get("terminationReason") != "NO_TOOL_CALL"
+        or payload.get("fullyIdle") is not True
+        or payload.get("continuationActive") is True
+    ):
+        return {}
+    try:
+        check = subprocess.run(
+            ["git", "-C", str(root), "diff", "--cached", "--check"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    if check.returncode != 0:
+        return {
+            "decision": "continue",
+            "reason": (
+                "Staged changes contain whitespace errors or conflict markers (`git diff --cached --check` failed). "
+                "Fix or unstage them before finishing."
+            ),
+        }
+    return {}
 
 
 def main() -> int:
@@ -500,6 +708,10 @@ def main() -> int:
         output = handle_pre_edit(payload, root)
     elif mode == "pre-mcp":
         output = handle_pre_mcp(payload, root)
+    elif mode == "post-invocation":
+        output = handle_post_invocation(payload, root)
+    elif mode == "stop":
+        output = handle_stop(payload, root)
     else:
         output = {"decision": "deny", "reason": f"agy_hook_adapter: unknown mode {mode!r}"}
 

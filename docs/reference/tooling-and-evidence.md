@@ -225,7 +225,7 @@ rules they enforce:
   to make it pass, and never relax the status without a new dated decision.
 - **Assistant state stays external.** Sessions, memory, credentials and personal settings never enter
   Git, CI or evidence. Track only shared instructions, reviewed hooks, rules, skills and subagents.
-  Claude Code settings, skill and subagent metadata and rule front matter are executable
+  Antigravity hooks, skill and subagent metadata and rule front matter are executable
   configuration: their changes route to the existing Python tests (`test_agent_hooks.py`).
 
 ## Common mistakes

@@ -121,20 +121,121 @@ def strip_heredocs(text: str) -> tuple[str, list[tuple[str, str]]]:
 
 
 def _substitutions(text: str) -> list[str]:
-    """Bodies of `$(...)` (balanced) and backtick substitutions in raw shell text."""
-    bodies = re.findall(r"`([^`]*)`", text)
+    """Bodies of `$(...)` (balanced) and backtick substitutions outside single quotes.
+
+    Single-quoted segments (`'...'`) are literal text in POSIX shells, so markdown
+    code spans such as `git commit -m 'block `git rebase`'` never trigger command
+    substitution parsing (BKL-63); double-quoted and unquoted substitutions still do."""
+    bodies: list[str] = []
     index = 0
-    while True:
-        start = text.find("$(", index)
-        if start < 0:
-            break
-        depth, cursor = 1, start + 2
-        while cursor < len(text) and depth:
-            depth += {"(": 1, ")": -1}.get(text[cursor], 0)
-            cursor += 1
-        bodies.append(text[start + 2:cursor - 1])
-        index = start + 2
+    length = len(text)
+    in_single = False
+    in_double = False
+    while index < length:
+        ch = text[index]
+        if in_single:
+            if ch == "'":
+                in_single = False
+            index += 1
+            continue
+        if ch == "\\" and index + 1 < length:
+            index += 2
+            continue
+        if ch == '"' and not in_single:
+            in_double = not in_double
+            index += 1
+            continue
+        if ch == "'" and not in_double:
+            in_single = True
+            index += 1
+            continue
+        if ch == "`":
+            end = index + 1
+            while end < length:
+                if text[end] == "\\" and end + 1 < length:
+                    end += 2
+                    continue
+                if text[end] == "`":
+                    break
+                end += 1
+            if end < length:
+                bodies.append(text[index + 1:end])
+                index = end + 1
+                continue
+        if ch == "$" and index + 1 < length and text[index + 1] == "(":
+            depth, cursor = 1, index + 2
+            sub_single = False
+            sub_double = False
+            while cursor < length and depth:
+                c = text[cursor]
+                if sub_single:
+                    if c == "'":
+                        sub_single = False
+                elif c == "\\" and cursor + 1 < length:
+                    cursor += 2
+                    continue
+                elif c == '"':
+                    sub_double = not sub_double
+                elif c == "'" and not sub_double:
+                    sub_single = True
+                elif not sub_double:
+                    if c == "(":
+                        depth += 1
+                    elif c == ")":
+                        depth -= 1
+                cursor += 1
+            bodies.append(text[index + 2:cursor - 1 if depth == 0 else cursor])
+            index += 2
+            continue
+        index += 1
     return bodies
+
+
+def _mask_backticks(text: str) -> str:
+    """Replace backtick substitutions outside single quotes with SUBSTITUTED."""
+    out: list[str] = []
+    index = 0
+    length = len(text)
+    in_single = False
+    in_double = False
+    while index < length:
+        ch = text[index]
+        if in_single:
+            out.append(ch)
+            if ch == "'":
+                in_single = False
+            index += 1
+            continue
+        if ch == "\\" and index + 1 < length:
+            out.append(text[index:index + 2])
+            index += 2
+            continue
+        if ch == '"':
+            in_double = not in_double
+            out.append(ch)
+            index += 1
+            continue
+        if ch == "'" and not in_double:
+            in_single = True
+            out.append(ch)
+            index += 1
+            continue
+        if ch == "`":
+            end = index + 1
+            while end < length:
+                if text[end] == "\\" and end + 1 < length:
+                    end += 2
+                    continue
+                if text[end] == "`":
+                    break
+                end += 1
+            if end < length:
+                out.append(SUBSTITUTED)
+                index = end + 1
+                continue
+        out.append(ch)
+        index += 1
+    return "".join(out)
 
 
 def _resolve(base: Path | None, value: str) -> Path | None:
@@ -205,7 +306,7 @@ def git_invocations(command: str, cwd: Path, depth: int = 0) -> list[GitInvocati
             found.extend(git_invocations(body, cwd, depth + 1))
     for body in _substitutions(text):
         found.extend(git_invocations(body, cwd, depth + 1))
-    text = re.sub(r"`[^`]*`", SUBSTITUTED, text)
+    text = _mask_backticks(text)
     text = join_quoted_newlines(text)                # a message that spans lines is one word
 
     tokens: list[str] = []

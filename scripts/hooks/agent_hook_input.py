@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Normalize Claude Code hook input for the repository shell hooks.
+"""Normalize agent lifecycle hook input for the repository shell hooks.
 
 Bash calls expose the shell text as tool_input.command. File-edit tools expose
 their target as tool_input.file_path (Edit, Write, MultiEdit) or
@@ -374,10 +374,10 @@ def simulator_policy(command: str, depth: int = 0) -> str:
         reason = simulator_policy(body, depth + 1)
         if reason:
             return reason
-    # A command substitution runs wherever it appears, even inside a search pattern or a commit
-    # message that is otherwise read as text.
-    for match in SUBSTITUTION.finditer(stripped):
-        reason = simulator_policy(match.group(1) if match.group(1) is not None else match.group(2), depth + 1)
+    # A command substitution runs wherever it appears outside single quotes, even inside
+    # a double-quoted search pattern or commit message.
+    for sub in git_commands._substitutions(stripped):
+        reason = simulator_policy(sub, depth + 1)
         if reason:
             return reason
     for words in _simple_commands(stripped):

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""Claude Code PreToolUse guard for subagents and side sessions (CLAUDE.md: Agents and side
-sessions).
+"""PreToolUse guard for subagents and side sessions (AGENTS.md: Subagents and worktrees).
 
 Only a subagent's hook input carries `agent_id`; the lead's never does. A call made from a
 linked worktree, such as a desktop app side session's, is screened the same way; the lead works

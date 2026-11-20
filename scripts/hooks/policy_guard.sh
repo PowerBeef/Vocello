@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Claude Code PreToolUse hook (matcher: Bash): repository policy guard.
+# PreToolUse hook (run_command / Bash): repository policy guard.
 #
 # Reads the hook JSON from stdin and inspects `tool_input.command`. It blocks
 # (exit 2, reason on stderr) the handful of shell commands that violate a hard
-# invariant in CLAUDE.md regardless of intent:
+# invariant in AGENTS.md regardless of intent:
 #
 #   * Simulator destinations and simulator lifecycle commands (Physical iPhone only)
 #   * whole build-cache deletion outside scripts/clean_build_caches.sh (Owned output)
 #   * force pushes, pushes of any ref but main or to any repository but origin,
 #     hand-made branches and worktrees, and ref rewrites (Main is the only
-#     published branch; agent worktrees come only from Claude Code Agent
-#     isolation, EnterWorktree or a desktop app session)
+#     published branch; agent worktrees come only from Antigravity shared-workspace
+#     subagents/swarms)
 #   * local history rewrites: `git commit --amend`/`--fixup`/`--squash`,
 #     `git rebase`, `git pull --rebase`, a `git reset` that moves the branch to
 #     another commit, `git filter-branch`/`filter-repo` (preserve prior commits)

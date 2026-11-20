@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude Code PreToolUse hook (Bash): commit and push lint; --staged runs it directly.
+# PreToolUse hook (run_command / Bash): commit and push lint; --staged runs it directly.
 #
 # Fired for every Bash tool call. git_commands.py lists every `git commit` and
 # `git push` in the command (any global options, quoted `-C` paths, chains,

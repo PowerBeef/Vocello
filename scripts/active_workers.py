@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Host-wide Claude Code worker leases. Never use Git worktree locks as activity evidence.
+"""Host-wide agent worker leases. Never use Git worktree locks as activity evidence.
 
-Leases bind a session/agent id to a live Claude Code process and its start time. Another
-live session counts like a worker. Unknown ownership is inconclusive, not idle. Hooks are
-supplementary: the lead must also join its known workers before measurements. No transcript
-or prompt is retained.
+Leases bind a session/agent id to a live host agent process (Antigravity or legacy CLI)
+and its start time. Another live session counts like a worker. Unknown ownership is
+inconclusive, not idle. Hooks are supplementary: the lead must also join its known
+workers before measurements. No transcript or prompt is retained.
 """
 from __future__ import annotations
 
@@ -17,9 +17,9 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-# The native Claude Code CLI reports this command name. A Node-hosted install
-# reports `node`, which cannot prove ownership; lanes then require lead-only.
-OWNER_NAMES = ("claude",)
+# Recognized native agent host process names. Generic interpreters such as `node`
+# or `python3` cannot prove ownership; lanes then require lead-only.
+OWNER_NAMES = ("antigravity", "agy", "claude")
 
 
 def directory() -> Path:
@@ -57,7 +57,7 @@ def owner() -> dict:
         pid = info["parent"]
         if pid <= 1:
             break
-    raise RuntimeError("no live Claude Code process owner found")
+    raise RuntimeError("no live agent process owner found")
 
 
 def key(session: str, agent: str = "") -> str:

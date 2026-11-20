@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude Code SessionStart hook: branch and dirty state, open agent worktrees, dev.sh status, one cache-health
+# SessionStart hook: branch and dirty state, open agent worktrees, dev.sh status, one cache-health
 # line and the first "Resume now" checkpoint of docs/development-progress.md. Local-only, bounded, never fails.
 # It runs under the macOS system bash 3.2; besides `scripts/dev.sh status` it uses only git, awk, df and perl.
 

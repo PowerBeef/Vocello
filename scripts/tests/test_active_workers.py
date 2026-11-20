@@ -158,12 +158,18 @@ class ActiveWorkerTests(unittest.TestCase):
             with patch.object(workers.subprocess, "run", return_value=result), self.assertRaises(RuntimeError):
                 workers.process(43210)
 
-    def test_owner_walks_ancestors_and_rejects_missing_claude_owner(self) -> None:
-        with patch.object(workers.os, "getppid", return_value=7), patch.object(workers, "process", side_effect=[
-            {"pid": 7, "parent": 8, "started": "shell", "command": "/bin/bash"},
-            {**self.identity, "parent": 1, "command": "/opt/bin/claude"},
-        ]):
-            self.assertEqual(workers.owner(), self.identity)
+    def test_owner_walks_ancestors_and_rejects_missing_agent_owner(self) -> None:
+        for command in (
+            "/Applications/Antigravity.app/Contents/MacOS/Antigravity",
+            "/opt/bin/agy",
+            "/opt/bin/claude",
+        ):
+            with self.subTest(command=command), patch.object(workers.os, "getppid", return_value=7), \
+                    patch.object(workers, "process", side_effect=[
+                        {"pid": 7, "parent": 8, "started": "shell", "command": "/bin/bash"},
+                        {**self.identity, "parent": 1, "command": command},
+                    ]):
+                self.assertEqual(workers.owner(), self.identity)
         with patch.object(workers.os, "getppid", return_value=7), patch.object(workers, "process", return_value=None), \
                 self.assertRaises(RuntimeError):
             workers.owner()
@@ -173,6 +179,16 @@ class ActiveWorkerTests(unittest.TestCase):
                     patch.object(workers, "process", side_effect=[{**self.identity, "parent": 1, "command": command}]), \
                     self.assertRaises(RuntimeError):
                 workers.owner()
+
+    def test_antigravity_owner_counts_as_active_in_snapshot(self) -> None:
+        self.apply("SessionStart")
+        self.apply("SubagentStart", "worktree-1")
+        for command in ("/Applications/Antigravity.app/Contents/MacOS/Antigravity", "/opt/bin/agy"):
+            with self.subTest(command=command):
+                report = self.snapshot(inspect=lambda pid, cmd=command: {**self.inspect(pid), "command": cmd})
+                self.assertTrue(report["trackingAvailable"])
+                self.assertEqual(report["activeWorkers"], 1)
+                self.assertEqual(report["staleRecords"], 0)
 
     def test_retired_codex_owner_counts_as_stale(self) -> None:
         self.apply("SessionStart")

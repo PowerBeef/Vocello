@@ -30,6 +30,7 @@ def fixture_hooks(root):
     hooks = root / "scripts/hooks"
     shutil.copytree(HOOKS, hooks, dirs_exist_ok=True)
     shutil.copyfile(ROOT / "scripts/privacy_scan.py", root / "scripts/privacy_scan.py")
+    shutil.copyfile(ROOT / "scripts/active_workers.py", root / "scripts/active_workers.py")
     return hooks
 
 
@@ -358,11 +359,22 @@ class HooksWiringTests(unittest.TestCase):
         self.assertEqual(set(self.config), {"vocello-guards"})
         spec = self.config["vocello-guards"]
         self.assertEqual(spec.get("enabled", True), True)
-        self.assertEqual(len(spec["SessionStart"]), 1)
-        start = spec["SessionStart"][0]
-        self.assertEqual(start["type"], "command")
-        self.assertEqual(start["command"], "python3 ../scripts/hooks/agy_hook_adapter.py session-start")
-        self.assertLessEqual(start["timeout"], 15)
+        for event, expected_cmd in (
+            ("SessionStart", "python3 ../scripts/hooks/agy_hook_adapter.py session-start"),
+            ("PostInvocation", "python3 ../scripts/hooks/agy_hook_adapter.py post-invocation"),
+            ("Stop", "python3 ../scripts/hooks/agy_hook_adapter.py stop"),
+        ):
+            with self.subTest(event=event):
+                self.assertEqual(len(spec[event]), 1)
+                entry = spec[event][0]
+                self.assertEqual(entry["type"], "command")
+                self.assertEqual(entry["command"], expected_cmd)
+                self.assertLessEqual(entry["timeout"], 15)
+                parts = entry["command"].split()
+                self.assertEqual(parts[0], "python3")
+                resolved = (HOOKS_CONFIG.parent / parts[1]).resolve()
+                self.assertEqual(resolved, (HOOKS / "agy_hook_adapter.py").resolve())
+                self.assertTrue(resolved.is_file())
 
         seen = {}
         for group in spec["PreToolUse"]:
@@ -416,6 +428,7 @@ class HooksWiringTests(unittest.TestCase):
             for mode, agy_payload, expected_decision in (
                 ("pre-command", {"toolCall": {"name": "run_command", "args": {"CommandLine": "git status"}}, "cwd": str(ROOT)}, "allow"),
                 ("pre-command", {"toolCall": {"name": "run_command", "args": {"CommandLine": "git switch -c smoke"}}, "cwd": str(ROOT)}, "deny"),
+                ("pre-command", {"toolCall": {"name": "run_command", "args": {"CommandLine": "git push origin main"}}, "cwd": str(ROOT)}, "force_ask"),
                 ("pre-edit", {"toolCall": {"name": "edit_file", "args": {"Path": str(ROOT / "docs/ROADMAP.md")}}, "cwd": str(ROOT)}, "deny"),
                 ("pre-mcp", {"toolCall": {"name": "call_mcp_tool", "args": {"ServerName": "mobilebuildmcp", "ToolName": "boot" + SIM_SUFFIX}}, "cwd": str(ROOT)}, "deny"),
             ):
@@ -426,6 +439,18 @@ class HooksWiringTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertNotIn("Traceback", result.stderr)
                     self.assertEqual(json.loads(result.stdout)["decision"], expected_decision)
+            for mode, agy_payload in (
+                ("post-invocation", {"hookEventName": "PostInvocation", "cwd": str(ROOT)}),
+                ("stop", {"hookEventName": "Stop", "terminationReason": "NO_TOOL_CALL",
+                          "fullyIdle": True, "continuationActive": True, "cwd": str(ROOT)}),
+            ):
+                with self.subTest(interpreter=interpreter, hook="agy_hook_adapter.py", mode=mode):
+                    result = subprocess.run(
+                        [interpreter, str(HOOKS / "agy_hook_adapter.py"), mode],
+                        input=json.dumps(agy_payload), text=True, capture_output=True, timeout=20)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertNotIn("Traceback", result.stderr)
+                    self.assertIsInstance(json.loads(result.stdout), dict)
             for mode, command, expected in (("git-policy", "git status", ""),
                                             ("simulator-policy", "rg 'simctl boot' && xcrun simctl list", ""),
                                             ("simulator-policy", "xcrun simctl boot 1234", "`simctl boot`\n")):
@@ -441,7 +466,8 @@ class HooksWiringTests(unittest.TestCase):
             cases = [
                 ("pre-command", {"name": "run_command", "args": {"CommandLine": "git push --force origin main"}}, "deny"),
                 ("pre-command", {"name": "run_command", "args": {"CommandLine": "git push origin subagent-1"}}, "deny"),
-                ("pre-command", {"name": "run_command", "args": {"CommandLine": "git push origin main"}}, "ask"),
+                ("pre-command", {"name": "run_command", "args": {"CommandLine": "git push origin main"}}, "force_ask"),
+                ("pre-command", {"name": "run_command", "args": {"CommandLine": "git restore notes.md"}}, "ask"),
                 ("pre-command", {"name": "run_command", "args": {"CommandLine": "git status --short"}}, "allow"),
                 ("pre-edit", {"name": "edit_file", "args": {"Path": f"{prefix}docs/ROADMAP.md"}}, "deny"),
                 ("pre-edit", {"name": "write_file", "args": {"Path": f"{prefix}docs/note.md"}}, "allow"),
@@ -461,6 +487,115 @@ class HooksWiringTests(unittest.TestCase):
         data = json.loads(result.stdout)
         text = data["injectSteps"][0]["systemMessage"]["systemMessage"]
         self.assertIn("AGENTS.md: Start here", text)
+
+    def test_post_invocation_reports_swift_membership_and_roadmap_drift_only_when_stale(self):
+        with tempfile.TemporaryDirectory(prefix="vocello drift ") as tmp:
+            root = Path(tmp).resolve() / "repo"
+            initialize_repo(root)
+            (root / "Sources").mkdir()
+            (root / "QwenVoice.xcodeproj").mkdir()
+            (root / "QwenVoice.xcodeproj/project.pbxproj").write_text("// proj\n", encoding="utf-8")
+            (root / "config").mkdir()
+            (root / "docs").mkdir()
+            (root / "config/roadmap.json").write_text("{}\n", encoding="utf-8")
+            (root / "docs/ROADMAP.md").write_text("# Roadmap\n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(root), "add", "QwenVoice.xcodeproj/project.pbxproj",
+                            "config/roadmap.json", "docs/ROADMAP.md"], check=True)
+            subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", "seed"], check=True)
+
+            clean = invoke_agy("post-invocation", {"hookEventName": "PostInvocation", "cwd": str(root)}, root=root)
+            self.assertEqual(json.loads(clean.stdout), {})
+
+            (root / "Sources/NewFeature.swift").write_text("struct NewFeature {}\n", encoding="utf-8")
+            drifted = invoke_agy("post-invocation", {"hookEventName": "PostInvocation", "cwd": str(root)}, root=root)
+            msg = json.loads(drifted.stdout)["injectSteps"][0]["systemMessage"]["systemMessage"]
+            self.assertIn("regenerate_project.sh --fast", msg)
+
+            (root / "QwenVoice.xcodeproj/project.pbxproj").write_text("// updated\n", encoding="utf-8")
+            synced = invoke_agy("post-invocation", {"hookEventName": "PostInvocation", "cwd": str(root)}, root=root)
+            self.assertEqual(json.loads(synced.stdout), {})
+
+            (root / "config/roadmap.json").write_text('{"items": []}\n', encoding="utf-8")
+            rm_drifted = invoke_agy("post-invocation", {"hookEventName": "PostInvocation", "cwd": str(root)}, root=root)
+            msg = json.loads(rm_drifted.stdout)["injectSteps"][0]["systemMessage"]["systemMessage"]
+            self.assertIn("roadmap.py render", msg)
+
+            (root / "docs/ROADMAP.md").write_text("# Updated Roadmap\n", encoding="utf-8")
+            rm_synced = invoke_agy("post-invocation", {"hookEventName": "PostInvocation", "cwd": str(root)}, root=root)
+            self.assertEqual(json.loads(rm_synced.stdout), {})
+
+            worktree = root.parent / "wt-1"
+            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "subagent-1", str(worktree)], check=True)
+            (worktree / "Sources").mkdir(exist_ok=True)
+            (worktree / "Sources/Worker.swift").write_text("struct Worker {}\n", encoding="utf-8")
+            wt_out = invoke_agy("post-invocation", {"hookEventName": "PostInvocation", "cwd": str(worktree)},
+                                cwd=worktree, root=root)
+            self.assertEqual(json.loads(wt_out.stdout), {})
+
+    def test_stop_catches_staged_whitespace_once_and_never_loops(self):
+        with tempfile.TemporaryDirectory(prefix="vocello stop ") as tmp:
+            root = Path(tmp).resolve() / "repo"
+            initialize_repo(root)
+            clean_payload = {"hookEventName": "Stop", "terminationReason": "NO_TOOL_CALL",
+                             "fullyIdle": True, "continuationActive": False, "cwd": str(root)}
+            self.assertEqual(json.loads(invoke_agy("stop", clean_payload, root=root).stdout), {})
+
+            (root / "notes.md").write_text("trailing   \n", encoding="utf-8")
+            subprocess.run(["git", "-C", str(root), "add", "notes.md"], check=True)
+            continued = json.loads(invoke_agy("stop", clean_payload, root=root).stdout)
+            self.assertEqual(continued["decision"], "continue")
+            self.assertIn("git diff --cached --check", continued["reason"])
+
+            # Never loop once continuationActive is True, or on non-normal termination.
+            for skip in (
+                {**clean_payload, "continuationActive": True},
+                {**clean_payload, "fullyIdle": False},
+                {**clean_payload, "terminationReason": "USER_CANCELED"},
+            ):
+                with self.subTest(payload=skip):
+                    self.assertEqual(json.loads(invoke_agy("stop", skip, root=root).stdout), {})
+
+    def test_antigravity_adapter_tracks_linked_worktree_worker_leases(self):
+        adapter_mod = importlib_module(HOOKS / "agy_hook_adapter.py")
+        with tempfile.TemporaryDirectory(prefix="vocello leases ") as tmp:
+            root = Path(tmp).resolve() / "repo"
+            workers_dir = Path(tmp).resolve() / "workers"
+            workers_dir.mkdir()
+            initialize_repo(root)
+            worktree = root.parent / "wt-worker"
+            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "subagent-worker", str(worktree)],
+                           check=True)
+            identity = {"pid": 99999, "started": "Fri Nov 20 12:00:00 2026"}
+            from unittest.mock import patch
+            with patch.dict(os.environ, {"QVOICE_WORKER_DIRECTORY": str(workers_dir)}), \
+                    patch.object(adapter_mod.active_workers, "owner", return_value=identity):
+                adapter_mod.handle_pre_command(
+                    {"conversationId": "conv-1", "cwd": str(worktree),
+                     "toolCall": {"name": "run_command", "args": {"CommandLine": "git status"}}},
+                    root,
+                )
+                inspect_agy = lambda pid: {**identity, "pid": pid, "parent": 1,
+                                           "command": "/Applications/Antigravity.app/Contents/MacOS/Antigravity"}
+                snap = adapter_mod.active_workers.snapshot(base=workers_dir, inspect=inspect_agy, session="")
+                self.assertEqual(snap["activeWorkers"], 1)
+
+                # Stop while not fullyIdle keeps the worker lease active.
+                adapter_mod.handle_stop(
+                    {"conversationId": "conv-1", "cwd": str(worktree), "fullyIdle": False,
+                     "terminationReason": "NO_TOOL_CALL"},
+                    root,
+                )
+                snap = adapter_mod.active_workers.snapshot(base=workers_dir, inspect=inspect_agy, session="")
+                self.assertEqual(snap["activeWorkers"], 1)
+
+                # Stop with fullyIdle=True releases the worker lease.
+                adapter_mod.handle_stop(
+                    {"conversationId": "conv-1", "cwd": str(worktree), "fullyIdle": True,
+                     "terminationReason": "NO_TOOL_CALL"},
+                    root,
+                )
+                snap = adapter_mod.active_workers.snapshot(base=workers_dir, inspect=inspect_agy, session="")
+                self.assertEqual(snap["activeWorkers"], 0)
 
 
 class AgentGuardTests(unittest.TestCase):
@@ -566,34 +701,46 @@ class AntigravityPolicyTests(unittest.TestCase):
         return self.adapter.handle_pre_mcp(payload, ROOT)["decision"]
 
     def test_pushes_ask_and_releases_and_credentials_are_denied(self):
-        self.assertEqual(self.cmd("git push"), "ask")
-        self.assertEqual(self.cmd("git push origin main"), "ask")
+        self.assertEqual(self.cmd("git push"), "force_ask")
+        self.assertEqual(self.cmd("git push origin main"), "force_ask")
         for denied in ("scripts/release.sh", "./scripts/release.sh --tag v3.1.0", "bash scripts/release.sh",
                        "sudo scripts/release.sh", "git push origin main && scripts/release.sh",
                        "gh release create v3.1.0", "gh release upload v3.1.0 a.dmg", "hf auth token"):
             with self.subTest(denied=denied):
                 self.assertEqual(self.cmd(denied), "deny")
-        self.assertEqual(self.cmd("sudo echo hi"), "ask")
-        for allowed in ("python3 scripts/ios_candidate_tag.py", "scripts/dev.sh check",
-                        "git status --short", "git stash list"):
+        self.assertEqual(self.cmd("sudo echo hi"), "force_ask")
+        self.assertEqual(self.cmd("python3 scripts/ios_candidate_tag.py"), "force_ask")
+        for allowed in ("python3 scripts/ios_candidate_tag.py --dry-run", "python3 scripts/ios_candidate_tag.py --help",
+                        "scripts/dev.sh check", "git status --short", "git stash list"):
             with self.subTest(allowed=allowed):
                 self.assertEqual(self.cmd(allowed), "allow")
 
-    def test_authorization_bound_commands_ask(self):
+    def test_authorization_bound_commands_ask_or_force_ask(self):
         for command in (
             "scripts/macos_test.sh models install", "scripts/macos_test.sh --lead-only models install",
             "scripts/macos_test.sh models ensure",
             "scripts/ui_test.sh macos model-download", "scripts/clean_build_caches.sh --cache macos",
-            "scripts/install_pinned_tools.sh", "python3 scripts/publish_benchmark_history.py",
-            "python3 scripts/benchmark_history.py record a.json",
-            "gh workflow run ci.yml", "gh pr create --title x", "gh issue create --title x",
-            "gh api -X POST repos/o/r/issues", "gh api --method DELETE repos/o/r/issues/1",
-            "git branch -D worktree-old", "git worktree remove --force /tmp/w", "git reset --hard HEAD",
+            "scripts/install_pinned_tools.sh", "git restore notes.md", "git checkout -- notes.md",
             "brew install ripgrep", "npm --prefix website install", "swift package update",
-            "vercel deploy", "asc apps list", "defaults write com.qwenvoice.app foo bar",
         ):
             with self.subTest(ask=command):
                 self.assertEqual(self.cmd(command), "ask")
+        for command in (
+            "python3 scripts/publish_benchmark_history.py",
+            "python3 scripts/benchmark_history.py record a.json",
+            "python3 scripts/ios_candidate_tag.py",
+            "gh workflow run ci.yml", "gh pr create --title x", "gh issue create --title x",
+            "gh api -X POST repos/o/r/issues", "gh api --method DELETE repos/o/r/issues/1",
+            "git branch -D worktree-old", "git worktree remove --force /tmp/w", "git reset --hard HEAD",
+            "git clean -fd", "git config --global user.name x",
+            "vercel deploy", "asc apps list", "defaults write com.qwenvoice.app foo bar",
+            "xcode-select -s /Applications/Xcode.app",
+        ):
+            with self.subTest(force_ask=command):
+                self.assertEqual(self.cmd(command), "force_ask")
+        # Precedence: force_ask beats ask, deny beats force_ask.
+        self.assertEqual(self.cmd("git restore a && git push origin main"), "force_ask")
+        self.assertEqual(self.cmd("git push origin main && scripts/release.sh"), "deny")
 
     def test_the_failure_issue_script_asks_including_normalized_spellings(self):
         arguments = "--label nightly --title 'Nightly lane failing' --heading 'Nightly run failed'"
@@ -605,7 +752,7 @@ class AntigravityPolicyTests(unittest.TestCase):
             f"RESULTS='{{}}' RUN_URL=x python3 scripts/ci/failure_issue.py {arguments}",
         ):
             with self.subTest(command=command):
-                self.assertEqual(self.cmd(command), "ask")
+                self.assertEqual(self.cmd(command), "force_ask")
         for command in ("python3 scripts/ci/classify_changes.py --base origin/main",
                         "python3 scripts/ci/summarize_test_failures.py build/x",
                         "cat scripts/ci/failure_issue.py"):
@@ -618,19 +765,22 @@ class AntigravityPolicyTests(unittest.TestCase):
                         "hf papers read 2609.16989", "hf cache ls", "hf cache verify owner/model"):
             with self.subTest(read=command):
                 self.assertEqual(self.cmd(command), "allow")
-        for command in ("hf download owner/model", "hf upload owner/model .", "hf repos create owner/model",
+        self.assertEqual(self.cmd("hf download owner/model"), "ask")
+        self.assertEqual(self.cmd("huggingface-cli download owner/model"), "ask")
+        for command in ("hf upload owner/model .", "hf repos create owner/model",
                         "hf cp ./a hf://owner/model/a", "hf sync ./a hf://buckets/o/b",
                         "hf jobs run python:3.12 python -c 1", "hf endpoints deploy x",
                         "hf spaces restart owner/space", "hf collections create Vocello",
                         "hf discussions comment owner/model 1", "hf auth login",
-                        "hf cache rm model/owner/model", "hf skills add owner/skill", "hf update"):
+                        "hf cache rm model/owner/model", "hf skills add owner/skill", "hf update",
+                        "huggingface-cli upload owner/model ."):
             with self.subTest(write=command):
-                self.assertEqual(self.cmd(command), "ask")
+                self.assertEqual(self.cmd(command), "force_ask")
         self.assertEqual(self.cmd("hf auth token"), "deny")
         for tool in ("hf_fs", "hub_repo_search", "hub_repo_details", "hf_whoami"):
             self.assertEqual(self.mcp("huggingface", tool), "allow")
         for tool in ("dynamic_space", "gr1_z_image_turbo_generate"):
-            self.assertEqual(self.mcp("huggingface", tool), "ask")
+            self.assertEqual(self.mcp("huggingface", tool), "force_ask")
 
     def test_mcp_guard_denies_simulators_cua_driver_and_mobilebuild_writes(self):
         for tool in (f"boot{SIM_SUFFIX}", f"build{SIM_SUFFIX}", f"build_run{SIM_SUFFIX}",
@@ -763,7 +913,7 @@ class ConnectorWriteGuardTests(unittest.TestCase):
                     payload = {"toolCall": {"name": "call_mcp_tool", "args": {"ServerName": server, "ToolName": tool}},
                                "cwd": str(ROOT)}
                     decision = self.adapter.handle_pre_mcp(payload, ROOT)["decision"]
-                    self.assertEqual(decision, "ask" if write else "allow")
+                    self.assertEqual(decision, "force_ask" if write else "allow")
 
 
 class PolicyGuardTests(unittest.TestCase):
@@ -1024,6 +1174,9 @@ class PolicyGuardTests(unittest.TestCase):
                 "git reset -p", "git reset --merge", "git reset abc1234 -- scripts/x.py",
                 "git rebase --abort", "git rebase --quit", "git rebase --help", "git pull --ff-only",
                 "git pull --no-rebase", "git pull --rebase=false", "git log --grep=rebase", 'rg -n "git rebase" docs',
+                # BKL-63: single-quoted backticks and $() are literal text in POSIX shells, not command substitutions.
+                f"{commit} -m 'fix: block `git rebase` in hook'",
+                f"{commit} -m 'docs: never run `$(git push --force)` in scripts'",
                 "git config --get pull.rebase", "$EDITOR notes.md", "$PYTHON -m pytest -q", "echo $G push")):
             with self.subTest(command=command):
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -1041,6 +1194,9 @@ class PolicyGuardTests(unittest.TestCase):
             "git reset HEAD^", "git reset abc1234", "git reset --hard origin/main", "git reset --hard HEAD~2",
             "git reset --keep HEAD^", "git reset -q HEAD~1 --", "git filter-branch --tree-filter x HEAD",
             "git filter-repo --path x", f"G=git; $G {commit} --amend", "git status && git reset --soft HEAD~1",
+            # Double-quoted backticks and $() DO execute in POSIX shells and remain blocked.
+            f'{commit} -m "notes `git rebase -i HEAD~2`"',
+            f'{commit} -m "notes $(git rebase -i HEAD~2)"',
         )
         for command, result in run_all(self.guard, refused):
             with self.subTest(command=command):

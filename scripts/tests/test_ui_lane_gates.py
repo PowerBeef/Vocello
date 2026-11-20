@@ -485,5 +485,53 @@ class MacLaneSigningTests(unittest.TestCase):
                 self.assertIn("signed ad hoc and its privacy grants last one build", completed.stderr)
 
 
+class MacBuildLogTests(unittest.TestCase):
+    """A failed macOS build-for-testing retains raw xcodebuild output in xcodebuild-build.log
+    and mirrors it into xcodebuild.log so triage and lane_ledger can classify build failures."""
+
+    def test_failed_macos_build_retains_build_log_mirrors_xcodebuild_log_and_keeps_exit_code(self) -> None:
+        sandbox = ui_lane_sandbox(self)
+        (sandbox.root / "QwenVoice.xcodeproj").mkdir()
+        sandbox.helper(PUBLISHER, "exit 0")
+        sandbox.helper("scripts/lane_ledger.py", "exit 0")
+        sandbox.helper("scripts/tree_fingerprint.py", "echo fixture-fingerprint")
+        sandbox.helper(
+            "scripts/lib/ui_lane_data.py",
+            f'if [[ "$1" == "virtual-mic" ]]; then exit 0; fi\n'
+            f'exec "$QV_REAL_PYTHON" {quote(ROOT / "scripts/lib/ui_lane_data.py")} "$@"\n',
+        )
+        sandbox.executable("scripts/clean_build_caches.sh")
+        sandbox.tool("pgrep", "exit 1")
+        sandbox.tool("automationmodetool", "exit 0")
+        sandbox.tool("ioreg", "exit 0")
+        sandbox.tool("plutil", "exit 0")
+        sandbox.tool("sqlite3", "exit 1")
+        sandbox.tool("xcodebuild", "echo 'Xcode 27.2'")
+        sandbox.tool("rm", 'case "$*" in *vocello-bench-current-take*) exit 0 ;; esac\nexec /bin/rm "$@"')
+        (sandbox.root / "scripts/lib/build_cache.sh").write_text(
+            f". {quote(sandbox.record)}\n"
+            + "".join(f"qv_stub {name}\n" for name in (
+                "require_build_free_space", "require_ios_xcode_platform", "ensure_project_regenerated",
+                "ensure_spm_resolved", "write_build_provenance", "warn_if_storage_bloated",
+            ))
+            + 'xcb_run() { qv_record xcb_run "$@"; echo "CodeSign Sparkle.framework/Versions/B failed" >&2; return 65; }\n',
+            encoding="utf-8",
+        )
+        completed = sandbox.run_script("macos", "smoke", "--scenario", "layout")
+        self.assertEqual(completed.returncode, 65, completed.stderr)
+        runs = list((sandbox.build / "qvoice_artifacts_ui_tests/macos").glob("macos-xcui-smoke-*"))
+        self.assertEqual(len(runs), 1, runs)
+        run_dir = runs[0]
+        build_log = run_dir / "xcodebuild-build.log"
+        xcode_log = run_dir / "xcodebuild.log"
+        self.assertTrue(build_log.is_file(), sorted(p.name for p in run_dir.iterdir()))
+        self.assertTrue(xcode_log.is_file(), sorted(p.name for p in run_dir.iterdir()))
+        self.assertIn("CodeSign Sparkle.framework/Versions/B failed", build_log.read_text(encoding="utf-8"))
+        self.assertEqual(xcode_log.read_text(encoding="utf-8"), build_log.read_text(encoding="utf-8"))
+        self.assertIn("macOS UI build-for-testing failed", completed.stderr)
+        self.assertIn("xcodebuild-build.log", completed.stderr)
+        self.assertIn("CodeSign Sparkle.framework/Versions/B failed", completed.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -3356,6 +3356,7 @@
 			);
 			inputPaths = (
 				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/Sparkle.framework/Versions/B",
+				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/Sparkle.framework/Versions/B/_CodeSignature",
 			);
 			name = "Prepare embedded Sparkle";
 			outputFileListPaths = (

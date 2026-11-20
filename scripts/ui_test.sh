@@ -1797,6 +1797,7 @@ elif [[ "$platform" == "macos" ]]; then
     required_step_record "$step_ledger" ui-build 0
   else
     rm -f "$mac_build_marker"
+    mac_build_status=0
     required_step_run "$step_ledger" ui-build xcb_run build-for-testing \
       -project "$PROJECT" -scheme VocelloMacUI -configuration Release \
       -destination 'platform=macOS,arch=arm64' -derivedDataPath "$MAC_DERIVED" \
@@ -1805,8 +1806,16 @@ elif [[ "$platform" == "macos" ]]; then
       -onlyUsePackageVersionsFromResolvedFile \
       CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$mac_signing_identity" ONLY_ACTIVE_ARCH=YES ARCHS=arm64 \
       QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
-      SWIFT_OPTIMIZATION_LEVEL=-O \
-      || die "macOS UI build-for-testing failed (see $out/xcodebuild.log)"
+      SWIFT_OPTIMIZATION_LEVEL=-O >"$out/xcodebuild-build.log" 2>&1 || mac_build_status=$?
+    if (( mac_build_status != 0 )); then
+      ui_primary_native_exit_code="$mac_build_status"
+      # The lane ledger classifies infrastructure failures (signing, provisioning) from
+      # xcodebuild.log, which no test run will write now.
+      cp "$out/xcodebuild-build.log" "$out/xcodebuild.log" 2>/dev/null || true
+      warn "macOS UI build-for-testing failed (see $out/xcodebuild-build.log)"
+      tail -n 40 "$out/xcodebuild-build.log" >&2 || true
+      exit "$mac_build_status"
+    fi
     printf '%s\n' "$mac_fingerprint" >"$mac_build_marker"
   fi
   ensure_mac_runner_signature

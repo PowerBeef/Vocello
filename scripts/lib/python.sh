@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Select the repository's Python for a shell entry point and its children.
 #
-# Sourced by scripts/dev.sh and scripts/check_project_inputs.sh. The bare
+# Sourced by scripts/dev.sh, scripts/check_project_inputs.sh and the native
+# lane drivers (macos_test.sh, ui_test.sh, ios_device.sh). The bare
 # `python3` of the caller's shell may lack the pinned test packages (pytest,
 # pytest-xdist, numpy); scripts/select_python.py picks an already-installed
 # interpreter that has them, and scripts/lib/python-bin/python3 keeps every

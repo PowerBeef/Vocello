@@ -12,6 +12,8 @@ import tempfile
 import unittest
 from unittest import mock
 
+from shell_stubs import LaneShell, ui_lane_sandbox
+
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("select_python", ROOT / "scripts/select_python.py")
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -207,3 +209,34 @@ class SharedShellSelectionTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn("Validating", result.stdout)
         self.assertIn("VOCELLO_PYTHON", result.stderr)
+
+    def test_dev_qc_runs_on_the_selected_interpreter(self):
+        result = subprocess.run([str(ROOT / "scripts/dev.sh"), "qc", "--help"], text=True,
+                                capture_output=True, timeout=60,
+                                env={**self.environment, "VOCELLO_PYTHON": str(self.selected)})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(any(call.endswith("/scripts/qc.py --help") for call in self.calls()), self.calls())
+
+    def test_native_lanes_select_python_and_accept_lead_only(self):
+        for script, subcommand, stub in (
+                ("macos_test.sh", "preflight", "cmd_preflight"),
+                ("ios_device.sh", "preflight", "cmd_preflight"),
+        ):
+            with self.subTest(script=script):
+                shell = LaneShell(self, script)
+                result = shell.run(
+                    f"qv_stub vocello_use_selected_python\n"
+                    f"qv_stub {stub}\n"
+                    f"main --lead-only {subcommand}\n"
+                    'printf "QVOICE_LEAD_ONLY=%s\\n" "${QVOICE_LEAD_ONLY:-}"\n'
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("QVOICE_LEAD_ONLY=1", result.stdout)
+                self.assertTrue(shell.calls_to("vocello_use_selected_python"), shell.calls())
+                self.assertTrue(shell.calls_to(stub), shell.calls())
+
+        sandbox = ui_lane_sandbox(self)
+        completed = sandbox.run_script("--lead-only", "macos", "smoke")
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("QwenVoice.xcodeproj", completed.stderr)
+        self.assertTrue(sandbox.calls_to("vocello_use_selected_python"), sandbox.calls())

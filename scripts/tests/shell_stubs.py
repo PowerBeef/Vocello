@@ -253,6 +253,9 @@ class LaneShell(_Sandbox):
             '  [[ "$__qv_value" == "$__qv_real_build" || "$__qv_value" == "$__qv_real_build"/* ]] || continue\n'
             '  printf -v "$__qv_name" \'%s\' "$__qv_sandbox_build${__qv_value#"$__qv_real_build"}"\n'
             "done\n"
+            # Keep the sandbox's python3 shim first on PATH when a test invokes main
+            # without polluting shell.calls(); tests that assert the call stub it explicitly.
+            "vocello_use_selected_python() { :; }\n"
             + body
         )
         return subprocess.run(
@@ -309,6 +312,7 @@ def ui_lane_sandbox(test: unittest.TestCase) -> ScriptSandbox:
     has one (the canonical matrix)."""
     sandbox = ScriptSandbox(test, "scripts/ui_test.sh", {
         "scripts/lib/build_paths.sh": SANDBOX_BUILD_PATHS,
+        "scripts/lib/python.sh": "qv_stub vocello_use_selected_python\n",
         "scripts/lib/build_cache.sh": "".join(f"qv_stub {name}\n" for name in (
             "require_build_free_space", "require_ios_xcode_platform", "ensure_project_regenerated",
             "ensure_spm_resolved", "write_build_provenance", "warn_if_storage_bloated",

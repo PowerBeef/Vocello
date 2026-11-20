@@ -6619,6 +6619,25 @@
         "run:ios-xcui-control-audit-20261117-162211-b83a9b51",
         "run:ios-xcui-control-audit-20261117-162451-2b3bbfe7"
       ]
+    },
+    {
+      "id": "RF-67",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Adapt development harness from Claude Code to Antigravity",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "AGENTS.md, website/AGENTS.md, .agents/hooks.json, .agents/plugins/vocello/ (glob rules, 6 skills, 2 read-only subagents) and scripts/hooks/agy_hook_adapter.py enforce every repository invariant (including blocking MobileBuildMCP simulator/UI/build/persist calls and cua-driver, and prompting on external writes); doctor, contracts, invariants, CI routing and Python hook tests pass with .claude/ and CLAUDE.md retired.",
+      "sourceOfTruth": [
+        "AGENTS.md",
+        ".agents/hooks.json",
+        "scripts/hooks/agy_hook_adapter.py",
+        "scripts/tests/test_agent_hooks.py"
+      ],
+      "updated": "2026-11-20",
+      "notes": "Maintainer 2026-11-20: move repository-owned agent governance cleanly from Claude Code (.claude/, CLAUDE.md) to Antigravity (.agents/, AGENTS.md) with zero Swift or product binary changes. Live verified after server restart on 2026-11-20: AGENTS.md loaded, all 6 vocello-* skills and 2 read-only subagents discovered, PreToolUse hooks live-denied force push, generated-file edit on docs/ROADMAP.md, mobilebuildmcp list_sims and cua-driver list_apps while allowing git status and mobilebuildmcp list_schemes. SessionStart injectSteps verified by unit tests and will fire automatically on the next new conversation.",
+      "evidence": [
+        "commit:8e2c0497"
+      ]
     }
   ]
 }

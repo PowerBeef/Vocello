@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 52/90 (58%) |
+| `release-first-3-0-2026-09` | active | release-qa | 53/90 (59%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (85)
+### Mac, remotely (84)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -126,7 +126,6 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `RF-52` (planned) Quality remediation, stage 2: clone conditioning parity
 - `RF-54` (planned) Quality remediation, stage 4: the decoder's 72-frame attention window
 - `RF-57` (planned) Audit the tooling the quality remediation relies on
-- `RF-67` (planned) Adapt development harness from Claude Code to Antigravity
 - `UIF-08` (parked) Native acceptance of the iOS-derived screens on current source
 
 ### At the keyboard (17)
@@ -262,7 +261,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-63` | planned | Fit the 3.1 App Review notes into what is left of the 4,000 characters | — |
 | `RF-65` | planned | Measure the shipped hybrid on an iPhone 15 Pro | — |
 | `RF-66` | planned | Record a demo video of the shipping flow on a physical iPhone | — |
-| `RF-67` | planned | Adapt development harness from Claude Code to Antigravity | — |
 
 ### Open items in detail
 
@@ -381,9 +379,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-66`** (planned) — Record a demo video of the shipping flow on a physical iPhone.
   gate: A screen recording from a signed candidate on a physical iPhone shows first launch, the download size prompt, the download, a take, the cloning consent screen and the export purchase, with no claim the status bar contradicts, and it is attached or linked for App Review.
-
-- **`RF-67`** (planned) — Adapt development harness from Claude Code to Antigravity.
-  gate: AGENTS.md, website/AGENTS.md, .agents/hooks.json, .agents/plugins/vocello/ (glob rules, 6 skills, 2 read-only subagents) and scripts/hooks/agy_hook_adapter.py enforce every repository invariant (including blocking MobileBuildMCP simulator/UI/build/persist calls and cua-driver, and prompting on external writes); doctor, contracts, invariants, CI routing and Python hook tests pass with .claude/ and CLAUDE.md retired.
 
 ## Specialist-audit remediation
 

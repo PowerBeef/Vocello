@@ -35,8 +35,14 @@ or product-binary changes. `main` stays on the iOS 3.1.0 TestFlight candidate tr
 - **Worker tracking:** Antigravity has no `SubagentStart`/`SubagentStop`/`SessionEnd` hooks or
   `CLAUDE_ENV_FILE`, and its default terminal sandbox blocks `ps`; join all subagents
   (`manage_subagents list`, `swarm status`) and declare `QVOICE_LEAD_ONLY=1` before measured lanes.
-- **Next:** start a fresh Antigravity session at the repository root to complete Phase 4 live hook
-  activation verification, then resume iOS 3.1.0 candidate work (`RF-12`/`RF-15`/`RF-35`–`RF-42`).
+- **Live verification (2026-11-20):** after server restart, Antigravity automatically loaded
+  `AGENTS.md`, all six `vocello-*` skills and both read-only subagents (`vocello-swift-review`,
+  `vocello-xcresult-triage`). Live `PreToolUse` probes denied `git push --force --dry-run origin main`,
+  an `edit_file` on `docs/ROADMAP.md`, `mobilebuildmcp:list_sims` and `cua-driver_cua-driver:list_apps`,
+  while allowing `git status --short --branch` and `mobilebuildmcp:list_schemes`. `RF-67` is closed;
+  `SessionStart` `injectSteps` is unit-tested and fires on the next new conversation.
+- **Next:** resume iOS 3.1.0 candidate work (`RF-12`/`RF-15`/`RF-35`–`RF-42`), and push `main` when
+  requested.
 
 ### November 17: Vocello 3.1.0 is public on the Mac
 

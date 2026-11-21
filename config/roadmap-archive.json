@@ -6708,6 +6708,22 @@
       "evidence": [
         "commit:0e207be0"
       ]
+    },
+    {
+      "id": "BKL-79",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The model downloader skips verification when no digest is supplied",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "The download API takes the expected SHA-256 as a required argument (or a missing digest is logged and counted in diagnostics and the download refused), every catalog-driven call site passes its digest, and a test proves that a call without one cannot proceed.",
+      "sourceOfTruth": [
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift"
+      ],
+      "updated": "2026-11-20",
+      "notes": "Parked 2026-11-16 from two external audits of the 3.1.0 tree, each claim re-checked against the code and Apple's current pages. The verification entry point returns silently when normalizedSHA256 yields nothing (HuggingFaceDownloader.swift, the guard at about line 1503). Catalog downloads are safe today because the catalog schema requires a digest; the gap is a future call site. Substantive Swift: the review agent applies. Fail-closed SHA-256 verification enforced in validateDownloadedFile and runDownload across both files and installedFiles, with RangeStubURLProtocol zero-request/zero-staging tests (Reviewed-by: vocello-swift-review).",
+      "evidence": [
+        "commit:1251fcc4"
+      ]
     }
   ]
 }

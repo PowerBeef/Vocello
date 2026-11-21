@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 53/91 (58%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 54/91 (59%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 9/14 (64%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (80)
+### Mac, remotely (79)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -65,7 +65,6 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `BKL-76` (parked) Notes from the 3.1 release review of the command line, the MCP server and the player
 - `BKL-77` (parked) The Mac perf lane's click scenarios mostly measure XCUITest's accessibility snapshots
 - `BKL-78` (parked) The tracker still shows two resolved issues open and has no review line
-- `BKL-79` (parked) The model downloader skips verification when no digest is supplied
 - `BKL-80` (parked) A pass over try? in the engine, model-management and History paths
 - `BKL-81` (parked) Split GenerationOutputAdapter and HuggingFaceDownloader by concern
 - `BKL-82` (parked) Dependabot's two grouped updates wait for the 3.1.0 promotion
@@ -782,7 +781,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-76` | parked | Notes from the 3.1 release review of the command line, the MCP server and the player | — |
 | `BKL-77` | parked | The Mac perf lane's click scenarios mostly measure XCUITest's accessibility snapshots | — |
 | `BKL-78` | parked | The tracker still shows two resolved issues open and has no review line | — |
-| `BKL-79` | parked | The model downloader skips verification when no digest is supplied | — |
 | `BKL-80` | parked | A pass over try? in the engine, model-management and History paths | — |
 | `BKL-81` | parked | Split GenerationOutputAdapter and HuggingFaceDownloader by concern | — |
 | `BKL-82` | parked | Dependabot's two grouped updates wait for the 3.1.0 promotion | — |
@@ -905,10 +903,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-78`** (parked) — The tracker still shows two resolved issues open and has no review line.
   gate: Issue #101 (the consent gate) is closed with a comment naming PA-17 (ff301d4f, 62fda9e2) and its tests; #95 (Simplified Chinese interface) is answered or closed with the localization state as it is; every other open issue is answered, labeled or closed; and docs/reference/macos-release-qa.md carries a line that the tracker is reviewed at each tag.
-  unparkWhen: Authorized now (it needs no iPhone): do it after the 3.1.0 promotion, closed in the change that fixes it.
-
-- **`BKL-79`** (parked) — The model downloader skips verification when no digest is supplied.
-  gate: The download API takes the expected SHA-256 as a required argument (or a missing digest is logged and counted in diagnostics and the download refused), every catalog-driven call site passes its digest, and a test proves that a call without one cannot proceed.
   unparkWhen: Authorized now (it needs no iPhone): do it after the 3.1.0 promotion, closed in the change that fixes it.
 
 - **`BKL-80`** (parked) — A pass over try? in the engine, model-management and History paths.

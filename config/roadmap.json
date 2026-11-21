@@ -2496,9 +2496,9 @@
       "needs": [
         "mac"
       ],
-      "updated": "2026-11-16",
+      "updated": "2026-11-20",
       "unparkWhen": "The 3.1 iOS submission is done and the maintainer picks the next plan.",
-      "notes": "Parked 2026-11-16 from the delivery-menu investigation (maintainer request). A sampler on the app during an unpublished perf run showed 79% of the busy main-thread time in delivery-menu, and 64% in sidebar-navigation, inside XCTAutomationSupport's accessibility snapshots; AppKit's menu code is 12% and SwiftUI plus Vocello's code under 2% in the menu scenario. Each snapshot also makes AppKit open every menu-bar menu for inspection. The delivery menu's rise from 67 to 70 ms/s (September 27, macOS 27.0, Xcode 27.0) to 81 to 86 (since November 14, 27.2.1, 27.2) is therefore harness cost, not a slower menu; its ceiling stays warn-only. Window resize rose separately inside the week of November 14 (34 to 50 to 61 ms per action) and was not looked into."
+      "notes": "Parked 2026-11-16 from the delivery-menu investigation (maintainer request). A sampler on the app during an unpublished perf run showed 79% of the busy main-thread time in delivery-menu, and 64% in sidebar-navigation, inside XCTAutomationSupport's accessibility snapshots; AppKit's menu code is 12% and SwiftUI plus Vocello's code under 2% in the menu scenario. Each snapshot also makes AppKit open every menu-bar menu for inspection. The delivery menu's rise from 67 to 70 ms/s (September 27, macOS 27.0, Xcode 27.0) to 81 to 86 (since November 14, 27.2.1, 27.2) is therefore harness cost, not a slower menu; its ceiling stays warn-only. Window resize rose separately inside the week of November 14 (34 to 50 to 61 ms per action) and was not looked into. 2026-11-20 (81b0dbf8): eliminated XCUITest snapshot walks in test05DeliveryMenu via window-anchored coordinates + keyboard and exposed actionHitchTimeMSPerS/queryHitchTimeMSPerS in check_macos_ui_perf.py; awaits a 3-run Mac perf window to recalibrate and enforce."
     },
     {
       "id": "BKL-78",
@@ -2517,23 +2517,6 @@
       "updated": "2026-11-16",
       "unparkWhen": "Authorized now (it needs no iPhone): do it after the 3.1.0 promotion, closed in the change that fixes it.",
       "notes": "Parked 2026-11-16 from two external audits of the 3.1.0 tree, each claim re-checked against the code and Apple's current pages. #101 was opened 2026-09-08 and its fix landed 2026-09-23, so anyone reading the tracker concludes the consent hole is open. Closing or commenting on issues is an external write: it needs the maintainer's word."
-    },
-    {
-      "id": "BKL-79",
-      "plan": "post-3-0-backlog-2026-10",
-      "title": "The model downloader skips verification when no digest is supplied",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "The download API takes the expected SHA-256 as a required argument (or a missing digest is logged and counted in diagnostics and the download refused), every catalog-driven call site passes its digest, and a test proves that a call without one cannot proceed.",
-      "sourceOfTruth": [
-        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift"
-      ],
-      "needs": [
-        "mac"
-      ],
-      "updated": "2026-11-16",
-      "unparkWhen": "Authorized now (it needs no iPhone): do it after the 3.1.0 promotion, closed in the change that fixes it.",
-      "notes": "Parked 2026-11-16 from two external audits of the 3.1.0 tree, each claim re-checked against the code and Apple's current pages. The verification entry point returns silently when normalizedSHA256 yields nothing (HuggingFaceDownloader.swift, the guard at about line 1503). Catalog downloads are safe today because the catalog schema requires a digest; the gap is a future call site. Substantive Swift: the review agent applies."
     },
     {
       "id": "BKL-80",
@@ -2956,9 +2939,9 @@
       "needs": [
         "mac"
       ],
-      "updated": "2026-10-20",
+      "updated": "2026-11-20",
       "unparkWhen": "The 3.0 submission is done: P2-3 steps 2-4 change the iOS app, and package warnings-as-errors waits on the MLXArray Sendable warnings.",
-      "notes": "Maintainer 2026-10-18: runs now; P2-5, then P2-3. Landed: P2-1 owned-target optimization variables (a2147383). P2-6 MemberImportVisibility and project Swift 6 (a2147383), no first-party @preconcurrency imports (42b15022), SwiftLint gate (1a4aaf6e), nightly migrate-mode report (8f9bdbeb, e32fb52f). P2-4 Swift Testing in the owned package (c406eea2, 54842e39). P2-7 signposts, Logger, macOS MetricKit (adb556a2, 25192b69, 82c921a7, dcfdcf07). P2-5 (2026-10-19): allocator seam keeping core tests off MLX (e124f375); load-coordinator and runtime seam suites, fakes failing inside warm and prime bodies (7fe58fa2; mutation-checked; B-02 and BKL-20 strict expected failures); nightly shipped-configuration run (dfb51453). P2-3 step 1 (2026-10-19): VocelloCLICore, the CLI's tested files compiled once and imported @testable (cd4843eb). Step 2 waits for the submission: the Mac-only files need shared code the Mac app compiles by path from the iOS folders, so the shared set moves first, and that changes the iOS app. Declined: P2-2 dwarf test builds and the compilation cache. Open: P2-3 steps 2-4; package warnings-as-errors waits on the MLXArray Sendable warnings."
+      "notes": "Maintainer 2026-10-18: runs now; P2-5, then P2-3. Landed: P2-1 owned-target opt vars (a2147383); P2-6 MemberImportVisibility + Swift 6 (a2147383), no @preconcurrency (42b15022), SwiftLint gate (1a4aaf6e), migrate-mode report (8f9bdbeb, e32fb52f); P2-4 Swift Testing in owned package (c406eea2, 54842e39); P2-7 signposts/Logger/MetricKit (adb556a2..dcfdcf07); P2-5 allocator/runtime seams + shipped-config run (e124f375, 7fe58fa2, dfb51453); P2-3 step 1 VocelloCLICore (cd4843eb). 2026-11-20 Antigravity Phase B/C: Ruff burned 44->0 (f466500e); Pyright burned 789->81 across 72 files (08c70744, aa97fb2e); VocelloQwen3Core bumped to tools 6.2 with warnings-as-errors on 4/5 targets, SwiftLint expanded + no_if_debug, pure-Swift Qwen3PropertyInvariantTests (cc305197); VocelloSharedPolicies multiplatform static framework extracted for 7 pure runtime/Studio policies (91f5eae6). Declined: P2-2 dwarf/compilation cache. Open: remaining P2-3 shared-store files; MLXAudioTTS warnings-as-errors waits on upstream MLXArray Sendable."
     },
     {
       "id": "DW-04",
@@ -2975,9 +2958,9 @@
       "needs": [
         "mac"
       ],
-      "updated": "2026-11-01",
+      "updated": "2026-11-20",
       "unparkWhen": "After the 3.0 iPhone App Review submission (RF-16), by maintainer decision 2026-11-01.",
-      "notes": "Maintainer 2026-10-18: one refactor at a time; Periphery, Pyright and website type checks approved; CI Xcode stays 26.6. Landed: P3-1 the Xcode 27 preview run; P3-4 the Pyright gate, Periphery nightly, website checkJs and ESLint; P3-2 @Observable, Mutex, AnyView 21 to 10; P3-3 InferIsolatedConformances, strict memory safety, NonisolatedNonsendingByDefault (stall gate max 460 ms of 600); P3-5 tested lane modules and core-test --repeat. 2026-10-20 documentation audit: about 40 stale statements fixed, docs/reference cut from 49 to 32 files, the agent guard refuses subagent roadmap writes. 2026-10-24 Claude desktop app (maintainer): side sessions are workers, computer use allowed except as evidence, browser-pane launch.json; DW-02 shared derive_team with ios_device.sh. Open: moving the iOS-only lane snippets and ios_device.sh into tested Python modules needs an attended iPhone window to prove the moved lanes; CI on Xcode 27 when runners offer it. 2026-10-28: the report-only Xcode preview run (xcode-preview.yml) has failed every day since at least 2026-10-21; it blocks nothing, and nobody has investigated (focus rules)."
+      "notes": "Maintainer 2026-10-18: one refactor at a time; Periphery, Pyright and website checks approved; CI Xcode stays 26.6. Landed: P3-1 Xcode 27 preview run; P3-4 Pyright gate, Periphery nightly, website checkJs/ESLint; P3-2 @Observable/Mutex/AnyView 21->10; P3-3 InferIsolatedConformances, strict memory safety, NonisolatedNonsendingByDefault (stall max 460/600 ms); P3-5 tested lane modules + core-test --repeat; 2026-10-20 docs audit & subagent roadmap guard; DW-02 shared derive_team. 2026-11-20 Antigravity Phase C: added macos_test.sh profile --kind metal (Metal System Trace + os_signpost) across retention & history contracts (2aea00c9); verified xcode-preview.yml is 4-for-4 green (Nov 17-20, runs 44106341576..44751216683); documented Repeatable Innovation Playbook and Xcode 27 cutover checklist in development-workflow.md. Open: moving iOS-only lane snippets/ios_device.sh into tested Python modules needs an attended iPhone window; CI Xcode 27 cutover waits on GitHub GA macos-27 runners."
     }
   ]
 }

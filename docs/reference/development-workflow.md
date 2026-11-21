@@ -367,14 +367,15 @@ defect rules selected in `ruff.toml`: syntax errors (`E9`), pyflakes (`F`), inva
 pylint's errors (`PLE`), mutable defaults (`B006`) and debugger calls (`T10`); the file records why
 the style families stay out (Python 3.10; 3.9 for the hooks and `scripts/select_python.py`), and
 SwiftLint's `.swiftlint.yml` rules over every tracked Swift file its
-`excluded` list leaves in (`Sources/`, `Tests/` and `scripts/`; not `Packages/`). All three are
+`excluded` list leaves in (`Sources/`, `Tests/`, `scripts/`, and `Packages/VocelloQwen3Core/` except
+the upstream-identical `Mimi/Conv.swift`; includes custom rule `no_if_debug`). All three are
 SHA-pinned in `config/toolchain.json` (`artifactPins`; the runner installs the `-linux-x86_64`
 entries, for SwiftLint its fully static binary, which needs no Swift toolchain because none of the
 rules uses SourceKit). Pyright follows in `pyrightconfig.json`'s basic mode over the tracked
 `scripts/` Python, at the npm version in `npmPins`, against a fresh interpreter with no packages so
 its findings never depend on the host; its import-resolution rules are therefore not judged. Only a
 finding absent from `config/lint-baseline/<tool>.json` fails; the
-SwiftLint baseline was empty when its gate began (DW-03), so any finding of its rules fails. A
+SwiftLint, shellcheck and Ruff baselines are empty (0 findings), so any new finding of their rules fails. A
 finding is keyed by file, rule and the text of its line, not its line number, so editing a line that
 carries a baselined finding makes it new: fix it then. The baselines only shrink: `python3
 scripts/lint_baseline.py shellcheck|ruff|swiftlint|pyright` reproduces the gate locally and names entries
@@ -620,6 +621,37 @@ Reusable `.agents/workflows/` scripts (invoked via `run_workflow(ScriptPath=...,
   inherited model and hands their worktree branches/SHAs back to the lead for cherry-pick integration.
 - `qc_experiment_synthesizer.py` — synthesizes retained QC v2 metrics, `RF-57` self-test/seed compliance,
   and MLX/Instruments traces (`axiom_xcprof_*` when a `.trace` bundle is supplied).
+
+### Repeatable innovation playbook, Metal tracing and Xcode 27 cutover
+
+For any multi-file feature, runtime optimization or debt wave, run one deterministic four-stage loop:
+
+1. **Plan & de-risk (Carbon / lead):** read source, contracts and relevant `axiom` / `sosumi` Apple
+   references; for architectural or sample-altering changes use `/plan` + `/grill-me` and record
+   `RF-57` machine-screen decision rules before generating any takes.
+2. **Parallel disjoint execution (Neon workers + `run_workflow`):** commit the lead checkpoint on
+   `main`, then fan out at most 3 disjoint `Workspace: "share"` workers (or `.agents/workflows/debt_burndown_pipeline.py`)
+   that edit code and run non-native checks on their `subagent-*` branches without touching builds,
+   devices or the roadmap.
+3. **Lead integration & warm verification:** kill/join all workers, cherry-pick onto `main`, remove
+   worktrees (`git worktree remove`), and run the smallest meaningful native/contract lanes on the
+   warm main cache (`scripts/dev.sh check`, `macos_test.sh`, `dev.sh ios`, `build_ui_test_bundles.sh`).
+4. **Adversarial review & visual QA:** run `.agents/workflows/swift_adversarial_review.py` on every
+   substantive Swift diff (`Reviewed-by: vocello-swift-review`), and `.agents/workflows/xcuitest_visual_qa.py`
+   on every live XCUITest run directory.
+
+**GPU / MLX profiling (`--kind metal`):** run `scripts/macos_test.sh profile --kind metal --lead-only`
+(with zero active workers) to capture a bounded Metal System Trace + `os_signpost` `.trace` bundle
+(1 cold + 1 warm medium take, 120 s default cap, 15 GiB disk floor, kept by default for history),
+then inspect it offline via `axiom_xcprof_analyze` / `axiom_xcprof_compare` or
+`.agents/workflows/qc_experiment_synthesizer.py`.
+
+**Xcode 27 / Swift 6.4 cutover checklist:** `xcode-preview.yml` (report-only on `xcode-27`) is
+green across consecutive runs as of 2026-11-20. Keep `config/toolchain.json` pinned to Xcode 26.6
+until GitHub promotes a GA `macos-27` / Xcode 27 runner image and the maintainer authorizes the
+cutover; at cutover, bump `config/toolchain.json`, verify `ci.yml` + `release-rehearsal.yml` +
+`supply_chain_contract.py`, and evaluate Swift 6.4 warnings-as-errors across `MLXAudioTTS` once
+upstream `mlx-swift` adds `MLXArray: Sendable`.
 
 Safeguards remain directly callable without hook activation:
 

@@ -18,36 +18,51 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 20, evening: Antigravity harness Phase A hardening & macOS lane verification (resume here)
+### November 20, night: Antigravity harness Phases A, B & C complete on local `main` (resume here)
 
-Live macOS XCUITest verification and Phase A of the Antigravity harness upgrade landed on local
-`main` (ahead of `origin/main` `670f7e77`; **not yet pushed**), with zero product-binary regressions
-and four authorized backlog items closed (`BKL-63`, `BKL-74`, `BKL-87`, `BKL-90`).
+Phases A, B and C of the Antigravity harness & engineering-velocity upgrade landed on local `main`
+(ahead of `origin/main` `670f7e77`; **not yet pushed**), closing five authorized backlog items
+(`BKL-63`, `BKL-74`, `BKL-79`, `BKL-87`, `BKL-90`) with zero audio-sample changes and zero
+product-binary regressions.
 
-- **Live macOS lanes (PASS):** `macos-xcui-smoke-20261120-202030-03d22d24` (layout smoke PASS) and
-  `macos-xcui-perf-20261120-223253-e83975d8` (12/12 scenarios PASS, no warnings) after fixing the
-  Sparkle incremental `CodeSign` race (`BKL-74`) and mirroring macOS build-for-testing logs into
-  `$out/xcodebuild-build.log` + `$out/xcodebuild.log` (`0e207be0`).
-- **Antigravity hooks & worker tracking (`39991806`, closes `BKL-63`):** upgraded irreversible external
-  writes, `git push`, live `scripts/ios_candidate_tag.py`, `sudo`, `asc`, `vercel`, `gh`/`hf` writes,
-  `failure_issue.py`, destructive Git and remote MCP writes to uncacheable `"force_ask"`; wired
-  `PostInvocation` drift reminders (Swift membership vs `project.pbxproj`, `roadmap*.json` vs
-  `docs/ROADMAP.md`) and non-looping `Stop` staged-whitespace guard; moved `agent_guard` in-process;
-  updated `scripts/active_workers.py` for `Antigravity`/`agy` host ancestry with worktree worker
-  lease tracking; fixed single-quoted backtick false blocks on `git rebase` commit messages; cleaned
-  stale `.claude/worktrees` excludes and prose.
-- **CI blind spots & candidate build log (`3eeed981`, closes `BKL-87`, `BKL-90`):** added
-  `scripts/ios_control_audit.py validate` (`<0.2s` stdlib validator) to `scripts/lib/contract_gate.py`
-  so CI's always-run `contracts` job catches iOS control-audit drift on every push/PR; replaced
-  `if: failure()` on `nightly.yml` and `release-rehearsal.yml` `report` jobs with
-  `always() && !cancelled() && (needs.<job>.result != 'success' || ...)`; mirrored iOS
-  `candidate-runner-build.log` into `$out/xcodebuild.log`.
-- **Workflow kit & docs:** added reusable `.agents/workflows/` scripts (`swift_adversarial_review.py`,
-  `xcuitest_visual_qa.py`, `debt_burndown_pipeline.py`, `qc_experiment_synthesizer.py`) documented in
-  `docs/reference/development-workflow.md` with Gemini 4 (Carbon / Neon / Hydrogen) model routing,
-  trimmed this checkpoint below 25 KB, and closed `BKL-63`, `BKL-74`, `BKL-87`, `BKL-90`.
-- **Next:** push local `main` when explicitly requested, observe CI, then resume iOS 3.1.0 candidate
-  work (`RF-12`/`RF-15`/`RF-35`–`RF-42`) in the next iPhone window.
+- **Phase A — Harness safety, CI blind spots & workflow kit (`0e207be0`..`f5b1879f`, closes `BKL-63`,
+  `BKL-74`, `BKL-87`, `BKL-90`):** fixed Sparkle incremental `CodeSign` race + macOS/iOS build-log
+  mirroring (live macOS smoke `macos-xcui-smoke-20261120-202030-03d22d24` and perf
+  `macos-xcui-perf-20261120-223253-e83975d8` 12/12 PASS); upgraded irreversible external/destructive
+  commands & MCP writes to uncacheable `"force_ask"` with `PostInvocation` drift reminders,
+  non-looping `Stop` whitespace guard, in-process `agent_guard` and Antigravity worktree leases;
+  gated `ios_control_audit.py validate` in `contract_gate.py`; fixed `nightly.yml` and
+  `release-rehearsal.yml` `report` triggers (`always() && !cancelled()`); added `.agents/workflows/`
+  (`swift_adversarial_review.py`, `xcuitest_visual_qa.py`, `debt_burndown_pipeline.py`,
+  `qc_experiment_synthesizer.py`).
+- **Phase B — Lint burndown, Swift 6 hardening, security & perf harness (`f466500e`..`81b0dbf8`,
+  `aa97fb2e`, closes `BKL-79`):**
+  - Burned **Ruff `44 → 0`** (`f466500e`) and **Pyright `789 → 81`** across 72 Python files via two
+    3-worker parallel `share`-worktree waves (`08c70744`, `aa97fb2e`; 0 `# type: ignore`; 3,149
+    pytest passed).
+  - Hardened `Packages/VocelloQwen3Core` (`cc305197`, `Reviewed-by: vocello-swift-review`):
+    `swift-tools-version: 6.2`, `.treatAllWarnings(as: .error)` on 4/5 targets (`MLXAudioTTS`
+    documented as waiting on upstream `mlx-swift` `MLXArray: Sendable`), SwiftLint expanded to
+    `Packages/VocelloQwen3Core/` (0/0) + `no_if_debug` rule, pure-Swift parameterized Swift Testing
+    suite (`Qwen3PropertyInvariantTests`, 9 `@Test` suites); audited all 164 `try?` sites in
+    `Sources/` (zero silent data-loss sites).
+  - Hardened `HuggingFaceDownloader` (`1251fcc4`, `Reviewed-by: vocello-swift-review`, closes
+    `BKL-79`) to fail closed when any planned/installed file lacks a valid 64-hex SHA-256 or
+    disagrees between `files` and `installedFiles`, with zero-request/zero-staging tests.
+  - Eliminated XCUITest accessibility snapshot walks in `test05DeliveryMenu()` (`81b0dbf8`, `BKL-77`)
+    using window-anchored coordinate clicks + keyboard and exposed `actionHitchTimeMSPerS` /
+    `queryHitchTimeMSPerS` in `check_macos_ui_perf.py` (awaits a 3-run Mac perf calibration window).
+- **Phase C — Metal profiling, `VocelloSharedPolicies` modularization & playbook (`2aea00c9`,
+  `91f5eae6`):** added `macos_test.sh profile --kind metal` (`Metal System Trace` + `os_signpost`)
+  across trace retention and benchmark history contracts; extracted pure multiplatform static
+  framework `VocelloSharedPolicies` (`91f5eae6`, `Reviewed-by: vocello-swift-review`) compiling 7
+  runtime/Studio/ownership/retry policy files once instead of 4–5x across 5 targets (macOS, iOS,
+  CLI and all 3 UI test bundles verified green); verified `xcode-preview.yml` 4-for-4 green on
+  Nov 17–20 (`config/toolchain.json` stays pinned to Xcode 26.6 pending GA `macos-27` cutover);
+  documented the Repeatable Innovation Playbook in `docs/reference/development-workflow.md`.
+- **Next:** push local `main` when explicitly requested, observe CI, schedule a 3-run Mac perf
+  window to recalibrate & enforce `BKL-77`, and resume iOS 3.1.0 candidate work (`RF-12`/`RF-15`/
+  `RF-35`–`RF-42`) in the next iPhone window.
 
 ### November 20: Antigravity harness takeover
 

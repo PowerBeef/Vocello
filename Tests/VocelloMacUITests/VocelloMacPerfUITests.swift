@@ -461,14 +461,3 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
         ))
     }
 }
-
-/// Named spans of one measured window, in wall-clock epoch milliseconds
-/// (audit #32); appended in order, so they are disjoint and ordered.
-@MainActor
-final class VocelloPerfPhaseLog {
-    private(set) var phases: [VocelloUIPerfPhase] = []
-
-    func append(_ name: String, from start: Int64, to end: Int64) {
-        phases.append(VocelloUIPerfPhase(name: name, startEpochMS: start, endEpochMS: max(start, end)))
-    }
-}

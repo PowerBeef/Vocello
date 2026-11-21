@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "description": "The tests a full macOS UI lane must have run, as scripts/lib/xctest_summary.py names them (Suite/method). scripts/ui_test.sh passes the lane to xctest_summary.py --expect-lane after a full smoke, perf or benchmark run; a listed test that is missing from the results or was skipped fails the lane. A --scenario run is a subset and checks nothing. scripts/tests/test_xctest_summary.py compares each list with the test methods in Tests/VocelloMacUITests, so a renamed, added or deleted journey must change this file in the same commit (RF-61, audit T10).",
+  "description": "The tests a full macOS or iOS UI lane must have run, as scripts/lib/xctest_summary.py names them (Suite/method). scripts/ui_test.sh passes the lane to xctest_summary.py --expect-lane after a full smoke, perf, benchmark, or iOS localization run; a listed test that is missing from the results or was skipped fails the lane. A --scenario or --preinstalled-candidate run is a subset and checks nothing. scripts/tests/test_xctest_summary.py validates each list against Tests/VocelloMacUITests and Tests/VocelloiOSUITests, so a renamed, added or deleted journey must change this file in the same commit (RF-61, audit T10).",
   "lanes": {
     "macos-smoke": [
       "VocelloMacSmokeUITests/test00_WindowSizesAndSettingsScene",
@@ -36,6 +36,32 @@
     ],
     "macos-benchmark": [
       "VocelloMacBenchmarkUITests/testOrderedConfigurableMatrix"
+    ],
+    "ios-smoke": [
+      "VocelloiOSSmokeUITests/testPhysicalDeviceSmokeJourney",
+      "VocelloiOSSmokeUITests/testRecordThenPlayReviewsTheClip",
+      "VocelloiOSSmokeUITests/testStudioModesKeepTheirDockLayout",
+      "VocelloiOSSmokeUITests/testZLongFormProjectJourney"
+    ],
+    "ios-localization": [
+      "VocelloiOSSmokeUITests/testSettingsAccessibilityLayoutWalk"
+    ],
+    "ios-perf": [
+      "VocelloiOSPerfUITests/test01IdleBaseline",
+      "VocelloiOSPerfUITests/test02TabNavigation",
+      "VocelloiOSPerfUITests/test02aHarnessControl",
+      "VocelloiOSPerfUITests/test03HistoryScroll",
+      "VocelloiOSPerfUITests/test03bHistoryFilter",
+      "VocelloiOSPerfUITests/test03cHistoryFilterPaged",
+      "VocelloiOSPerfUITests/test04VoicesScroll",
+      "VocelloiOSPerfUITests/test05SettingsScroll",
+      "VocelloiOSPerfUITests/test06ComposerTyping",
+      "VocelloiOSPerfUITests/test07SheetPresentDismiss",
+      "VocelloiOSPerfUITests/test08PlayerScrub",
+      "VocelloiOSPerfUITests/test09GenerationActive"
+    ],
+    "ios-benchmark": [
+      "VocelloiOSBenchmarkUITests/testOrderedConfigurableMatrix"
     ]
   }
 }

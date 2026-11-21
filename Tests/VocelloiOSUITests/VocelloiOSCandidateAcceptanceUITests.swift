@@ -45,7 +45,7 @@ final class VocelloiOSCandidateAcceptanceUITests: XCTestCase {
         }
         for _ in 0..<3 {
             let ids = ["iosAttributionDetailBackButton", "iosSettings_voiceModelsBackButton", "iosSettings_openSourceBackButton"]
-                + ["audio", "modelsFiles", "privacyPermissions", "accessibility", "about"].map { "iosSettings_\($0)BackButton" }
+                + ["audio", "modelsFiles", "appLanguage", "privacyPermissions", "accessibility", "about"].map { "iosSettings_\($0)BackButton" }
             guard let back = ids.map({ VocelloUIWait.element(app, id: $0) }).first(where: { $0.exists }) else { break }
             for _ in 0..<12 {
                 if back.isHittable { break }

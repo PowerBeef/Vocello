@@ -54,22 +54,35 @@ class ExpectedLaneTestsWiring(unittest.TestCase):
 
     def test_perf_and_benchmark_runs_name_their_own_lane(self) -> None:
         lanes = json.loads(LANE_CONFIG.read_text(encoding="utf-8"))["lanes"]
-        for lane in ("perf", "benchmark"):
-            with self.subTest(lane=lane):
-                expected = lanes[f"macos-{lane}"]
-                status, results = self.summarize([(name, "passed") for name in expected], lane=lane)
-                self.assertEqual((status, results["expected"]["lane"]), (0, f"macos-{lane}"))
-                # The smoke journeys are not this lane's tests.
-                status, results = self.summarize([(name, "passed") for name in SMOKE], lane=lane)
+        for platform, lane in (
+            ("macos", "perf"),
+            ("macos", "benchmark"),
+            ("ios", "smoke"),
+            ("ios", "localization"),
+            ("ios", "perf"),
+            ("ios", "benchmark"),
+        ):
+            with self.subTest(platform=platform, lane=lane):
+                lane_key = f"{platform}-{lane}"
+                expected = lanes[lane_key]
+                status, results = self.summarize(
+                    [(name, "passed") for name in expected], platform=platform, lane=lane
+                )
+                self.assertEqual((status, results["expected"]["lane"]), (0, lane_key))
+                # The macOS smoke journeys are not this lane's tests.
+                status, results = self.summarize(
+                    [(name, "passed") for name in SMOKE], platform=platform, lane=lane
+                )
                 self.assertEqual((status, results["expected"]["missing"]), (4, expected))
 
     def test_a_scenario_run_and_the_other_lanes_check_nothing(self) -> None:
         one_journey = [(SMOKE[0], "passed")]
         focused_runs: tuple[dict[str, Any], ...] = (
             {"scenario": "layout"},                      # a focused macOS smoke run
-            {"lane": "localization"},                    # test01 alone, by design
+            {"lane": "localization"},                    # macOS test01 alone, by design
             {"lane": "auto-language"},
-            {"platform": "ios"},                         # the iPhone lanes list nothing yet
+            {"platform": "ios", "scenario": "studio-layout"},
+            {"platform": "ios", "lane": "control-audit"},
         )
         for arguments in focused_runs:
             with self.subTest(**arguments):
@@ -532,6 +545,89 @@ class MacBuildLogTests(unittest.TestCase):
         self.assertIn("macOS UI build-for-testing failed", completed.stderr)
         self.assertIn("xcodebuild-build.log", completed.stderr)
         self.assertIn("CodeSign Sparkle.framework/Versions/B failed", completed.stderr)
+
+
+class IOSBuildLogTests(unittest.TestCase):
+    """A failed iOS build-for-testing records its own ui-build step before arming
+    ui_test_attempted, mirrors xcodebuild-build.log into xcodebuild.log, and
+    never runs test-summary or xcresult attachment collection on a non-run."""
+
+    def test_failed_ios_build_retains_build_log_mirrors_xcodebuild_log_and_keeps_exit_code(self) -> None:
+        sandbox = ui_lane_sandbox(self)
+        (sandbox.root / "QwenVoice.xcodeproj").mkdir()
+        sandbox.helper(PUBLISHER, "exit 0")
+        sandbox.helper("scripts/lane_ledger.py", "exit 0")
+        sandbox.helper("scripts/tree_fingerprint.py", "echo fixture-fingerprint")
+        sandbox.helper("scripts/ios_signing_identity.py", "exit 0")
+        sandbox.helper(
+            "scripts/lib/ios_coredevice_probe.py",
+            'echo \'{"reachable":true,"identifier":"fixture-iphone","productType":"iPhone18,1","availableForDevelopment":true,"lock":{"deviceLocked":false}}\'\n',
+        )
+        sandbox.helper(
+            "scripts/lib/ui_lane_data.py",
+            f'exec "$QV_REAL_PYTHON" {quote(ROOT / "scripts/lib/ui_lane_data.py")} "$@"\n',
+        )
+        sandbox.executable("scripts/clean_build_caches.sh")
+        sandbox.tool("pgrep", "exit 1")
+        sandbox.tool("xcodebuild", "echo 'Xcode 27.2'")
+        sandbox.tool("xcrun", "exit 0")
+        (sandbox.root / "scripts/lib/build_cache.sh").write_text(
+            f". {quote(sandbox.record)}\n"
+            + "".join(f"qv_stub {name}\n" for name in (
+                "require_build_free_space", "require_ios_xcode_platform", "ensure_project_regenerated",
+                "ensure_spm_resolved", "write_build_provenance", "warn_if_storage_bloated",
+            ))
+            + 'derive_team() { echo TEAM123456; }\n'
+            + 'qvoice_path_map_settings() { QVOICE_PATH_MAP_SETTINGS=(); }\n'
+            + 'xcb_run() { qv_record xcb_run "$@"; echo "error: iOS build fixture failure" >&2; return 65; }\n',
+            encoding="utf-8",
+        )
+        completed = sandbox.run_script("ios", "smoke", "--scenario", "studio-layout")
+        self.assertEqual(completed.returncode, 65, completed.stderr)
+        runs = list((sandbox.build / "qvoice_artifacts_ui_tests/ios").glob("ios-xcui-smoke-*"))
+        self.assertEqual(len(runs), 1, runs)
+        run_dir = runs[0]
+        build_log = run_dir / "xcodebuild-build.log"
+        xcode_log = run_dir / "xcodebuild.log"
+        self.assertTrue(build_log.is_file(), sorted(p.name for p in run_dir.iterdir()))
+        self.assertTrue(xcode_log.is_file(), sorted(p.name for p in run_dir.iterdir()))
+        self.assertIn("error: iOS build fixture failure", build_log.read_text(encoding="utf-8"))
+        self.assertEqual(xcode_log.read_text(encoding="utf-8"), build_log.read_text(encoding="utf-8"))
+        # Build failure occurred before ui_test_attempted=1, so no bogus test-results.json exists.
+        self.assertFalse((run_dir / "test-results.json").exists())
+        self.assertIn("iPhone UI build-for-testing failed", completed.stderr)
+
+    def test_ios_preflight_refuses_non_canonical_iphone_for_publishing_perf_and_benchmark(self) -> None:
+        shell = UIFunctionShell(self)
+        shell.helper("scripts/ios_signing_identity.py", "exit 0")
+        profiles_dest = shell.path / "benchmarks/hardware-profiles.json"
+        profiles_dest.parent.mkdir(parents=True, exist_ok=True)
+        profiles_dest.write_text((ROOT / "benchmarks/hardware-profiles.json").read_text(encoding="utf-8"), encoding="utf-8")
+        probe_json = json.dumps({
+            "reachable": True,
+            "identifier": "non-canonical-phone",
+            "productType": "iPhone16,1",
+            "availableForDevelopment": True,
+            "lock": {"deviceLocked": False},
+        })
+        for lane, no_publish, expected_code in (
+            ("benchmark", 0, 1),
+            ("perf", 0, 1),
+            ("perf", 1, 0),
+        ):
+            with self.subTest(lane=lane, no_publish=no_publish):
+                completed = shell.run(
+                    ("ios_ui_preflight",),
+                    f"ROOT_DIR={quote(shell.path)}\nlane={lane}\nno_publish={no_publish}\n"
+                    f"ios_mirroring_running() {{ return 1; }}\n"
+                    f"ios_probe() {{ printf '%s\\n' {quote(probe_json)}; }}\n"
+                    f"derive_team() {{ echo TEAM123456; }}\n"
+                    "status=0\nios_ui_preflight || status=$?\necho status=$status\n",
+                )
+                self.assertEqual(completed.returncode, 0, completed.stderr)
+                self.assertIn(f"status={expected_code}", completed.stdout)
+                if expected_code == 1:
+                    self.assertIn("not the canonical benchmark profile", completed.stderr)
 
 
 if __name__ == "__main__":

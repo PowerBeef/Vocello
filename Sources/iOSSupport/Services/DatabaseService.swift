@@ -209,6 +209,26 @@ final class DatabaseService: @unchecked Sendable {
         }
     }
 
+    /// Persist multiple generations inside a single SQLite write transaction.
+    /// Used by `IOSUIPerfHistorySeeder` so seeding 400–700 synthetic History
+    /// rows on first launch pays one fsync instead of hundreds.
+    func saveGenerations(_ generations: inout [Generation]) throws {
+        guard !generations.isEmpty else { return }
+        let dbQueue = try requireQueue(for: .write)
+        do {
+            var persisted = generations
+            try dbQueue.write { db in
+                try longFormAcceptance.reconcile(in: db)
+                for index in persisted.indices {
+                    try persisted[index].save(db)
+                }
+            }
+            generations = persisted
+        } catch {
+            throw HistoryPersistenceError.classify(error, operation: .write)
+        }
+    }
+
     /// Async variant — call from a detached Task to keep the SQLite
     /// write off the main run loop. GRDB's `DatabaseQueue.write` has an
     /// async overload that bridges to its internal write queue;

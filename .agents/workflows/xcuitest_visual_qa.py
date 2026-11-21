@@ -28,6 +28,13 @@ if not run_dir.is_dir():
     raise FileNotFoundError(f"Run directory not found: {run_dir}")
 
 max_screenshots = int(args.get("max_screenshots") or 16)
+run_metadata_path = run_dir / "run.json"
+run_platform = "unknown"
+if run_metadata_path.is_file():
+    try:
+        run_platform = str(json.loads(run_metadata_path.read_text(encoding="utf-8")).get("platform") or "unknown").lower()
+    except Exception:
+        run_platform = "unknown"
 
 phase("Discover Retained Screenshots")
 
@@ -36,24 +43,46 @@ screenshot_entries = []
 if index_path.is_file():
     data = json.loads(index_path.read_text(encoding="utf-8"))
     raw_items = data if isinstance(data, list) else data.get("screenshots", data.get("items", []))
-    for item in raw_items:
+    for idx, item in enumerate(raw_items):
         if isinstance(item, str):
             p = (index_path.parent / item).resolve()
             label = item
+            failure = False
+            source = "named"
+            test_name = ""
         elif isinstance(item, dict):
             rel = item.get("path") or item.get("file") or item.get("filename") or ""
             p = Path(rel) if Path(rel).is_absolute() else (index_path.parent / rel).resolve()
             label = str(item.get("name") or item.get("scenario") or rel)
+            failure = bool(item.get("failure") or "failure" in label.lower())
+            source = str(item.get("source") or "named")
+            test_name = str(item.get("test") or "")
         else:
             continue
         if p.is_file() and p.suffix.lower() in (".png", ".jpg", ".jpeg"):
-            screenshot_entries.append({"label": label, "path": str(p)})
+            screenshot_entries.append({
+                "idx": idx,
+                "label": label,
+                "path": str(p),
+                "failure": failure,
+                "source": source,
+                "test": test_name,
+            })
 else:
-    for p in sorted((run_dir / "screenshots").glob("*.png")) if (run_dir / "screenshots").is_dir() else []:
-        screenshot_entries.append({"label": p.name, "path": str(p.resolve())})
+    for idx, p in enumerate(sorted((run_dir / "screenshots").glob("*.png")) if (run_dir / "screenshots").is_dir() else []):
+        screenshot_entries.append({
+            "idx": idx,
+            "label": p.name,
+            "path": str(p.resolve()),
+            "failure": "failure" in p.name.lower(),
+            "source": "named",
+            "test": "",
+        })
 
+# Prioritize failure screenshots, then named screenshots, preserving original order within each group.
+screenshot_entries.sort(key=lambda entry: (not entry["failure"], entry["source"] != "named", entry["idx"]))
 screenshot_entries = screenshot_entries[:max_screenshots]
-log(f"Run dir: {run_dir.name} | screenshots queued: {len(screenshot_entries)}")
+log(f"Run dir: {run_dir.name} | platform={run_platform} | screenshots queued: {len(screenshot_entries)}")
 
 TRIAGE_SCHEMA = {
     "type": "object",
@@ -91,19 +120,39 @@ triage_task = agent(
     model="inherit",
 )
 
-# Group screenshots into small batches of up to 4 images per flash reviewer to stay fast and bounded.
-batches = [screenshot_entries[i : i + 4] for i in range(0, len(screenshot_entries), 4)]
+# Cap to at most 3 visual reviewer agents (respecting the repository 4-agent budget:
+# lead + 3 visual reviewers after triage finishes).
+MAX_VISUAL_BATCHES = 3
+if screenshot_entries:
+    batch_size = max(4, (len(screenshot_entries) + MAX_VISUAL_BATCHES - 1) // MAX_VISUAL_BATCHES)
+    batches = [screenshot_entries[i : i + batch_size] for i in range(0, len(screenshot_entries), batch_size)]
+else:
+    batches = []
+
+ios_checklist = (
+    " (6) iPhone Dynamic Island / top Safe Area collisions, "
+    "(7) bottom tab-dock overlap with primary action buttons or content, "
+    "(8) software keyboard occluding text editors or action buttons, "
+    "(9) AX-XXXL Dynamic Type text clipping or horizontal overflow."
+    if run_platform == "ios"
+    else ""
+)
 
 
 async def inspect_batch(batch):
-    items_desc = "\n".join(f"- {entry['label']}: {entry['path']}" for entry in batch)
+    lines = []
+    for entry in batch:
+        fail_tag = " [FAILURE]" if entry.get("failure") else ""
+        test_tag = f" (test={entry['test']})" if entry.get("test") else ""
+        lines.append(f"- {entry['label']}{fail_tag}{test_tag}: {entry['path']}")
+    items_desc = "\n".join(lines)
     return await agent(
         (
             "Read-only visual QA — edit nothing, run no commands. "
             "Call `read_file` on each screenshot image below and inspect for: "
             "(1) clipped/truncated labels or buttons, (2) overlapping controls or Dynamic Type overflow, "
             "(3) unreadable Dark/Light contrast, (4) raw localization keys or placeholder strings, "
-            "(5) unexpected macOS/iOS permission prompts or system overlays blocking the app. "
+            f"(5) unexpected macOS/iOS permission prompts or system overlays blocking the app.{ios_checklist} "
             "Never quote any private user paths or sensitive text.\n\n"
             f"Screenshots:\n{items_desc}"
         ),

@@ -1092,6 +1092,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         confirmationID: String
     ) -> String {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element(chipID), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element(confirmationID), timeout: 20))
         let selected = findSelectedID(rowPrefix: rowPrefix, candidates: candidates)
         XCTAssertNotNil(selected, "\(chipID) must expose one selected row")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element(confirmationID), timeout: 20))
@@ -1110,6 +1111,7 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
 
     private func captureDeliverySelection() -> IOSControlAuditDeliverySelection {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("studioChip_delivery"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("deliveryPicker_confirm"), timeout: 20))
         if let preset = findSelectedID(
             rowPrefix: "deliveryPickerPreset_",
             candidates: deliveryIDs
@@ -1155,26 +1157,65 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         XCTAssertTrue(VocelloUIWait.disappears(element("voiceBrief_editor"), timeout: 20))
     }
 
+    /// Captures one full app snapshot with bounded retry so a transient
+    /// mid-animation snapshot error never triggers a premature swipe that
+    /// scrolls the top-selected lazy row off-screen.
+    private func snapshotWithRetry(attempts: Int = 5) -> XCUIElementSnapshot? {
+        for attempt in 0..<attempts {
+            if let root = try? app.snapshot() {
+                return root
+            }
+            if attempt + 1 < attempts {
+                RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
+            }
+        }
+        return nil
+    }
+
+    private func firstSelectedIdentifier(
+        in snapshot: XCUIElementSnapshot,
+        matching predicate: (String) -> Bool
+    ) -> String? {
+        if snapshot.isSelected && predicate(snapshot.identifier) {
+            return snapshot.identifier
+        }
+        for child in snapshot.children {
+            if let match = firstSelectedIdentifier(in: child, matching: predicate) {
+                return match
+            }
+        }
+        return nil
+    }
+
     private func captureCloneReferenceSelection() -> String? {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("studioChip_reference"), timeout: 20))
+        XCTAssertTrue(VocelloUIWait.exists(element("bottomSheet_close"), timeout: 20))
+        let prefix = "referenceClipRow_"
         var selected: String?
         for _ in 0..<16 where selected == nil {
-            let rows = app.descendants(matching: .any)
-                .matching(NSPredicate(format: "identifier BEGINSWITH %@", "referenceClipRow_"))
-                .allElementsBoundByIndex
-            selected = rows.first(where: \.isSelected)?.identifier
-                .replacingOccurrences(of: "referenceClipRow_", with: "")
-            if selected == nil { app.swipeUp() }
+            guard let root = snapshotWithRetry() else {
+                XCTFail("Failed to capture accessibility snapshot while reading clone reference selection")
+                break
+            }
+            if let match = firstSelectedIdentifier(in: root, matching: { $0.hasPrefix(prefix) }) {
+                selected = String(match.dropFirst(prefix.count))
+            } else {
+                app.swipeUp()
+            }
         }
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("bottomSheet_close"), timeout: 20))
         return selected
     }
 
     private func findSelectedID(rowPrefix: String, candidates: [String]) -> String? {
+        let expectedIdentifiers = Set(candidates.map { "\(rowPrefix)\($0)" })
         for _ in 0..<16 {
-            for candidate in candidates {
-                let row = element("\(rowPrefix)\(candidate)")
-                if row.exists && row.isSelected { return candidate }
+            guard let root = snapshotWithRetry() else {
+                XCTFail("Failed to capture accessibility snapshot while locating selected \(rowPrefix) row")
+                return nil
+            }
+            if let match = firstSelectedIdentifier(in: root, matching: { expectedIdentifiers.contains($0) }) {
+                return String(match.dropFirst(rowPrefix.count))
             }
             app.swipeUp()
         }

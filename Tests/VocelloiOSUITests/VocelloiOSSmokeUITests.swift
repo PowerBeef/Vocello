@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 
 /// Inspect a previously observed row without generation, pinning, deletion, or
@@ -596,6 +597,7 @@ final class VocelloiOSSmokeUITests: VocelloiOSUITestCase {
                 observed = name
                 break polling
             }
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
         }
         XCUIDevice.shared.press(.home)
         return observed

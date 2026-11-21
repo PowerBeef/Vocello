@@ -62,11 +62,16 @@ if str(REPO_ROOT / "scripts") not in sys.path:
 from lib import ui_perf_thresholds as calibration_rules  # noqa: E402
 from lib import ui_perf_lane  # noqa: E402
 from lib import ui_perf_samples  # noqa: E402
+from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
+from lib.ui_perf_samples import PHASE_NAMES, overlap_fraction, span_hitch  # noqa: E402
 
 EXPECTED_SCENARIOS = [
     "ios-idle-baseline",
     "ios-tab-navigation",
+    "ios-harness-control",
     "ios-history-scroll",
+    "ios-history-filter",
+    "ios-history-filter-paged",
     "ios-voices-scroll",
     "ios-settings-scroll",
     "ios-composer-typing",
@@ -184,6 +189,26 @@ def exploratory_scenarios(thresholds: dict) -> set[str]:
     return set(EXPECTED_SCENARIOS) - set(thresholds["confirmatoryScenarios"])
 
 
+def enforced_scenarios(thresholds: dict | None) -> list[str]:
+    if thresholds is None:
+        return []
+    return list(thresholds.get("enforce") or [])
+
+
+def phase_hitch_rates(marker: dict, blocks: list[dict]) -> dict | None:
+    try:
+        return ui_perf_samples.phase_hitch_rates(marker, blocks)
+    except ValueError as error:
+        raise GateError(str(error)) from None
+
+
+def cycle_hitch_rates(marker: dict, blocks: list[dict]) -> list[float] | None:
+    try:
+        return ui_perf_samples.cycle_hitch_rates(marker, blocks)
+    except ValueError as error:
+        raise GateError(str(error)) from None
+
+
 def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str]) -> tuple[dict, float]:
     start = int(marker["windowStartEpochMS"])
     end = int(marker["windowEndEpochMS"])
@@ -206,14 +231,7 @@ def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str])
     # the covered span, so a 500 ms block outside the window can neither
     # inflate nor dilute the scenario. maxGapMS stays unclipped: a gap cannot
     # be apportioned, so it is the worst gap of any block touching the window.
-    def fraction(block: dict) -> float:
-        span = int(block["endEpochMS"]) - int(block["startEpochMS"])
-        if span <= 0:
-            return 0.0
-        overlap = min(int(block["endEpochMS"]), end) - max(int(block["startEpochMS"]), start)
-        return max(0.0, min(1.0, overlap / span))
-
-    fractions = {id(b): fraction(b) for b in window}
+    fractions = {id(b): overlap_fraction(b, start, end) for b in window}
     covered_ms = sum(
         min(int(b["endEpochMS"]), end) - max(int(b["startEpochMS"]), start)
         for b in window
@@ -251,6 +269,8 @@ def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str])
     summary_rows = [r for r in rows if r.get("kind") == "summary"]
     stall = summary_rows[0] if summary_rows else {}
     scenario = marker["scenario"]
+    cycle_rates = cycle_hitch_rates(marker, blocks)
+    phase_rates = phase_hitch_rates(marker, blocks)
     summary = {
         "scenario": scenario,
         "designation": "exploratory" if scenario in exploratory else "confirmatory",
@@ -264,6 +284,16 @@ def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str])
         # In-window excess frame time per scripted action (audit #79).
         "hitchMSPerAction": round(excess_ms / marker["actionCount"], 3)
         if isinstance(marker.get("actionCount"), int) and marker["actionCount"] > 0 else None,
+        **({"cycleHitchTimeMSPerS": cycle_rates} if cycle_rates is not None else {}),
+        **({"phases": phase_rates} if phase_rates is not None else {}),
+        **(
+            {"actionHitchTimeMSPerS": phase_rates["action"]["hitchTimeMSPerS"]}
+            if phase_rates is not None and "action" in phase_rates else {}
+        ),
+        **(
+            {"queryHitchTimeMSPerS": phase_rates["query"]["hitchTimeMSPerS"]}
+            if phase_rates is not None and "query" in phase_rates else {}
+        ),
         "maxGapMS": round(max_gap, 2),
         "p95GapMSApprox": approximate_p95_gap_ms(histogram, refresh_ms),
         "gapHistogram": histogram,
@@ -322,9 +352,38 @@ def load_thresholds(path: Path) -> dict:
     confirmatory = thresholds.get("confirmatoryScenarios")
     if not isinstance(confirmatory, list) or not set(confirmatory) <= set(EXPECTED_SCENARIOS):
         raise GateError(f"thresholds contract names unknown confirmatory scenarios: {path}")
-    for key in ("hitchCeilingMSPerS", "maxGapCeilingMS"):
-        if set(thresholds.get(key, {})) != set(confirmatory):
-            raise GateError(f"thresholds contract {key} must cover exactly the confirmatory scenarios: {path}")
+    hitch = thresholds.get("hitchCeilingMSPerS")
+    gap = thresholds.get("maxGapCeilingMS")
+    if not isinstance(hitch, dict) or not isinstance(gap, dict) or set(hitch) != set(gap):
+        raise GateError(
+            "thresholds contract hitchCeilingMSPerS and maxGapCeilingMS must cover the same "
+            f"scenarios: {path}"
+        )
+    if not set(confirmatory) <= set(hitch) <= set(EXPECTED_SCENARIOS):
+        raise GateError(
+            "thresholds contract ceilings must cover every confirmatory scenario and name only "
+            f"known scenarios: {path}"
+        )
+    enforce = thresholds.get("enforce", [])
+    if (
+        not isinstance(enforce, list) or any(not isinstance(name, str) for name in enforce)
+        or len(set(enforce)) != len(enforce)
+    ):
+        raise GateError(f"thresholds contract enforce must be a list of distinct scenario names: {path}")
+    if unknown := [name for name in enforce if name not in EXPECTED_SCENARIOS]:
+        raise GateError(f"thresholds contract enforces unknown scenarios ({', '.join(unknown)}): {path}")
+    unjudged = [
+        name for name in enforce
+        if any(
+            isinstance(ceilings.get(name), bool) or not isinstance(ceilings.get(name), (int, float))
+            or ceilings[name] <= 0
+            for ceilings in (hitch, gap)
+        )
+    ]
+    if unjudged:
+        raise GateError(
+            f"thresholds contract enforces scenarios without ceilings ({', '.join(unjudged)}): {path}"
+        )
     if problems := calibration_rules.validate_calibration_fields(thresholds):
         raise GateError(f"thresholds contract {'; '.join(problems)}: {path}")
     return thresholds
@@ -461,6 +520,7 @@ def build_evidence_manifest(
     profile_id: str,
     hardware: dict,
     run_warnings: list[str] | None = None,
+    optimization: str | None = None,
 ) -> dict:
     """Registry-ready evidence (IUI-6): the platform-ios twin of the macOS
     UI-7 manifest — kind ui-perf, canonical matrix scope, one take per
@@ -489,6 +549,32 @@ def build_evidence_manifest(
         {code for codes in scenario_warnings.values() for code in codes} | set(run_warnings or [])
     )
     status = "passedWithWarnings" if run_warnings else "passed"
+    history_record: dict = {
+        "run": {
+            "id": run_id,
+            "kind": "ui-perf",
+            "platform": "ios",
+            "status": status,
+            "label": label or run_id,
+            "matrixScope": "canonical",
+            "warnings": run_warnings,
+        },
+        "hardware": {"profileID": profile_id},
+        "models": [],
+        "evidence": {
+            "validatorPassed": True,
+            "crashDeltaPassed": True,
+            "crashCount": 0,
+            "expectedTakeCount": len(EXPECTED_SCENARIOS),
+            "actualTakeCount": len(takes),
+            "telemetrySchemaVersion": "not-applicable",
+            "qcAlgorithmVersion": "not-applicable",
+            "rawTelemetryDigest": probe_digest,
+        },
+        "takes": takes,
+    }
+    if optimization is not None:
+        history_record["toolchain"] = {"optimization": optimization}
     return {
         "schemaVersion": 1,
         "benchmarkKind": "ui-perf",
@@ -499,30 +585,7 @@ def build_evidence_manifest(
         # Device-truth runtime hardware; benchmark_history.py record merges
         # this over the profile defaults and host-side devicectl enrichment.
         "hardware": hardware,
-        "historyRecord": {
-            "run": {
-                "id": run_id,
-                "kind": "ui-perf",
-                "platform": "ios",
-                "status": status,
-                "label": label or run_id,
-                "matrixScope": "canonical",
-                "warnings": run_warnings,
-            },
-            "hardware": {"profileID": profile_id},
-            "models": [],
-            "evidence": {
-                "validatorPassed": True,
-                "crashDeltaPassed": True,
-                "crashCount": 0,
-                "expectedTakeCount": len(EXPECTED_SCENARIOS),
-                "actualTakeCount": len(takes),
-                "telemetrySchemaVersion": "not-applicable",
-                "qcAlgorithmVersion": "not-applicable",
-                "rawTelemetryDigest": probe_digest,
-            },
-            "takes": takes,
-        },
+        "historyRecord": history_record,
     }
 
 
@@ -545,12 +608,85 @@ def canonical_profile_id() -> str:
     return str(publisher.canonical_hardware_profile("ios")["id"])
 
 
+def derivation_scenarios(argument: str | None, base: dict) -> list[str]:
+    """The scenarios a derivation gives ceilings: ``--scenarios a,b,c``, or the
+    confirmatory ones. The list must keep the base contract loadable, so it
+    covers every confirmatory and every enforced scenario."""
+    confirmatory = list(base["confirmatoryScenarios"])
+    if argument is None:
+        scenarios = confirmatory
+    else:
+        scenarios = [name.strip() for name in argument.split(",")]
+        if not all(scenarios) or len(set(scenarios)) != len(scenarios):
+            raise GateError("--scenarios must be a comma-separated list of distinct scenario names")
+        if unknown := [name for name in scenarios if name not in EXPECTED_SCENARIOS]:
+            raise GateError(f"--scenarios names unknown scenarios: {', '.join(unknown)}")
+        if missing := [name for name in confirmatory if name not in scenarios]:
+            raise GateError(f"--scenarios must keep the confirmatory scenarios: {', '.join(missing)}")
+    if missing := [name for name in enforced_scenarios(base) if name not in scenarios]:
+        raise GateError(f"the contract enforces scenarios the derivation gives no ceiling: {', '.join(missing)}")
+    return scenarios
+
+
+def derive_contract(records: list[dict], base: dict, scenarios: list[str], *, rule: str) -> dict:
+    """A contract with ceilings for `scenarios`, derived by the shared rules. The
+    confirmatory designation, the ``enforce`` list and its description carry over
+    from `base`: a derivation moves ceilings, never what fails a run."""
+    confirmatory = list(base["confirmatoryScenarios"])
+    derived = calibration_rules.derive(records, {**base, "confirmatoryScenarios": scenarios}, rule=rule)
+    contract: dict = {}
+    for key, value in derived.items():
+        if key == "basis" and scenarios != confirmatory:
+            value = value.replace("Per confirmatory scenario", "Per scenario with a ceiling")
+        if key == "confirmatoryScenarios":
+            value = confirmatory
+        contract[key] = value
+        if key == "confirmatoryScenarios":
+            for carried in ("enforce", "enforceDescription"):
+                if carried in base:
+                    contract[carried] = base[carried]
+    return contract
+
+
+def derive_thresholds_main(argv: list[str]) -> int:
+    """`--derive-thresholds RECORD... [--scenarios a,b,c]` (matching macOS)."""
+    parser = argparse.ArgumentParser(
+        description="Derive ios ui-perf ceilings from at least three counted runs of one profile.",
+    )
+    parser.add_argument("--derive-thresholds", nargs="+", required=True, metavar="RECORD",
+                        help="ui-perf record paths or run IDs (benchmarks/runs/ui-perf/<id>.json)")
+    parser.add_argument("--rule", choices=calibration_rules.RULES, default=calibration_rules.SPREAD_RULE)
+    parser.add_argument("--thresholds", type=Path, default=DEFAULT_THRESHOLDS_PATH,
+                        help="the contract whose confirmatory scenarios, enforce list and footprint "
+                        "ceiling carry over")
+    parser.add_argument("--scenarios", metavar="A,B,C",
+                        help="the scenarios that get ceilings (default: the contract's confirmatory "
+                        "scenarios, which the list must include)")
+    parser.add_argument("--write", type=Path, metavar="PATH",
+                        help="write the derived contract here instead of printing it")
+    args = parser.parse_args(argv)
+    try:
+        base = load_thresholds(args.thresholds)
+        scenarios = derivation_scenarios(args.scenarios, base)
+        records = [calibration_rules.load_record(reference, UI_PERF_RUNS) for reference in args.derive_thresholds]
+        if {record.get("run", {}).get("platform") for record in records} != {"ios"}:
+            raise calibration_rules.DerivationError("derivation inputs must be ios ui-perf records")
+        contract = derive_contract(records, base, scenarios, rule=args.rule)
+    except (ValueError, OSError, KeyError) as error:
+        print(f"ios ui-perf derivation FAILED: {error}", file=sys.stderr)
+        return 1
+    text = json.dumps(contract, indent=2) + "\n"
+    if args.write:
+        args.write.write_text(text, encoding="utf-8")
+        print(f"ios ui-perf ceilings ({args.rule}, {contract['calibrationProfile']}) -> {args.write}")
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
 def main() -> int:
     if "--derive-thresholds" in sys.argv[1:]:
-        return calibration_rules.derive_main(
-            sys.argv[1:], platform="ios", default_thresholds=DEFAULT_THRESHOLDS_PATH,
-            load_thresholds=load_thresholds, runs_root=UI_PERF_RUNS,
-        )
+        return derive_thresholds_main(sys.argv[1:])
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--xcodebuild-log", required=True)
     parser.add_argument("--diagnostics", required=True,
@@ -565,12 +701,17 @@ def main() -> int:
     )
     parser.add_argument(
         "--thresholds", type=Path, default=DEFAULT_THRESHOLDS_PATH,
-        help="warn-only ceiling contract (config/ui-perf-thresholds-ios.json)",
+        help="ceiling contract, warn-only outside its enforce list (config/ui-perf-thresholds-ios.json)",
     )
     parser.add_argument("--label", default="")
     parser.add_argument(
         "--step-ledger", type=Path, default=None,
         help="the lane's required-steps.json; its step durations join the report's lanePhases (audit #82)",
+    )
+    parser.add_argument(
+        "--build-provenance", type=Path, default=None, metavar="PATH",
+        help="last-build.json written by the lane's build step; binds toolchain.optimization "
+        "in the emitted evidence manifest",
     )
     parser.add_argument(
         "--require-canonical", action="store_true",
@@ -588,7 +729,15 @@ def main() -> int:
     diagnostics = Path(args.diagnostics).expanduser()
     ui_perf_dir = diagnostics / "ui-perf"
     profile_id = None
+    optimization: str | None = None
     try:
+        if args.build_provenance is not None:
+            try:
+                optimization = str(
+                    load_build_provenance(args.build_provenance, platform="ios")["optimization"]
+                )
+            except ProvenanceError as error:
+                raise GateError(f"build provenance: {error}") from None
         thresholds = load_thresholds(args.thresholds or DEFAULT_THRESHOLDS_PATH)
         exploratory = exploratory_scenarios(thresholds)
         if args.require_canonical:
@@ -640,19 +789,29 @@ def main() -> int:
     calibration = calibration_rules.calibration(
         thresholds, canonical_profile_id(), [row["refreshIntervalMS"] for row in scenarios],
     )
+    enforced = enforced_scenarios(thresholds)
     scenario_warnings: dict[str, list[str]] = {}
+    run_failures: list[str] = []
     for summary in scenarios:
+        breaches = evaluate_thresholds(summary, thresholds) if calibration["calibrated"] else []
+        failures = breaches if summary["scenario"] in enforced else []
         warnings = list(cadence_warnings[summary["scenario"]])
-        if calibration["calibrated"]:
-            warnings += evaluate_thresholds(summary, thresholds)
+        if not failures:
+            warnings += breaches
         warnings += calibration_rules.footprint_growth_warning(summary, thresholds)
         summary["thresholdWarnings"] = warnings
+        summary["thresholdFailures"] = failures
         scenario_warnings[summary["scenario"]] = warnings
+        run_failures += failures
     extra_run_warnings = [calibration["code"]] if calibration["code"] else []
 
     evidence_profile = None
     hardware_context = None
-    if args.emit_evidence:
+    if environment_rows:
+        hardware_context = run_hardware_context(
+            environment_rows, scenarios, profile_id or "pending"
+        )
+    if args.emit_evidence and not run_failures:
         if profile_id is not None:
             evidence_profile = profile_id
         else:
@@ -674,16 +833,20 @@ def main() -> int:
     report = {
         "schemaVersion": 1,
         "platform": "ios",
-        "evidence": "registry" if evidence_profile else "local-only",
+        "evidence": "registry" if evidence_profile and not run_failures else "local-only",
+        **({"hardwareContext": {k: v for k, v in hardware_context.items() if k != "profileID"}} if hardware_context else {}),
         "runID": args.run_id,
         "label": args.label or args.run_id,
-        "status": "passedWithWarnings" if run_warnings else "passed",
+        "status": "failed" if run_failures else "passedWithWarnings" if run_warnings else "passed",
         "hardwareProfileID": profile_id,
         "probeDigest": probe_hash.hexdigest(),
         "thresholds": {
             "path": str(args.thresholds) if args.thresholds else None,
-            "warnOnly": True,
+            "warnOnly": not enforced,
             "warnings": run_warnings,
+            "enforce": enforced,
+            "failures": run_failures,
+            "enforcementApplied": bool(enforced) and calibration["calibrated"],
             "calibrated": calibration["calibrated"],
             "calibrationProfile": calibration["calibrationProfile"],
             "calibrationRefreshIntervalMS": calibration["calibrationRefreshIntervalMS"],
@@ -704,13 +867,23 @@ def main() -> int:
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if not calibration["calibrated"]:
+        print(f"  ceilings not applied ({calibration['code']}): {'; '.join(calibration['reasons'])}")
+        if enforced:
+            print(f"  enforced ceilings NOT applied either: {', '.join(enforced)} cannot fail this run")
     for row in scenarios:
-        flag = " !" + ",".join(row["thresholdWarnings"]) if row["thresholdWarnings"] else ""
+        codes = row["thresholdFailures"] + row["thresholdWarnings"]
+        flag = " !" + ",".join(codes) if codes else ""
         print(
             f"  {row['scenario']:26} hitch {row['hitchTimeMSPerS']:>8} ms/s  "
             f"maxGap {row['maxGapMS']:>8} ms  cadence {row['medianBlockCadenceHz']:>6} Hz  "
             f"coverage {row['probeCoverage']:.0%}  [{row['designation']}]{flag}"
         )
+
+    if run_failures:
+        # No evidence manifest: a failed run never reaches the registry.
+        print(f"ios ui-perf gate FAILED: enforced ceiling breached: {', '.join(run_failures)}", file=sys.stderr)
+        return 1
 
     if evidence_profile is not None and hardware_context is not None:
         manifest = build_evidence_manifest(
@@ -722,6 +895,7 @@ def main() -> int:
             profile_id=evidence_profile,
             hardware=hardware_context,
             run_warnings=extra_run_warnings,
+            optimization=optimization,
         )
         evidence_path = output.parent / "benchmark-evidence.json"
         evidence_path.write_text(

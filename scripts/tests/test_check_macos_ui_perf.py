@@ -448,6 +448,16 @@ class UIPerfFixture(unittest.TestCase):
         idle = takes[0]
         self.assertEqual(idle["status"], "passedWithWarnings")
         self.assertEqual(takes[1]["status"], "passed")
+        manifest_with_opt = checker.build_evidence_manifest(
+            run_id="macos-xcui-perf-fixture-0001",
+            label="fixture",
+            scenarios=summaries,
+            scenario_warnings={},
+            probe_digest="0" * 64,
+            profile_id="mac-mini-m6-16gb",
+            optimization="-O",
+        )
+        self.assertEqual(manifest_with_opt["historyRecord"]["toolchain"], {"optimization": "-O"})
 
 
 

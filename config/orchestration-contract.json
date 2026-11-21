@@ -254,6 +254,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -267,6 +268,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -281,6 +283,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -294,6 +297,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -307,6 +311,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -321,6 +326,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -334,6 +340,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -353,6 +360,7 @@
       "optionalSteps": [
         "control-audit-device-correlation",
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -372,6 +380,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -386,6 +395,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -401,6 +411,7 @@
       "optionalSteps": [
         "history-publication",
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -415,6 +426,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -429,6 +441,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -442,6 +455,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -455,6 +469,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -468,6 +483,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -481,6 +497,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -494,6 +511,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -507,6 +525,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },
@@ -541,6 +560,7 @@
       ],
       "optionalSteps": [
         "result-retention",
+        "ui-build",
         "ui-preflight"
       ]
     },

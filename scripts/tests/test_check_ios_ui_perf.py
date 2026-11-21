@@ -235,7 +235,16 @@ class IOSUIPerfFixture(unittest.TestCase):
         self.assertTrue(contract["warnOnly"])
         confirmatory = set(checker.EXPECTED_SCENARIOS) - checker.exploratory_scenarios(contract)
         self.assertEqual(set(contract["confirmatoryScenarios"]), confirmatory)
-        self.assertEqual(checker.exploratory_scenarios(contract), {"ios-player-scrub", "ios-generation-active"})
+        self.assertEqual(
+            checker.exploratory_scenarios(contract),
+            {
+                "ios-harness-control",
+                "ios-history-filter",
+                "ios-history-filter-paged",
+                "ios-player-scrub",
+                "ios-generation-active",
+            },
+        )
         self.assertEqual(set(contract["hitchCeilingMSPerS"]), confirmatory)
         self.assertEqual(set(contract["maxGapCeilingMS"]), confirmatory)
         # audit #77: the contract names the profile its ceilings belong to.
@@ -284,7 +293,10 @@ class IOSUIPerfFixture(unittest.TestCase):
         self.assertFalse(hardware["lowPowerMode"])
         self.assertEqual(hardware["uptimeSeconds"], 3_600.0)
         self.assertEqual(hardware["freeStorageBytes"], 40_000_000_000)
-        self.assertAlmostEqual(hardware["loadAverage1M"], 2.3)
+        self.assertAlmostEqual(
+            hardware["loadAverage1M"],
+            1.5 + (len(checker.EXPECTED_SCENARIOS) - 1) * 0.1,
+        )
         self.assertEqual(record["evidence"]["telemetrySchemaVersion"], "not-applicable")
         self.assertEqual(record["evidence"]["qcAlgorithmVersion"], "not-applicable")
         takes = record["takes"]
@@ -375,6 +387,97 @@ class IOSUIPerfFixture(unittest.TestCase):
             checker.verify_canonical_iphone = original
         self.assertEqual(status, 1)
         self.assertIsNone(report)
+
+    def test_phases_and_cycles_emit_action_query_and_cycle_rates(self):
+        blocks = [dict(block, scenario="ios-tab-navigation") for block in make_blocks(0, 6, hitch_ms_per_block=25.0)]
+        marker = {
+            "schemaVersion": 1,
+            "scenario": "ios-tab-navigation",
+            "windowStartEpochMS": 500,
+            "windowEndEpochMS": 2_500,
+            "actionCount": 4,
+            "cycles": [
+                {"startEpochMS": 500, "endEpochMS": 1_500},
+                {"startEpochMS": 1_500, "endEpochMS": 2_500},
+            ],
+            "phases": [
+                {"name": "query", "startEpochMS": 500, "endEpochMS": 1_000},
+                {"name": "action", "startEpochMS": 1_000, "endEpochMS": 2_500},
+            ],
+        }
+        summary, coverage = checker.summarize_scenario(marker, blocks, exploratory=set())
+        self.assertEqual(coverage, 1.0)
+        self.assertEqual(summary["cycleHitchTimeMSPerS"], [50.0, 50.0])
+        self.assertEqual(summary["actionHitchTimeMSPerS"], 50.0)
+        self.assertEqual(summary["queryHitchTimeMSPerS"], 50.0)
+        self.assertEqual(set(summary["phases"]), {"action", "query"})
+
+    def test_enforced_ceiling_fails_closed_on_calibrated_profile_only(self):
+        thresholds = self.root / "enforced-thresholds.json"
+        contract = {
+            "schemaVersion": 1,
+            "warnOnly": True,
+            "calibrationProfile": "iphone-17-pro",
+            "calibrationRefreshIntervalMS": 16.67,
+            "confirmatoryScenarios": ["ios-idle-baseline"],
+            "enforce": ["ios-idle-baseline"],
+            "hitchCeilingMSPerS": {"ios-idle-baseline": 5.0},
+            "maxGapCeilingMS": {"ios-idle-baseline": 40.0},
+        }
+        thresholds.write_text(json.dumps(contract))
+        log = self.write_run(hitch_by_scenario={"ios-idle-baseline": 50.0})
+        status, report = self.run_checker(log, thresholds=thresholds, emit_evidence=True)
+        self.assertEqual(status, 1)
+        assert report is not None
+        self.assertEqual(report["status"], "failed")
+        self.assertEqual(report["thresholds"]["failures"], ["uiperf.hitch:ios-idle-baseline(50/5)"])
+        self.assertTrue(report["thresholds"]["enforcementApplied"])
+        self.assertFalse((self.root / "benchmark-evidence.json").exists())
+
+        # Off the calibration profile, enforcement is never applied.
+        thresholds.write_text(json.dumps({**contract, "calibrationProfile": "iphone-15-pro"}))
+        status, report = self.run_checker(log, thresholds=thresholds)
+        self.assertEqual(status, 0)
+        assert report is not None
+        self.assertFalse(report["thresholds"]["enforcementApplied"])
+
+    def test_build_provenance_binds_toolchain_optimization_in_evidence(self):
+        log = self.write_run()
+        import hashlib
+        subject = Path(checker.REPO_ROOT) / "project.yml"
+        provenance = self.root / "last-build.json"
+        provenance.write_text(json.dumps({
+            "schemaVersion": 1,
+            "status": "passed",
+            "platform": "ios",
+            "configuration": "Release",
+            "optimization": "O",
+            "executableRelativePath": "project.yml",
+            "executableSHA256": hashlib.sha256(subject.read_bytes()).hexdigest(),
+        }))
+        output = self.root / "ui-perf-report.json"
+        argv = [
+            "check_ios_ui_perf.py",
+            "--xcodebuild-log", str(log),
+            "--diagnostics", str(self.diagnostics),
+            "--run-id", "ios-xcui-perf-fixture-0001",
+            "--run-started-epoch-ms", str(self.run_started),
+            "--output", str(output),
+            "--build-provenance", str(provenance),
+            "--emit-evidence",
+        ]
+        original = checker.verify_canonical_iphone
+        checker.verify_canonical_iphone = lambda diagnostics, run_id: "iphone-17-pro"
+        old_argv = sys.argv
+        sys.argv = argv
+        try:
+            status = checker.main()
+        finally:
+            sys.argv = old_argv
+            checker.verify_canonical_iphone = original
+        self.assertEqual(status, 0)
+        manifest = json.loads((self.root / "benchmark-evidence.json").read_text())
+        self.assertEqual(manifest["historyRecord"]["toolchain"], {"optimization": "-O"})
 
 
 if __name__ == "__main__":

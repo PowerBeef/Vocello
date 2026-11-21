@@ -2073,8 +2073,12 @@ class BenchmarkHistoryTests(unittest.TestCase):
         self.assertEqual(mac[0] - mac[1], {"history-filter-paged"})
         self.assertEqual(mac[1] - mac[2], {"harness-control", "sidebar-navigation-warms"})
         self.assertNotIn(mac[0] - {"harness-control"}, mac)
-        self.assertEqual(history.ui_perf_scenario_sets("ios"),
-                         [history.UI_PERF_SCENARIOS_BY_PLATFORM["ios"]])
+        ios = history.ui_perf_scenario_sets("ios")
+        self.assertEqual([len(scenarios) for scenarios in ios], [12, 9])
+        self.assertEqual(
+            ios[0] - ios[1],
+            {"ios-harness-control", "ios-history-filter", "ios-history-filter-paged"},
+        )
 
     def test_records_without_an_rtf_need_no_rtf_definition_after_the_cutover(self) -> None:
         # ui-perf measures frame health; the first perf run after the cutover

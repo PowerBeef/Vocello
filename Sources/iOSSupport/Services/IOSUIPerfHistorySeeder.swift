@@ -49,20 +49,24 @@ enum IOSUIPerfHistorySeeder {
                 return Int(tail)
             })
         let modes = ["custom", "design", "clone"]
+        var pending: [Generation] = []
+        pending.reserveCapacity(max(0, target - present.count))
         for index in 0..<target where !present.contains(index) {
-            var generation = unsafe Generation(
-                text: String(format: "%@%04d · %@", textPrefix, index, fillerSentence),
-                mode: modes[index % modes.count],
-                modelTier: "pro",
-                voice: index % 3 == 0 ? "aiden" : nil,
-                emotion: nil,
-                speed: nil,
-                audioPath: wavPath,
-                duration: seedDurationSeconds,
-                createdAt: Date().addingTimeInterval(Double(-index) * 3_600 * 7)
+            pending.append(
+                unsafe Generation(
+                    text: String(format: "%@%04d · %@", textPrefix, index, fillerSentence),
+                    mode: modes[index % modes.count],
+                    modelTier: "pro",
+                    voice: index % 3 == 0 ? "aiden" : nil,
+                    emotion: nil,
+                    speed: nil,
+                    audioPath: wavPath,
+                    duration: seedDurationSeconds,
+                    createdAt: Date().addingTimeInterval(Double(-index) * 3_600 * 7)
+                )
             )
-            try? service.saveGeneration(&generation)
         }
+        try? service.saveGenerations(&pending)
     }
 
     /// A minimal valid 24 kHz mono PCM16 WAV of 30 s silence, written once.

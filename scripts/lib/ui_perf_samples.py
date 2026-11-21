@@ -21,6 +21,95 @@ from __future__ import annotations
 import math
 from typing import Any, Iterable
 
+# The named spans a UI-perf scenario marker may carry inside its window (audit #32).
+PHASE_NAMES = frozenset({"query", "action", "verify"})
+
+
+def overlap_fraction(block: dict[str, Any], start: int, end: int) -> float:
+    span = int(block["endEpochMS"]) - int(block["startEpochMS"])
+    if span <= 0:
+        return 0.0
+    overlap = min(int(block["endEpochMS"]), end) - max(int(block["startEpochMS"]), start)
+    return max(0.0, min(1.0, overlap / span))
+
+
+def span_hitch(blocks: list[dict[str, Any]], start: int, end: int) -> tuple[float, int]:
+    """(in-span excess frame time, covered ms) of one span, apportioned like a window."""
+    touching = [b for b in blocks if b["endEpochMS"] > start and b["startEpochMS"] < end]
+    covered = sum(min(int(b["endEpochMS"]), end) - max(int(b["startEpochMS"]), start) for b in touching)
+    excess = sum(b["sumExcessMS"] * overlap_fraction(b, start, end) for b in touching)
+    return excess, covered
+
+
+def phase_hitch_rates(marker: dict[str, Any], blocks: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Per phase name, the phases' total duration and hitch rate (audit #32).
+
+    Optional marker field `phases`: [{name, startEpochMS, endEpochMS}, ...],
+    ordered, disjoint (a phase may start where the previous ended) and inside
+    the window. Report-only: no record metric or ceiling reads it."""
+    phases = marker.get("phases")
+    if phases is None:
+        return None
+    scenario = marker["scenario"]
+    start, end = int(marker["windowStartEpochMS"]), int(marker["windowEndEpochMS"])
+    if not isinstance(phases, list) or not phases:
+        raise ValueError(f"scenario '{scenario}': phases must be a non-empty list")
+    totals: dict[str, dict[str, float]] = {}
+    previous_end = start
+    for phase in phases:
+        try:
+            name = phase["name"]
+            phase_start, phase_end = int(phase["startEpochMS"]), int(phase["endEpochMS"])
+        except (KeyError, TypeError, ValueError):
+            raise ValueError(f"scenario '{scenario}': malformed phase marker") from None
+        if name not in PHASE_NAMES:
+            raise ValueError(f"scenario '{scenario}': unknown phase {name!r}")
+        if not previous_end <= phase_start <= phase_end <= end:
+            raise ValueError(f"scenario '{scenario}': phases must be ordered, disjoint and inside the window")
+        previous_end = phase_end
+        excess, covered = span_hitch(blocks, phase_start, phase_end)
+        entry = totals.setdefault(name, {"durationMS": 0.0, "excessMS": 0.0, "coveredMS": 0.0})
+        entry["durationMS"] += phase_end - phase_start
+        entry["excessMS"] += excess
+        entry["coveredMS"] += covered
+    return {
+        name: {
+            "durationMS": int(entry["durationMS"]),
+            "hitchTimeMSPerS": round(entry["excessMS"] / (entry["coveredMS"] / 1000.0), 3)
+            if entry["coveredMS"] > 0 else None,
+        }
+        for name, entry in sorted(totals.items())
+    }
+
+
+def cycle_hitch_rates(marker: dict[str, Any], blocks: list[dict[str, Any]]) -> list[float] | None:
+    """Per-cycle hitch time for a scenario that marks its repeated cycles (audit #34(b)).
+
+    Optional marker field `cycles`: [{startEpochMS, endEpochMS}, ...], ordered,
+    non-overlapping and inside the scenario window. Each cycle is apportioned
+    exactly like the window, so the rates are within-run samples of the same
+    statistic. Markers without cycles return None."""
+    cycles = marker.get("cycles")
+    if cycles is None:
+        return None
+    scenario = marker["scenario"]
+    start, end = int(marker["windowStartEpochMS"]), int(marker["windowEndEpochMS"])
+    if not isinstance(cycles, list) or not cycles:
+        raise ValueError(f"scenario '{scenario}': cycles must be a non-empty list")
+    rates = []
+    previous_end = start
+    for cycle in cycles:
+        try:
+            cycle_start, cycle_end = int(cycle["startEpochMS"]), int(cycle["endEpochMS"])
+        except (KeyError, TypeError, ValueError):
+            raise ValueError(f"scenario '{scenario}': malformed cycle marker") from None
+        if not previous_end <= cycle_start < cycle_end <= end:
+            raise ValueError(f"scenario '{scenario}': cycles must be ordered, disjoint and inside the window")
+        previous_end = cycle_end
+        excess, covered = span_hitch(blocks, cycle_start, cycle_end)
+        rates.append(round(excess / (covered / 1000.0), 3) if covered > 0 else 0.0)
+    return rates
+
 
 def _complete(blocks: list[dict[str, Any]], key: str, dropped: str) -> bool:
     return bool(blocks) and all(key in block and not block.get(dropped) for block in blocks)

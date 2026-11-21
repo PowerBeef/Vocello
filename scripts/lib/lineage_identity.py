@@ -284,6 +284,13 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # instead of XCUITest accessibility snapshot walks and marks action phases,
     # removing the ~79% harness-snapshot observer cost from its hitch rate.
     ("ui-perf", "macos"): 3,
+    # 2 (2026-11-21, DW-03/DW-04 iOS UI-perf overhaul): pure-UI scenarios
+    # suppress proactive warms (QVOICE_IOS_DISABLE_PROACTIVE_PREFETCH=1),
+    # seeded History scenarios isolate into per-row-count support roots (400/700),
+    # tab/composer/sheet/scrubber interactions switch to root-anchored coordinates
+    # + VocelloPerfPhaseLog spans (eliminating in-window snapshot walks), and
+    # ios-harness-control / ios-history-filter / ios-history-filter-paged join.
+    ("ui-perf", "ios"): 2,
     # 2 (2026-09-25, audit #45/#56): the iPhone gate's generation step and the
     # memory-qualification wait no longer copy the whole diagnostics tree from
     # the phone every 10 s while the take runs; they poll only their markers.

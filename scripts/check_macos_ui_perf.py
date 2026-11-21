@@ -63,6 +63,8 @@ if str(REPO_ROOT / "scripts") not in sys.path:
 from lib import ui_perf_thresholds as calibration_rules  # noqa: E402
 from lib import ui_perf_lane  # noqa: E402
 from lib import ui_perf_samples  # noqa: E402
+from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
+from lib.ui_perf_samples import PHASE_NAMES, overlap_fraction, span_hitch  # noqa: E402
 
 EXPECTED_SCENARIOS = [
     "idle-baseline",
@@ -79,8 +81,6 @@ EXPECTED_SCENARIOS = [
     "sidebar-navigation-warms",
     "generation-active",
 ]
-# The named spans a marker may carry inside its window (audit #32).
-PHASE_NAMES = frozenset({"query", "action", "verify"})
 # The History scenarios are exploratory because a 400-row list under
 # XCUITest cannot be measured clean: per-interaction element queries and
 # the post-search-clear accessibility maintenance for 400 re-rendered rows
@@ -183,95 +183,18 @@ def exploratory_scenarios(thresholds: dict) -> set[str]:
     return set(EXPECTED_SCENARIOS) - set(thresholds["confirmatoryScenarios"])
 
 
-def overlap_fraction(block: dict, start: int, end: int) -> float:
-    span = int(block["endEpochMS"]) - int(block["startEpochMS"])
-    if span <= 0:
-        return 0.0
-    overlap = min(int(block["endEpochMS"]), end) - max(int(block["startEpochMS"]), start)
-    return max(0.0, min(1.0, overlap / span))
-
-
-def span_hitch(blocks: list[dict], start: int, end: int) -> tuple[float, int]:
-    """(in-span excess frame time, covered ms) of one span, apportioned like a window."""
-    touching = [b for b in blocks if b["endEpochMS"] > start and b["startEpochMS"] < end]
-    covered = sum(min(int(b["endEpochMS"]), end) - max(int(b["startEpochMS"]), start) for b in touching)
-    excess = sum(b["sumExcessMS"] * overlap_fraction(b, start, end) for b in touching)
-    return excess, covered
-
-
 def phase_hitch_rates(marker: dict, blocks: list[dict]) -> dict | None:
-    """Per phase name, the phases' total duration and hitch rate (audit #32).
-
-    Optional marker field `phases`: [{name, startEpochMS, endEpochMS}, ...],
-    ordered, disjoint (a phase may start where the previous ended) and inside
-    the window. Report-only: no record metric or ceiling reads it."""
-    phases = marker.get("phases")
-    if phases is None:
-        return None
-    scenario = marker["scenario"]
-    start, end = int(marker["windowStartEpochMS"]), int(marker["windowEndEpochMS"])
-    if not isinstance(phases, list) or not phases:
-        raise GateError(f"scenario '{scenario}': phases must be a non-empty list")
-    totals: dict[str, dict[str, float]] = {}
-    previous_end = start
-    for phase in phases:
-        try:
-            name = phase["name"]
-            phase_start, phase_end = int(phase["startEpochMS"]), int(phase["endEpochMS"])
-        except (KeyError, TypeError, ValueError):
-            raise GateError(f"scenario '{scenario}': malformed phase marker") from None
-        if name not in PHASE_NAMES:
-            raise GateError(f"scenario '{scenario}': unknown phase {name!r}")
-        if not previous_end <= phase_start <= phase_end <= end:
-            raise GateError(f"scenario '{scenario}': phases must be ordered, disjoint and inside the window")
-        previous_end = phase_end
-        excess, covered = span_hitch(blocks, phase_start, phase_end)
-        entry = totals.setdefault(name, {"durationMS": 0.0, "excessMS": 0.0, "coveredMS": 0.0})
-        entry["durationMS"] += phase_end - phase_start
-        entry["excessMS"] += excess
-        entry["coveredMS"] += covered
-    return {
-        name: {
-            "durationMS": int(entry["durationMS"]),
-            "hitchTimeMSPerS": round(entry["excessMS"] / (entry["coveredMS"] / 1000.0), 3)
-            if entry["coveredMS"] > 0 else None,
-        }
-        for name, entry in sorted(totals.items())
-    }
+    try:
+        return ui_perf_samples.phase_hitch_rates(marker, blocks)
+    except ValueError as error:
+        raise GateError(str(error)) from None
 
 
 def cycle_hitch_rates(marker: dict, blocks: list[dict]) -> list[float] | None:
-    """Per-cycle hitch time for a scenario that marks its repeated cycles (audit #34(b)).
-
-    Optional marker field `cycles`: [{startEpochMS, endEpochMS}, ...], ordered,
-    non-overlapping and inside the scenario window. Each cycle is apportioned
-    exactly like the window, so the rates are within-run samples of the same
-    statistic. Markers without cycles (every record before this) return None.
-    """
-    cycles = marker.get("cycles")
-    if cycles is None:
-        return None
-    scenario = marker["scenario"]
-    start, end = int(marker["windowStartEpochMS"]), int(marker["windowEndEpochMS"])
-    if not isinstance(cycles, list) or not cycles:
-        raise GateError(f"scenario '{scenario}': cycles must be a non-empty list")
-    rates = []
-    previous_end = start
-    for cycle in cycles:
-        try:
-            cycle_start, cycle_end = int(cycle["startEpochMS"]), int(cycle["endEpochMS"])
-        except (KeyError, TypeError, ValueError):
-            raise GateError(f"scenario '{scenario}': malformed cycle marker") from None
-        if not previous_end <= cycle_start < cycle_end <= end:
-            raise GateError(f"scenario '{scenario}': cycles must be ordered, disjoint and inside the window")
-        previous_end = cycle_end
-        touching = [b for b in blocks if b["endEpochMS"] > cycle_start and b["startEpochMS"] < cycle_end]
-        covered = sum(
-            min(int(b["endEpochMS"]), cycle_end) - max(int(b["startEpochMS"]), cycle_start) for b in touching
-        )
-        excess = sum(b["sumExcessMS"] * overlap_fraction(b, cycle_start, cycle_end) for b in touching)
-        rates.append(round(excess / (covered / 1000.0), 3) if covered > 0 else 0.0)
-    return rates
+    try:
+        return ui_perf_samples.cycle_hitch_rates(marker, blocks)
+    except ValueError as error:
+        raise GateError(str(error)) from None
 
 
 def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str]) -> tuple[dict, float]:
@@ -559,6 +482,7 @@ def build_evidence_manifest(
     profile_id: str,
     hardware: dict | None = None,
     run_warnings: list[str] | None = None,
+    optimization: str | None = None,
 ) -> dict:
     """`run_warnings` carries run-level codes such as `uiperf.uncalibrated:<profile>`."""
     takes = []
@@ -584,6 +508,32 @@ def build_evidence_manifest(
         {code for codes in scenario_warnings.values() for code in codes} | set(run_warnings or [])
     )
     status = "passedWithWarnings" if run_warnings else "passed"
+    history_record: dict = {
+        "run": {
+            "id": run_id,
+            "kind": "ui-perf",
+            "platform": "macos",
+            "status": status,
+            "label": label or run_id,
+            "matrixScope": "canonical",
+            "warnings": run_warnings,
+        },
+        "hardware": {**(hardware or {}), "profileID": profile_id},
+        "models": [],
+        "evidence": {
+            "validatorPassed": True,
+            "crashDeltaPassed": True,
+            "crashCount": 0,
+            "expectedTakeCount": len(EXPECTED_SCENARIOS),
+            "actualTakeCount": len(takes),
+            "telemetrySchemaVersion": "not-applicable",
+            "qcAlgorithmVersion": "not-applicable",
+            "rawTelemetryDigest": probe_digest,
+        },
+        "takes": takes,
+    }
+    if optimization is not None:
+        history_record["toolchain"] = {"optimization": optimization}
     return {
         "schemaVersion": 1,
         "benchmarkKind": "ui-perf",
@@ -591,30 +541,7 @@ def build_evidence_manifest(
         "runID": run_id,
         "status": status,
         "label": label or run_id,
-        "historyRecord": {
-            "run": {
-                "id": run_id,
-                "kind": "ui-perf",
-                "platform": "macos",
-                "status": status,
-                "label": label or run_id,
-                "matrixScope": "canonical",
-                "warnings": run_warnings,
-            },
-            "hardware": {**(hardware or {}), "profileID": profile_id},
-            "models": [],
-            "evidence": {
-                "validatorPassed": True,
-                "crashDeltaPassed": True,
-                "crashCount": 0,
-                "expectedTakeCount": len(EXPECTED_SCENARIOS),
-                "actualTakeCount": len(takes),
-                "telemetrySchemaVersion": "not-applicable",
-                "qcAlgorithmVersion": "not-applicable",
-                "rawTelemetryDigest": probe_digest,
-            },
-            "takes": takes,
-        },
+        "historyRecord": history_record,
     }
 
 
@@ -724,6 +651,11 @@ def main() -> int:
         help="the lane's required-steps.json; its step durations join the report's lanePhases (audit #82)",
     )
     parser.add_argument(
+        "--build-provenance", type=Path, default=None, metavar="PATH",
+        help="last-build.json written by the lane's build step; binds toolchain.optimization "
+        "in the emitted evidence manifest",
+    )
+    parser.add_argument(
         "--emit-evidence", action="store_true",
         help="write benchmark-evidence.json beside the report when the live "
         "host matches the canonical hardware profile (registry publication "
@@ -732,7 +664,15 @@ def main() -> int:
     args = parser.parse_args()
 
     ui_perf_dir = Path(args.diagnostics).expanduser() / "ui-perf"
+    optimization: str | None = None
     try:
+        if args.build_provenance is not None:
+            try:
+                optimization = str(
+                    load_build_provenance(args.build_provenance, platform="macos")["optimization"]
+                )
+            except ProvenanceError as error:
+                raise GateError(f"build provenance: {error}") from None
         thresholds = load_thresholds(args.thresholds)
         markers = parse_markers(Path(args.xcodebuild_log))
         missing = [s for s in EXPECTED_SCENARIOS if s not in markers]
@@ -863,6 +803,7 @@ def main() -> int:
                 profile_id=profile_id,
                 hardware={k: v for k, v in hardware_context.items() if k != "profileID"},
                 run_warnings=extra_run_warnings,
+                optimization=optimization,
             )
             evidence_path = output.parent / "benchmark-evidence.json"
             evidence_path.write_text(

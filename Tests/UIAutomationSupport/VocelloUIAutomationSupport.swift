@@ -816,6 +816,20 @@ public struct VocelloUIPerfPhase: Codable {
     }
 }
 
+/// Named spans of one measured window, in wall-clock epoch milliseconds
+/// (audit #32); appended in order, so they are disjoint and ordered.
+/// Shared by both macOS and iOS UI-perf suites.
+@MainActor
+public final class VocelloPerfPhaseLog {
+    public private(set) var phases: [VocelloUIPerfPhase] = []
+
+    public init() {}
+
+    public func append(_ name: String, from start: Int64, to end: Int64) {
+        phases.append(VocelloUIPerfPhase(name: name, startEpochMS: start, endEpochMS: max(start, end)))
+    }
+}
+
 /// Where one UI-perf scenario's lane time went (audit #82): wall-clock epoch
 /// stamps from the scenario's launch to the end of its measured window, printed
 /// as one `VOCELLO_UIPERF_SETUP=<base64>` line the checker folds into the report.

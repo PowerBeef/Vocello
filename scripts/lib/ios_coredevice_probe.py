@@ -113,12 +113,15 @@ def pick_device(data: dict[str, Any], device_id: str | None = None) -> dict[str,
 def summarize_device(d: dict[str, Any]) -> dict[str, Any]:
     cp = d.get("connectionProperties") or {}
     props = d.get("deviceProperties") or {}
+    hw = d.get("hardwareProperties") or {}
     tunnel = cp.get("tunnelState", "")
     pairing = cp.get("pairingState", "")
     reachable = _reachable(d)
     return {
         "identifier": d.get("identifier"),
         "name": props.get("name"),
+        "productType": hw.get("productType"),
+        "marketingName": hw.get("marketingName"),
         "tunnelState": tunnel,
         "pairingState": pairing,
         "transportType": cp.get("transportType"),

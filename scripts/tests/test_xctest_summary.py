@@ -171,12 +171,19 @@ class SwiftTestingTests(unittest.TestCase):
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 LANE_CONFIG = ROOT / "config" / "ui-lane-tests.json"
 MAC_UI_TESTS = ROOT / "Tests" / "VocelloMacUITests"
+IOS_UI_TESTS = ROOT / "Tests" / "VocelloiOSUITests"
 # The XCTest class each lane of config/ui-lane-tests.json runs in full (scripts/ui_test.sh).
-LANE_CLASSES = {
-    "macos-smoke": "VocelloMacSmokeUITests",
-    "macos-perf": "VocelloMacPerfUITests",
-    "macos-benchmark": "VocelloMacBenchmarkUITests",
+# `subset=True` denotes lanes whose class also carries scenario-only test methods.
+LANE_SPECS: dict[str, tuple[pathlib.Path, str, bool]] = {
+    "macos-smoke": (MAC_UI_TESTS, "VocelloMacSmokeUITests", False),
+    "macos-perf": (MAC_UI_TESTS, "VocelloMacPerfUITests", False),
+    "macos-benchmark": (MAC_UI_TESTS, "VocelloMacBenchmarkUITests", False),
+    "ios-smoke": (IOS_UI_TESTS, "VocelloiOSSmokeUITests", True),
+    "ios-localization": (IOS_UI_TESTS, "VocelloiOSSmokeUITests", True),
+    "ios-perf": (IOS_UI_TESTS, "VocelloiOSPerfUITests", False),
+    "ios-benchmark": (IOS_UI_TESTS, "VocelloiOSBenchmarkUITests", False),
 }
+LANE_CLASSES = {lane: suite for lane, (_, suite, _) in LANE_SPECS.items()}
 SWIFT_TYPE = re.compile(r"^(?:[a-z@()]+\s+)*(?:class|extension|struct|enum|actor|protocol)\s+(\w+)")
 SWIFT_TEST_METHOD = re.compile(r"^\s+func (test\w*)\s*\(\s*\)")
 
@@ -228,17 +235,28 @@ class ExpectedLaneTests(unittest.TestCase):
         """A renamed, added or deleted journey must change config/ui-lane-tests.json with it."""
         config = json.loads(LANE_CONFIG.read_text(encoding="utf-8"))
         self.assertEqual(config["schemaVersion"], 1)
-        self.assertEqual(set(config["lanes"]), set(LANE_CLASSES))
-        methods = swift_test_methods(MAC_UI_TESTS)
-        for lane, suite in LANE_CLASSES.items():
+        self.assertEqual(set(config["lanes"]), set(LANE_SPECS))
+        methods_by_dir = {
+            MAC_UI_TESTS: swift_test_methods(MAC_UI_TESTS),
+            IOS_UI_TESTS: swift_test_methods(IOS_UI_TESTS),
+        }
+        for lane, (directory, suite, is_subset) in LANE_SPECS.items():
             with self.subTest(lane=lane):
-                self.assertTrue(methods.get(suite), f"no test methods found for {suite}")
-                self.assertEqual(config["lanes"][lane], [f"{suite}/{name}" for name in sorted(methods[suite])])
-                self.assertEqual(summary.expected_tests(LANE_CONFIG, lane), config["lanes"][lane])
+                available = [f"{suite}/{name}" for name in sorted(methods_by_dir[directory].get(suite, []))]
+                self.assertTrue(available, f"no test methods found for {suite}")
+                listed = config["lanes"][lane]
+                if is_subset:
+                    self.assertTrue(listed, f"lane {lane} must list at least one test")
+                    self.assertTrue(set(listed) <= set(available), f"{lane} lists unknown methods")
+                else:
+                    self.assertEqual(listed, available)
+                self.assertEqual(summary.expected_tests(LANE_CONFIG, lane), listed)
         # The parser reads one class's methods, not its neighbours in the same file.
-        self.assertEqual(methods["VocelloMacAutoLanguageUITests"], ["testAutoLanguageReachesTheEngine"])
+        self.assertEqual(methods_by_dir[MAC_UI_TESTS]["VocelloMacAutoLanguageUITests"], ["testAutoLanguageReachesTheEngine"])
         self.assertEqual(len(config["lanes"]["macos-smoke"]), 16)
         self.assertEqual(config["lanes"]["macos-benchmark"], ["VocelloMacBenchmarkUITests/testOrderedConfigurableMatrix"])
+        self.assertEqual(len(config["lanes"]["ios-perf"]), 12)
+        self.assertEqual(config["lanes"]["ios-benchmark"], ["VocelloiOSBenchmarkUITests/testOrderedConfigurableMatrix"])
 
     def test_a_full_run_of_every_expected_test_passes(self):
         for lane in LANE_CLASSES:

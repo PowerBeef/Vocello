@@ -722,6 +722,9 @@ UI_PERF_SCENARIOS_BY_PLATFORM = {
         "ios-idle-baseline", "ios-tab-navigation", "ios-history-scroll",
         "ios-voices-scroll", "ios-settings-scroll", "ios-composer-typing",
         "ios-sheet-present-dismiss", "ios-player-scrub", "ios-generation-active",
+        # Since 2026-11-21 (DW-03/DW-04 iOS UI-perf overhaul): harness-only
+        # query control and 400/700-row History filters (exploratory).
+        "ios-harness-control", "ios-history-filter", "ios-history-filter-paged",
     },
 }
 # Scenarios a platform's earlier records measured without, oldest addition
@@ -729,7 +732,7 @@ UI_PERF_SCENARIOS_BY_PLATFORM = {
 # one of these additions, never a mix.
 UI_PERF_SCENARIOS_ADDED = {
     "macos": [{"harness-control", "sidebar-navigation-warms"}, {"history-filter-paged"}],
-    "ios": [],
+    "ios": [{"ios-harness-control", "ios-history-filter", "ios-history-filter-paged"}],
 }
 
 

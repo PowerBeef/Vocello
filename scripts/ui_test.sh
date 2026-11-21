@@ -686,17 +686,27 @@ ensure_mac_runner_signature() {
 # certificate that signed the bundle inside it, the test target's entitlements.
 ensure_ios_candidate_runner_signature() {
   local runner="$1"
-  codesign --verify --deep --strict "$runner" && return 0
-  local plugin="$runner/PlugIns/VocelloiOSCandidateUITests.xctest"
-  local xcent="$IOS_DERIVED/Build/Intermediates.noindex/QwenVoice.build/Release-iphoneos/VocelloiOSCandidateUITests.build/VocelloiOSCandidateUITests.xctest.xcent"
+  ensure_ios_runner_signature "$runner" "VocelloiOSCandidateUITests"
+}
+
+# Parameterized iOS XCTRunner signature check/re-seal for VocelloiOSUITests,
+# VocelloiOSPurchaseUITests and VocelloiOSCandidateUITests (2026-10-25: Xcode's
+# incremental build-for-testing can relink the plugin without re-sealing the
+# XCTRunner wrapper around it).
+ensure_ios_runner_signature() {
+  local runner="$1" bundle="${2:-VocelloiOSUITests}"
+  [[ -d "$runner" ]] || return 1
+  codesign --verify --deep --strict "$runner" >/dev/null 2>&1 && return 0
+  local plugin="$runner/PlugIns/${bundle}.xctest"
+  local xcent="$IOS_DERIVED/Build/Intermediates.noindex/QwenVoice.build/Release-iphoneos/${bundle}.build/${bundle}.xctest.xcent"
   local certs identity
   certs="$(mktemp -d)"
   (cd "$certs" && codesign -d --extract-certificates "$plugin") >/dev/null 2>&1
   identity="$(openssl x509 -inform DER -in "$certs/codesign0" -noout -fingerprint -sha1 2>/dev/null \
     | sed 's/.*=//; s/://g')"
   rm -rf "$certs"
-  [[ -n "$identity" && -f "$xcent" ]] || { echo "cannot re-seal: no signing certificate or entitlements"; return 1; }
-  echo "re-sealing the runner wrapper with the test bundle's certificate $identity"
+  [[ -n "$identity" && -f "$xcent" ]] || { echo "cannot re-seal $bundle runner: no signing certificate or entitlements"; return 1; }
+  echo "re-sealing $bundle runner wrapper with the test bundle's certificate $identity"
   codesign --force --sign "$identity" --entitlements "$xcent" --timestamp=none \
     --generate-entitlement-der "$runner" && codesign --verify --deep --strict "$runner"
 }
@@ -784,14 +794,20 @@ write_test_summary() {
 }
 
 # The lane of config/ui-lane-tests.json a full run must satisfy (audit T10): a
-# deleted or skipped journey still ends with a consistent log, so the full macOS
-# smoke, perf and benchmark runs check which tests ran. A --scenario run is one
-# journey by design and names no lane; neither does any other lane.
+# deleted or skipped journey still ends with a consistent log, so full macOS and
+# iOS runs check which tests ran. A --scenario or --preinstalled-candidate run
+# is a subset by design and names no lane.
 expected_test_lane() {
-  [[ "$platform" == "macos" && -z "$scenario_argument" ]] || return 0
-  case "$lane" in
-    smoke|perf|benchmark) printf 'macos-%s\n' "$lane" ;;
-  esac
+  [[ -z "${scenario_argument:-}" && -z "${candidate_evidence:-}" ]] || return 0
+  if [[ "$platform" == "macos" ]]; then
+    case "$lane" in
+      smoke|perf|benchmark) printf 'macos-%s\n' "$lane" ;;
+    esac
+  elif [[ "$platform" == "ios" ]]; then
+    case "$lane" in
+      smoke|localization|perf|benchmark) printf 'ios-%s\n' "$lane" ;;
+    esac
+  fi
 }
 
 # The crash marker is stamped by arm_mac_crash_marker right before the app
@@ -1009,6 +1025,30 @@ else:
     warn "ui-preflight: no Apple Development team found; set QWENVOICE_DEVELOPMENT_TEAM"
     return 1
   }
+  python3 "$ROOT_DIR/scripts/ios_signing_identity.py" check --team "$team" >&2 || {
+    warn "ui-preflight: no usable Apple Development signing identity for team $team"
+    return 1
+  }
+  if [[ "$lane" == "benchmark" || ( "$lane" == "perf" && "$no_publish" -eq 0 ) ]]; then
+    local hw_check
+    hw_check="$(python3 - "$ROOT_DIR/benchmarks/hardware-profiles.json" "$probe" <<'PY'
+import json, pathlib, sys
+profiles = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")).get("profiles", [])
+canonical = next((p for p in profiles if p.get("platform") == "ios" and p.get("canonical")), None)
+if not canonical:
+    raise SystemExit(0)
+probe = json.loads(sys.argv[2])
+product_type = probe.get("productType")
+expected = canonical.get("modelIdentifier")
+if product_type and expected and product_type != expected:
+    print(f"mismatch {product_type} != {expected} ({canonical.get('id')})")
+PY
+    )" || true
+    if [[ "$hw_check" == mismatch\ * ]]; then
+      warn "ui-preflight: paired iPhone is not the canonical benchmark profile (${hw_check#mismatch }); pass --no-publish for local-only perf runs"
+      return 1
+    fi
+  fi
 }
 
 snapshot_ios_crashes() {
@@ -1288,21 +1328,44 @@ ios_ui_find_xctestrun() {
   ios_ui_xctestrun="$found"
 }
 
-# Digests of the .xctestrun, the app and the test bundle; fails unless all three exist.
+# Digests of the .xctestrun, the app, its dSYM DWARF binary, and the test bundle;
+# fails unless all four exist (a missing or overwritten dSYM forces a rebuild
+# before running tests instead of failing post-run symbol preservation).
 ios_ui_products_digest() {
   local products="$IOS_DERIVED/Build/Products/Release-iphoneos" bundle digests
   bundle="$(ios_ui_bundle_name)"
   digests="$(shasum -a 256 "$ios_ui_xctestrun" "$products/Vocello.app/Vocello" \
+    "$products/Vocello.app.dSYM/Contents/Resources/DWARF/Vocello" \
     "$products/${bundle}-Runner.app/PlugIns/${bundle}.xctest/${bundle}" \
     2>/dev/null | awk '{print $1}')" || return 1
-  [[ "$(printf '%s\n' "$digests" | grep -c .)" == 3 ]] || return 1
+  [[ "$(printf '%s\n' "$digests" | grep -c .)" == 4 ]] || return 1
   printf '%s\n' "$digests" | paste -sd, -
 }
 
+ios_ui_find_dev_profile_name() {
+  local profile_team="$1"
+  local profiles_dir="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+  [[ -d "$profiles_dir" ]] || return 0
+  local f plist appid gta name
+  for f in "$profiles_dir"/*.mobileprovision; do
+    [[ -e "$f" ]] || continue
+    plist="$(security cms -D -i "$f" 2>/dev/null)" || continue
+    gta="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:get-task-allow' /dev/stdin <<<"$plist" 2>/dev/null)" || continue
+    [[ "$gta" == "true" ]] || continue
+    appid="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' /dev/stdin <<<"$plist" 2>/dev/null)" || continue
+    if [[ "$appid" == "$profile_team.$BUNDLE_ID_IOS" ]]; then
+      name="$(/usr/libexec/PlistBuddy -c 'Print :Name' /dev/stdin <<<"$plist" 2>/dev/null)" || continue
+      [[ -n "$name" ]] && { printf '%s' "$name"; return 0; }
+    fi
+  done
+  return 0
+}
+
 ios_ui_build_for_testing() {
-  local scheme bundle marker fingerprint toolchain products="" status=0
+  local scheme bundle runner marker fingerprint toolchain products="" status=0
   scheme="$(ios_ui_scheme_name)"
   bundle="$(ios_ui_bundle_name)"
+  runner="$IOS_DERIVED/Build/Products/Release-iphoneos/${bundle}-Runner.app"
   marker="$IOS_DERIVED/.vocello-ios-ui-build-fingerprint.${scheme}"
   fingerprint="$(python3 "$ROOT_DIR/scripts/tree_fingerprint.py" --root "$ROOT_DIR" --build-inputs)" || return 1
   # The toolchain (an Xcode update changes the binary with no source change) and the
@@ -1311,15 +1374,17 @@ ios_ui_build_for_testing() {
   fingerprint="$fingerprint|$toolchain|$device|$scheme"
   if ios_ui_find_xctestrun; then products="$(ios_ui_products_digest || true)"; fi
   if [[ -n "$products" && -f "$marker" \
-      && "$(cat "$marker" 2>/dev/null)" == "$fingerprint|$team|$products" ]]; then
+      && "$(cat "$marker" 2>/dev/null)" == "$fingerprint|$team|$products" ]] \
+      && ensure_ios_runner_signature "$runner" "$bundle" >"$out/runner-signature.log" 2>&1; then
     note "build-for-testing skipped ($scheme) — source fingerprint and products unchanged"
+    required_step_record "$step_ledger" ui-build 0
     return 0
   fi
   rm -f "$marker"
   # An SDK update names a new .xctestrun beside the old one; keep exactly the fresh one.
   find "$IOS_DERIVED/Build/Products" -maxdepth 1 -name "${scheme}_*.xctestrun" -delete 2>/dev/null || true
   qvoice_path_map_settings "$ROOT_DIR"
-  xcb_run build-for-testing \
+  required_step_run "$step_ledger" ui-build xcb_run build-for-testing \
     -project "$PROJECT" -scheme "$scheme" -configuration Release \
     -destination "id=$device" -derivedDataPath "$IOS_DERIVED" \
     -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
@@ -1330,6 +1395,26 @@ ios_ui_build_for_testing() {
     QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
     QVOICE_OWNED_SWIFT_OPTIMIZATION=-O QVOICE_OWNED_SWIFT_COMPILATION_MODE=wholemodule \
     ${QVOICE_PATH_MAP_SETTINGS[@]+"${QVOICE_PATH_MAP_SETTINGS[@]}"} >"$out/xcodebuild-build.log" 2>&1 || status=$?
+  if (( status != 0 )) && grep -Eiq 'No Account for Team|Provisioning|network|timed out|offline' "$out/xcodebuild-build.log"; then
+    local manual_profile
+    manual_profile="$(ios_ui_find_dev_profile_name "$team")"
+    if [[ -n "$manual_profile" ]]; then
+      note "Automatic signing failed; retrying $scheme build-for-testing offline with installed profile '$manual_profile'"
+      status=0
+      required_step_run "$step_ledger" ui-build xcb_run build-for-testing \
+        -project "$PROJECT" -scheme "$scheme" -configuration Release \
+        -destination "id=$device" -derivedDataPath "$IOS_DERIVED" \
+        -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
+        -disableAutomaticPackageResolution \
+        -onlyUsePackageVersionsFromResolvedFile \
+        DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Manual \
+        "CODE_SIGN_IDENTITY=Apple Development" "PROVISIONING_PROFILE_SPECIFIER=$manual_profile" \
+        ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+        QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
+        QVOICE_OWNED_SWIFT_OPTIMIZATION=-O QVOICE_OWNED_SWIFT_COMPILATION_MODE=wholemodule \
+        ${QVOICE_PATH_MAP_SETTINGS[@]+"${QVOICE_PATH_MAP_SETTINGS[@]}"} >"$out/xcodebuild-build.log" 2>&1 || status=$?
+    fi
+  fi
   if (( status != 0 )); then
     ui_primary_native_exit_code="$status"
     # The lane ledger classifies infrastructure failures (signing, provisioning) from
@@ -1339,17 +1424,15 @@ ios_ui_build_for_testing() {
     tail -n 40 "$out/xcodebuild-build.log" >&2 || true
     return "$status"
   fi
+  if ! ensure_ios_runner_signature "$runner" "$bundle" >"$out/runner-signature.log" 2>&1; then
+    warn "iPhone UI runner signature verification failed (see $out/runner-signature.log)"
+    return 1
+  fi
   if ! ios_ui_find_xctestrun || ! products="$(ios_ui_products_digest)"; then
     warn "build-for-testing left no single $scheme .xctestrun and its products"
     return 1
   fi
   printf '%s\n' "$fingerprint|$team|$products" >"$marker"
-}
-
-ios_ui_build_and_test() {
-  ios_ui_build_for_testing || return $?
-  run_xcodebuild xcb_run test-without-building -xctestrun "$ios_ui_xctestrun" \
-    -destination "id=$device" "$@"
 }
 
 run_xcodebuild() {
@@ -1409,6 +1492,7 @@ validate_macos_ui_perf() {
     --output "$out/ui-perf-report.json" \
     --copy-probe-files-to "$out/diagnostics/ui-perf" \
     --step-ledger "$step_ledger" \
+    --build-provenance "$out/last-build.json" \
     --label "$label" \
     --emit-evidence \
     >"$out/ui-perf-gate.txt" 2>&1
@@ -1566,7 +1650,10 @@ validate_ios_ui_perf() {
   # a platform-ios ui-perf registry entry (IUI-6) — the same flow as macOS.
   local diagnostics="$out/diagnostics"
   rm -rf "$diagnostics"
-  "$ROOT_DIR/scripts/ios_device.sh" pull "$diagnostics" >/dev/null \
+  # Scope the pull to only the ui-perf frame probe JSONL tree and the run's
+  # device manifest, avoiding copying the whole growing diagnostics mirror.
+  "$ROOT_DIR/scripts/ios_device.sh" pull "$diagnostics" --subtree ui-perf \
+      --optional-subtree "$run_id" >/dev/null \
     || return 1
   python3 "$ROOT_DIR/scripts/check_ios_ui_perf.py" \
     --xcodebuild-log "$out/xcodebuild.log" \
@@ -1575,6 +1662,7 @@ validate_ios_ui_perf() {
     --run-started-epoch-ms "$perf_run_started_epoch_ms" \
     --output "$out/ui-perf-report.json" \
     --step-ledger "$step_ledger" \
+    --build-provenance "$out/last-build.json" \
     --label "$label" \
     --require-canonical \
     --emit-evidence \
@@ -1652,27 +1740,42 @@ run_preinstalled_candidate() {
     python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" snapshot-crashes \
       --device "$device" --output "$out/system-crashes-before" || return 1
   candidate_collection_needed=1
-  local candidate_build_status=0
-  qvoice_path_map_settings "$ROOT_DIR"
-  required_step_run "$step_ledger" candidate-runner-build xcb_run build-for-testing \
-    -project "$PROJECT" -scheme VocelloiOSCandidateUI -configuration Release \
-    -destination 'generic/platform=iOS' -derivedDataPath "$IOS_DERIVED" \
-    -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
-    -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile \
-    -allowProvisioningUpdates DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
-    ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
-    QVOICE_OWNED_SWIFT_OPTIMIZATION=-O QVOICE_OWNED_SWIFT_COMPILATION_MODE=wholemodule \
-    ${QVOICE_PATH_MAP_SETTINGS[@]+"${QVOICE_PATH_MAP_SETTINGS[@]}"} \
-    >"$out/candidate-runner-build.log" 2>&1 || candidate_build_status=$?
-  if (( candidate_build_status != 0 )); then
-    ui_primary_native_exit_code="$candidate_build_status"
-    cp "$out/candidate-runner-build.log" "$out/xcodebuild.log" 2>/dev/null || true
-    warn "iOS candidate runner build-for-testing failed (see $out/candidate-runner-build.log)"
-    tail -n 40 "$out/candidate-runner-build.log" >&2 || true
-    return "$candidate_build_status"
-  fi
+  local candidate_build_status=0 candidate_marker candidate_fingerprint candidate_toolchain candidate_products=""
   runner="$IOS_DERIVED/Build/Products/Release-iphoneos/VocelloiOSCandidateUITests-Runner.app"
-  xctestrun="$(python3 - "$IOS_DERIVED/Build/Products" <<'PY'
+  candidate_marker="$IOS_DERIVED/.vocello-ios-ui-build-fingerprint.VocelloiOSCandidateUI"
+  candidate_fingerprint="$(python3 "$ROOT_DIR/scripts/tree_fingerprint.py" --root "$ROOT_DIR" --build-inputs)" || return 1
+  candidate_toolchain="$(xcodebuild -version 2>/dev/null | shasum -a 256 | awk '{print $1}')" || return 1
+  candidate_fingerprint="$candidate_fingerprint|$candidate_toolchain|$team|VocelloiOSCandidateUI"
+  xctestrun="$(find "$IOS_DERIVED/Build/Products" -maxdepth 1 -name 'VocelloiOSCandidateUI_*.xctestrun' -print 2>/dev/null | head -1 || true)"
+  if [[ -n "$xctestrun" && -f "$runner/PlugIns/VocelloiOSCandidateUITests.xctest/VocelloiOSCandidateUITests" ]]; then
+    candidate_products="$(shasum -a 256 "$xctestrun" "$runner/PlugIns/VocelloiOSCandidateUITests.xctest/VocelloiOSCandidateUITests" 2>/dev/null | awk '{print $1}' | paste -sd, -)" || candidate_products=""
+  fi
+  if [[ -n "$candidate_products" && -f "$candidate_marker" \
+      && "$(cat "$candidate_marker" 2>/dev/null)" == "$candidate_fingerprint|$candidate_products" ]]; then
+    note "candidate-runner-build skipped — source fingerprint and products unchanged"
+    required_step_record "$step_ledger" candidate-runner-build 0
+  else
+    rm -f "$candidate_marker"
+    find "$IOS_DERIVED/Build/Products" -maxdepth 1 -name 'VocelloiOSCandidateUI_*.xctestrun' -delete 2>/dev/null || true
+    qvoice_path_map_settings "$ROOT_DIR"
+    required_step_run "$step_ledger" candidate-runner-build xcb_run build-for-testing \
+      -project "$PROJECT" -scheme VocelloiOSCandidateUI -configuration Release \
+      -destination 'generic/platform=iOS' -derivedDataPath "$IOS_DERIVED" \
+      -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
+      -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile \
+      -allowProvisioningUpdates DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
+      ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+      QVOICE_OWNED_SWIFT_OPTIMIZATION=-O QVOICE_OWNED_SWIFT_COMPILATION_MODE=wholemodule \
+      ${QVOICE_PATH_MAP_SETTINGS[@]+"${QVOICE_PATH_MAP_SETTINGS[@]}"} \
+      >"$out/candidate-runner-build.log" 2>&1 || candidate_build_status=$?
+    if (( candidate_build_status != 0 )); then
+      ui_primary_native_exit_code="$candidate_build_status"
+      cp "$out/candidate-runner-build.log" "$out/xcodebuild.log" 2>/dev/null || true
+      warn "iOS candidate runner build-for-testing failed (see $out/candidate-runner-build.log)"
+      tail -n 40 "$out/candidate-runner-build.log" >&2 || true
+      return "$candidate_build_status"
+    fi
+    xctestrun="$(python3 - "$IOS_DERIVED/Build/Products" <<'PY'
 import pathlib, sys
 paths = list(pathlib.Path(sys.argv[1]).glob('VocelloiOSCandidateUI_*.xctestrun'))
 if len(paths) != 1:
@@ -1680,6 +1783,9 @@ if len(paths) != 1:
 print(paths[0])
 PY
 )" || return 1
+    candidate_products="$(shasum -a 256 "$xctestrun" "$runner/PlugIns/VocelloiOSCandidateUITests.xctest/VocelloiOSCandidateUITests" 2>/dev/null | awk '{print $1}' | paste -sd, -)" || return 1
+    printf '%s\n' "$candidate_fingerprint|$candidate_products" >"$candidate_marker"
+  fi
   required_step_run "$step_ledger" candidate-runner-configuration \
     python3 "$ROOT_DIR/scripts/ios_candidate_acceptance.py" prepare-runner \
       --xctestrun "$xctestrun" --runner "$runner" --identity "$out/candidate-identity.json" \
@@ -2044,9 +2150,14 @@ else
     test_selection_args+=("-only-testing:VocelloiOSUITests/VocelloiOSSmokeUITests/testLeavingDuringColdTakeWarmupKeepsTheAppRunning")
   fi
   note "physical-iPhone XCUITest $lane on $device → $out"
+  # Split build-for-testing as its own `ui-build` step before arming
+  # `ui_test_attempted=1` (matching macOS): a build failure fails cleanly
+  # without running test-summary or xcresult attachment collection.
+  ios_ui_build_for_testing || exit $?
   xcuitest_status=0
   ui_test_attempted=1
-  if required_step_run "$step_ledger" xcuitest ios_ui_build_and_test \
+  if required_step_run "$step_ledger" xcuitest run_xcodebuild xcb_run test-without-building \
+      -xctestrun "$ios_ui_xctestrun" -destination "id=$device" \
       -resultBundlePath "$result" -collect-test-diagnostics never \
       "${test_selection_args[@]}" -parallel-testing-enabled NO; then
     xcuitest_status=0

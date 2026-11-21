@@ -323,6 +323,34 @@ final class DatabaseServiceTests: XCTestCase {
         XCTAssertEqual(page.archiveCount, 3)
     }
 
+    func testSaveGenerationsPersistsBatchAndSkipsEmptyInput() throws {
+        // Empty input returns without opening the database.
+        let uncreatedRoot = try makeRoot(creatingDirectory: false)
+        let uncreatedService = DatabaseService(rootDirectory: uncreatedRoot)
+        var emptyBatch: [Generation] = []
+        XCTAssertNoThrow(try uncreatedService.saveGenerations(&emptyBatch))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: uncreatedRoot.path))
+
+        // Non-empty batch fails closed when the database cannot open.
+        var blockedBatch = [row("/nonexistent/blocked-batch.wav", at: 0)]
+        XCTAssertThrowsError(try uncreatedService.saveGenerations(&blockedBatch)) { error in
+            XCTAssertEqual((error as? HistoryPersistenceError)?.operation, .write)
+        }
+
+        // Batch persists every row in one write transaction and assigns IDs.
+        let service = try makeService()
+        var batch = (0..<5).map { index in
+            row("/nonexistent/batch-\(index).wav", text: "batch \(index)", at: Double(index))
+        }
+        try service.saveGenerations(&batch)
+        XCTAssertEqual(batch.compactMap(\.id).count, 5)
+        XCTAssertEqual(Set(batch.compactMap(\.id)).count, 5)
+        XCTAssertEqual(
+            try service.fetchAllGenerations().map(\.text),
+            ["batch 4", "batch 3", "batch 2", "batch 1", "batch 0"]
+        )
+    }
+
     @concurrent func testSaveIfMissingIsIdempotentByAudioPath() async throws {
         let service = try makeService()
         let first = try await service.saveGenerationIfMissingAsync(row("/nonexistent/same.wav", text: "original", at: 0))

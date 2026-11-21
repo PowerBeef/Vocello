@@ -1500,7 +1500,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 reason: "expected \(expectedSize) bytes, found \(actualSize)"
             )
         }
-        guard let expectedSHA256 = normalizedSHA256(sha256) else { return }
+        guard let expectedSHA256 = normalizedSHA256(sha256) else {
+            throw DownloadError.integrityCheckFailed(
+                path: url.path,
+                reason: "missing or invalid expected sha256 digest"
+            )
+        }
         let actualSHA256: String = try {
             let verificationSignpost = ModelDownloadSignposts.signposter.beginInterval(
                 "Model File Verification",
@@ -1728,6 +1733,23 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
               downloadPaths.count == files.count,
               downloadPaths.isSubset(of: installedPaths) else {
             throw DownloadError.apiError("Invalid authenticated installation file plan")
+        }
+        // BKL-79: fail closed before staging or network I/O when any file in either
+        // the download or installed plan lacks a valid SHA-256 digest (or disagrees on digest).
+        if let unauthenticatedFile = (files + installedFiles).first(where: { Self.normalizedSHA256($0.sha256) == nil }) {
+            throw DownloadError.integrityCheckFailed(
+                path: unauthenticatedFile.path,
+                reason: "missing or invalid expected sha256 digest"
+            )
+        }
+        let installedDigestsByPath = Dictionary(
+            uniqueKeysWithValues: installedFiles.map { ($0.path, Self.normalizedSHA256($0.sha256)) }
+        )
+        if let mismatchedFile = files.first(where: { Self.normalizedSHA256($0.sha256) != installedDigestsByPath[$0.path] }) {
+            throw DownloadError.integrityCheckFailed(
+                path: mismatchedFile.path,
+                reason: "download plan sha256 digest disagrees with installed plan"
+            )
         }
         if let sharedComponentPlan {
             guard sharedComponentPlan.modelFolder == targetDir.lastPathComponent,

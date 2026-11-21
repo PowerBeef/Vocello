@@ -438,6 +438,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         try FileManager.default.removeItem(at: partial)
         try FileManager.default.moveItem(at: durableTemporary, to: partial)
 
+        let expectedSHA256 = try HuggingFaceDownloader.sha256Hex(for: partial)
         XCTAssertEqual(
             try HuggingFaceDownloader.authoritativeFileSize(at: partial),
             Int64(payload.count)
@@ -445,13 +446,107 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         XCTAssertNoThrow(try HuggingFaceDownloader.validateDownloadedFile(
             at: partial,
             expectedSize: Int64(payload.count),
-            sha256: nil
+            sha256: expectedSHA256
         ))
         XCTAssertThrowsError(try HuggingFaceDownloader.validateDownloadedFile(
             at: partial,
             expectedSize: Int64(payload.count + 1),
-            sha256: nil
+            sha256: expectedSHA256
         ))
+    }
+
+    func testValidateDownloadedFileRefusesMissingOrMalformedSHA256() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let file = root.appendingPathComponent("model.safetensors")
+        let payload = Data("vocello-digest-required".utf8)
+        try payload.write(to: file)
+
+        for badDigest in [nil, "", "   ", "not-a-digest", String(repeating: "a", count: 63)] as [String?] {
+            XCTAssertThrowsError(
+                try HuggingFaceDownloader.validateDownloadedFile(
+                    at: file,
+                    expectedSize: Int64(payload.count),
+                    sha256: badDigest
+                ),
+                "digest \(String(describing: badDigest)) must be refused"
+            ) { error in
+                guard case HuggingFaceDownloader.DownloadError.integrityCheckFailed(_, let reason) = error else {
+                    return XCTFail("expected integrityCheckFailed, got \(error)")
+                }
+                XCTAssertTrue(reason.contains("sha256"), reason)
+            }
+        }
+    }
+
+    @concurrent func testDownloadFilesRefusesPlanMissingSHA256BeforeAnyNetworkTransfer() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let host = "bkl79-\(UUID().uuidString.lowercased()).range-stub.invalid"
+        let payload = Data("vocello-stub-bytes".utf8)
+        RangeStubURLProtocol.install(host: host, payload: payload, faults: [:], ignoreRange: false)
+        defer { RangeStubURLProtocol.uninstall(host: host) }
+
+        let stubURL = URL(string: "https://\(host)/weights/model.safetensors")!
+        let validSHA = String(repeating: "a", count: 64)
+        let cases: [(name: String, files: [HuggingFaceDownloader.RepoFile], installed: [HuggingFaceDownloader.RepoFile]?)] = [
+            (
+                "nil-digest",
+                [HuggingFaceDownloader.RepoFile(path: "weights/model.safetensors", size: Int64(payload.count), sha256: nil, absoluteURL: stubURL)],
+                nil
+            ),
+            (
+                "malformed-digest",
+                [HuggingFaceDownloader.RepoFile(path: "weights/model.safetensors", size: Int64(payload.count), sha256: "not-hex", absoluteURL: stubURL)],
+                nil
+            ),
+            (
+                "files-missing-digest-with-valid-installedFiles",
+                [HuggingFaceDownloader.RepoFile(path: "weights/model.safetensors", size: Int64(payload.count), sha256: nil, absoluteURL: stubURL)],
+                [HuggingFaceDownloader.RepoFile(path: "weights/model.safetensors", size: Int64(payload.count), sha256: validSHA, absoluteURL: stubURL)]
+            ),
+        ]
+
+        for testCase in cases {
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.protocolClasses = [RangeStubURLProtocol.self]
+            let downloader = HuggingFaceDownloader(
+                progressHandler: nil,
+                sessionConfiguration: configuration
+            )
+            let stagingRoot = root.appendingPathComponent("staging-\(testCase.name)", isDirectory: true)
+            do {
+                _ = try await downloader.downloadFiles(
+                    testCase.files,
+                    repo: "stub/model",
+                    revision: String(repeating: "a", count: 40),
+                    to: root.appendingPathComponent("models/\(testCase.name)", isDirectory: true),
+                    stagingRoot: stagingRoot,
+                    installedFiles: testCase.installed
+                )
+                XCTFail("\(testCase.name): downloadFiles must refuse missing/invalid SHA-256")
+            } catch let error as HuggingFaceDownloader.DownloadError {
+                guard case .integrityCheckFailed(let path, let reason) = error else {
+                    return XCTFail("\(testCase.name): expected integrityCheckFailed, got \(error)")
+                }
+                XCTAssertEqual(path, "weights/model.safetensors", testCase.name)
+                XCTAssertTrue(reason.contains("sha256"), "\(testCase.name): \(reason)")
+            }
+            XCTAssertTrue(
+                RangeStubURLProtocol.requests(host: host).isEmpty,
+                "\(testCase.name): refused plan must issue zero network requests"
+            )
+            XCTAssertFalse(
+                FileManager.default.fileExists(atPath: stagingRoot.appendingPathComponent("files").path),
+                "\(testCase.name): refused plan must not create staging files directory"
+            )
+        }
     }
 
     func testRetryPolicySeparatesTransientPermanentTLSDiskAndIntegrity() {

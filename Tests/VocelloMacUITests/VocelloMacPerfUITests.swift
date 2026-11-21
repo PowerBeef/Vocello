@@ -305,27 +305,42 @@ final class VocelloMacPerfUITests: VocelloMacUITestCase {
     func test05DeliveryMenu() {
         // Warms suppressed, as in sidebar-navigation (RF-61, audit finding A10): the menu's own
         // frame cost, without a model warm starting inside the window.
+        // BKL-77: resolve the shipped picker's frame relative to the window once before the
+        // measured window and drive menu open/selection/dismissal through that window-anchored
+        // coordinate + keyboard keys so XCUITest does not walk the whole accessibility tree
+        // (including every menu-bar menu) on every cycle inside the measured window.
         beginScenario("delivery-menu", suppressWarmup: true)
         navigate(to: .customVoice)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(VocelloUIWait.exists(window, timeout: 10))
         let picker = element("delivery_tonePicker")
         XCTAssertTrue(VocelloUIWait.exists(picker, timeout: 20))
-        measuredCycles("delivery-menu", cycles: 10, actionsPerCycle: 1) { repetition in
-            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: picker, timeout: 10))
+        let windowFrame = window.frame
+        let pickerFrame = picker.frame
+        XCTAssertGreaterThan(pickerFrame.width, 0)
+        XCTAssertGreaterThan(pickerFrame.height, 0)
+        let pickerPoint = window.coordinate(withNormalizedOffset: .zero).withOffset(
+            CGVector(
+                dx: pickerFrame.midX - windowFrame.minX,
+                dy: pickerFrame.midY - windowFrame.minY
+            )
+        )
+        let log = VocelloPerfPhaseLog()
+        measuredCycles("delivery-menu", cycles: 10, actionsPerCycle: 1, phaseLog: log) { repetition in
+            let actionStart = Self.epochMS()
+            pickerPoint.click()
             Thread.sleep(forTimeInterval: 0.4)
             if repetition == 4 || repetition == 9 {
-                // Twice, select a different tone so dependent re-render
-                // cost (advisory caption, tint) is inside the window.
-                let target = repetition == 4 ? "Calm" : "Happy"
-                let item = app.menuItems[target].firstMatch
-                if item.exists {
-                    item.click()
-                } else {
-                    app.typeKey(.escape, modifierFlags: [])
-                }
+                // Twice, select a different tone via keyboard so dependent re-render
+                // cost (advisory caption, tint) stays inside the window without
+                // triggering an accessibility snapshot walk.
+                app.typeKey(.downArrow, modifierFlags: [])
+                app.typeKey(.return, modifierFlags: [])
             } else {
                 app.typeKey(.escape, modifierFlags: [])
             }
             Thread.sleep(forTimeInterval: 0.3)
+            log.append("action", from: actionStart, to: Self.epochMS())
         }
     }
 

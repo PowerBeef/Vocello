@@ -350,9 +350,17 @@ def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str])
         "hitchMSPerAction": round(excess_ms / action_count, 3)
         if isinstance(action_count, int) and action_count > 0 else None,
         **({"cycleHitchTimeMSPerS": cycle_rates} if cycle_rates is not None else {}),
-        # Report-only per-phase hitch (audit #32): how much fell while the
-        # harness queried, acted or verified.
+        # Report-only per-phase hitch (audit #32, BKL-77): how much fell while the
+        # harness queried, acted or verified, plus top-level action/query separation.
         **({"phases": phase_rates} if phase_rates is not None else {}),
+        **(
+            {"actionHitchTimeMSPerS": phase_rates["action"]["hitchTimeMSPerS"]}
+            if phase_rates is not None and "action" in phase_rates else {}
+        ),
+        **(
+            {"queryHitchTimeMSPerS": phase_rates["query"]["hitchTimeMSPerS"]}
+            if phase_rates is not None and "query" in phase_rates else {}
+        ),
         "maxGapMS": round(max_gap, 2),
         "p95GapMSApprox": approximate_p95_gap_ms(histogram, refresh_ms),
         "gapHistogram": histogram,

@@ -878,6 +878,31 @@ class ThresholdsContractTests(unittest.TestCase):
             with self.assertRaisesRegex(checker.GateError, "unsupported"):
                 checker.load_thresholds(path)
 
+    def test_phase_markers_expose_top_level_action_and_query_hitch_separation(self):
+        start = 10_000
+        blocks = make_blocks(start, 4, hitch_ms_per_block=0.0)
+        blocks[0]["sumExcessMS"] = 40.0  # query phase: 80.0 ms/s
+        blocks[1]["sumExcessMS"] = 5.0   # action phase: 10.0 ms/s
+        blocks[2]["sumExcessMS"] = 30.0  # query phase: 60.0 ms/s
+        blocks[3]["sumExcessMS"] = 5.0   # action phase: 10.0 ms/s
+        marker = {
+            "schemaVersion": 1,
+            "scenario": "sidebar-navigation",
+            "windowStartEpochMS": start,
+            "windowEndEpochMS": start + 2_000,
+            "actionCount": 2,
+            "phases": [
+                {"name": "query", "startEpochMS": start, "endEpochMS": start + 500},
+                {"name": "action", "startEpochMS": start + 500, "endEpochMS": start + 1_000},
+                {"name": "query", "startEpochMS": start + 1_000, "endEpochMS": start + 1_500},
+                {"name": "action", "startEpochMS": start + 1_500, "endEpochMS": start + 2_000},
+            ],
+        }
+        summary, _ = checker.summarize_scenario(marker, blocks, exploratory=set())
+        self.assertEqual(summary["actionHitchTimeMSPerS"], 10.0)
+        self.assertEqual(summary["queryHitchTimeMSPerS"], 70.0)
+        self.assertEqual(summary["hitchTimeMSPerS"], 40.0)
+
 
 if __name__ == "__main__":
     unittest.main()

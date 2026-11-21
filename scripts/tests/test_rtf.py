@@ -28,7 +28,9 @@ class RequestWallTests(unittest.TestCase):
             mark("streamGenerationEnded", 7_900),
             mark("streamCompleted", 8_030),
         ]
-        self.assertAlmostEqual(rtf.request_wall_seconds_from_marks(marks), 6.03)
+        wall = rtf.request_wall_seconds_from_marks(marks)
+        assert wall is not None
+        self.assertAlmostEqual(wall, 6.03)
 
     def test_startup_windows_publish_exactly_what_the_request_wall_excludes(self) -> None:
         # audit #58: the excluded startup time is published, not just subtracted.
@@ -45,8 +47,11 @@ class RequestWallTests(unittest.TestCase):
         self.assertEqual(windows, {
             "modelLoadWindowMS": 1_500.0, "prewarmWindowMS": 500.0, "excludedStartupMS": 2_000.0,
         })
+        assert windows is not None
+        wall = rtf.request_wall_seconds_from_marks(marks)
+        assert wall is not None
         self.assertAlmostEqual(
-            rtf.request_wall_seconds_from_marks(marks),
+            wall,
             (8_030 - windows["excludedStartupMS"]) / 1_000,
         )
 
@@ -60,7 +65,9 @@ class RequestWallTests(unittest.TestCase):
             mark("startup.prewarm_started", 500), mark("startup.prewarm_completed", 400),
             mark("streamCompleted", 900),
         ]}
-        self.assertEqual(rtf.startup_windows_ms(inverted)["excludedStartupMS"], 0.0)
+        inverted_windows = rtf.startup_windows_ms(inverted)
+        assert inverted_windows is not None
+        self.assertEqual(inverted_windows["excludedStartupMS"], 0.0)
         self.assertEqual(rtf.request_wall_seconds_from_marks(inverted["stageMarks"]), 0.9)
         # No terminal mark: no request wall, so no windows.
         self.assertIsNone(rtf.startup_windows_ms({"stageMarks": [mark("startup.model_loaded", 5)]}))
@@ -116,12 +123,18 @@ class RequestWallTests(unittest.TestCase):
             "derivedMetrics": {"audioSeconds": 5.0, "audioSecondsPerWallSecond": 2.0},
             "backendMetrics": {"stages": [mark("startup.request_validated", 0), mark("streamCompleted", 3_000)]},
         }
-        self.assertAlmostEqual(rtf.engine_rtf(row), 0.6)
+        engine = rtf.engine_rtf(row)
+        assert engine is not None
+        self.assertAlmostEqual(engine, 0.6)
         self.assertIsNone(rtf.engine_rtf({"derivedMetrics": {"audioSeconds": 5.0}}))
 
     def test_app_end_to_end_rtf_uses_the_submit_to_completed_span(self) -> None:
-        self.assertAlmostEqual(rtf.app_end_to_end_rtf({"frontendMetrics": {"submitToCompletedMS": 7_000}}, 10.0), 0.7)
-        self.assertAlmostEqual(rtf.app_end_to_end_rtf({"timingsMS": {"submitToCompletedMS": 7_000}}, 10.0), 0.7)
+        frontend = rtf.app_end_to_end_rtf({"frontendMetrics": {"submitToCompletedMS": 7_000}}, 10.0)
+        assert frontend is not None
+        self.assertAlmostEqual(frontend, 0.7)
+        timings = rtf.app_end_to_end_rtf({"timingsMS": {"submitToCompletedMS": 7_000}}, 10.0)
+        assert timings is not None
+        self.assertAlmostEqual(timings, 0.7)
         self.assertIsNone(rtf.app_end_to_end_rtf({}, 10.0))
         self.assertIsNone(rtf.app_end_to_end_rtf({"timingsMS": {"submitToCompletedMS": 7_000}}, 0.0))
 

@@ -55,7 +55,9 @@ class AgreementTests(unittest.TestCase):
         self.assertEqual(int(agreement.octave.sum()), 20)
         self.assertFalse(agreement.agree[95:105].any())
         self.assertEqual(pitch.octave_jumps(agreement), [])
-        self.assertAlmostEqual(pitch.take_median_semitones(agreement), 12.0, places=6)
+        median = pitch.take_median_semitones(agreement)
+        assert median is not None
+        self.assertAlmostEqual(median, 12.0, places=6)
 
     def test_voicing_drop_by_one_tracker_leaves_a_gap_not_a_jump(self) -> None:
         a = track((1.0, 220.0), (0.2, None), (1.0, 220.0))
@@ -73,9 +75,13 @@ class AgreementTests(unittest.TestCase):
 
 class RegisterTests(unittest.TestCase):
     def test_take_median_and_register_offset(self) -> None:
-        self.assertAlmostEqual(pitch.take_median_semitones(track((1.0, 200.0))), 12.0)
+        median = pitch.take_median_semitones(track((1.0, 200.0)))
+        assert median is not None
+        self.assertAlmostEqual(median, 12.0)
         self.assertIsNone(pitch.take_median_semitones(track((1.0, None))))
-        self.assertAlmostEqual(pitch.register_offset(14.5, 12.0), 2.5)
+        offset = pitch.register_offset(14.5, 12.0)
+        assert offset is not None
+        self.assertAlmostEqual(offset, 2.5)
         self.assertIsNone(pitch.register_offset(None, 12.0))
 
 
@@ -84,6 +90,10 @@ class SustainedShiftTests(unittest.TestCase):
         shifted = 200.0 * 2.0 ** (6 / 12)
         result = pitch.sustained_shifts(track((2.0, 200.0), (0.5, shifted), (1.0, 200.0)))
         self.assertTrue(result.detected)
+        assert result.take_median_st is not None
+        assert result.shift_st is not None
+        assert result.start is not None
+        assert result.end is not None
         self.assertAlmostEqual(result.take_median_st, 12.0, places=6)
         self.assertAlmostEqual(result.shift_st, 6.0, places=4)
         self.assertAlmostEqual(result.start, 2.0, delta=0.03)
@@ -94,12 +104,14 @@ class SustainedShiftTests(unittest.TestCase):
         lowered = 200.0 * 2.0 ** (-8 / 12)
         result = pitch.sustained_shifts(track((2.0, 200.0), (0.6, lowered), (1.0, 200.0)))
         self.assertTrue(result.detected)
+        assert result.shift_st is not None
         self.assertAlmostEqual(result.shift_st, -8.0, places=4)
 
     def test_brief_excursion_is_not_sustained(self) -> None:
         spike = 200.0 * 2.0 ** (9 / 12)
         result = pitch.sustained_shifts(track((1.5, 200.0), (0.1, spike), (1.5, 200.0)))
         self.assertFalse(result.detected)
+        assert result.shift_st is not None
         self.assertLess(abs(result.shift_st), 6.0)
 
     def test_ordinary_intonation_is_not_a_shift(self) -> None:
@@ -134,6 +146,12 @@ class ToneRunTests(unittest.TestCase):
         result = pitch.tone_runs({"hopSeconds": HOP, "f0Hz": list(f0)}, audio, SR)
         self.assertTrue(result.detected)
         self.assertTrue(result.tone_like)
+        assert result.start is not None
+        assert result.end is not None
+        assert result.median_hz is not None
+        assert result.std_st is not None
+        assert result.flatness is not None
+        assert result.hnr_db is not None
         self.assertAlmostEqual(result.start, 1.0, delta=0.02)
         self.assertAlmostEqual(result.end, 1.6, delta=0.02)
         self.assertAlmostEqual(result.median_hz, 730.0, delta=1.0)
@@ -162,6 +180,7 @@ class ToneRunTests(unittest.TestCase):
         result = pitch.tone_runs({"hopSeconds": HOP, "f0Hz": list(f0)}, noise, SR)
         self.assertTrue(result.detected)
         self.assertFalse(result.tone_like)
+        assert result.flatness is not None
         self.assertGreater(result.flatness, 0.1)
 
     def test_unvoiced_track(self) -> None:

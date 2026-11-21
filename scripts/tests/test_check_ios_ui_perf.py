@@ -136,6 +136,7 @@ class IOSUIPerfFixture(unittest.TestCase):
         log = self.write_run()
         status, report = self.run_checker(log)
         self.assertEqual(status, 0)
+        assert report is not None
         self.assertEqual(report["platform"], "ios")
         self.assertEqual(report["status"], "passed")
         self.assertTrue(
@@ -149,11 +150,13 @@ class IOSUIPerfFixture(unittest.TestCase):
         """audit #33 (iPhone): the probe's environment row names the cadence."""
         status, report = self.run_checker(self.write_run(sampler_interval_ms=500))
         self.assertEqual(status, 0)
+        assert report is not None
         generation = next(item for item in report["scenarios"] if item["scenario"] == "ios-generation-active")
         self.assertEqual(checker.take_metrics(generation)["samplerTargetIntervalMS"], 500)
         others = [item for item in report["scenarios"] if item["scenario"] != "ios-generation-active"]
         self.assertFalse([item for item in others if "samplerTargetIntervalMS" in checker.take_metrics(item)])
         status, report = self.run_checker(self.write_run())
+        assert report is not None
         generation = next(item for item in report["scenarios"] if item["scenario"] == "ios-generation-active")
         self.assertNotIn("samplerTargetIntervalMS", checker.take_metrics(generation))
 
@@ -193,6 +196,7 @@ class IOSUIPerfFixture(unittest.TestCase):
         log = self.write_run(frames_by_scenario={"ios-player-scrub": 15})
         status, report = self.run_checker(log)
         self.assertEqual(status, 0)
+        assert report is not None
         self.assertEqual(report["status"], "passedWithWarnings")
         self.assertEqual(
             report["thresholds"]["warnings"], ["uiperf.cadence:ios-player-scrub(30/55-65)"])
@@ -212,6 +216,7 @@ class IOSUIPerfFixture(unittest.TestCase):
         log = self.write_run(hitch_by_scenario={"ios-idle-baseline": 50.0})
         status, report = self.run_checker(log, thresholds=thresholds)
         self.assertEqual(status, 0)
+        assert report is not None
         self.assertEqual(report["status"], "passedWithWarnings")
         self.assertEqual(
             report["thresholds"]["warnings"], ["uiperf.hitch:ios-idle-baseline(50/5)"])
@@ -219,6 +224,7 @@ class IOSUIPerfFixture(unittest.TestCase):
         thresholds.write_text(json.dumps({**contract, "calibrationProfile": "iphone-15-pro"}))
         status, report = self.run_checker(log, thresholds=thresholds)
         self.assertEqual(status, 0)
+        assert report is not None
         self.assertFalse(report["thresholds"]["calibrated"])
         self.assertEqual(report["thresholds"]["warnings"], ["uiperf.uncalibrated:iphone-15-pro"])
 
@@ -256,6 +262,7 @@ class IOSUIPerfFixture(unittest.TestCase):
         finally:
             checker.verify_canonical_iphone = original
         self.assertEqual(status, 0)
+        assert report is not None
         self.assertEqual(report["status"], "passedWithWarnings")
         self.assertEqual(report["evidence"], "registry")
         self.assertEqual(
@@ -329,6 +336,7 @@ class IOSUIPerfFixture(unittest.TestCase):
         finally:
             checker.verify_canonical_iphone = original
         self.assertEqual(status, 0)
+        assert report is not None
         self.assertEqual(report["evidence"], "local-only")
         self.assertFalse((self.root / "benchmark-evidence.json").exists())
 
@@ -348,6 +356,7 @@ class IOSUIPerfFixture(unittest.TestCase):
         finally:
             checker.verify_canonical_iphone = original
         self.assertEqual(status, 0)
+        assert report is not None
         self.assertEqual(report["hardwareProfileID"], "iphone-17-pro")
         self.assertEqual(observed["diagnostics"], self.diagnostics)
         self.assertEqual(observed["run_id"], "ios-xcui-perf-fixture-0001")

@@ -86,7 +86,7 @@ from pathlib import Path, PurePosixPath
 import re
 import shutil
 import sys
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence, TypeGuard
 import unicodedata
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -229,7 +229,11 @@ def text_issues(text: Any) -> list[str]:
     return issues
 
 
-def _count(value: Any, *, positive: bool = False) -> bool:
+def _as_dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _count(value: Any, *, positive: bool = False) -> TypeGuard[int]:
     return not isinstance(value, bool) and isinstance(value, int) and (value > 0 if positive else value >= 0)
 
 
@@ -238,7 +242,7 @@ def _decimal_seed(value: Any) -> Any:
     return int(value) if isinstance(value, str) and value.isascii() and value.isdigit() else value
 
 
-def _positive_number(value: Any) -> bool:
+def _positive_number(value: Any) -> TypeGuard[int | float]:
     return not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(value) and value > 0
 
 
@@ -284,7 +288,7 @@ def contract_speaker_languages(path: Path = SPEAKER_CONTRACT) -> dict[str, str]:
 
 def _split_brief_families(policy: Mapping[str, Any]) -> dict[str, set[str]]:
     """The Voice Design briefs each split speaks: its brief, that brief's translations and its cross-lingual briefs."""
-    briefs = policy.get("designBriefs") if isinstance(policy.get("designBriefs"), dict) else {}
+    briefs = _as_dict(policy.get("designBriefs"))
     families: dict[str, set[str]] = {}
     for split in SPLITS:
         entry = (policy.get("splits") or {}).get(split) or {}
@@ -301,7 +305,7 @@ def _brief_issues(briefs: Mapping[str, Any]) -> list[str]:
         text = brief.get("text")
         if not BRIEF_ID.fullmatch(str(brief_id)):
             issues.append(f"design brief id {brief_id!r} is unsafe")
-        if text_issues(text) or len(text) > MAX_BRIEF_CHARACTERS:
+        if not isinstance(text, str) or text_issues(text) or len(text) > MAX_BRIEF_CHARACTERS:
             issues.append(f"design brief {brief_id!r} must be one trimmed line of at most {MAX_BRIEF_CHARACTERS} characters")
         if brief.get("language") not in LANGUAGE_LOCALE_CODES:
             issues.append(f"design brief {brief_id!r} names no product language")
@@ -320,7 +324,7 @@ def _split_issues(policy: Mapping[str, Any], briefs: Mapping[str, Any], language
     for split in SPLITS:
         entry = splits[split] if isinstance(splits[split], dict) else {}
         brief_id = entry.get("designBrief")
-        if brief_id not in briefs or briefs[brief_id].get("concept") != brief_id:
+        if not isinstance(brief_id, str) or brief_id not in briefs or briefs[brief_id].get("concept") != brief_id:
             issues.append(f"split {split} names an unknown design brief or a translation")
             continue
         for language in languages:
@@ -364,7 +368,7 @@ def _clone_issues(config: Mapping[str, Any], policy: Mapping[str, Any], language
                   registry: Mapping[str, Any]) -> list[str]:
     issues = []
     sources = config.get("referenceSources")
-    registered = registry.get("sources") if isinstance(registry.get("sources"), dict) else {}
+    registered = _as_dict(registry.get("sources"))
     if not isinstance(sources, dict) or set(sources) != set(languages):
         return ["cells.clone.referenceSources must name every policy language"]
     for language, names in sources.items():
@@ -373,7 +377,7 @@ def _clone_issues(config: Mapping[str, Any], policy: Mapping[str, Any], language
             continue
         for name in names:
             entry = registered.get(name)
-            labels = entry.get("labels") if isinstance(entry, dict) and isinstance(entry.get("labels"), dict) else {}
+            labels = _as_dict(entry.get("labels")) if isinstance(entry, dict) else {}
             if not isinstance(entry, dict) or "speaker" not in {entry.get("group"), *(entry.get("alsoIn") or [])}:
                 issues.append(f"clone reference source {name!r} is not a registered speaker corpus")
             elif language not in (entry.get("languages") or []):
@@ -386,21 +390,25 @@ def _clone_issues(config: Mapping[str, Any], policy: Mapping[str, Any], language
     if not isinstance(excluded, dict) or any(name not in registered or any(name in names for names in sources.values())
                                              for name in excluded):
         issues.append("cells.clone.excludedSources must name registered sources it does not use")
-    window = config.get("referenceWindowSeconds") if isinstance(config.get("referenceWindowSeconds"), dict) else {}
-    bounds = [window.get(key) for key in ("minimum", "preferredMinimum", "maximum")]
-    if not all(_positive_number(value) for value in bounds) or not bounds[0] <= bounds[1] <= bounds[2]:
+    window = _as_dict(config.get("referenceWindowSeconds"))
+    minimum, preferred_minimum, maximum = (
+        window.get("minimum"), window.get("preferredMinimum"), window.get("maximum"),
+    )
+    if (not _positive_number(minimum) or not _positive_number(preferred_minimum)
+            or not _positive_number(maximum) or not minimum <= preferred_minimum <= maximum):
         issues.append("cells.clone.referenceWindowSeconds must order 0 < minimum <= preferredMinimum <= maximum")
     emotions = config.get("referenceEmotions")
     if not isinstance(emotions, list) or not all(isinstance(value, str) and value for value in emotions):
         issues.append("cells.clone.referenceEmotions must list canonical emotions")
-    counts = [config.get(key) for key in ("primaryReferencesPerLanguage", "secondaryReferencesPerLanguage",
-                                          "scriptsPerReference")]
-    if not all(_count(value, positive=True) for value in counts):
+    primary = config.get("primaryReferencesPerLanguage")
+    secondary = config.get("secondaryReferencesPerLanguage")
+    per_reference = config.get("scriptsPerReference")
+    if not (_count(primary, positive=True) and _count(secondary, positive=True) and _count(per_reference, positive=True)):
         issues.append("cells.clone reference counts must be positive integers")
     else:
         for split in SPLITS:
             scripts = ((policy.get("splits") or {}).get(split) or {}).get("expectedScriptsPerLanguage")
-            if _count(scripts, positive=True) and (counts[0] * counts[2] != scripts or counts[1] * counts[2] > scripts):
+            if _count(scripts, positive=True) and (primary * per_reference != scripts or secondary * per_reference > scripts):
                 issues.append(f"cells.clone gives each of the {split} split's {scripts} scripts one primary take")
     return issues
 
@@ -414,10 +422,11 @@ def _long_form_issues_of_policy(config: Mapping[str, Any], languages: Sequence[s
     if not _count(config.get("projectsPerLanguage"), positive=True):
         issues.append("cells.long-form.projectsPerLanguage must be a positive integer")
     limit = config.get("runtimeTokenLimit")
-    window = config.get("estimateWindow") if isinstance(config.get("estimateWindow"), dict) else {}
-    if not _count(limit, positive=True) or not _count(window.get("minimum"), positive=True) \
-            or not _count(window.get("maximum"), positive=True) \
-            or not limit < window["minimum"] <= window["maximum"]:
+    window = _as_dict(config.get("estimateWindow"))
+    minimum = window.get("minimum")
+    maximum = window.get("maximum")
+    if (not _count(limit, positive=True) or not _count(minimum, positive=True)
+            or not _count(maximum, positive=True) or not limit < minimum <= maximum):
         issues.append("cells.long-form.estimateWindow must order runtimeTokenLimit < minimum <= maximum")
     unspaced = config.get("unspacedLanguages", [])
     if not isinstance(unspaced, list) or any(language not in LANGUAGE_LOCALE_CODES for language in unspaced):
@@ -458,7 +467,7 @@ def policy_issues(policy: Any, *, speakers: set[str], registry: Mapping[str, Any
     version = policy.get("version")
     if isinstance(version, bool) or not isinstance(version, int) or version < 2:
         issues.append("the policy version must be an integer of at least 2 (the cells layout)")
-    generation = policy.get("generation") if isinstance(policy.get("generation"), dict) else {}
+    generation = _as_dict(policy.get("generation"))
     # delivery "app-default": the lane passes `vocello batch --app-delivery`, so Custom and Design carry the
     # apps' Neutral preset instruction as a new Studio draft does (uninstructed takes wander in pitch).
     expected_generation = {"customMode": "custom", "designMode": "design", "cloneMode": "clone", "variant": "speed",
@@ -466,13 +475,13 @@ def policy_issues(policy: Any, *, speakers: set[str], registry: Mapping[str, Any
     for key, value in expected_generation.items():
         if generation.get(key) != value:
             issues.append(f"generation.{key} must be {value!r}")
-    seed_rule = policy.get("seedRule") if isinstance(policy.get("seedRule"), dict) else {}
+    seed_rule = _as_dict(policy.get("seedRule"))
     seed_generation = seed_rule.get("generation")
     if isinstance(seed_generation, bool) or not isinstance(seed_generation, int) or seed_generation < 1:
         issues.append("seedRule.generation must be a positive integer")
     if not isinstance(seed_rule.get("policy"), str) or not seed_rule["policy"]:
         issues.append("seedRule.policy must name the seed policy")
-    assignment = policy.get("assignment") if isinstance(policy.get("assignment"), dict) else {}
+    assignment = _as_dict(policy.get("assignment"))
     if not _count(assignment.get("donorScriptsPerLanguage")):
         issues.append("assignment.donorScriptsPerLanguage must be a non-negative integer")
 
@@ -486,7 +495,7 @@ def policy_issues(policy: Any, *, speakers: set[str], registry: Mapping[str, Any
         briefs = {}
     issues += _brief_issues(briefs)
     issues += _partition_issues(policy, speakers, genders)
-    partition = policy.get("speakerPartition") if isinstance(policy.get("speakerPartition"), dict) else {}
+    partition = _as_dict(policy.get("speakerPartition"))
 
     languages = policy.get("languages")
     if not isinstance(languages, list) or not languages:
@@ -509,7 +518,8 @@ def policy_issues(policy: Any, *, speakers: set[str], registry: Mapping[str, Any
             unknown = [speaker for speaker in pair if speaker not in speakers]
             if unknown:
                 issues.append(f"{language}: {split} names speakers absent from the contract: {', '.join(unknown)}")
-            side = partition.get(split) if isinstance(partition.get(split), list) else []
+            raw_side = partition.get(split)
+            side = raw_side if isinstance(raw_side, list) else []
             if any(speaker not in side for speaker in pair):
                 issues.append(f"{language}: {split} names a speaker of the other split (speakerPartition)")
             # A split whose Built-in speakers have both genders pairs a male and a female in every language.
@@ -520,9 +530,8 @@ def policy_issues(policy: Any, *, speakers: set[str], registry: Mapping[str, Any
         if len(voices) == len(SPLITS) and set(voices["calibration"]) & set(voices["confirmation"]):
             issues.append(f"{language}: the splits must not share a Built-in speaker")
     issues += _split_issues(policy, briefs, seen)
-    if registry is None:
-        registry = load_json(CORPORA_REGISTRY)
-    issues += _cell_issues(policy, seen, registry)
+    resolved_registry: Mapping[str, Any] = load_json(CORPORA_REGISTRY) if registry is None else registry
+    issues += _cell_issues(policy, seen, resolved_registry)
     return issues
 
 
@@ -707,7 +716,7 @@ def _clip_eligible(clip: Mapping[str, Any], language: str, config: Mapping[str, 
     if clip.get("language") != language or not isinstance(speaker, str) or not speaker.strip():
         return False
     # The transcript travels as one argument of one lane row: one line, never read as a flag.
-    if text_issues(text) or text.startswith("-"):
+    if not isinstance(text, str) or text_issues(text) or text.startswith("-"):
         return False
     if not _positive_number(duration) or not window["minimum"] <= duration <= window["maximum"]:
         return False
@@ -1099,7 +1108,8 @@ def _batch_reference_issues(reference: Any) -> list[str]:
     if not _relative_posix(reference.get("corpusPath")):
         issues.append("a clone reference's corpus path is relative to the corpora root")
     transcript = reference.get("transcript")
-    if text_issues(transcript) or transcript.startswith("-") or reference.get("transcriptSHA256") != text_sha256(transcript):
+    if (not isinstance(transcript, str) or text_issues(transcript) or transcript.startswith("-")
+            or reference.get("transcriptSHA256") != text_sha256(transcript)):
         issues.append("a clone reference's transcript is one bound line")
     if not _positive_number(reference.get("durationSeconds")):
         issues.append("a clone reference names its duration")
@@ -1131,9 +1141,10 @@ def validate_plan(plan: Any) -> dict[str, Any]:
         by_id[take_id] = take
         if text_issues(take.get("text")) or take.get("textSHA256") != text_sha256(take["text"]):
             raise TakeError(f"{take_id}: the planned text is invalid or unbound")
-        voice = take.get("voice") if isinstance(take.get("voice"), dict) else {}
-        if take.get("role") not in ROLES or take.get("mode") not in MODES \
-                or VOICE_MODES.get(voice.get("kind")) != take.get("mode"):
+        voice = _as_dict(take.get("voice"))
+        voice_kind = voice.get("kind")
+        if (take.get("role") not in ROLES or take.get("mode") not in MODES
+                or not isinstance(voice_kind, str) or VOICE_MODES.get(voice_kind) != take.get("mode")):
             raise TakeError(f"{take_id}: invalid role, mode or voice")
         if take.get("cell", STANDARD) not in cells:
             raise TakeError(f"{take_id}: its cell is not one of the plan's")
@@ -1579,7 +1590,7 @@ def engine_introspections(diagnostics: Path | None, wav_digests: set[str]) -> di
         notes = record.get("notes")
         digest = notes.get("samplingWAVDigest") if isinstance(notes, dict) else None
         block = record.get("engineIntrospection")
-        if digest in wav_digests and not introspection_issues(block):
+        if digest in wav_digests and isinstance(block, dict) and not introspection_issues(block):
             summary = {key: block.get(key) for key in INTROSPECTION_NUMBERS}
             summary["seamCodecFrames"] = list(block.get("seamCodecFrames", []))
             # The WAV the generation wrote: a summary describes that audio only (a copied entry must not inherit it).
@@ -1686,7 +1697,7 @@ def build_manifest(*, plan_path: Path, batch_results: Path, wav_root: Path, outp
                 textBinding=outcome["textBinding"],
             )
             if batch.get("longForm"):
-                evidence = outcome.get("longForm") or {}
+                evidence = _as_dict(outcome.get("longForm"))
                 try:
                     record["longForm"] = long_form_block(evidence.get("assembly"))
                 except TakeError as error:
@@ -1752,7 +1763,7 @@ def _reduced_generation(value: Mapping[str, Any]) -> dict[str, Any] | None:
     if not isinstance(generation_id, str) or not GENERATION_ID.fullmatch(generation_id):
         return None
     row: dict[str, Any] = {"generationID": generation_id.upper()}
-    notes = value.get("notes") if isinstance(value.get("notes"), dict) else {}
+    notes = _as_dict(value.get("notes"))
     kept: dict[str, Any] = {}
     if is_sha256(notes.get("samplingWAVDigest")):
         kept["samplingWAVDigest"] = notes["samplingWAVDigest"]
@@ -1769,11 +1780,11 @@ def _reduced_generation(value: Mapping[str, Any]) -> dict[str, Any] | None:
     block = value.get("engineIntrospection")
     if isinstance(block, dict) and not introspection_issues(block):
         row["engineIntrospection"] = block
-    timings = value.get("timingsMS") if isinstance(value.get("timingsMS"), dict) else {}
+    timings = _as_dict(value.get("timingsMS"))
     held = {key: timings[key] for key in EOS_HOLD_TIMINGS if _count(timings.get(key))}
     if held:
         row["timingsMS"] = held
-    identity = value.get("modelRuntimeIdentity") if isinstance(value.get("modelRuntimeIdentity"), dict) else {}
+    identity = _as_dict(value.get("modelRuntimeIdentity"))
     tokenizer = identity.get("speechTokenizerDigest")
     if isinstance(tokenizer, str) and TOKENIZER_DIGEST.fullmatch(tokenizer):
         row["speechTokenizerDigest"] = tokenizer

@@ -8,6 +8,7 @@ from pathlib import Path
 import struct
 import sys
 import tempfile
+from typing import Any
 import unittest
 import wave
 
@@ -105,8 +106,8 @@ class AnalyzeProsodyTests(unittest.TestCase):
         write_pcm16(short, sine(3.0))
         write_pcm16(long, sine(15.0))
 
-        short_report = analyze(str(short))
-        long_report = analyze(str(long))
+        short_report: dict[str, Any] = analyze(str(short))
+        long_report: dict[str, Any] = analyze(str(long))
 
         self.assertNotIn("error", short_report)
         self.assertNotIn("error", long_report)
@@ -155,7 +156,7 @@ class AnalyzeProsodyTests(unittest.TestCase):
         samples = sine(2.0)
         samples[int(0.75 * SAMPLE_RATE):int(1.25 * SAMPLE_RATE)] = 0.0
         write_pcm16(path, samples)
-        report = analyze(str(path), boundary_seconds=[1.0])
+        report: dict[str, Any] = analyze(str(path), boundary_seconds=[1.0])
         self.assertGreaterEqual(report["pauses_max_pause_seconds"], 0.45)
         self.assertEqual(report["boundaries_observed_count"], 1)
         self.assertEqual(report["boundaries_silence_overlap_count"], 1)
@@ -167,7 +168,7 @@ class AnalyzeProsodyTests(unittest.TestCase):
         samples[midpoint] = 1.0
         samples[midpoint + 1] = -1.0
         write_pcm16(path, samples)
-        report = analyze(str(path), boundary_seconds=[midpoint / SAMPLE_RATE])
+        report: dict[str, Any] = analyze(str(path), boundary_seconds=[midpoint / SAMPLE_RATE])
         self.assertGreaterEqual(report["signal_clipping_count"], 2)
         self.assertGreaterEqual(report["signal_click_count"], 2)
         self.assertGreater(report["boundaries_max_sample_jump"], 0.9)
@@ -177,8 +178,8 @@ class AnalyzeProsodyTests(unittest.TestCase):
         expressive = self.directory / "expressive.wav"
         write_pcm16(flat, sine(5.0))
         write_pcm16(expressive, modulated_sine(5.0))
-        flat_report = analyze(str(flat))
-        expressive_report = analyze(str(expressive))
+        flat_report: dict[str, Any] = analyze(str(flat))
+        expressive_report: dict[str, Any] = analyze(str(expressive))
         self.assertGreater(
             expressive_report["f0_std_semitones"],
             flat_report["f0_std_semitones"] + 0.2,
@@ -195,7 +196,7 @@ class AnalyzeProsodyTests(unittest.TestCase):
         for frequency in (80.0, 100.0, 150.0, 220.0, 300.0, 390.0):
             path = self.directory / f"f0-{int(frequency)}.wav"
             write_pcm16(path, harmonic_tone(2.0, frequency=frequency))
-            report = analyze(str(path))
+            report: dict[str, Any] = analyze(str(path))
             self.assertNotIn("error", report)
             self.assertAlmostEqual(
                 report["f0_median_hz"],
@@ -207,7 +208,7 @@ class AnalyzeProsodyTests(unittest.TestCase):
     def test_stereo_downmix_remains_supported(self) -> None:
         path = self.directory / "stereo.wav"
         write_pcm16(path, sine(2.0), channels=2)
-        report = analyze(str(path))
+        report: dict[str, Any] = analyze(str(path))
         self.assertNotIn("error", report)
         self.assertGreater(report["f0_median_hz"], 0)
 
@@ -221,7 +222,7 @@ class AnalyzeProsodyTests(unittest.TestCase):
             writer.setsampwidth(4)
             writer.setframerate(SAMPLE_RATE)
             writer.writeframes(struct.pack("<f", math.nan) * SAMPLE_RATE)
-        report = analyze(str(path))
+        report: dict[str, Any] = analyze(str(path))
         self.assertIn("error", report)
         self.assertIn("expected 16-bit PCM", report["error"])
 

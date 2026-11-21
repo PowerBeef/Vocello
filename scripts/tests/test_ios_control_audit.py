@@ -8,6 +8,7 @@ import hashlib
 import pathlib
 import struct
 import tempfile
+from typing import Any
 import unittest
 from unittest import mock
 import zlib
@@ -648,6 +649,10 @@ class IOSControlAuditCompositionTests(unittest.TestCase):
 
 
 class IOSControlAuditIncrementalEvidenceTests(unittest.TestCase):
+    contract: dict[str, Any]
+    source_identity: str
+    plan: dict[str, Any]
+    metadata: dict[str, Any]
     setUp = IOSControlAuditCompositionTests.setUp
     observation = IOSControlAuditCompositionTests.observation
     def event(self, index: int, control: str, phase: str = "terminal", **fields) -> dict:
@@ -733,6 +738,10 @@ class IOSControlAuditIncrementalEvidenceTests(unittest.TestCase):
 
 
 class IOSControlAuditCorrelationV2Tests(unittest.TestCase):
+    contract: dict[str, Any]
+    source_identity: str
+    plan: dict[str, Any]
+    metadata: dict[str, Any]
     setUp = IOSControlAuditCompositionTests.setUp
     observation = IOSControlAuditCompositionTests.observation
     event = IOSControlAuditIncrementalEvidenceTests.event
@@ -899,7 +908,7 @@ class IOSControlAuditResumeTests(unittest.TestCase):
     ) -> dict:
         run_root = root / run_id
         run_root.mkdir()
-        run = {
+        run: dict[str, Any] = {
             "runID": run_id,
             "status": "failed",
             "treeFingerprint": self.source_identity,

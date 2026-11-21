@@ -18,6 +18,7 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -158,7 +159,9 @@ class FixtureServer:
         class Server(http.server.ThreadingHTTPServer):
             def server_bind(self):  # skip the host-name lookup (seconds on a Mac)
                 socketserver.TCPServer.server_bind(self)
-                self.server_name, self.server_port = self.server_address[:2]
+                host, port = self.server_address[:2]
+                self.server_name = str(host)
+                self.server_port = int(port)
 
         self.server = Server(("127.0.0.1", 0), Handler)
         self.port = self.server.server_address[1]
@@ -185,10 +188,10 @@ class FetchTests(unittest.TestCase):
         self.server.close()
         self.directory.cleanup()
 
-    def fetcher(self, **overrides):
+    def fetcher(self, **overrides: Any):
         local = ("127.0.0.1",)
-        options = dict(layout=self.layout, hf_base=self.base, raw_base=f"{self.base}/raw", allow_http=True,
-                       allowlist={host: local for host in models.HOST_ALLOWLIST}, token=None, log=self.logs.append)
+        options: dict[str, Any] = dict(layout=self.layout, hf_base=self.base, raw_base=f"{self.base}/raw", allow_http=True,
+                                       allowlist={host: local for host in models.HOST_ALLOWLIST}, token=None, log=self.logs.append)
         options.update(overrides)
         return models.Fetcher(**options)
 
@@ -518,7 +521,9 @@ class CacheTests(unittest.TestCase):
         output = self.layout.results_dir("m")
         store.write_result(output, model="m", runner_sha="r1", audio_sha=digest, variant=None,
                            duration_seconds=2.0, outputs={"mos": 3.9})
-        self.assertEqual(store.read_result(self.layout, "m", digest, None, "r1")["outputs"], {"mos": 3.9})
+        loaded = store.read_result(self.layout, "m", digest, None, "r1")
+        assert loaded is not None
+        self.assertEqual(loaded["outputs"], {"mos": 3.9})
         self.assertIsNone(store.read_result(self.layout, "m", digest, None, "r2"))
         self.assertIsNone(store.read_result(self.layout, "m", digest, "abcd", "r1"))
         self.assertIsNone(store.read_result(self.layout, "other", digest, None, "r1"))
@@ -531,7 +536,9 @@ class CacheTests(unittest.TestCase):
         self.assertNotEqual(key, store.variant_key("bonjour", "english", None))
         store.write_result(self.layout.results_dir("m"), model="m", runner_sha="r", audio_sha=digest,
                            variant=key, duration_seconds=None, error="decode-failed")
-        self.assertEqual(store.read_result(self.layout, "m", digest, key, "r")["error"], "decode-failed")
+        errored = store.read_result(self.layout, "m", digest, key, "r")
+        assert errored is not None
+        self.assertEqual(errored["error"], "decode-failed")
         with self.assertRaises(ValueError):
             store.write_result(self.layout.results_dir("m"), model="m", runner_sha="r", audio_sha=digest,
                                variant=None, duration_seconds=None)
@@ -759,6 +766,7 @@ class PruneTests(unittest.TestCase):
         self.layout.config.mkdir(parents=True)
         self.layout.registry.write_text(json.dumps(registry(model_entry())))
         spec = importlib.util.spec_from_file_location("qc_cli", SCRIPTS / "qc.py")
+        assert spec is not None and spec.loader is not None
         cli = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cli)
         with mock.patch("sys.stdout") as stdout:
@@ -810,6 +818,7 @@ class RepositoryTests(unittest.TestCase):
             layout.config.mkdir(parents=True)
             layout.registry.write_text(json.dumps(registry(model_entry())))
             spec = importlib.util.spec_from_file_location("qc_cli", SCRIPTS / "qc.py")
+            assert spec is not None and spec.loader is not None
             cli = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(cli)
             with mock.patch("sys.stdout") as stdout:

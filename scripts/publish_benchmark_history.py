@@ -133,6 +133,10 @@ def load_json(path: Path) -> dict[str, Any]:
     return jsonio.load_json(path, error=PublicationError)
 
 
+def _as_dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
 def canonical_hardware_profile(platform: str) -> dict[str, Any]:
     payload = load_json(ROOT / "benchmarks" / "hardware-profiles.json")
     profiles = payload.get("profiles")
@@ -615,9 +619,9 @@ def load_app_rows(diagnostics: Path) -> list[dict[str, Any]]:
 def validate_language_app_row(
     row: dict[str, Any], *, run_id: str, cell_id: str, planned_take: dict[str, Any]
 ) -> None:
-    notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+    notes = _as_dict(row.get("notes"))
     finish = str(row.get("finishReason", "")).lower()
-    frontend = row.get("frontendMetrics") if isinstance(row.get("frontendMetrics"), dict) else {}
+    frontend = _as_dict(row.get("frontendMetrics"))
     submit_to_completed = finite_number(frontend.get("submitToCompletedMS"))
     if (
         not isinstance(row.get("schemaVersion"), int) or row["schemaVersion"] < 7
@@ -671,12 +675,9 @@ def correlated_ios_app_rows(
                 f"iOS generation {generation_id} has {len(matches)} app rows; expected exactly one"
             )
         app = matches[0]
-        notes = app.get("notes") if isinstance(app.get("notes"), dict) else {}
-        frontend = (
-            app.get("frontendMetrics")
-            if isinstance(app.get("frontendMetrics"), dict) else {}
-        )
-        timings = app.get("timingsMS") if isinstance(app.get("timingsMS"), dict) else {}
+        notes = _as_dict(app.get("notes"))
+        frontend = _as_dict(app.get("frontendMetrics"))
+        timings = _as_dict(app.get("timingsMS"))
         frontend_completed = finite_number(frontend.get("submitToCompletedMS"))
         timing_completed = finite_number(timings.get("submitToCompletedMS"))
         finish = str(app.get("finishReason", "")).lower()
@@ -749,16 +750,16 @@ def successful_row(row: dict[str, Any]) -> None:
 
 
 def row_metrics(row: dict[str, Any], take: dict[str, Any] | None = None) -> dict[str, float]:
-    derived = row.get("derivedMetrics") if isinstance(row.get("derivedMetrics"), dict) else {}
-    summary = row.get("summary") if isinstance(row.get("summary"), dict) else {}
-    timings = row.get("timingsMS") if isinstance(row.get("timingsMS"), dict) else {}
-    backend = row.get("backendMetrics") if isinstance(row.get("backendMetrics"), dict) else {}
+    derived = _as_dict(row.get("derivedMetrics"))
+    summary = _as_dict(row.get("summary"))
+    timings = _as_dict(row.get("timingsMS"))
+    backend = _as_dict(row.get("backendMetrics"))
     typed_timings = {
         item.get("key"): item.get("milliseconds")
         for item in backend.get("timings", [])
         if isinstance(item, dict)
     }
-    resources = summary.get("processResourceUsage") if isinstance(summary.get("processResourceUsage"), dict) else {}
+    resources = _as_dict(summary.get("processResourceUsage"))
     minor_faults = finite_number(resources.get("minorPageFaults")) or 0.0
     major_faults = finite_number(resources.get("majorPageFaults")) or 0.0
     voluntary_switches = finite_number(resources.get("voluntaryContextSwitches")) or 0.0
@@ -826,7 +827,8 @@ def row_metrics(row: dict[str, Any], take: dict[str, Any] | None = None) -> dict
         "samplerCaptureFailureCount": summary.get("captureFailureCount"),
         "memoryTrimCount": len(trim_levels),
         "maximumTrimLevel": max(
-            (TRIM_SEVERITY.get(level, 0) for level in trim_levels), default=0
+            (TRIM_SEVERITY.get(level, 0) for level in trim_levels if isinstance(level, str)),
+            default=0,
         ),
     }
     # The startup windows the standard RTF leaves out of the request wall.
@@ -855,7 +857,7 @@ def hardware_context(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
     environments: list[dict[str, Any]] = []
     thermal_values: list[str] = []
     for row in rows:
-        summary = row.get("summary") if isinstance(row.get("summary"), dict) else {}
+        summary = _as_dict(row.get("summary"))
         environment = summary.get("runEnvironment")
         if isinstance(environment, dict):
             environments.append(environment)
@@ -890,7 +892,7 @@ def hardware_context(rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
 
 def uses_forced_memory_profile(rows: Iterable[dict[str, Any]]) -> bool:
     for row in rows:
-        notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+        notes = _as_dict(row.get("notes"))
         if str(notes.get("deviceClassForced", "false")).lower() == "true":
             return True
         if notes.get("memoryProfile") or notes.get("simulatedProcessLimitMB"):
@@ -918,7 +920,7 @@ def runtime_policy_provenance(rows: Iterable[dict[str, Any]]) -> dict[str, Any] 
     stamped = unstamped = 0
     forced = False
     for row in rows:
-        notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+        notes = _as_dict(row.get("notes"))
         device_class = notes.get("deviceClass")
         if isinstance(device_class, str) and device_class:
             stamped += 1
@@ -1076,7 +1078,7 @@ def engine_record_classification(
 def prompt_corpus_digest(rows: Iterable[dict[str, Any]]) -> str:
     ordered: list[str] = []
     for row in rows:
-        notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+        notes = _as_dict(row.get("notes"))
         digest = notes.get("promptDigest")
         if (
             not isinstance(digest, str)
@@ -1132,11 +1134,15 @@ def runtime_identity(row: dict[str, Any], *, mode: str, model_id: str) -> dict[s
         for field in ("modelRevision", "modelIntegrityDigest"):
             value = required[field]
             expected_length = 40 if field == "modelRevision" else 64
-            if len(value) != expected_length or any(character not in "0123456789abcdef" for character in value):
+            if (
+                not isinstance(value, str)
+                or len(value) != expected_length
+                or any(character not in "0123456789abcdef" for character in value)
+            ):
                 raise PublicationError(f"schema-v7 engine telemetry has invalid {field}")
         fixture_digest = identity.get("fixtureDigest")
     else:
-        notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+        notes = _as_dict(row.get("notes"))
         required = {
             "modelRepository": str(notes.get("modelRepository", "not-applicable")),
             "modelRevision": str(notes.get("huggingFaceRevision", "not-applicable")),
@@ -1372,7 +1378,7 @@ def engine_take(
 ) -> dict[str, Any]:
     successful_row(row)
     generation_id = str(take.get("generationID", ""))
-    notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+    notes = _as_dict(row.get("notes"))
     if notes.get("benchRunID") != run_id:
         raise PublicationError(f"generation {generation_id} has the wrong or missing benchRunID")
     if notes.get("benchTakeIndex") is None or str(notes.get("benchTakeIndex")) != str(index):
@@ -1429,7 +1435,7 @@ def engine_take(
     # Each take's own host sample (its run environment at generation start),
     # so a comparison judges the busiest measured take rather than only the
     # first take's load (audit #54).
-    summary = row.get("summary") if isinstance(row.get("summary"), dict) else {}
+    summary = _as_dict(row.get("summary"))
     environment = summary.get("runEnvironment")
     if isinstance(environment, dict):
         if (load := finite_number(environment.get("loadAverage1Minute"))) is not None:
@@ -1472,7 +1478,7 @@ def label_instrumented_takes(takes: list[dict[str, Any]], trace: dict[str, Any] 
     kind = settings.get("profileKind") if isinstance(settings, dict) else None
     if not isinstance(kind, str) or not kind:
         raise PublicationError("profile trace evidence does not name its profile kind")
-    summary = trace.get("summary") if isinstance(trace.get("summary"), dict) else {}
+    summary = _as_dict(trace.get("summary"))
     plausibility = summary.get("cpuPlausibility")
     implausible = set(
         trace_cpu.implausible_take_indices(plausibility) if isinstance(plausibility, dict) else []
@@ -1572,12 +1578,13 @@ def memory_retention_evidence(
             raise PublicationError(
                 f"memory qualification mode {mode} does not contain exactly three retained takes"
             )
-        retained_ends = [
+        raw_retained_ends = [
             finite_number(take["metrics"].get("physicalFootprintEndMB"))
             for take in retained_takes
         ]
-        if any(value is None for value in retained_ends):
+        if any(value is None for value in raw_retained_ends):
             raise PublicationError(f"memory qualification mode {mode} lacks post-trim footprint evidence")
+        retained_ends = [value for value in raw_retained_ends if value is not None]
         baseline = float(retained_ends[0])
         growth_by_mode[mode] = max(
             0.0,
@@ -1663,15 +1670,16 @@ def retained_memory_v2_evidence(
     limits = retained_memory_v2_limits(declaration, modes, platform)
     growth_by_mode: dict[str, float] = {}
     for mode in modes:
-        ends = [
+        raw_ends = [
             finite_number((take.get("metrics") or {}).get("mlxEndActiveMB"))
             for take in takes
             if take.get("mode") == mode and "/retained#" in str(take.get("cell"))
         ]
-        if len(ends) != policy["repetitionsPerMode"] or any(value is None for value in ends):
+        if len(raw_ends) != policy["repetitionsPerMode"] or any(value is None for value in raw_ends):
             raise PublicationError(
                 f"memory qualification mode {mode} lacks end-of-take MLX evidence for retained-memory-v2"
             )
+        ends = [value for value in raw_ends if value is not None]
         growth_by_mode[mode] = max(0.0, max(float(value) for value in ends[1:]) - float(ends[0]))
     evidence: dict[str, Any] = {
         "policyID": RETAINED_MEMORY_V2_ID,
@@ -1693,7 +1701,7 @@ def retained_memory_v2_evidence(
 
 def minimal_take(index: int, cell: str, row: dict[str, Any]) -> dict[str, Any]:
     successful_row(row)
-    notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+    notes = _as_dict(row.get("notes"))
     qc = qc_record(row)
     model_id = str(row.get("modelID", "not-applicable"))
     mode = str(row.get("mode", "not-applicable"))
@@ -2005,7 +2013,7 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
         # #13). The engine writes `samplingSeed` for every seeded request, so a
         # missing receipt is broken telemetry, never an unconfirmed seed.
         for take, row in zip(takes, selected):
-            notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+            notes = _as_dict(row.get("notes"))
             observed = notes.get("samplingSeed")
             if observed is None:
                 raise PublicationError(
@@ -2060,8 +2068,8 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
             raise PublicationError("bench-prosody.json must be an array")
         prosody_rows = [row for row in loaded if isinstance(row, dict)]
         profile_digests = {
-            row.get("profileDigest") for row in prosody_rows
-            if isinstance(row.get("profileDigest"), str)
+            digest for row in prosody_rows
+            if isinstance((digest := row.get("profileDigest")), str)
         }
         if len(profile_digests) != 1:
             raise PublicationError("delivery prosody rows do not share one analysis profile")
@@ -2472,7 +2480,7 @@ def validate_language_sampling_identity(
     if sentinel.get("schemaVersion") != LANGUAGE_SENTINEL_SCHEMA:
         raise PublicationError(f"language cell {cell_id} lacks sentinel schema v2 evidence")
     seed = uint64_value(planned_take.get("seed"))
-    notes = engine_row.get("notes") if isinstance(engine_row.get("notes"), dict) else {}
+    notes = _as_dict(engine_row.get("notes"))
     if seed is None or uint64_value(sentinel.get("seed")) != seed:
         raise PublicationError(f"language cell {cell_id} sentinel seed does not match the plan")
     if uint64_value(notes.get("samplingSeed")) != seed:
@@ -2556,7 +2564,7 @@ def validate_macos_planned_row(
     speaker note for Custom, the typed fixture digest of the brief for Design.
     Any drift, or a row that predates the speaker note, refuses publication.
     """
-    notes = engine_row.get("notes") if isinstance(engine_row.get("notes"), dict) else {}
+    notes = _as_dict(engine_row.get("notes"))
     mode = planned_take.get("mode")
     if engine_row.get("mode") != mode:
         raise PublicationError(f"language cell {cell_id} telemetry mode does not match the plan")
@@ -2607,7 +2615,13 @@ def validate_equivalent_outputs(cells: list[dict[str, Any]], takes: list[dict[st
         group = cell.get("promptEquivalenceGroup")
         seed = take.get("seed")
         digest = (take.get("output") or {}).get("fileDigest")
-        if not isinstance(group, str) or not group or not isinstance(seed, int) or not is_sha256(digest):
+        if (
+            not isinstance(group, str)
+            or not group
+            or not isinstance(seed, int)
+            or not isinstance(digest, str)
+            or not is_sha256(digest)
+        ):
             continue
         grouped.setdefault((group, seed), {})[str(cell.get("id"))] = digest
     for (group, seed), members in sorted(grouped.items()):
@@ -2636,7 +2650,7 @@ def validate_engine_prompt_equivalence(
         if not isinstance(group, str) or not group:
             continue
         cell_id = str(cell.get("id"))
-        notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+        notes = _as_dict(row.get("notes"))
         digest = notes.get("resolvedPromptAssemblyDigest")
         if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
             raise PublicationError(
@@ -2737,7 +2751,7 @@ def sanitized_asr_evidence(
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             raise PublicationError(f"language cell {cell_id} has invalid {key}")
         count_fields[key] = value
-    boolean_fields = {
+    raw_boolean_fields = {
         key: verification.get(key) for key in ("languagePass", "accuracyPass", "pass")
     }
     expect_failure = cell.get("expectedOutcome") == "fail"
@@ -2750,8 +2764,11 @@ def sanitized_asr_evidence(
         or count_fields["referenceCharacterCount"] <= 0
     ):
         raise PublicationError(f"language cell {cell_id} has non-finite ASR scores")
-    if any(not isinstance(value, bool) for value in boolean_fields.values()):
+    if any(not isinstance(value, bool) for value in raw_boolean_fields.values()):
         raise PublicationError(f"language cell {cell_id} has malformed ASR verdicts")
+    boolean_fields: dict[str, bool] = {
+        key: value for key, value in raw_boolean_fields.items() if isinstance(value, bool)
+    }
     if verification.get("skipReason") is not None:
         raise PublicationError(
             f"language cell {cell_id} failed output verification (skipped: {verification.get('skipReason')})"
@@ -2817,6 +2834,7 @@ def sanitized_asr_evidence(
         average_confidence = finite_number(repetition.get("averageConfidence"))
         minimum_confidence = finite_number(repetition.get("minimumConfidence"))
         transcript = repetition.get("transcript")
+        segment_count = repetition.get("segmentCount")
         if (
             repetition.get("passIndex") != index
             or repetition.get("localeIdentifier") != locale
@@ -2826,9 +2844,9 @@ def sanitized_asr_evidence(
             or repetition.get("finalResultStatus") != "finalResult"
             or duration is None or duration <= 0
             or not isinstance(transcript, str) or not transcript.strip() or transcript != transcript.strip()
-            or isinstance(repetition.get("segmentCount"), bool)
-            or not isinstance(repetition.get("segmentCount"), int)
-            or repetition.get("segmentCount") <= 0
+            or isinstance(segment_count, bool)
+            or not isinstance(segment_count, int)
+            or segment_count <= 0
             or segment_start is None or segment_start < 0
             or segment_end is None or segment_end <= segment_start
             or timing_coverage is None or timing_coverage <= 0
@@ -3075,8 +3093,8 @@ def sanitized_qc_evidence(
         raise PublicationError(f"language cell {cell_id} has no output duration to bind recognitions to")
     if entry.get("generationID") != engine_row.get("generationID") or entry.get("audioSHA256") != expected_audio_sha256:
         raise PublicationError(f"language cell {cell_id} QC v2 recognitions belong to other audio")
-    recognitions = entry.get("recognitions")
-    for recognition in recognitions if isinstance(recognitions, list) else []:
+    raw_recognitions = entry.get("recognitions")
+    for recognition in raw_recognitions if isinstance(raw_recognitions, list) else []:
         family = recognition.get("modelFamily") if isinstance(recognition, dict) else None
         recognizer = recognizers.get(family) if isinstance(family, str) else None
         if recognizer is None or recognition.get("modelID") != recognizer["modelID"] or recognition.get(
@@ -3087,7 +3105,7 @@ def sanitized_qc_evidence(
             )
     expect_failure = cell.get("expectedOutcome") == "fail"
     verdict = qc_take_verdict(
-        recognitions, audio_sha256=expected_audio_sha256, script=reference_script,
+        raw_recognitions, audio_sha256=expected_audio_sha256, script=reference_script,
         language=expected_language, duration_seconds=duration, expect_failure=expect_failure,
         accuracy_metric_version=LANGUAGE_ACCURACY_METRIC_VERSION,
     )
@@ -3095,6 +3113,7 @@ def sanitized_qc_evidence(
         detail = "; ".join(f"{family}: {', '.join(sorted(set(issues)))}"
                            for family, issues in sorted(verdict["issues"].items()))
         raise PublicationError(f"language cell {cell_id} QC v2 recognition is unqualified: {detail}")
+    recognitions = raw_recognitions if isinstance(raw_recognitions, list) else []
     agreement = verdict["consensus"]
     if agreement["outcome"] != "met":
         detail = ", ".join(f"{channel}={agreement['statuses'][channel]}" for channel in agreement["expected"])
@@ -3204,7 +3223,7 @@ def language_command(args: argparse.Namespace) -> Path:
     selected_app: list[dict[str, Any]] = []
     sentinels: dict[str, dict[str, Any]] = {}
     selected_sentinel_paths: dict[str, Path] = {}
-    if ios_plan:
+    if ios_plan and planned_takes is not None:
         by_generation: dict[str, list[dict[str, Any]]] = {}
         for row in rows:
             by_generation.setdefault(str(row.get("generationID")), []).append(row)
@@ -3250,7 +3269,7 @@ def language_command(args: argparse.Namespace) -> Path:
                     f"language cell {cell_id} generation has {len(matches)} rows; expected one"
                 )
             row = matches[0]
-            notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+            notes = _as_dict(row.get("notes"))
             if notes.get("benchCell") != cell_id or row.get("mode") != planned_take.get("mode"):
                 raise PublicationError(f"language cell {cell_id} telemetry identity is invalid")
             expected_hint = str(cell.get("expectedHint"))
@@ -3338,7 +3357,7 @@ def language_command(args: argparse.Namespace) -> Path:
         # The Auto take's own seed leaves no shared audio to compare, so the
         # engine rows' resolved prompt digests prove Auto resolution (BT-05).
         validate_engine_prompt_equivalence(cells, selected)
-    if ios_plan:
+    if ios_plan and planned_takes is not None:
         validate_prompt_equivalence(
             planned_takes=planned_takes,
             sentinels=sentinels,
@@ -3356,7 +3375,7 @@ def language_command(args: argparse.Namespace) -> Path:
     validate_equivalent_outputs(cells, takes)
     asr_evidence: list[dict[str, Any]] = []
     if output_verified:
-        if not ios_plan:
+        if not ios_plan or planned_takes is None:
             raise PublicationError("output verification publication requires an immutable run plan")
         for cell, planned_take, row, take in zip(cells, planned_takes, selected, takes):
             if cell.get("skipOutputVerification"):
@@ -3428,17 +3447,17 @@ def language_command(args: argparse.Namespace) -> Path:
                 continue
             cell_id = str(cell.get("id"))
             child = child_by_cell.get(cell_id)
-            entry = recognitions["cells"].get(child) if child else None
-            if entry is None:
-                entry = recognitions["cells"].get(cell_id)
-            if entry is None:
+            qc_entry = recognitions["cells"].get(child) if child else None
+            if qc_entry is None:
+                qc_entry = recognitions["cells"].get(cell_id)
+            if qc_entry is None:
                 raise PublicationError(f"language cell {cell_id} lacks QC v2 recognition evidence")
-            if entry.get("cellID", cell_id) != cell_id:
+            if qc_entry.get("cellID", cell_id) != cell_id:
                 raise PublicationError(f"language cell {cell_id} QC v2 recognition names another cell")
             output = take.get("output") or {}
             expected_digest = output.get("fileDigest") or (row.get("notes") or {}).get("samplingWAVDigest")
             evidence = sanitized_qc_evidence(
-                cell=cell, engine_row=row, entry=entry,
+                cell=cell, engine_row=row, entry=qc_entry,
                 reference_script=corpus_scripts[str(cell["scriptLang"])],
                 expected_audio_sha256=expected_digest, duration_seconds=output.get("durationSeconds"),
                 recognizers=qc_recognizers,
@@ -3551,7 +3570,7 @@ def language_command(args: argparse.Namespace) -> Path:
                     "requiredPassCount": evidence["recognitionPassCount"],
                 })
             qc_cell = qc_by_cell.get(cell_id)
-            if qc_cell is not None:
+            if qc_cell is not None and qc_recognizers is not None:
                 entry["qcRecognition"] = {
                     "algorithm": QC_ASR_ALGORITHM,
                     "families": {
@@ -3749,9 +3768,9 @@ def _legacy_telemetry_overhead_record(args: argparse.Namespace) -> Path:
         mode_order = int(sample["modeOrder"])
         measured_take = int(sample["measuredTake"])
         context = context_by_lane.get((rotation, mode_order, mode), {})
-        before = context.get("before") if isinstance(context.get("before"), dict) else {}
-        after = context.get("after") if isinstance(context.get("after"), dict) else {}
-        environment = sample.get("environment") if isinstance(sample.get("environment"), dict) else {}
+        before = _as_dict(context.get("before"))
+        after = _as_dict(context.get("after"))
+        environment = _as_dict(sample.get("environment"))
         audio_seconds = finite_number(sample.get("audioSeconds"))
         rtf = finite_number(sample.get("rtf"))
         ttfc = finite_number(sample.get("ttfcMS"))
@@ -4025,7 +4044,9 @@ class _TraceTableScan:
             if any(value is None for value in resolved):
                 self.cpu_unresolved_rows += 1
             elif self.schema == "cpu-profile":
-                self.cpu_cycle_samples.append((resolved[0], resolved[1]))
+                sample_time, cycle_weight = resolved[0], resolved[1]
+                if sample_time is not None and cycle_weight is not None:
+                    self.cpu_cycle_samples.append((sample_time, cycle_weight))
         if not self.signposts:
             return
         serialized = self._resolved_text(row)
@@ -4034,7 +4055,13 @@ class _TraceTableScan:
         take_index = re.search(r"\btakeIndex=\s*([1-9][0-9]*)", serialized)
         cell = re.search(r"\bcell=\s*([^\s<]+)", serialized)
         run = re.search(r"\brunID=\s*([A-Za-z0-9._-]+)", serialized)
-        if run is not None and run.group(1) == self.run_id and all((generation, take_index, cell)):
+        if (
+            run is not None
+            and run.group(1) == self.run_id
+            and generation is not None
+            and take_index is not None
+            and cell is not None
+        ):
             candidate = (generation.group(1), int(take_index.group(1)), cell.group(1))
             if candidate in self.expected_correlations:
                 correlation = candidate
@@ -4087,10 +4114,13 @@ class _TraceTableScan:
                 self._remember(element)
 
 
-def _toc_recorded_duration_seconds(toc: ET.ElementTree) -> float | None:
+def _toc_recorded_duration_seconds(toc: ET.ElementTree[Any]) -> float | None:
     """The trace's own recorded duration from its table of contents, not the
     requested time limit (audit #96)."""
-    for summary in toc.getroot().iter():
+    root = toc.getroot()
+    if root is None:
+        return None
+    for summary in root.iter():
         if summary.tag.rsplit("}", 1)[-1].lower() != "summary":
             continue
         for child in summary:
@@ -4695,15 +4725,15 @@ def _profile_take_expectations(
     )
     expectations: dict[tuple[str, int, str], dict[str, Any]] = {}
     for correlation, row in zip(ordered, rows):
-        timings = row.get("timingsMS") if isinstance(row.get("timingsMS"), dict) else {}
-        derived = row.get("derivedMetrics") if isinstance(row.get("derivedMetrics"), dict) else {}
+        timings = _as_dict(row.get("timingsMS"))
+        derived = _as_dict(row.get("derivedMetrics"))
         tokens = timings.get("qwen_generated_code_count", derived.get("generatedTokenCount"))
         if isinstance(tokens, bool) or not isinstance(tokens, int) or tokens < 1:
             raise PublicationError(
                 f"generation {correlation[0]} has no generated-token count to size its "
                 "signpost completeness check"
             )
-        notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+        notes = _as_dict(row.get("notes"))
         end_reason = notes.get("generation_end_reason")
         if not isinstance(end_reason, str) or (
             end_reason not in trace_intervals.LOOP_STEPS_BEYOND_TOKENS
@@ -4712,17 +4742,16 @@ def _profile_take_expectations(
                 f"generation {correlation[0]} records no eos or token_cap end reason to size "
                 "its signpost completeness check"
             )
-        summary = row.get("summary") if isinstance(row.get("summary"), dict) else {}
-        resources = (
-            summary.get("processResourceUsage")
-            if isinstance(summary.get("processResourceUsage"), dict) else {}
-        )
-        cpu_ms = [finite_number(resources.get(key)) for key in ("userCPUTimeMS", "systemCPUTimeMS")]
+        summary = _as_dict(row.get("summary"))
+        resources = _as_dict(summary.get("processResourceUsage"))
+        user_cpu_ms = finite_number(resources.get("userCPUTimeMS"))
+        system_cpu_ms = finite_number(resources.get("systemCPUTimeMS"))
         expectations[correlation] = {
             "generatedTokens": tokens, "endReason": end_reason, "timingsMS": timings,
             # The take's rusage CPU time, for the cycle plausibility (audit #97).
             "cpuSeconds": (
-                sum(cpu_ms) / 1_000.0 if all(value is not None for value in cpu_ms) else None
+                (user_cpu_ms + system_cpu_ms) / 1_000.0
+                if user_cpu_ms is not None and system_cpu_ms is not None else None
             ),
         }
     return expectations

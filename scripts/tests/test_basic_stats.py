@@ -58,7 +58,9 @@ class EffectSizeTests(unittest.TestCase):
     def test_cohens_dz_is_mean_over_standard_deviation(self):
         values = [1.0, 2.0, 3.0, 4.0]
         expected = 2.5 / math.sqrt(sum((v - 2.5) ** 2 for v in values) / 3)
-        self.assertAlmostEqual(cohens_dz(values), expected, places=9)
+        dz = cohens_dz(values)
+        assert dz is not None
+        self.assertAlmostEqual(dz, expected, places=9)
 
     def test_constant_or_single_sample_has_no_defined_effect_size(self):
         self.assertIsNone(cohens_dz([2.0, 2.0, 2.0]))
@@ -68,6 +70,7 @@ class EffectSizeTests(unittest.TestCase):
         large = required_pairs(0.8)
         medium = required_pairs(0.5)
         small = required_pairs(0.2)
+        assert large is not None and medium is not None and small is not None
         self.assertLess(large, medium)
         self.assertLess(medium, small)
         # Sanity against the standard table: d_z = 0.5 needs about 34 pairs.
@@ -80,20 +83,24 @@ class IntervalTests(unittest.TestCase):
         first = bootstrap_ci(sample, resamples=2000)
         second = bootstrap_ci(sample, resamples=2000)
         self.assertEqual(first, second)
+        assert first is not None
         self.assertLess(first["lower"], first["mean"])
         self.assertGreater(first["upper"], first["mean"])
 
     def test_wilson_interval_stays_inside_zero_to_one_at_the_extremes(self):
         perfect = wilson_interval(10, 10)
+        assert perfect is not None
         self.assertLessEqual(perfect["upper"], 1.0)
         self.assertLess(perfect["lower"], 1.0)
         empty = wilson_interval(0, 10)
+        assert empty is not None
         self.assertGreaterEqual(empty["lower"], 0.0)
         self.assertGreater(empty["upper"], 0.0)
 
     def test_wilson_interval_narrows_as_trials_grow(self):
         few = wilson_interval(8, 10)
         many = wilson_interval(80, 100)
+        assert few is not None and many is not None
         self.assertLess(many["upper"] - many["lower"], few["upper"] - few["lower"])
 
 

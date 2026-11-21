@@ -7,9 +7,9 @@ import argparse
 import hashlib
 import json
 import math
-import os
 import re
 import struct
+import sys
 import uuid
 import wave
 from datetime import datetime
@@ -956,6 +956,8 @@ def validate_result(
             raise ContractError("take predecessor identity is not the prior session")
         stages = observed.get("startupTimeline")
         validate_timeline(stages, "take.startupTimeline")
+        if not isinstance(stages, list):
+            raise ContractError("take.startupTimeline must be a list")
         if stages != attempts[-1].get("startupTimeline"):
             raise ContractError("terminal startup timeline is not the final represented attempt")
         if observed.get("status") == "pass" and not any(
@@ -1034,7 +1036,9 @@ def validate_ui_parity(log_path: Path, diagnostics: Path, run_id: str, output: P
                 continue
             if row_generation == visible_generation and value.get("layer") == "engine":
                 rows.append(value)
-    receipts = [row.get("requestReceipt") for row in rows if isinstance(row.get("requestReceipt"), dict)]
+    receipts: list[dict[str, Any]] = [
+        item for row in rows if isinstance((item := row.get("requestReceipt")), dict)
+    ]
     if not receipts:
         raise ContractError("UI generation has no correlated engine request receipt")
     receipt = max(receipts, key=lambda value: value.get("retryAttempt", -1))
@@ -1457,7 +1461,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.output,
             )
     except (ContractError, json.JSONDecodeError, OSError) as error:
-        print(f"startup reliability contract failed: {error}", file=os.sys.stderr)
+        print(f"startup reliability contract failed: {error}", file=sys.stderr)
         return 2
     return 0
 

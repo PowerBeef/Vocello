@@ -38,6 +38,7 @@ import sys
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 SCRIPT_DIRECTORY = Path(__file__).resolve().parent
 if str(SCRIPT_DIRECTORY) not in sys.path:
@@ -534,6 +535,15 @@ def _engine_run(e, app_lookup, *, cell_override=None):
         parts = cell_override.split("/")
         if len(parts) == 3:
             bucket = parts[1]
+    frontend_heartbeat = frontend.get("heartbeatCoveragePPM")
+    app_heartbeat = app_counters.get("heartbeatCoveragePPM")
+    ui_heartbeat_coverage = (
+        frontend_heartbeat / 1_000_000
+        if isinstance(frontend_heartbeat, (int, float))
+        else app_heartbeat / 1_000_000
+        if isinstance(app_heartbeat, (int, float))
+        else None
+    )
     run = {
         "generationID": e.get("generationID"),
         "mode": e.get("mode") or "?",
@@ -563,13 +573,7 @@ def _engine_run(e, app_lookup, *, cell_override=None):
         "uiMaxDelayedHeartbeatMS": frontend.get("maximumDelayedHeartbeatMS")
             if frontend.get("maximumDelayedHeartbeatMS") is not None
             else app_counters.get("maximumDelayedHeartbeatMS", app_counters.get("uiMaxStallMS")),
-        "uiHeartbeatCoverage": (
-            frontend.get("heartbeatCoveragePPM") / 1_000_000
-            if isinstance(frontend.get("heartbeatCoveragePPM"), (int, float))
-            else app_counters.get("heartbeatCoveragePPM") / 1_000_000
-            if isinstance(app_counters.get("heartbeatCoveragePPM"), (int, float))
-            else None
-        ),
+        "uiHeartbeatCoverage": ui_heartbeat_coverage,
         "decodeLoopMS": backend_timings.get("tokenLoop")
             if backend_timings.get("tokenLoop") is not None
             else timings.get("qwen_token_loop_total"),
@@ -1076,7 +1080,7 @@ def count_memory_events(engine_row, summary):
         level = (mark.get("metadata") or {}).get("level")
         if stage == "memory_trim":
             trim_count += 1
-            rank = _TRIM_SEVERITY.get(level, 0)
+            rank = _TRIM_SEVERITY.get(level, 0) if isinstance(level, str) else 0
             if rank > worst_rank:
                 worst_rank, worst_label = rank, level
         elif stage == "memory_pressure":
@@ -1458,7 +1462,7 @@ def effective_threshold(base_cell, threshold, median_key="rtf", mad_key="rtfMAD"
     return threshold
 
 
-def metric_threshold(base_cell, metric, threshold, mad_key=None):
+def metric_threshold(base_cell, metric, threshold: float, mad_key=None):
     """(threshold, basis) for one metric of one baseline cell.
 
     The largest of: the metric's floor (or the flat threshold), three MADs of
@@ -1466,7 +1470,7 @@ def metric_threshold(base_cell, metric, threshold, mad_key=None):
     when the baseline pools at least three seeded runs (so no seed run would
     have regressed against the baseline it helped build).
     """
-    candidates = [(METRIC_THRESHOLD_FLOORS.get(metric, threshold), "floor")]
+    candidates: list[tuple[float, str]] = [(METRIC_THRESHOLD_FLOORS.get(metric, threshold), "floor")]
     if mad_key:
         within = effective_threshold(base_cell, 0.0, metric, mad_key)
         if within > 0:
@@ -1509,7 +1513,7 @@ def baseline_rtf_definition(payload):
     return rtf_semantics.LEGACY_RTF_DEFINITION
 
 
-def baseline_cells(payload, *, current_identity=None, require_identity=False):
+def baseline_cells(payload, *, current_identity: Any = None, require_identity=False):
     """The baseline's cells once its identity (if any) matches the current run.
 
     `current_identity` is the run's identity, or a callable that derives it
@@ -1542,7 +1546,7 @@ def baseline_cells(payload, *, current_identity=None, require_identity=False):
         )
     if current_identity is None:
         raise ValueError("schema-v2 baseline comparison requires current evidence identity")
-    comparable_current = dict(current_identity)
+    comparable_current: dict[str, Any] = dict(current_identity)
     if legacy_host:
         for key in HOST_IDENTITY_KEYS:
             comparable_current.pop(key, None)
@@ -1796,7 +1800,8 @@ def pooled_cells(seeded_runs):
 
 def _evidence_source(evidence_payload):
     history = (evidence_payload or {}).get("historyRecord") or {}
-    source = history.get("source") if isinstance(history.get("source"), dict) else {}
+    raw_source = history.get("source")
+    source = raw_source if isinstance(raw_source, dict) else {}
     return source.get("commit"), source.get("dirty")
 
 
@@ -1870,7 +1875,7 @@ def seed_baseline(path, cells, evidence_payload, *, states=None, minimum_takes=3
     ):
         runs = list(existing["seededRuns"])
         replaced = False
-    if any(run.get("runID") == run_id for run in runs):
+    if isinstance(existing, dict) and any(run.get("runID") == run_id for run in runs):
         return existing, len(runs), False
     runs.append({"runID": run_id, "sourceCommit": commit, "cells": cells})
     document = {

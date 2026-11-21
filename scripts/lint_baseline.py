@@ -42,6 +42,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_VERSION = 1
@@ -119,9 +120,9 @@ def _relative(root: Path, filename: str) -> str:
 def parse_findings(tool: str, output: str, root: Path) -> list[Finding]:
     """Findings from shellcheck's `-f json1`, ruff's `--output-format json`, SwiftLint's `--reporter json`
     or Pyright's `--outputjson`."""
-    empty: object = {"comments": []} if tool == "shellcheck" else {"generalDiagnostics": []} if tool == "pyright" else []
+    empty: Any = {"comments": []} if tool == "shellcheck" else {"generalDiagnostics": []} if tool == "pyright" else []
     try:
-        payload = json.loads(output) if output.strip() else empty
+        payload: Any = json.loads(output) if output.strip() else empty
     except json.JSONDecodeError as error:
         raise LintBaselineError(f"{tool} output is not JSON: {error}") from error
     findings: list[Finding] = []

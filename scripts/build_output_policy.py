@@ -597,8 +597,9 @@ def _plist_path_value(value: Any) -> Path | None:
 
 def _external_xcode_matches(policy: LoadedPolicy) -> dict[str, Any]:
     config = policy.document["externalXcodeDerivedData"]
-    configured = os.path.expanduser(config["path"])
-    root = Path(os.environ.get("QVOICE_EXTERNAL_XCODE_DERIVED_DATA", configured)).absolute()
+    configured = os.path.expanduser(str(config["path"]))
+    override = os.environ.get("QVOICE_EXTERNAL_XCODE_DERIVED_DATA")
+    root = Path(configured if override is None else override).absolute()
     project_path = (policy.repo_root / "QwenVoice.xcodeproj").absolute()
     names = set(config["projectNames"])
     matches: list[dict[str, Any]] = []
@@ -670,7 +671,9 @@ def _valid_ui_history_record(policy: LoadedPolicy, run_id: str, platform: str) -
         / f"{run_id}.json"
     )
     payload = _load_json_object(record)
-    run = payload.get("run") if payload else None
+    if payload is None:
+        return False
+    run = payload.get("run")
     if not (
         isinstance(run, dict)
         and run.get("id") == run_id
@@ -719,7 +722,9 @@ def _valid_profile_history_record(
         / f"{run_dir.name}.json"
     )
     payload = _load_json_object(record)
-    run = payload.get("run") if payload else None
+    if payload is None:
+        return False
+    run = payload.get("run")
     if not (
         isinstance(run, dict)
         and run.get("id") == run_dir.name
@@ -833,6 +838,8 @@ def _profile_retention_status(policy: LoadedPolicy) -> dict[str, Any]:
             )
             if (
                 marker_valid
+                and marker is not None
+                and isinstance(kind, str)
                 and marker.get("status") == "published"
                 and _valid_profile_history_record(
                     policy, run_dir, platform=platform
@@ -844,6 +851,7 @@ def _profile_retention_status(policy: LoadedPolicy) -> dict[str, Any]:
                 )
             if (
                 marker_valid
+                and marker is not None
                 and marker.get("retentionPolicy") == "failedCompactionPending"
                 and valid_failed_profile_for_compaction(
                     root=policy.repo_root,
@@ -1042,8 +1050,9 @@ def build_status(policy: LoadedPolicy) -> dict[str, Any]:
                     policy, run_id, platform
                 ),
             )
-            ui_analysis = summarize_decisions(decisions)
-            reclaimable = ui_analysis["reclaimableBytes"]
+            summary: dict[str, Any] = summarize_decisions(decisions)
+            ui_analysis = summary
+            reclaimable = summary["reclaimableBytes"]
             blocked = max(0, allocated - reclaimable)
         totals[entry["cleanup"]] += reclaimable
         item: dict[str, Any] = {

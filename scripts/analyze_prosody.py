@@ -49,7 +49,7 @@ import json
 import math
 import os
 import wave
-from typing import Callable, Iterable, Iterator, Sequence
+from typing import Any, Callable, Iterable, Iterator, Sequence
 
 import numpy as np
 
@@ -773,7 +773,7 @@ def _signal_and_anchor_pass(
     metadata: WavMetadata,
     boundary_offsets: Sequence[int],
     memory: ManagedMemoryEstimate,
-) -> dict[str, object]:
+) -> dict[str, int | float]:
     f0_histogram = FixedHistogram(
         F0_MIN - F0_HISTOGRAM_STEP_HZ / 2,
         F0_MAX + F0_HISTOGRAM_STEP_HZ / 2,
@@ -868,10 +868,10 @@ def _signal_and_anchor_pass(
 def _analysis_pass(
     path: str,
     metadata: WavMetadata,
-    anchor: dict[str, object],
+    anchor: dict[str, int | float],
     boundary_offsets: Sequence[int],
     memory: ManagedMemoryEstimate,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     f0_histogram = FixedHistogram(
         F0_MIN - F0_HISTOGRAM_STEP_HZ / 2,
         F0_MAX + F0_HISTOGRAM_STEP_HZ / 2,

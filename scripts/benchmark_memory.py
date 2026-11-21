@@ -479,8 +479,10 @@ def _memory_warnings_and_failures(row: dict[str, Any]) -> MemoryEventSummary:
     maximum_trim = 0
     policy_cache_clear_count = 0
 
-    memory_metrics = row.get("memoryMetrics") if isinstance(row.get("memoryMetrics"), dict) else {}
-    typed_events = memory_metrics.get("events") if isinstance(memory_metrics.get("events"), list) else []
+    raw_memory_metrics = row.get("memoryMetrics")
+    memory_metrics: dict[str, Any] = raw_memory_metrics if isinstance(raw_memory_metrics, dict) else {}
+    raw_typed_events = memory_metrics.get("events")
+    typed_events: list[Any] = raw_typed_events if isinstance(raw_typed_events, list) else []
     typed_kind_counts: dict[str, int] = {}
     for event in typed_events:
         if not isinstance(event, dict):
@@ -552,7 +554,8 @@ def _memory_warnings_and_failures(row: dict[str, Any]) -> MemoryEventSummary:
     stage_kind_counts: dict[str, int] = {}
     for mark in _stage_marks(row):
         stage = str(mark.get("stage") or "")
-        metadata = mark.get("metadata") if isinstance(mark.get("metadata"), dict) else {}
+        raw_metadata = mark.get("metadata")
+        metadata: dict[str, Any] = raw_metadata if isinstance(raw_metadata, dict) else {}
         level = str(metadata.get("level") or metadata.get("action") or "none")
         reason = str(metadata.get("reason") or "").lower()
         if stage == "memory_pressure":
@@ -918,19 +921,17 @@ def _validate_layer(
         raise MemoryEvidenceError(
             f"generation {generation_id} {layer}: typed boundary coverage disagrees with summary"
         )
-    expected_role = "app" if layer == "app" else {
-        "engine", "engine-service", "current-process",
-    }
     sample_roles = {sample.get("processRole") for sample in samples}
     summary_role = summary.get("processRole")
     typed_role = memory_metrics.get("processRole")
     if layer == "app":
-        roles_valid = sample_roles == {expected_role} and summary_role == expected_role and typed_role == expected_role
+        roles_valid = sample_roles == {"app"} and summary_role == "app" and typed_role == "app"
     else:
+        expected_roles = {"engine", "engine-service", "current-process"}
         roles_valid = (
             len(sample_roles) == 1
-            and next(iter(sample_roles)) in expected_role
-            and summary_role in expected_role
+            and next(iter(sample_roles)) in expected_roles
+            and summary_role in expected_roles
             and typed_role == summary_role
         )
     if not roles_valid:
@@ -967,11 +968,12 @@ def _validate_layer(
         ("graphicsFootprintEndMB", graphics, -1),
     ):
         if summary_key in summary:
-            if not values or values[pick] is None:
+            picked = values[pick] if values else None
+            if picked is None:
                 raise MemoryEvidenceError(
                     f"generation {generation_id} {layer}: {summary_key} has no sampled ledger"
                 )
-            match(summary_key, float(values[pick]))
+            match(summary_key, float(picked))
 
     max_gpu_recommended = max(gpu_recommended)
     gpu_ratio = max(gpu_ratios)
@@ -1285,7 +1287,8 @@ def qualify_take_memory(
     target_ms = float(metrics["samplerTargetIntervalMS"])
     gap_ms = float(metrics["samplerMaximumUnobservedGapMS"])
     gap_bound = load_unobserved_gap_bound()
-    notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+    raw_notes = row.get("notes")
+    notes: dict[str, Any] = raw_notes if isinstance(raw_notes, dict) else {}
     floor_tier = gap_bound.is_floor_tier(platform, notes.get("deviceClass"))
     limit_ms = gap_bound.limit_ms(target_ms, floor_tier=floor_tier)
     if gap_ms > limit_ms + 1e-9:

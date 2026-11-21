@@ -102,6 +102,12 @@ jobs:
           QVOICE_FOUNDATION_SWIFT_COMPILATION_MODE: "wholemodule"
         run: ./scripts/build_foundation_targets.sh macos
 
+      - name: Compile the iOS app and policy tests optimized (warnings are errors)
+        env:
+          QVOICE_FOUNDATION_SWIFT_OPTIMIZATION: "-O"
+          QVOICE_FOUNDATION_SWIFT_COMPILATION_MODE: "wholemodule"
+        run: ./scripts/build_foundation_targets.sh ios
+
       - name: Upload compile results on failure
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

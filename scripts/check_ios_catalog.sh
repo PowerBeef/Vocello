@@ -160,7 +160,7 @@ def validate_descriptor($entries):
                 (if ($sz | type) != "number" or ($sz % 1) != 0 or $sz < 0
                    then [$d.modelID + " invalid sizeBytes for " + $p + ": " + ($sz | tostring)]
                    else [] end),
-                (if ($sha | type) != "string" or ($sha | length) != 64
+                (if ($sha | type) != "string" or ($sha | test("^[0-9a-fA-F]{64}$") | not)
                    then [$d.modelID + " invalid sha256 for " + $p]
                    else [] end),
                 (if $u != null and ((($u | type) != "string") or (($u | startswith("https://")) | not))

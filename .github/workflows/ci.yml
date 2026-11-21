@@ -58,6 +58,7 @@ jobs:
       website: ${{ steps.classify.outputs.website }}
       workflows: ${{ steps.classify.outputs.workflows }}
       macos_ui: ${{ steps.classify.outputs.macos_ui }}
+      ios_ui: ${{ steps.classify.outputs.ios_ui }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -493,7 +494,7 @@ jobs:
   ios-compile:
     name: iOS compile check (device SDK)
     needs: changes
-    if: github.event_name != 'pull_request' && needs.changes.outputs.ios == 'true'
+    if: github.event_name != 'pull_request' && (needs.changes.outputs.ios == 'true' || needs.changes.outputs.ios_ui == 'true')
     runs-on: xcode-27
     timeout-minutes: 30
     steps:
@@ -513,13 +514,14 @@ jobs:
           xcode="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
           # The dependency graph only (audit W-04): project.yml is regenerated each run.
           graph="${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved', 'Packages/VocelloQwen3Core/Package.swift') }}"
-          # One entry per (Xcode, dependency graph, ISO week): a warm run hits it
-          # exactly and saves nothing; the first run of a week or of a new graph
-          # misses the exact key, restores the newest prefix match and saves once.
+          # Unique per-run key mirroring macos-tests: restore picks the newest snapshot of this
+          # week, then graph, then Xcode; a new snapshot is saved when nothing of this week was
+          # restored or when drift exceeded 200 SwiftCompile tasks.
           week="$(date -u +%G-W%V)"
           echo "prefix=ios-xcode${xcode}-" >> "$GITHUB_OUTPUT"
           echo "graph=ios-xcode${xcode}-${graph}-" >> "$GITHUB_OUTPUT"
-          echo "value=ios-xcode${xcode}-${graph}-${week}" >> "$GITHUB_OUTPUT"
+          echo "week=ios-xcode${xcode}-${graph}-${week}-" >> "$GITHUB_OUTPUT"
+          echo "value=ios-xcode${xcode}-${graph}-${week}-${{ github.run_id }}-${{ github.run_attempt }}" >> "$GITHUB_OUTPUT"
           echo "spm=spm-${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved') }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore build caches
@@ -530,6 +532,7 @@ jobs:
           path: build/cache/xcode/ios-device
           key: ${{ steps.key.outputs.value }}
           restore-keys: |
+            ${{ steps.key.outputs.week }}
             ${{ steps.key.outputs.graph }}
             ${{ steps.key.outputs.prefix }}
 
@@ -548,20 +551,32 @@ jobs:
         run: ./scripts/regenerate_project.sh --fast
 
       - name: Compile VocelloiOS and the iOS policy tests for the device SDK
-        # Same script and same persistent DerivedData as the local checkpoint;
-        # CODE_SIGNING_ALLOWED=NO inside the script. Compile only, no phone. A
-        # compile check needs no optimized products, so CI keeps -Onone and the
-        # arena stays incremental; the local checkpoint keeps -O for the device lanes.
+        # Same script and persistent DerivedData as the local checkpoint;
+        # CODE_SIGNING_ALLOWED=NO inside the script. Compile only, no phone.
+        # QVOICE_FOUNDATION_SWIFT_OPTIMIZATION=-Onone now targets owned Swift targets
+        # only (leaving MLX/GRDB SwiftPM packages at -O wholemodule). Skipped on an
+        # iOS-UI-test-only push; build_ui_test_bundles.sh brings the app host current.
+        if: needs.changes.outputs.ios == 'true'
         env:
           QVOICE_FOUNDATION_SWIFT_OPTIMIZATION: "-Onone"
+          QVOICE_BUILD_TIMING_SUMMARY: "1"
         run: ./scripts/build_foundation_targets.sh ios --incremental
 
-      - name: Compile the iOS XCUITest bundle for the device SDK (build only, never run)
-        # PA-24: the same arena and settings as the compile above (unsigned,
-        # -Onone), so only the UI-test target compiles. No phone, no runner.
+      - name: Compile the iOS XCUITest bundles for the device SDK (build only, never run)
+        # PA-24: the same arena and owned-only -Onone settings as the compile above,
+        # so only the UI-test targets compile. No phone, no runner.
         env:
           QVOICE_FOUNDATION_SWIFT_OPTIMIZATION: "-Onone"
+          QVOICE_BUILD_TIMING_SUMMARY: "1"
         run: ./scripts/build_ui_test_bundles.sh ios --gate
+
+      - name: Measure cache drift
+        id: drift
+        if: always()
+        run: |
+          compiled="$(grep -hc '^SwiftCompile ' build/artifacts/foundation/vocello-ios-*.log build/artifacts/ui-bundles/VocelloiOS*.log 2>/dev/null | awk '{s+=$1} END {print s+0}')"
+          echo "compiled=${compiled:-0}" >> "$GITHUB_OUTPUT"
+          echo "recompiled ${compiled:-0} iOS Swift file(s); a new snapshot is saved above 200"
 
       - name: Name the compile errors
         if: failure()
@@ -587,7 +602,7 @@ jobs:
           echo "restored from: ${{ steps.cache.outputs.cache-matched-key || 'nothing (cold)' }}"
 
       - name: Save build caches
-        if: ${{ success() && steps.cache.outputs.cache-hit != 'true' }}
+        if: ${{ success() && (!startsWith(steps.cache.outputs.cache-matched-key, steps.key.outputs.week) || fromJSON(steps.drift.outputs.compiled || '0') > 200) }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: build/cache/xcode/ios-device

@@ -345,14 +345,20 @@ class ClassificationTests(unittest.TestCase):
         expected = {
             "Tests/VocelloMacUITests/VocelloMacSmokeUITests.swift": {"macos_ui"},
             "Tests/VocelloMacUITests/Info.plist": {"macos_ui"},
-            "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift": {"ios"},
-            "Tests/UIAutomationSupport/VocelloUIInteractionPolicy.swift": {"swift", "ios", "macos_ui"},
-            "Tests/VocelloCoreTests/CLIExecutionTests.swift": {"swift", "ios"},
+            "Tests/VocelloiOSUITests/VocelloiOSSmokeUITests.swift": {"ios_ui"},
+            "Tests/UIAutomationSupport/VocelloUIInteractionPolicy.swift": {"swift", "ios", "macos_ui", "ios_ui"},
+            "Tests/VocelloCoreTests/CLIExecutionTests.swift": {"swift"},
             "Tests/VocelloiOSLogicTests/X.swift": {"swift", "ios"},
+            "Sources/VocelloDesktopCore/DesktopAppPresence.swift": {"swift"},
+            "Sources/DesktopShared/EngineHostLease.swift": {"swift"},
+            "Sources/ContentView.swift": {"swift"},
+            "scripts/verify_ios_release_artifacts.py": {"ios", "python"},
+            "config/xcode-schemes/VocelloiOSLogic.xcscheme.template": {"swift", "ios", "python"},
         }
         for path, lanes in expected.items():
             self.assertEqual(self.lanes(path), lanes, path)
         self.assertTrue(MODULE.classify([])["macos_ui"])
+        self.assertTrue(MODULE.classify([])["ios_ui"])
 
 
 if __name__ == "__main__":

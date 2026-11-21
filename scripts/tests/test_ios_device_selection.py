@@ -160,5 +160,17 @@ class ResolveDeviceTests(unittest.TestCase):
         self.assertIn("no paired iPhone found", result.stderr)
 
 
+class LeadOnlyFlagPositionTests(unittest.TestCase):
+    def test_accepts_lead_only_before_or_after_subcommand(self) -> None:
+        shell = LaneShell(self, "ios_device.sh")
+        for invocation in ("main --lead-only help", "main help --lead-only"):
+            with self.subTest(invocation=invocation):
+                result = shell.run(
+                    f'unset QVOICE_LEAD_ONLY\n{invocation} >/dev/null 2>&1\nprintf "%s" "${{QVOICE_LEAD_ONLY:-}}"\n'
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), "1")
+
+
 if __name__ == "__main__":
     unittest.main()

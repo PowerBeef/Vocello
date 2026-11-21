@@ -1264,41 +1264,63 @@ summarize_long_form_project_if_present() {
 # team and the digests of the app, the test bundle and the .xctestrun, so a product that
 # another build overwrote is rebuilt, never tested. Both halves run inside the lane's
 # `xcuitest` step, so a build failure still fails that step.
+ios_ui_scheme_name() {
+  if [[ "$lane" == "purchase" ]]; then
+    printf '%s\n' "VocelloiOSPurchaseUI"
+  else
+    printf '%s\n' "VocelloiOSUI"
+  fi
+}
+
+ios_ui_bundle_name() {
+  if [[ "$lane" == "purchase" ]]; then
+    printf '%s\n' "VocelloiOSPurchaseUITests"
+  else
+    printf '%s\n' "VocelloiOSUITests"
+  fi
+}
+
 ios_ui_find_xctestrun() {
-  local found
-  found="$(find "$IOS_DERIVED/Build/Products" -maxdepth 1 -name 'VocelloiOSUI_*.xctestrun' -print 2>/dev/null)"
+  local scheme found
+  scheme="$(ios_ui_scheme_name)"
+  found="$(find "$IOS_DERIVED/Build/Products" -maxdepth 1 -name "${scheme}_*.xctestrun" -print 2>/dev/null)"
   [[ -n "$found" && "$(printf '%s\n' "$found" | wc -l | tr -d ' ')" == 1 ]] || return 1
   ios_ui_xctestrun="$found"
 }
 
 # Digests of the .xctestrun, the app and the test bundle; fails unless all three exist.
 ios_ui_products_digest() {
-  local products="$IOS_DERIVED/Build/Products/Release-iphoneos" digests
+  local products="$IOS_DERIVED/Build/Products/Release-iphoneos" bundle digests
+  bundle="$(ios_ui_bundle_name)"
   digests="$(shasum -a 256 "$ios_ui_xctestrun" "$products/Vocello.app/Vocello" \
-    "$products/VocelloiOSUITests-Runner.app/PlugIns/VocelloiOSUITests.xctest/VocelloiOSUITests" \
+    "$products/${bundle}-Runner.app/PlugIns/${bundle}.xctest/${bundle}" \
     2>/dev/null | awk '{print $1}')" || return 1
   [[ "$(printf '%s\n' "$digests" | grep -c .)" == 3 ]] || return 1
   printf '%s\n' "$digests" | paste -sd, -
 }
 
 ios_ui_build_for_testing() {
-  local marker="$IOS_DERIVED/.vocello-ios-ui-build-fingerprint" fingerprint toolchain products="" status=0
+  local scheme bundle marker fingerprint toolchain products="" status=0
+  scheme="$(ios_ui_scheme_name)"
+  bundle="$(ios_ui_bundle_name)"
+  marker="$IOS_DERIVED/.vocello-ios-ui-build-fingerprint.${scheme}"
   fingerprint="$(python3 "$ROOT_DIR/scripts/tree_fingerprint.py" --root "$ROOT_DIR" --build-inputs)" || return 1
   # The toolchain (an Xcode update changes the binary with no source change) and the
   # phone (a newly registered device needs its provisioning profile) join the key.
   toolchain="$(xcodebuild -version 2>/dev/null | shasum -a 256 | awk '{print $1}')" || return 1
-  fingerprint="$fingerprint|$toolchain|$device"
+  fingerprint="$fingerprint|$toolchain|$device|$scheme"
   if ios_ui_find_xctestrun; then products="$(ios_ui_products_digest || true)"; fi
   if [[ -n "$products" && -f "$marker" \
       && "$(cat "$marker" 2>/dev/null)" == "$fingerprint|$team|$products" ]]; then
-    note "build-for-testing skipped — source fingerprint and products unchanged"
+    note "build-for-testing skipped ($scheme) — source fingerprint and products unchanged"
     return 0
   fi
   rm -f "$marker"
   # An SDK update names a new .xctestrun beside the old one; keep exactly the fresh one.
-  find "$IOS_DERIVED/Build/Products" -maxdepth 1 -name 'VocelloiOSUI_*.xctestrun' -delete 2>/dev/null || true
+  find "$IOS_DERIVED/Build/Products" -maxdepth 1 -name "${scheme}_*.xctestrun" -delete 2>/dev/null || true
+  qvoice_path_map_settings "$ROOT_DIR"
   xcb_run build-for-testing \
-    -project "$PROJECT" -scheme VocelloiOSUI -configuration Release \
+    -project "$PROJECT" -scheme "$scheme" -configuration Release \
     -destination "id=$device" -derivedDataPath "$IOS_DERIVED" \
     -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
     -disableAutomaticPackageResolution \
@@ -1306,18 +1328,19 @@ ios_ui_build_for_testing() {
     -allowProvisioningUpdates DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
     ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
     QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
-    SWIFT_OPTIMIZATION_LEVEL=-O >"$out/xcodebuild-build.log" 2>&1 || status=$?
+    QVOICE_OWNED_SWIFT_OPTIMIZATION=-O QVOICE_OWNED_SWIFT_COMPILATION_MODE=wholemodule \
+    ${QVOICE_PATH_MAP_SETTINGS[@]+"${QVOICE_PATH_MAP_SETTINGS[@]}"} >"$out/xcodebuild-build.log" 2>&1 || status=$?
   if (( status != 0 )); then
     ui_primary_native_exit_code="$status"
     # The lane ledger classifies infrastructure failures (signing, provisioning) from
     # xcodebuild.log, which no test run will write now.
     cp "$out/xcodebuild-build.log" "$out/xcodebuild.log" 2>/dev/null || true
-    warn "iPhone UI build-for-testing failed (see $out/xcodebuild-build.log)"
+    warn "iPhone UI build-for-testing failed ($scheme; see $out/xcodebuild-build.log)"
     tail -n 40 "$out/xcodebuild-build.log" >&2 || true
     return "$status"
   fi
   if ! ios_ui_find_xctestrun || ! products="$(ios_ui_products_digest)"; then
-    warn "build-for-testing left no single VocelloiOSUI .xctestrun and its products"
+    warn "build-for-testing left no single $scheme .xctestrun and its products"
     return 1
   fi
   printf '%s\n' "$fingerprint|$team|$products" >"$marker"
@@ -1625,12 +1648,16 @@ run_preinstalled_candidate() {
       --device "$device" --output "$out/system-crashes-before" || return 1
   candidate_collection_needed=1
   local candidate_build_status=0
+  qvoice_path_map_settings "$ROOT_DIR"
   required_step_run "$step_ledger" candidate-runner-build xcb_run build-for-testing \
     -project "$PROJECT" -scheme VocelloiOSCandidateUI -configuration Release \
     -destination 'generic/platform=iOS' -derivedDataPath "$IOS_DERIVED" \
     -clonedSourcePackagesDirPath "$QVOICE_XCODE_SOURCE_PACKAGES" \
     -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile \
-    DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
+    -allowProvisioningUpdates DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
+    ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+    QVOICE_OWNED_SWIFT_OPTIMIZATION=-O QVOICE_OWNED_SWIFT_COMPILATION_MODE=wholemodule \
+    ${QVOICE_PATH_MAP_SETTINGS[@]+"${QVOICE_PATH_MAP_SETTINGS[@]}"} \
     >"$out/candidate-runner-build.log" 2>&1 || candidate_build_status=$?
   if (( candidate_build_status != 0 )); then
     ui_primary_native_exit_code="$candidate_build_status"
@@ -1962,7 +1989,7 @@ else
   elif [[ "$lane" == "enroll-clone-fixture" ]]; then
     only_test="VocelloiOSUITests/VocelloiOSFixtureEnrollmentUITests/testEnrollBenchmarkCloneFixtureFromDocuments"
   elif [[ "$lane" == "purchase" ]]; then
-    only_test="VocelloiOSUITests/VocelloiOSPurchaseUITests/testLocalPurchaseLifecycle"
+    only_test="VocelloiOSPurchaseUITests/VocelloiOSPurchaseUITests/testLocalPurchaseLifecycle"
     export TEST_RUNNER_QVOICE_IOS_PURCHASE_RUN_ID="$run_id"
     export TEST_RUNNER_QVOICE_IOS_PURCHASE_SCENARIO="$scenario_argument"
     purchase_fixture_digest="$(shasum -a 256 "$ROOT_DIR/Tests/Fixtures/VocelloExports.storekit" | cut -d ' ' -f 1)"

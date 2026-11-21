@@ -183,6 +183,25 @@ schemes:
     archive:
       config: Release
 
+  VocelloiOSPurchaseUI:
+    build:
+      targets:
+        VocelloiOS: all
+        VocelloiOSPurchaseUITests: [test]
+    run:
+      config: Release
+    test:
+      config: Release
+      preferredScreenCaptureFormat: screenshots
+      targets:
+        - VocelloiOSPurchaseUITests
+    profile:
+      config: Release
+    analyze:
+      config: Release
+    archive:
+      config: Release
+
 targets:
   QwenVoice:
     type: application
@@ -911,12 +930,11 @@ targets:
     platform: iOS
     sources:
       - path: Tests/UIAutomationSupport
-      - path: Tests/Fixtures/VocelloExports.storekit
-        buildPhase: resources
       - path: Tests/VocelloiOSUITests
         excludes:
           - VocelloiOSCandidateAcceptanceUITests.swift
           - VocelloiOSCandidateJourneyUITests.swift
+          - VocelloiOSPurchaseUITests.swift
     dependencies:
       - target: VocelloiOS
     settings:
@@ -933,9 +951,38 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         SUPPORTS_MACCATALYST: NO
         SWIFT_STRICT_CONCURRENCY: complete
-        # This bundle imports StoreKitTest, whose Apple headers deprecate their
-        # own API; with warnings as errors the clang module fails to build, so
-        # the test bundle (never shipped) keeps warnings visible instead.
+
+  # Local StoreKitTest UI automation isolated into its own target so Apple's
+  # deprecated StoreKitTest Clang module headers do not relax warnings-as-errors
+  # across the rest of VocelloiOSUITests.
+  VocelloiOSPurchaseUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/UIAutomationSupport
+      - path: Tests/Fixtures/VocelloExports.storekit
+        buildPhase: resources
+      - path: Tests/VocelloiOSUITests/VocelloiOSPurchaseUITests.swift
+    dependencies:
+      - target: VocelloiOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.patricedery.vocello.purchaseuitests
+        PRODUCT_NAME: VocelloiOSPurchaseUITests
+        PRODUCT_MODULE_NAME: VocelloiOSPurchaseUITests
+        TEST_TARGET_NAME: VocelloiOS
+        SWIFT_VERSION: "6"
+        IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: $(QWENVOICE_DEVELOPMENT_TEAM)
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: NO
+        SWIFT_STRICT_CONCURRENCY: complete
+        # StoreKitTest's Apple SDK headers deprecate SKPaymentTransactionState
+        # in their own module map; with warnings as errors the Clang module
+        # fails to precompile, so this single opt-in test bundle keeps warnings
+        # visible while VocelloiOSUITests enforces warnings as errors.
         SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
 
   # Standalone runner for an already installed distribution app. Deliberately

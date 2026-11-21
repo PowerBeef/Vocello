@@ -22,6 +22,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/python.sh
+. "$ROOT_DIR/scripts/lib/python.sh"
+vocello_use_selected_python "$ROOT_DIR"
 # shellcheck source=lib/shared.sh
 . "$ROOT_DIR/scripts/lib/shared.sh"
 # shellcheck source=lib/build_paths.sh
@@ -112,28 +115,52 @@ if [[ "$MODE" == "ios" || "$MODE" == "all" ]]; then
   # Generic device SDK, never a Simulator, and unsigned: a compile needs no
   # identity and no phone.
   require_ios_xcode_platform || die "iOS compile is blocked by the selected Xcode toolchain"
+  qvoice_path_map_settings "$ROOT_DIR"
   if (( GATE == 1 )); then
     # build_foundation_targets.sh ios --incremental's settings, including its
     # QVOICE_FOUNDATION_SWIFT_OPTIMIZATION override (-O by default, -Onone in
-    # push CI); keep them in step with build_ios there.
+    # push CI); keep them in step with build_ios there so SwiftPM packages stay -O.
     optimization="${QVOICE_FOUNDATION_SWIFT_OPTIMIZATION:--O}"
     case "$optimization" in
       -O|-Onone) ;;
       *) die "QVOICE_FOUNDATION_SWIFT_OPTIMIZATION must be -O or -Onone (got '$optimization')" ;;
     esac
-    swift_settings=(SWIFT_OPTIMIZATION_LEVEL="$optimization")
-    [[ "$optimization" != "-Onone" ]] || swift_settings+=(SWIFT_COMPILATION_MODE=incremental)
+    if [[ "$optimization" == "-Onone" ]]; then
+      swift_settings=(
+        QVOICE_OWNED_SWIFT_OPTIMIZATION=-Onone
+        QVOICE_OWNED_SWIFT_COMPILATION_MODE=incremental
+        QVOICE_OWNED_GCC_OPTIMIZATION=0
+      )
+    else
+      swift_settings=(
+        QVOICE_OWNED_SWIFT_OPTIMIZATION=-O
+        QVOICE_OWNED_SWIFT_COMPILATION_MODE=wholemodule
+      )
+    fi
     build VocelloiOSUI "generic/platform=iOS" "$QVOICE_XCODE_IOS_DERIVED" \
-      CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES "${swift_settings[@]}"
+      CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+      "${swift_settings[@]}" ${QVOICE_PATH_MAP_SETTINGS[@]+"${QVOICE_PATH_MAP_SETTINGS[@]}"}
+    build VocelloiOSPurchaseUI "generic/platform=iOS" "$QVOICE_XCODE_IOS_DERIVED" \
+      CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+      "${swift_settings[@]}" ${QVOICE_PATH_MAP_SETTINGS[@]+"${QVOICE_PATH_MAP_SETTINGS[@]}"}
     # The candidate runner shares the iOS test base, so a base change must not
     # break it unnoticed; it builds no app.
     build VocelloiOSCandidateUI "generic/platform=iOS" "$QVOICE_XCODE_IOS_DERIVED" \
-      CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES "${swift_settings[@]}"
+      CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+      "${swift_settings[@]}" ${QVOICE_PATH_MAP_SETTINGS[@]+"${QVOICE_PATH_MAP_SETTINGS[@]}"}
   else
     build VocelloiOSUI "generic/platform=iOS" "$QVOICE_XCODE_IOS_DERIVED" \
-      CODE_SIGNING_ALLOWED=NO
+      CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+      QVOICE_OWNED_SWIFT_OPTIMIZATION=-O QVOICE_OWNED_SWIFT_COMPILATION_MODE=wholemodule \
+      ${QVOICE_PATH_MAP_SETTINGS[@]+"${QVOICE_PATH_MAP_SETTINGS[@]}"}
+    build VocelloiOSPurchaseUI "generic/platform=iOS" "$QVOICE_XCODE_IOS_DERIVED" \
+      CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+      QVOICE_OWNED_SWIFT_OPTIMIZATION=-O QVOICE_OWNED_SWIFT_COMPILATION_MODE=wholemodule \
+      ${QVOICE_PATH_MAP_SETTINGS[@]+"${QVOICE_PATH_MAP_SETTINGS[@]}"}
     build VocelloiOSCandidateUI "generic/platform=iOS" "$QVOICE_XCODE_IOS_DERIVED" \
-      CODE_SIGNING_ALLOWED=NO
+      CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
+      QVOICE_OWNED_SWIFT_OPTIMIZATION=-O QVOICE_OWNED_SWIFT_COMPILATION_MODE=wholemodule \
+      ${QVOICE_PATH_MAP_SETTINGS[@]+"${QVOICE_PATH_MAP_SETTINGS[@]}"}
   fi
 fi
 

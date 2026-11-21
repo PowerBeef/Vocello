@@ -691,11 +691,17 @@ class MemoryQualificationTests(unittest.TestCase):
         self.assertIn("marking peak-equality assertion failed", completed.stderr)
         self.assertEqual(shell.calls_to(HISTORY), [])
 
-    def ios_memory(self, sentinel: dict | None, *, wait_status: int = 0) -> tuple[subprocess.CompletedProcess[str], LaneShell]:
+    def ios_memory(
+        self,
+        sentinel: dict | None,
+        *,
+        wait_status: int = 0,
+        helpers: dict[str, str] | None = None,
+    ) -> tuple[subprocess.CompletedProcess[str], LaneShell]:
         shell = LaneShell(self, "ios_device.sh")
         shell.tool("xcrun", IOS_XCRUN)
-        for relative in (PUBLISHER, SUMMARIZER, HISTORY):
-            shell.helper(relative, "exit 0")
+        for relative in (PUBLISHER, SUMMARIZER, HISTORY, "scripts/check_marking_peak_equality.py"):
+            shell.helper(relative, (helpers or {}).get(relative, "exit 0"))
         shell.file("sentinel.json", json.dumps(sentinel or {}))
         body = (
             "qv_stub require_team\nqv_stub cmd_build\nqv_stub cmd_install\nqv_stub capture_benchmark_source\n"
@@ -724,6 +730,7 @@ class MemoryQualificationTests(unittest.TestCase):
     def test_ios_memory_launches_one_process_and_publishes_only_its_nine_take_pass(self) -> None:
         completed, shell = self.ios_memory(self.nine_takes())
         self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(shell.calls_to("cmd_build"), [["--optimized"]])
         [launch] = shell.calls_to("xcrun", "devicectl", "device", "process", "launch")
         environment = json.loads(option(launch, "-e"))
         plan = json.loads(environment["QVOICE_IOS_DEVICE_MEMORY_QUALIFICATION_SPEC"])
@@ -735,11 +742,28 @@ class MemoryQualificationTests(unittest.TestCase):
         self.assertEqual(wait[1:2] + wait[3:], ["900", "fixture-device", "4242"])
         [published] = shell.calls_to(PUBLISHER, "memory-qualification")
         self.assertEqual(option(published, "--platform"), "ios")
-        self.assertLess(shell.index("wait_memory_qualification_sentinel"), shell.index(PUBLISHER))
+        self.assertIn("--defer-record", published)
+        order = [
+            shell.index("wait_memory_qualification_sentinel"),
+            shell.index(PUBLISHER, "memory-qualification"),
+            shell.index("scripts/check_marking_peak_equality.py"),
+            shell.index(SUMMARIZER),
+            shell.index(HISTORY, "record"),
+        ]
+        self.assertEqual(order, sorted(order))
         self.assertEqual(shell.calls_to("xcrun", "devicectl", "device", "process", "terminate"),
                          [["devicectl", "device", "process", "terminate", "--device", "fixture-device",
                            "--pid", "4242", "--quiet"]])
         self.assertEqual(shell.calls_to("xcrun", "xctrace"), [], "memory qualification records no trace")
+
+    def test_ios_memory_publishes_nothing_when_marking_raised_the_peak(self) -> None:
+        completed, shell = self.ios_memory(
+            self.nine_takes(),
+            helpers={"scripts/check_marking_peak_equality.py": "exit 1"},
+        )
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("marking peak equality gate failed", completed.stderr)
+        self.assertEqual(shell.calls_to(HISTORY), [])
 
     def test_ios_memory_publishes_nothing_without_a_complete_nine_take_pass(self) -> None:
         eight = self.nine_takes()

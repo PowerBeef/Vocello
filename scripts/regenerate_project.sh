@@ -21,6 +21,9 @@ esac
 
 cd "$PROJECT_DIR"
 
+# shellcheck source=lib/python.sh
+. "$SCRIPT_DIR/lib/python.sh"
+vocello_use_selected_python "$PROJECT_DIR"
 # shellcheck source=lib/build_paths.sh
 . "$SCRIPT_DIR/lib/build_paths.sh"
 GENERATION_CACHE_DIR="$QVOICE_XCODE_SOURCE_PACKAGES/.qwenvoice-cache"

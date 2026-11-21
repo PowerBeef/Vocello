@@ -15,8 +15,9 @@
 # identity) when no Apple ID is signed into Xcode — so no account login is needed.
 #
 # Usage:
-#   scripts/ios_device.sh doctor                  # environment + device preflight
-#   scripts/ios_device.sh build                   # signed device build (-Onone)
+#   scripts/ios_device.sh [--lead-only] <command>  # --lead-only works before or after the subcommand
+#   scripts/ios_device.sh doctor                   # environment + device preflight
+#   scripts/ios_device.sh build [--optimized]      # signed device build (-Onone owned, or -O wholemodule)
 #   scripts/ios_device.sh install                 # install the built app
 #   scripts/ios_device.sh launch [spec]           # launch (with device diagnostics if spec given)
 #   scripts/ios_device.sh console [spec] [--voice-id SAVED_VOICE_ID]
@@ -271,11 +272,11 @@ find_dev_profile_name() {
   for f in "$PROFILES_DIR"/*.mobileprovision; do
     [[ -e "$f" ]] || continue
     plist="$(security cms -D -i "$f" 2>/dev/null)" || continue
-    gta="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:get-task-allow' /dev/stdin <<<"$plist" 2>/dev/null)"
+    gta="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:get-task-allow' /dev/stdin <<<"$plist" 2>/dev/null)" || continue
     [[ "$gta" == "true" ]] || continue
-    appid="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' /dev/stdin <<<"$plist" 2>/dev/null)"
+    appid="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' /dev/stdin <<<"$plist" 2>/dev/null)" || continue
     if [[ "$appid" == "$team.$BUNDLE_ID" ]]; then
-      name="$(/usr/libexec/PlistBuddy -c 'Print :Name' /dev/stdin <<<"$plist" 2>/dev/null)"
+      name="$(/usr/libexec/PlistBuddy -c 'Print :Name' /dev/stdin <<<"$plist" 2>/dev/null)" || continue
       [[ -n "$name" ]] && { printf '%s' "$name"; return 0; }
     fi
   done
@@ -459,16 +460,21 @@ cmd_build() {
   local dev; dev="$(resolve_device)"
   local producer="scripts/ios_device.sh build"
   (( diagnostics_build == 0 )) || producer+=" --device-diagnostics"
-  local swift_optimization="-Onone" optimization_label="Onone"
+  local swift_optimization="-Onone" optimization_label="Onone" compilation_mode="incremental"
   if (( optimized_build )); then
-    producer+=" --optimized"; swift_optimization="-O"; optimization_label="O"
+    producer+=" --optimized"
+    swift_optimization="-O"
+    optimization_label="O"
+    compilation_mode="wholemodule"
   fi
-  note "building $SCHEME ($CONFIG, $swift_optimization) for $dev (team $team)"
+  note "building $SCHEME ($CONFIG, $swift_optimization $compilation_mode) for $dev (team $team)"
   mkdir -p "$DERIVED"
   local log="$DERIVED/device-build.log"
 
   local mode="auto"
   [[ "${QVOICE_IOS_MANUAL_SIGN:-}" == "1" ]] && mode="manual"
+
+  qvoice_path_map_settings "$ROOT_DIR"
 
   _run_device_build() {
     build_sign_args "$1" "$team"
@@ -492,7 +498,17 @@ cmd_build() {
     fi
     command+=(
       ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
-      SWIFT_OPTIMIZATION_LEVEL="$swift_optimization" SWIFT_COMPILATION_MODE=incremental
+      # Target owned Swift compilation settings (project.yml P2-1), never global
+      # SWIFT_OPTIMIZATION_LEVEL, so SwiftPM packages (MLX, GRDB, VocelloQwen3Core)
+      # stay compiled at -O wholemodule across dev and measured device lanes.
+      QVOICE_OWNED_SWIFT_OPTIMIZATION="$swift_optimization"
+      QVOICE_OWNED_SWIFT_COMPILATION_MODE="$compilation_mode"
+    )
+    if (( optimized_build == 0 )); then
+      command+=(QVOICE_OWNED_GCC_OPTIMIZATION=0)
+    fi
+    command+=(
+      ${QVOICE_PATH_MAP_SETTINGS[@]+"${QVOICE_PATH_MAP_SETTINGS[@]}"}
       build
     )
     set +e
@@ -1524,7 +1540,7 @@ cmd_lang_bench() {
   python3 "$ROOT_DIR/scripts/language_bench_evidence.py" "${plan_args[@]}" \
     || die "could not create immutable language-run plan"
 
-  cmd_build
+  cmd_build --optimized
   cmd_install
   capture_benchmark_source "$artifacts"
   # The snapshot retains the crash baseline digest. Keeping a second complete copy of the
@@ -1805,7 +1821,7 @@ PY
 
   mkdir -p "$output"
   local dest="$output/pulled" dev env_json sentinel waited=0
-  cmd_build --device-diagnostics
+  cmd_build --optimized --device-diagnostics
   cmd_install >/dev/null
   dev="$(resolve_device)"
   export QVOICE_IOS_DEVICE_VOICE_RELIABILITY_EXPORT_SPEC="$export_spec"
@@ -1953,7 +1969,7 @@ cmd_voice_reliability() {
     cp "$plan" "$public_plan"
   fi
 
-  cmd_build --device-diagnostics
+  cmd_build --optimized --device-diagnostics
   cmd_install >/dev/null
   capture_benchmark_source "$artifacts"
   if (( resume == 0 )); then
@@ -2517,7 +2533,7 @@ cmd_profile() {
 
   # Profiling evidence must describe the current checkout, not merely whatever
   # compatible app happens to remain in the persistent device cache.
-  cmd_build
+  cmd_build --optimized
   cmd_install >/dev/null
   local run_id
   run_id="ios-${kind}-profile-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
@@ -2730,7 +2746,7 @@ plan["runID"] = sys.argv[2]
 print(json.dumps(plan, sort_keys=True, separators=(",", ":")))' "$policy" "$run_id")" \
     || die "could not construct the bounded memory qualification plan"
 
-  cmd_build
+  cmd_build --optimized
   cmd_install >/dev/null
   capture_benchmark_source "$artifacts"
   rm -rf "$dest"
@@ -2807,6 +2823,10 @@ PY
     --platform ios --run-id "$run_id" --results "$sentinel" --diagnostics "$diag" \
     --output-dir "$output_dir" --label "$label" --defer-record \
     || die "memory sequence passed but qualification failed; artifacts are preserved in $artifacts"
+  python3 "$ROOT_DIR/scripts/check_marking_peak_equality.py" \
+    "$artifacts/benchmark-evidence.json" --sidecar-dir "$diag/engine" \
+    >"$artifacts/marking-peak-equality.txt" 2>&1 \
+    || die "marking peak equality gate failed (see $artifacts/marking-peak-equality.txt)"
   python3 "$ROOT_DIR/scripts/summarize_generation_telemetry.py" "$diag" \
     --run-id "$run_id" --evidence-manifest "$artifacts/benchmark-evidence.json" \
     --engine-only --label "$label" >"$artifacts/summary.txt" 2>&1 \
@@ -2843,7 +2863,7 @@ cmd_clone_conditioning() {
   local launch_json="$artifacts/launch.json"
   mkdir -p "$artifacts"
 
-  cmd_build --device-diagnostics
+  cmd_build --optimized --device-diagnostics
   cmd_install >/dev/null
   capture_benchmark_source "$artifacts"
   rm -rf "$dest"
@@ -2949,7 +2969,7 @@ cmd_delivery_reliability() {
     --sanitized-output "$artifacts/sanitized-plan.json" --launch-output "$launch_spec" \
     || { rm -f "$launch_spec"; die "startup-reliability plan/script validation failed"; }
 
-  cmd_build --device-diagnostics
+  cmd_build --optimized --device-diagnostics
   cmd_install >/dev/null
   snapshot_startup_reliability_crashes "$artifacts/crashes-before" \
     || { rm -f "$launch_spec"; die "could not establish the pre-run crash baseline"; }
@@ -3125,7 +3145,7 @@ _gate_generation_check() {
   # The gate must not launch an older app already present on the phone. Rebuild,
   # install the exact APP_PATH, then snapshot that same local binary identity before
   # the diagnostic generation starts.
-  cmd_build
+  cmd_build --optimized
   cmd_install >/dev/null
   local run_id
   run_id="ios-gate-bench-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
@@ -3256,10 +3276,16 @@ cmd_gate() {
 }
 
 main() {
-  if [[ "${1:-}" == "--lead-only" ]]; then
-    export QVOICE_LEAD_ONLY=1
-    shift
-  fi
+  local -a filtered_args=()
+  local arg
+  for arg in "$@"; do
+    if [[ "$arg" == "--lead-only" ]]; then
+      export QVOICE_LEAD_ONLY=1
+    else
+      filtered_args+=("$arg")
+    fi
+  done
+  set -- ${filtered_args[@]+"${filtered_args[@]}"}
   local sub="${1:-help}"; shift || true
   case "$sub" in
     help|-h|--help) ;;

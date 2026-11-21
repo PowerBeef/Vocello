@@ -993,7 +993,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: build/cache/xcode/source-packages
-          key: ${{ steps.spm_key.outputs.prefix }}${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          key: ${{ steps.spm_key.outputs.prefix }}${{ hashFiles('QwenVoice.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/VocelloQwen3Core/Package.resolved') }}
           restore-keys: |
             ${{ steps.spm_key.outputs.prefix }}
 
@@ -1009,12 +1009,12 @@ jobs:
         # Purely a "does this still compile" gate.
         run: ./scripts/build_foundation_targets.sh ios
 
-      - name: Upload iOS xcresult bundle on failure
+      - name: Upload iOS compile artifacts on failure
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ios-compile-xcresult
-          path: build/artifacts/foundation/vocello-ios-generic-build.xcresult
+          name: ios-compile-artifacts
+          path: build/artifacts/foundation/
           if-no-files-found: warn
           retention-days: 14
 
@@ -1362,6 +1362,20 @@ jobs:
           fi
           if [ -n "${IOS_API_KEY_COPY_PATH:-}" ]; then rm -f "$IOS_API_KEY_COPY_PATH" || cleanup_result=1; fi
           exit "$cleanup_result"
+
+      - name: Upload iOS archive logs on failure
+        # Runs only after signing material has been removed above; uploads
+        # non-secret build logs and step ledgers for failed TestFlight tags.
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-archive-failure-logs
+          path: |
+            build/artifacts/ios/release/
+            build/artifacts/foundation/
+            build/artifacts/macos/tests/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Attest verified IPA provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2

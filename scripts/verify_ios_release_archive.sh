@@ -2,6 +2,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=./lib/python.sh
+. "$SCRIPT_DIR/lib/python.sh"
+vocello_use_selected_python "$ROOT_DIR"
 # shellcheck disable=SC2034  # read by matrix_read in lib/shared.sh
 MATRIX_PATH="$SCRIPT_DIR/../config/apple-platform-capability-matrix.json"
 

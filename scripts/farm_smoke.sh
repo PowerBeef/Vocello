@@ -15,6 +15,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/python.sh
+. "$ROOT_DIR/scripts/lib/python.sh"
+vocello_use_selected_python "$ROOT_DIR"
 . "$ROOT_DIR/scripts/lib/build_paths.sh"
 . "$ROOT_DIR/scripts/lib/build_cache.sh"
 . "$ROOT_DIR/scripts/lib/shared.sh"
@@ -102,7 +105,8 @@ package() {
     -allowProvisioningUpdates DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Automatic \
     ARCHS=arm64 ONLY_ACTIVE_ARCH=YES \
     QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG=-DVOCELLO_INTERNAL_DIAGNOSTICS \
-    SWIFT_OPTIMIZATION_LEVEL=-O "${QVOICE_PATH_MAP_SETTINGS[@]}" >"$log" 2>&1 || status=$?
+    QVOICE_OWNED_SWIFT_OPTIMIZATION=-O QVOICE_OWNED_SWIFT_COMPILATION_MODE=wholemodule \
+    ${QVOICE_PATH_MAP_SETTINGS[@]+"${QVOICE_PATH_MAP_SETTINGS[@]}"} >"$log" 2>&1 || status=$?
   if (( status == 0 )); then
     if ! ditto "$products/Vocello.app" "$stage/Vocello.app" \
         || ! ditto "$products/VocelloiOSUITests-Runner.app" "$stage/VocelloiOSUITests-Runner.app"; then

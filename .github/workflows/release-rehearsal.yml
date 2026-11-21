@@ -54,6 +54,12 @@ on:
       - project.yml
       - ExportOptions*.plist
       - Sources/QwenVoice.entitlements
+      - Sources/iOS/VocelloiOSRelease.entitlements
+      - Sources/iOS/Info.plist
+      - scripts/verify_ios_release_artifacts.py
+      - scripts/verify_ios_release_archive.sh
+      - scripts/check_ios_catalog.sh
+      - scripts/ios_candidate_tag.py
 
 permissions:
   contents: read

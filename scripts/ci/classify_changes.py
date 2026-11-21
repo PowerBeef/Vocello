@@ -44,9 +44,10 @@ import sys
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-LANES = ("swift", "ios", "python", "research", "website", "workflows", "macos_ui")
-# The CI job whose success proves a lane ran; research shares the Python job and
-# macos_ui the macOS job, which compiles the macOS XCUITest bundle on every run.
+LANES = ("swift", "ios", "python", "research", "website", "workflows", "macos_ui", "ios_ui")
+# The CI job whose success proves a lane ran; research shares the Python job,
+# macos_ui the macOS job, and ios_ui the iOS compile job, which compiles the
+# iOS XCUITest bundles on every run.
 LANE_JOBS = {
     "swift": "macOS deterministic tests",
     "ios": "iOS compile check (device SDK)",
@@ -54,6 +55,7 @@ LANE_JOBS = {
     "research": "Python tests (linux)",
     "website": "Website deterministic checks",
     "macos_ui": "macOS deterministic tests",
+    "ios_ui": "iOS compile check (device SDK)",
 }
 # Jobs that route with a lane and must also have passed before its base
 # advances. Without the TSan job here, a run whose deterministic tests passed
@@ -78,6 +80,13 @@ MACOS_ONLY = (
     "Sources/Models/*",
     "Sources/Services/*",
     "Sources/VocelloCLI/*",
+    "Sources/VocelloDesktopCore/*",
+    "Sources/DesktopShared/*",
+    "Sources/ContentView.swift",
+    "Sources/QwenVoiceApp.swift",
+    "Sources/Info.plist",
+    "Sources/QwenVoice.entitlements",
+    "Tests/VocelloCoreTests/*",
     "Tests/VocelloMacUITests/*",
 )
 
@@ -127,7 +136,8 @@ MACOS_LANE_SCRIPTS = ("scripts/project_generation.py", "scripts/macos_test.sh", 
 IOS_BUILD_SCRIPTS = ("scripts/project_generation.py", "scripts/build_foundation_targets.sh", "scripts/regenerate_project.sh",
                      "scripts/generate_cli_scheme.py", "scripts/generate_ios_logic_scheme.py",
                      "scripts/lib/ios_platform_preflight.py", "scripts/lib/storage_preflight.py",
-                     "scripts/build_output_policy.py", "scripts/build_ui_test_bundles.sh")
+                     "scripts/build_output_policy.py", "scripts/build_ui_test_bundles.sh",
+                     "scripts/verify_ios_release_artifacts.py")
 RESEARCH_PREFIXES = (
     "delivery_", "prosody_", "analyze_", "audio_", "ios_control_audit", "ios_startup_reliability",
     "check_language", "clone_", "bench_", "run_local_delivery", "prepare_delivery", "voice_identity",
@@ -221,11 +231,13 @@ def _is_swift(path: str) -> bool:
 
 def _is_ios(path: str) -> bool:
     """Inputs of the generic device-SDK compile."""
+    if path.startswith(IOS_UI_TEST_SOURCES):
+        return False
     if path in ("project.yml", *IOS_BUILD_SCRIPTS, *BUILD_CONFIGS) or path.endswith("Package.resolved"):
         return True
     if path in python_import_closure(IOS_BUILD_SCRIPTS):
         return True
-    if path.startswith("QwenVoice.xcodeproj/") or (path.startswith("scripts/lib/") and path.endswith(".sh")):
+    if path.startswith(("QwenVoice.xcodeproj/", "config/xcode-schemes/")) or (path.startswith("scripts/lib/") and path.endswith(".sh")):
         return True
     if path.startswith("Packages/"):
         return "/Sources/" in path or path.endswith(PACKAGE_MANIFESTS)
@@ -237,6 +249,11 @@ def _is_ios(path: str) -> bool:
 def _is_macos_ui(path: str) -> bool:
     """Sources of the macOS XCUITest bundle that are not already swift-lane compile inputs."""
     return path.startswith(MACOS_UI_TEST_SOURCES + SHARED_UI_TEST_SOURCES)
+
+
+def _is_ios_ui(path: str) -> bool:
+    """Sources of the iOS XCUITest bundles that do not require compiling VocelloiOSLogic."""
+    return path.startswith(IOS_UI_TEST_SOURCES + SHARED_UI_TEST_SOURCES)
 
 
 def _is_python(path: str) -> bool:
@@ -295,6 +312,8 @@ def classify(paths: list[str]) -> dict[str, bool]:
             lanes["research"] = True
         if _is_macos_ui(path):
             lanes["macos_ui"] = True
+        if _is_ios_ui(path):
+            lanes["ios_ui"] = True
     return lanes
 
 

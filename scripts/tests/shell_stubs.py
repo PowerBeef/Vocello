@@ -281,7 +281,9 @@ class ScriptSandbox(_Sandbox):
         self.script = self.root / script
         self.script.parent.mkdir(parents=True)
         self.script.symlink_to(ROOT / script)
-        for relative, text in libraries.items():
+        resolved_libraries = dict(libraries)
+        resolved_libraries.setdefault("scripts/lib/python.sh", "vocello_use_selected_python() { :; }\n")
+        for relative, text in resolved_libraries.items():
             target = self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             if text is None:
@@ -316,7 +318,7 @@ def ui_lane_sandbox(test: unittest.TestCase) -> ScriptSandbox:
         "scripts/lib/build_cache.sh": "".join(f"qv_stub {name}\n" for name in (
             "require_build_free_space", "require_ios_xcode_platform", "ensure_project_regenerated",
             "ensure_spm_resolved", "write_build_provenance", "warn_if_storage_bloated",
-        )) + 'xcb_run() { qv_record xcb_run "$@"; return 65; }\n',
+        )) + 'qvoice_path_map_settings() { QVOICE_PATH_MAP_SETTINGS=(); }\nxcb_run() { qv_record xcb_run "$@"; return 65; }\n',
         "scripts/lib/host_preflight.sh": "qv_stub require_quiet_host\nqv_stub settle_host_load\n",
         "scripts/lib/shared.sh": None,
         "scripts/lib/required_steps.sh": (

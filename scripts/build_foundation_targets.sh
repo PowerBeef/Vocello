@@ -13,6 +13,9 @@ fi
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_FILE="$ROOT_DIR/QwenVoice.xcodeproj"
 MATRIX_PATH="$ROOT_DIR/config/apple-platform-capability-matrix.json"
+# shellcheck source=lib/python.sh
+. "$ROOT_DIR/scripts/lib/python.sh"
+vocello_use_selected_python "$ROOT_DIR"
 . "$ROOT_DIR/scripts/lib/shared.sh"
 # shellcheck source=lib/build_paths.sh
 . "$ROOT_DIR/scripts/lib/build_paths.sh"
@@ -27,11 +30,20 @@ MACOS_OPTIMIZATION="${QVOICE_FOUNDATION_SWIFT_OPTIMIZATION:--Onone}"
 MACOS_COMPILATION_MODE="${QVOICE_FOUNDATION_SWIFT_COMPILATION_MODE:-incremental}"
 # The incremental iOS compile defaults to -O so its arena matches the physical-device
 # UI lanes; push CI sets -Onone because a compile check needs no optimized products.
+IOS_OPTIMIZATION="${QVOICE_FOUNDATION_SWIFT_OPTIMIZATION:--Onone}"
 IOS_INCREMENTAL_OPTIMIZATION="${QVOICE_FOUNDATION_SWIFT_OPTIMIZATION:--O}"
+IOS_COMPILATION_MODE="${QVOICE_FOUNDATION_SWIFT_COMPILATION_MODE:-}"
 case "${QVOICE_FOUNDATION_SWIFT_OPTIMIZATION:--O}" in
   -O|-Onone) ;;
   *)
     echo "error: QVOICE_FOUNDATION_SWIFT_OPTIMIZATION must be -O or -Onone (got '${QVOICE_FOUNDATION_SWIFT_OPTIMIZATION}')" >&2
+    exit 2
+    ;;
+esac
+case "${IOS_COMPILATION_MODE:-wholemodule}" in
+  wholemodule|incremental) ;;
+  *)
+    echo "error: QVOICE_FOUNDATION_SWIFT_COMPILATION_MODE must be wholemodule or incremental (got '${IOS_COMPILATION_MODE}')" >&2
     exit 2
     ;;
 esac
@@ -181,21 +193,29 @@ build_ios() {
   local logic_log_path="$FOUNDATION_BUILD_ROOT/vocello-ios-logic-generic-build.log"
   local provenance_optimization="Onone"
 
-  local -a swift_settings=(
-    SWIFT_OPTIMIZATION_LEVEL=-Onone
-    SWIFT_COMPILATION_MODE=incremental
-  )
+  local optimization="$IOS_OPTIMIZATION"
   if (( INCREMENTAL == 1 )); then
     derived_data_path="$QVOICE_XCODE_IOS_DERIVED"
-    provenance_optimization="${IOS_INCREMENTAL_OPTIMIZATION#-}"
-    # -O by default: match the physical-device UI lanes so package products
-    # remain reusable (the internal diagnostics conditions are target-scoped and
-    # may rebuild only owned QwenVoiceCore when the subsequent XCUITest lane
-    # needs them). Push CI asks for -Onone through QVOICE_FOUNDATION_SWIFT_OPTIMIZATION.
-    swift_settings=(SWIFT_OPTIMIZATION_LEVEL="$IOS_INCREMENTAL_OPTIMIZATION")
-    if [[ "$IOS_INCREMENTAL_OPTIMIZATION" == "-Onone" ]]; then
-      swift_settings+=(SWIFT_COMPILATION_MODE=incremental)
+    optimization="$IOS_INCREMENTAL_OPTIMIZATION"
+  fi
+  provenance_optimization="${optimization#-}"
+  # Target owned Swift compilation settings (project.yml P2-1), never global
+  # SWIFT_OPTIMIZATION_LEVEL, so SwiftPM packages (MLX, GRDB, VocelloQwen3Core)
+  # stay compiled once at -O wholemodule even when CI or fast compiles choose -Onone.
+  local compilation_mode="${IOS_COMPILATION_MODE}"
+  if [[ -z "$compilation_mode" ]]; then
+    if [[ "$optimization" == "-Onone" ]]; then
+      compilation_mode="incremental"
+    else
+      compilation_mode="wholemodule"
     fi
+  fi
+  local -a swift_settings=(
+    QVOICE_OWNED_SWIFT_OPTIMIZATION="$optimization"
+    QVOICE_OWNED_SWIFT_COMPILATION_MODE="$compilation_mode"
+  )
+  if [[ "$optimization" == "-Onone" ]]; then
+    swift_settings+=(QVOICE_OWNED_GCC_OPTIMIZATION=0)
   fi
 
   ensure_spm_resolved "$QVOICE_SCRATCH_PACKAGE_RESOLUTION" "$SOURCE_PACKAGES_DIR" \
@@ -221,7 +241,7 @@ build_ios() {
     ARCHS=arm64 \
     ONLY_ACTIVE_ARCH=YES \
     "${swift_settings[@]}" \
-    "${QVOICE_PATH_MAP_SETTINGS[@]}" \
+    ${QVOICE_PATH_MAP_SETTINGS[@]+"${QVOICE_PATH_MAP_SETTINGS[@]}"} \
     build
 
   # The same scan the signed IPA gets: no absolute path or enabled diagnostic in
@@ -246,6 +266,7 @@ build_ios() {
     ARCHS=arm64 \
     ONLY_ACTIVE_ARCH=YES \
     "${swift_settings[@]}" \
+    ${QVOICE_PATH_MAP_SETTINGS[@]+"${QVOICE_PATH_MAP_SETTINGS[@]}"} \
     build
   write_build_provenance "$FOUNDATION_BUILD_ROOT/last-build.json" \
     "scripts/build_foundation_targets.sh ios" VocelloiOS Release \

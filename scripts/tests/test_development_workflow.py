@@ -136,7 +136,11 @@ class CheckPlanTests(unittest.TestCase):
         """
         expected = {
             "macos": {"VocelloMacUI": "platform=macOS,arch=arm64"},
-            "ios": {"VocelloiOSUI": "generic/platform=iOS", "VocelloiOSCandidateUI": "generic/platform=iOS"},
+            "ios": {
+                "VocelloiOSUI": "generic/platform=iOS",
+                "VocelloiOSPurchaseUI": "generic/platform=iOS",
+                "VocelloiOSCandidateUI": "generic/platform=iOS",
+            },
         }
         expected["all"] = {**expected["macos"], **expected["ios"]}
         for mode, schemes in expected.items():
@@ -148,6 +152,7 @@ class CheckPlanTests(unittest.TestCase):
                         "scripts/lib/build_cache.sh": (
                             'xcb_run() { qv_record xcb_run "$@"; echo "SwiftCompile normal arm64 Fixture.swift"; }\n'
                             "QVOICE_OWNED_DEV_SETTINGS=(QVOICE_OWNED_SWIFT_OPTIMIZATION=-Onone)\n"
+                            "qvoice_path_map_settings() { QVOICE_PATH_MAP_SETTINGS=(); }\n"
                             "qv_stub ensure_project_regenerated\nqv_stub ensure_spm_resolved\n"
                             "qv_stub require_ios_xcode_platform\n"
                         ),

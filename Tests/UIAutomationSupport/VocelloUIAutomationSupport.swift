@@ -718,7 +718,22 @@ public enum VocelloUITextEntry {
         element.typeKey(.delete, modifierFlags: [])
         #else
         if let currentValue = element.value as? String, !currentValue.isEmpty {
-            element.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: currentValue.count))
+            // BKL-16: tapping a populated iOS UITextView often places the caret at the start,
+            // where plain backspaces delete nothing. Triple-tap selects each paragraph before
+            // deleting, with a bottom-right sweep fallback for any residual characters.
+            if element.elementType == .textView {
+                for _ in 0..<3 {
+                    guard let remaining = element.value as? String, !remaining.isEmpty else { break }
+                    element.tap(withNumberOfTaps: 3, numberOfTouches: 1)
+                    element.typeText(XCUIKeyboardKey.delete.rawValue)
+                }
+                if let remaining = element.value as? String, !remaining.isEmpty {
+                    element.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.95)).tap()
+                    element.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: remaining.count + 4))
+                }
+            } else {
+                element.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: currentValue.count))
+            }
         }
         #endif
         element.typeText(submit ? text + "\n" : text)

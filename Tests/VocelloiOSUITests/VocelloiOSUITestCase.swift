@@ -800,6 +800,17 @@ class VocelloiOSUITestCase: XCTestCase {
     /// prevented that defer from being registered or completed.
     private func restorePendingAutoplayPreference() {
         guard pendingAutoplayPreferenceRestore == false, session != nil else { return }
+        if element("voiceBrief_editor").exists {
+            let confirm = element("voiceBrief_confirm")
+            if confirm.exists, confirm.isEnabled {
+                _ = VocelloUIPrimaryAction.perform(on: confirm, timeout: 10)
+            } else {
+                element("voiceBrief_editor").swipeDown()
+            }
+            _ = VocelloUIWait.settles("voice brief sheet to close before restoring autoplay", timeout: 10) {
+                !self.element("voiceBrief_editor").exists
+            }
+        }
         select(tab: .settings)
         openSettingsPage(for: "iosSettings_autoPlayToggle")
         let toggle = element("iosSettings_autoPlayToggle")
@@ -1400,18 +1411,20 @@ class VocelloiOSUITestCase: XCTestCase {
         )
         let editor = element("voiceBrief_editor")
         XCTAssertTrue(VocelloUIWait.exists(editor, timeout: 20))
-        XCTAssertTrue(
-            VocelloUITextEntry.replace(
-                in: editor,
-                with: VocelloUIBenchMatrix.voiceDesignBrief,
-                timeout: 20
+        if ((editor.value as? String) ?? "") != VocelloUIBenchMatrix.voiceDesignBrief {
+            XCTAssertTrue(
+                VocelloUITextEntry.replace(
+                    in: editor,
+                    with: VocelloUIBenchMatrix.voiceDesignBrief,
+                    timeout: 20
+                )
             )
-        )
-        XCTAssertTrue(
-            VocelloUIWait.condition("voice-design brief to match the benchmark fixture", timeout: 15) {
-                (editor.value as? String) == VocelloUIBenchMatrix.voiceDesignBrief
-            }
-        )
+            XCTAssertTrue(
+                VocelloUIWait.condition("voice-design brief to match the benchmark fixture", timeout: 15) {
+                    (editor.value as? String) == VocelloUIBenchMatrix.voiceDesignBrief
+                }
+            )
+        }
         let confirm = element("voiceBrief_confirm")
         XCTAssertTrue(VocelloUIWait.enabled(confirm, timeout: 15))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: confirm, timeout: 15))

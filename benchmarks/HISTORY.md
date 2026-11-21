@@ -1963,6 +1963,12 @@ their harness files differ from the baseline's.
 | 2026-09-27 | [`macos-xcui-perf-20260927-123958-bfbe8242`](runs/ui-perf/macos-xcui-perf-20260927-123958-bfbe8242.json) | canonical | canonical | passedWithWarnings | not-applicable | 11 | — | `87f2aa391019` | `069502f6473f` | vs macos-xcui-perf-20260927-112952-a17db9fe: compatible | macos-xcui-perf-20260927-123958-bfbe8242 |
 | 2026-09-27 | [`macos-xcui-perf-20260927-133001-8484a1d1`](runs/ui-perf/macos-xcui-perf-20260927-133001-8484a1d1.json) | canonical | canonical | passedWithWarnings | not-applicable | 11 | — | `65a815e2733b` | `069502f6473f` | vs macos-xcui-perf-20260927-123958-bfbe8242: compatible | macos-xcui-perf-20260927-133001-8484a1d1 |
 
+## ui-perf / macos / mac-mini-m6-16gb / config `4f558fd338d5`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-21 | [`macos-xcui-perf-20261121-021029-38fc6c5f`](runs/ui-perf/macos-xcui-perf-20261121-021029-38fc6c5f.json) | canonical | canonical | passed | not-applicable | 12 | — | `e073bbb8c5c3` | `4f558fd338d5` | baseline | bkl77-cal-1 |
+
 ## ui-perf / macos / mac-mini-m6-16gb / config `684283851ab3`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

@@ -589,6 +589,7 @@ targets:
       - path: Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift
       - path: Sources/iOSSupport/Services/IOSStudioDraftPersistence.swift
       - path: Sources/iOSSupport/Services/IOSLeftoverAudioAnalysis.swift
+      - path: Sources/iOSSupport/Services/IOSAttributionManifest.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.qwenvoice.ios-policies
@@ -642,6 +643,7 @@ targets:
           - Services/IOSAudioSessionPolicy.swift
           - Services/IOSStudioDraftPersistence.swift
           - Services/IOSLeftoverAudioAnalysis.swift
+          - Services/IOSAttributionManifest.swift
       - path: Sources/SharedSupport
       - path: Sources/Resources/qwenvoice_contract.json
         buildPhase: resources
@@ -723,6 +725,8 @@ targets:
     platform: macOS
     sources:
       - path: Sources/Resources/Localizable.xcstrings
+        buildPhase: resources
+      - path: Sources/Resources/third_party_attributions.json
         buildPhase: resources
       - path: Tests/Fixtures/VocelloExports.storekit
         buildPhase: resources
@@ -881,6 +885,8 @@ targets:
     platform: iOS
     sources:
       - path: Sources/Resources/Localizable.xcstrings
+        buildPhase: resources
+      - path: Sources/Resources/third_party_attributions.json
         buildPhase: resources
       - path: Tests/Fixtures/VocelloExports.storekit
         buildPhase: resources

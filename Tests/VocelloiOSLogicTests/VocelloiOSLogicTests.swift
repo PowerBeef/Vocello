@@ -279,6 +279,39 @@ final class VocelloiOSLogicTests: XCTestCase {
         XCTAssertEqual(unscaled.minimumCloneCapableProcessLimitBytes(), (3_500 + 768) * mebibyte)
     }
 
+    /// RB-11: `IOSAttributionManifest` must decode `additionalBases` (8-bit hybrid attention
+    /// parents) and `builtFrom` from the real bundled `third_party_attributions.json` and include
+    /// them in the notice rendered by `OpenSourceLicensesScreen`.
+    func testAttributionManifestDecodesRealBundledHybridAdditionalBasesAndBuiltFrom() throws {
+        let manifest = try IOSAttributionManifest.load(from: Bundle(for: Self.self))
+        let byID = Dictionary(uniqueKeysWithValues: manifest.modelArtifacts.map { ($0.id, $0) })
+
+        for (artifactID, expected8BitBase) in [
+            ("pro_clone-speed", "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit"),
+            ("pro_custom-speed", "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit"),
+            ("pro_design-speed", "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-8bit"),
+        ] {
+            let artifact = try XCTUnwrap(byID[artifactID], "missing \(artifactID) in third_party_attributions.json")
+            let additional = try XCTUnwrap(artifact.additionalBases, "\(artifactID) must decode additionalBases")
+            XCTAssertTrue(
+                additional.contains(where: { $0.baseRepo == expected8BitBase }),
+                "\(artifactID) must attribute \(expected8BitBase)"
+            )
+            let builtFrom = try XCTUnwrap(artifact.builtFrom, "\(artifactID) must decode builtFrom")
+            XCTAssertGreaterThanOrEqual(builtFrom.count, 2)
+
+            let notice = artifact.attributionNoticeText
+            XCTAssertTrue(notice.contains("Model card SHA-256: \(artifact.modelCardSHA256)"))
+            XCTAssertTrue(notice.contains("Base: \(artifact.baseRepo) @ \(artifact.baseRevision)"))
+            XCTAssertTrue(notice.contains("Additional base: \(expected8BitBase)"))
+            XCTAssertTrue(notice.contains("Contribution:"))
+            XCTAssertTrue(notice.contains("Built from:"))
+            for source in builtFrom {
+                XCTAssertTrue(notice.contains("- \(source.repo) @ \(source.revision)"))
+            }
+        }
+    }
+
     func testCancellationReasonIsTypedAndRoundTrips() throws {
         let summary = GenerationCancellationSummary(
             generationID: UUID(uuidString: "00000000-0000-0000-0000-000000000001"),

@@ -34,6 +34,8 @@ REQUIRED_PROGRESS_MILESTONES = {"transfer-1", "transfer-25", "transfer-50", "tra
 REQUIRED_QUEUE_MILESTONES = {
     "queue-active",
     "queue-waiting",
+    "cancel-prepare-clean",
+    "queue-relaunch-restored",
 }
 REQUIRED_UPGRADE_MILESTONES = {
     "upgrade-later-paused",

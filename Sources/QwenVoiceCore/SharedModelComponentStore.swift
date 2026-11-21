@@ -1,6 +1,99 @@
 import CryptoKit
 import Darwin
 import Foundation
+import os
+
+/// Thread-safe expiration flag checked before acquiring each new App Group file
+/// lock in multi-folder reclamation loops (RB-07).
+public final class StorageBackgroundExpirationFlag: Sendable {
+    private let state = OSAllocatedUnfairLock(initialState: false)
+
+    public init() {}
+
+    public var isExpired: Bool {
+        state.withLock { $0 }
+    }
+
+    public func markExpired() {
+        state.withLock { $0 = true }
+    }
+}
+
+/// Acquires an iOS RunningBoard expiring-activity assertion around synchronous
+/// App Group storage lock operations (`flock(LOCK_EX)`) without hopping to
+/// `@MainActor` or blocking a Swift concurrency thread (RB-07).
+///
+/// On iOS, `ProcessInfo.processInfo.performExpiringActivity(withReason:using:)`
+/// holds a task assertion for the synchronous duration of `body`. If iOS cannot
+/// grant an assertion (the app is already suspending), `body` never runs so no
+/// `flock(LOCK_EX)` is acquired during suspension (`0xDEAD10CC`). On macOS,
+/// `body` executes directly.
+public enum SharedStorageBackgroundActivity {
+    @discardableResult
+    @concurrent public static func runBestEffort<T: Sendable>(
+        reason: String,
+        _ body: @escaping @Sendable (StorageBackgroundExpirationFlag) throws -> T
+    ) async -> T? {
+        #if os(iOS)
+        return try? await runOnIOS(reason: reason, body)
+        #else
+        return try? body(StorageBackgroundExpirationFlag())
+        #endif
+    }
+
+    @concurrent public static func runRequired<T: Sendable>(
+        reason: String,
+        _ body: @escaping @Sendable (StorageBackgroundExpirationFlag) throws -> T
+    ) async throws -> T {
+        #if os(iOS)
+        return try await runOnIOS(reason: reason, body)
+        #else
+        return try body(StorageBackgroundExpirationFlag())
+        #endif
+    }
+
+    #if os(iOS)
+    @concurrent private static func runOnIOS<T: Sendable>(
+        reason: String,
+        _ body: @escaping @Sendable (StorageBackgroundExpirationFlag) throws -> T
+    ) async throws -> T {
+        let expirationFlag = StorageBackgroundExpirationFlag()
+        let coordinator = OSAllocatedUnfairLock(initialState: (started: false, resumed: false))
+        return try await withCheckedThrowingContinuation { continuation in
+            ProcessInfo.processInfo.performExpiringActivity(withReason: reason) { expired in
+                if expired {
+                    expirationFlag.markExpired()
+                    let shouldResumeAsCancelled = coordinator.withLock { state -> Bool in
+                        guard !state.started, !state.resumed else { return false }
+                        state.started = true
+                        state.resumed = true
+                        return true
+                    }
+                    if shouldResumeAsCancelled {
+                        continuation.resume(throwing: SharedModelComponentStoreError.backgroundAssertionUnavailable)
+                    }
+                    return
+                }
+                let shouldRun = coordinator.withLock { state -> Bool in
+                    guard !state.started else { return false }
+                    state.started = true
+                    return true
+                }
+                guard shouldRun else { return }
+                let outcome = Result { try body(expirationFlag) }
+                let shouldResume = coordinator.withLock { state -> Bool in
+                    guard !state.resumed else { return false }
+                    state.resumed = true
+                    return true
+                }
+                if shouldResume {
+                    continuation.resume(with: outcome)
+                }
+            }
+        }
+    }
+    #endif
+}
 
 /// A privacy-safe identity for one immutable file in a shared model component.
 ///
@@ -304,7 +397,7 @@ public struct SharedComponentPruneResult: Equatable, Sendable {
     public let preservedDigests: [String]
 }
 
-public enum SharedModelComponentStoreError: Error, Equatable, LocalizedError, Sendable {
+public enum SharedModelComponentStoreError: Error, Equatable, LocalizedError, ModelUpdateFailureClassifiable, Sendable {
     case invalidRelativePath
     case invalidByteCount(relativePath: String)
     case invalidDigest(relativePath: String)
@@ -330,6 +423,19 @@ public enum SharedModelComponentStoreError: Error, Equatable, LocalizedError, Se
     case rollbackFailed
     case lockFailed(code: Int32)
     case filesystemFailure(operation: String, code: Int32)
+    case backgroundAssertionUnavailable
+
+    public var modelUpdateFailureClass: ModelUpdateFailure {
+        switch self {
+        case .filesystemFailure(_, let code) where code == ENOSPC || code == EDQUOT:
+            return .space
+        case .sizeMismatch, .digestMismatch, .contentIdentityMismatch, .compatibilityIdentityMismatch,
+             .corruptManifest, .corruptStoreLayout, .validationFailed:
+            return .verification
+        default:
+            return .other
+        }
+    }
 
     public var errorDescription: String? {
         switch self {
@@ -356,6 +462,8 @@ public enum SharedModelComponentStoreError: Error, Equatable, LocalizedError, Se
         case .rollbackFailed: "The migrated model failed validation and could not be rolled back."
         case .lockFailed: "The shared-component publication lock could not be acquired."
         case .filesystemFailure: "A shared-component filesystem operation failed."
+        case .backgroundAssertionUnavailable:
+            "Background execution time was unavailable to complete model storage updates."
         }
     }
 }
@@ -808,7 +916,8 @@ public struct SharedModelComponentStore: Sendable {
     public func deleteModel(
         modelFolder: String,
         componentGracePeriod: TimeInterval = SharedModelComponentStore.automaticReclaimGracePeriod,
-        reclamation: ReclamationSchedule = .immediate
+        reclamation: ReclamationSchedule = .immediate,
+        shouldStop: @Sendable () -> Bool = { false }
     ) throws {
         guard SharedComponentIdentityValidation.isSafeFolder(modelFolder) else {
             throw SharedModelComponentStoreError.invalidModelFolder
@@ -832,41 +941,61 @@ public struct SharedModelComponentStore: Sendable {
         PreparedModelOverlay.removeCachedOverlay(forModelFolder: modelFolder, modelsRoot: modelsRoot)
         switch reclamation {
         case .immediate:
+            // RB-07: if background time expired during the synchronous multi-GB tombstone
+            // unlink, skip acquiring a second publication lock for immediate reclamation.
+            guard !shouldStop() else { return }
             _ = try? reclaimUnreferencedComponents(
                 gracePeriod: componentGracePeriod,
                 releasedDigests: releasedDigests
             )
         case .background:
             let store = self
-            Task.detached(priority: .utility) { @concurrent in
-                _ = try? store.reclaimUnreferencedComponents(
-                    gracePeriod: componentGracePeriod,
-                    releasedDigests: releasedDigests
-                )
+            Task.detached(priority: .utility) { @concurrent () async in
+                await SharedStorageBackgroundActivity.runBestEffort(
+                    reason: "vocello.shared-store.reclaim"
+                ) { _ in
+                    try store.reclaimUnreferencedComponents(
+                        gracePeriod: componentGracePeriod,
+                        releasedDigests: releasedDigests
+                    )
+                }
             }
         }
     }
 
+    /// Fallback age after which abandoned RF-59 `pins/model-update/` hard links
+    /// are swept during automatic reclamation so orphaned shared blobs can
+    /// never leak permanently after an interrupted low-space update (RB-09).
+    public static let abandonedUpdatePinGracePeriod: TimeInterval = 24 * 60 * 60
+
     /// Automatic reclamation, run after every model delete and once per engine start. Unlike the
     /// exact `pruneUnreferencedComponents()`, it also sweeps `trash/` and `staging/` leftovers
-    /// from interrupted operations and the working directories a process killed mid-install left
-    /// beside the model folders (`WorkingDirectoryKind`), and protects what may belong to an
+    /// from interrupted operations, abandoned `pins/model-update/` links older than
+    /// `updatePinGracePeriod` (RB-09), and the working directories a process killed mid-install
+    /// left beside the model folders (`WorkingDirectoryKind`), and protects what may belong to an
     /// operation in flight: a blob with another hard link (an install or migration replica holds
     /// it, or a download pinned it for reuse) or one published within the grace period, and
     /// trash, staging or working-directory entries whose newest change is younger than it. A
-    /// working directory swept in this pass no longer protects the blobs it linked, so they are
-    /// reclaimed in the same pass. A store that does not exist yet is left uncreated.
+    /// working directory or abandoned pin folder swept in this pass no longer protects the blobs
+    /// it linked, so they are reclaimed in the same pass. A store that does not exist yet is left
+    /// uncreated.
     @discardableResult
     public func reclaimUnreferencedComponents(
-        gracePeriod: TimeInterval = SharedModelComponentStore.automaticReclaimGracePeriod
+        gracePeriod: TimeInterval = SharedModelComponentStore.automaticReclaimGracePeriod,
+        updatePinGracePeriod: TimeInterval = SharedModelComponentStore.abandonedUpdatePinGracePeriod
     ) throws -> SharedComponentPruneResult {
-        try reclaimUnreferencedComponents(gracePeriod: gracePeriod, releasedDigests: [])
+        try reclaimUnreferencedComponents(
+            gracePeriod: gracePeriod,
+            updatePinGracePeriod: updatePinGracePeriod,
+            releasedDigests: []
+        )
     }
 
-    /// `releasedDigests` are blobs a model delete just unlinked; they skip the grace period (the
-    /// unlink itself refreshed their ctime) but keep the hard-link protection.
+    /// `releasedDigests` are blobs a model delete or pin release just unlinked; they skip the grace
+    /// period (the unlink itself refreshed their ctime) but keep the hard-link protection.
     private func reclaimUnreferencedComponents(
         gracePeriod: TimeInterval,
+        updatePinGracePeriod: TimeInterval = SharedModelComponentStore.abandonedUpdatePinGracePeriod,
         releasedDigests: Set<String>
     ) throws -> SharedComponentPruneResult {
         // Without a component store there is nothing to reclaim. A models folder that has only ever
@@ -876,7 +1005,9 @@ public struct SharedModelComponentStore: Sendable {
         guard FileManager.default.fileExists(atPath: storeRoot.path) else {
             return SharedComponentPruneResult(removedDigests: [], preservedDigests: [])
         }
-        let cutoff = Date().addingTimeInterval(-max(gracePeriod, 0))
+        let now = Date()
+        let cutoff = now.addingTimeInterval(-max(gracePeriod, 0))
+        let updatePinCutoff = now.addingTimeInterval(-max(updatePinGracePeriod, 0))
         for root in [trashRoot, stagingRoot] {
             let entries = (try? FileManager.default.contentsOfDirectory(
                 at: root,
@@ -893,6 +1024,7 @@ public struct SharedModelComponentStore: Sendable {
         }
         var sweptTombstones: [URL] = []
         var sweptLinks: [SharedComponentFileSystem.FileIdentifier: UInt64] = [:]
+        var sweptPinDigests: Set<String> = []
         // Removed after the lock is released, and also when the prune below fails closed. A
         // tombstone that cannot be removed now is left to a later trash sweep.
         defer {
@@ -921,12 +1053,37 @@ public struct SharedModelComponentStore: Sendable {
                         sweptLinks[identifier, default: 0] += count
                     }
                 }
+                // RB-09: fallback age sweep for abandoned RF-59 `pins/model-update/` hard links.
+                if FileManager.default.fileExists(atPath: updatePinsRoot.path),
+                   let changedAt = SharedComponentFileSystem.newestChangeTime(of: updatePinsRoot),
+                   changedAt < updatePinCutoff {
+                    let tombstone = trashRoot.appendingPathComponent(
+                        "update-pins-\(UUID().uuidString)",
+                        isDirectory: true
+                    )
+                    if (try? SharedComponentFileSystem.move(
+                        updatePinsRoot,
+                        to: tombstone,
+                        operation: "tombstone-update-pins"
+                    )) != nil {
+                        sweptTombstones.append(tombstone)
+                        for (identifier, count) in SharedComponentFileSystem.linkCounts(under: tombstone) {
+                            sweptLinks[identifier, default: 0] += count
+                        }
+                        let pinEntries = (try? FileManager.default.contentsOfDirectory(
+                            at: tombstone,
+                            includingPropertiesForKeys: nil,
+                            options: []
+                        )) ?? []
+                        sweptPinDigests.formUnion(pinEntries.map(\.lastPathComponent))
+                    }
+                }
             },
             isProtected: { digest, blob in
                 guard let status = SharedComponentFileSystem.linkStatus(blob) else { return true }
-                // The links a swept working directory holds go with its tombstone.
+                // The links a swept working directory or pin folder holds go with its tombstone.
                 if status.linkCount > 1 + (sweptLinks[status.identifier] ?? 0) { return true }
-                if releasedDigests.contains(digest) { return false }
+                if releasedDigests.contains(digest) || sweptPinDigests.contains(digest) { return false }
                 return status.changedAt >= cutoff
             }
         )
@@ -1813,13 +1970,15 @@ public struct RetiredModelReclamation: Equatable, Sendable {
         models: [ModelDescriptor],
         in modelsDirectory: URL,
         force: Bool = false,
+        shouldStop: @Sendable () -> Bool = { false },
         isInstalled: ((ModelDescriptor) -> Bool)? = nil,
         isVerified: (ModelDescriptor) -> Bool
     ) -> RetiredModelReclamation {
+        guard !shouldStop() else { return .nothing }
         let folders = force
             ? presentFolders(of: models, in: modelsDirectory)
             : Self.folders(of: models, in: modelsDirectory, isVerified: isVerified)
-        guard !folders.isEmpty else { return .nothing }
+        guard !folders.isEmpty, !shouldStop() else { return .nothing }
         do {
             // A verified model is installed; one installed but not yet verified stays recorded until
             // its host's own reconcile drops it.
@@ -1834,7 +1993,8 @@ public struct RetiredModelReclamation: Equatable, Sendable {
                 removed: [], failed: Dictionary(uniqueKeysWithValues: folders.map { ($0, reason) })
             )
         }
-        return SharedModelComponentStore(modelsRoot: modelsDirectory).reclaimRetiredFolders(folders)
+        return SharedModelComponentStore(modelsRoot: modelsDirectory)
+            .reclaimRetiredFolders(folders, shouldStop: shouldStop)
     }
 
     /// The retired folders of `models` that may go now: every model's, once `isVerified` accepts
@@ -1875,12 +2035,20 @@ extension SharedModelComponentStore {
     }
 
     /// Deletes each of `folders`; a folder that fails stays for the next pass and never stops the
-    /// others. Hosts go through `RetiredModelReclamation.reclaim`, which records the update plan first.
-    func reclaimRetiredFolders(_ folders: [String]) -> RetiredModelReclamation {
+    /// others. Stops before acquiring the next folder's publication lock when `shouldStop()` turns
+    /// true (RB-07: iOS background-time expiration). Hosts go through `RetiredModelReclamation.reclaim`,
+    /// which records the update plan first.
+    func reclaimRetiredFolders(
+        _ folders: [String],
+        shouldStop: @Sendable () -> Bool = { false }
+    ) -> RetiredModelReclamation {
         var removed: [String] = []
         var failed: [String: String] = [:]
         var freedBytes: Int64 = 0
         for folder in folders {
+            if shouldStop() {
+                break
+            }
             guard ModelInstallFolderName.isSafe(folder) else {
                 failed[folder] = "not a model install folder name"
                 continue
@@ -1892,7 +2060,7 @@ extension SharedModelComponentStore {
             let held = Self.bytesHeldAlone(under: target) + Self.bytesHeldAlone(under: staging)
             HuggingFaceDownloader.discardStaging(forTargetDirectory: target)
             do {
-                try deleteModel(modelFolder: folder)
+                try deleteModel(modelFolder: folder, shouldStop: shouldStop)
                 removed.append(folder)
                 freedBytes += held
             } catch {
@@ -1920,10 +2088,48 @@ extension SharedModelComponentStore {
         return pinned
     }
 
-    /// Drops the links `pinSharedComponents(ofModelFolders:)` made; the next reclamation removes a
-    /// blob nothing else holds.
-    public func releaseUpdatePins() {
+    /// Drops the links `pinSharedComponents(ofModelFolders:)` made and reclaims any of those
+    /// exact blobs no longer linked by an installed model or active staging pin (RB-09), while
+    /// preserving the ordinary grace period for all unrelated blobs.
+    ///
+    /// Pass `reclamation: .background` from `@MainActor` callers (such as macOS
+    /// `ModelManagerViewModel`) so the publication lock and multi-hundred-MB unlinks never
+    /// block the main thread while pin removal itself stays ordered with the actor check.
+    @discardableResult
+    public func releaseUpdatePins(
+        reclaimUnreferenced: Bool = true,
+        reclamation: ReclamationSchedule = .immediate
+    ) -> Set<String> {
+        guard FileManager.default.fileExists(atPath: updatePinsRoot.path) else { return [] }
+        let entries = (try? FileManager.default.contentsOfDirectory(
+            at: updatePinsRoot,
+            includingPropertiesForKeys: nil,
+            options: []
+        )) ?? []
+        let releasedDigests = Set(entries.map(\.lastPathComponent))
         try? FileManager.default.removeItem(at: updatePinsRoot)
+        if reclaimUnreferenced, !releasedDigests.isEmpty {
+            switch reclamation {
+            case .immediate:
+                _ = try? reclaimUnreferencedComponents(
+                    gracePeriod: Self.automaticReclaimGracePeriod,
+                    releasedDigests: releasedDigests
+                )
+            case .background:
+                let store = self
+                Task.detached(priority: .utility) { @concurrent () async in
+                    await SharedStorageBackgroundActivity.runBestEffort(
+                        reason: "vocello.shared-store.reclaim-update-pins"
+                    ) { _ in
+                        try store.reclaimUnreferencedComponents(
+                            gracePeriod: Self.automaticReclaimGracePeriod,
+                            releasedDigests: releasedDigests
+                        )
+                    }
+                }
+            }
+        }
+        return releasedDigests
     }
 
     /// Bytes of the regular files under `root` that no other link holds.

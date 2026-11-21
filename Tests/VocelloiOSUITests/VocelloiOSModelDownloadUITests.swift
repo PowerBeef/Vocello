@@ -264,6 +264,13 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         openVoiceModels()
         resetIsolatedDeliveryForFreshLifecycle()
 
+        // RB-10: cancel immediately during the prepare/start window without waiting for
+        // transfer progress; row must return cleanly to Not Installed with no bogus failure.
+        startDownload(modelID: "pro_clone")
+        cancelDownload(modelID: "pro_clone")
+        assertModelActionContract(modelID: "pro_clone", status: "Not Installed", expectedAction: "Download")
+        recordObservation(modelID: "pro_clone", milestone: "cancel-prepare-clean")
+
         startDownload(modelID: "pro_custom")
         guard waitForMeasurableTransfer(
             modelID: "pro_custom",
@@ -275,6 +282,28 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         assertModelActionContract(modelID: "pro_custom", status: "Downloading", expectedAction: "Cancel")
         recordObservation(modelID: "pro_custom", milestone: "queue-active")
         recordObservation(modelID: "pro_design", milestone: "queue-waiting")
+
+        // RB-06: background, terminate and relaunch mid-multi-model queue; Model 2 must
+        // immediately restore visible Queued/Downloading status and a live Cancel button.
+        XCUIDevice.shared.press(.home)
+        XCTAssertTrue(VocelloUIWait.condition("Vocello to enter the background", timeout: 30) {
+            self.app.state == .runningBackground || self.app.state == .runningBackgroundSuspended
+        })
+        app.terminate()
+        launchApp(additionalEnvironment: modelManagementEnvironment())
+        openVoiceModels()
+        let designStatus = element("iosModelStatus_pro_design")
+        XCTAssertTrue(VocelloUIWait.exists(designStatus, timeout: 60))
+        XCTAssertTrue(
+            VocelloUIWait.condition("restored pro_design row to remain queued or downloading", timeout: 60) {
+                let text = self.accessibilityText(designStatus) ?? ""
+                return text.localizedCaseInsensitiveContains("Queued")
+                    || text.localizedCaseInsensitiveContains("Downloading")
+            }
+        )
+        XCTAssertTrue(VocelloUIWait.exists(element("iosModelCancel_pro_design"), timeout: 30))
+        recordObservation(modelID: "pro_design", milestone: "queue-relaunch-restored")
+
         cancelDownload(modelID: "pro_design")
         resetIsolatedDeliveryForFreshLifecycle()
         launchApp()

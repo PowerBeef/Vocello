@@ -94,4 +94,28 @@ final class IOSModelDownloadAdmissionTests: XCTestCase {
     func testTheLimitIsAtLeastOne() {
         XCTAssertEqual(IOSModelDownloadAdmission(maxConcurrentModels: 0).maxConcurrentModels, 1)
     }
+
+    /// RB-10: Cancel during `beginDownload` (after `pending.removeFirst()` and before `inflight`
+    /// insertion) or during `install` preparation must resolve to `.starting` / `.preparing`
+    /// instead of `.none` (which previously caused bogus no-op failures while 2.2 GB downloaded).
+    func testCancelTargetRecognizesStartingAndPreparingWindows() {
+        var admission = IOSModelDownloadAdmission(maxConcurrentModels: 1)
+
+        XCTAssertEqual(admission.cancelTarget(for: "pro_clone", isPending: false, isActive: false), .none)
+        XCTAssertTrue(admission.claimPreparation(of: "pro_clone", hasDownload: false))
+        XCTAssertEqual(admission.cancelTarget(for: "pro_clone", isPending: false, isActive: false), .preparing)
+
+        admission.releasePreparation(of: "pro_clone")
+        XCTAssertEqual(admission.cancelTarget(for: "pro_clone", isPending: true, isActive: false), .pending)
+
+        XCTAssertTrue(admission.claimStart(of: "pro_clone", runningCount: 0))
+        XCTAssertEqual(
+            admission.cancelTarget(for: "pro_clone", isPending: false, isActive: false),
+            .starting,
+            "popped from pending and awaiting 682 MB SHA-256 verification must resolve to .starting"
+        )
+
+        admission.releaseStart(of: "pro_clone")
+        XCTAssertEqual(admission.cancelTarget(for: "pro_clone", isPending: false, isActive: true), .active)
+    }
 }

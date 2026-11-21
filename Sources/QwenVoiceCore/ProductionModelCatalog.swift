@@ -224,6 +224,49 @@ public struct ProductionModelCatalog: Decodable, Sendable {
         )
     }
 
+    /// Exact bytes of shared components already present and SHA-256 verified in
+    /// `SharedModelComponentStore` for each descriptor in `descriptors` (RB-12).
+    /// Non-mutating (takes no publication lock) and deduplicated by shared
+    /// component ID so a shared speech tokenizer is hashed at most once across
+    /// all update candidates.
+    public func reusableSharedComponentBytesByModelID(
+        for descriptors: [ModelDescriptor],
+        platform: ModelArtifactPlatform,
+        modelsRoot: URL
+    ) -> [String: Int64] {
+        let store = SharedModelComponentStore(modelsRoot: modelsRoot)
+        var verifiedComponentBytes: [String: Int64] = [:]
+        var result: [String: Int64] = [:]
+        for model in descriptors {
+            guard let artifact = try? artifactMatchingDescriptor(
+                platform: platform,
+                folder: model.folder,
+                repo: model.huggingFaceRepo,
+                revision: model.huggingFaceRevision,
+                artifactVersion: model.artifactVersion,
+                estimatedDownloadBytes: model.estimatedDownloadBytes,
+                requiredRelativePaths: model.requiredRelativePaths
+            ),
+                  artifact.sharedComponentIDs.count == 1,
+                  let componentID = artifact.sharedComponentIDs.first,
+                  let component = sharedComponents.first(where: { $0.id == componentID }) else {
+                continue
+            }
+            let bytes: Int64
+            if let cached = verifiedComponentBytes[componentID] {
+                bytes = cached
+            } else {
+                let verified = (try? store.containsVerified(component.contentIdentity)) == true
+                bytes = verified ? component.contentIdentity.files.reduce(Int64(0)) { $0 + $1.byteCount } : 0
+                verifiedComponentBytes[componentID] = bytes
+            }
+            if bytes > 0 {
+                result[model.id] = bytes
+            }
+        }
+        return result
+    }
+
     /// Reconciles an already-installed schema-v2 artifact before a delivery plan decides whether
     /// shared bytes may be reused. This is entirely local: a legacy model is allowed to publish
     /// component blobs only after every catalog file has passed its exact size/SHA-256 check. A

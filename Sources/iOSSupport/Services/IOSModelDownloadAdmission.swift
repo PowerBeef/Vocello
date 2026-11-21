@@ -53,8 +53,31 @@ public struct IOSModelDownloadAdmission: Equatable, Sendable {
         startingModelIDs.remove(modelID)
     }
 
+    /// Which coordinator stage currently owns `modelID` when Cancel arrives (RB-10).
+    /// Covers the 682 MB SHA-256 prepare/start windows between `pending.removeFirst()`
+    /// and `inflight` insertion so Cancel never falls through to a bogus no-op failure.
+    public enum CancelTarget: Equatable, Sendable {
+        case pending
+        case starting
+        case preparing
+        case active
+        case none
+    }
+
     /// Whether the model is being prepared or started.
     public func isClaimed(_ modelID: String) -> Bool {
         preparingModelIDs.contains(modelID) || startingModelIDs.contains(modelID)
+    }
+
+    public func cancelTarget(
+        for modelID: String,
+        isPending: Bool,
+        isActive: Bool
+    ) -> CancelTarget {
+        if isPending { return .pending }
+        if startingModelIDs.contains(modelID) { return .starting }
+        if preparingModelIDs.contains(modelID) { return .preparing }
+        if isActive { return .active }
+        return .none
     }
 }

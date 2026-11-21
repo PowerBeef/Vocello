@@ -160,6 +160,17 @@ public struct IOSModelDownloadLedger: Codable, Equatable, Sendable {
         self.requests = requests
     }
 
+    /// Whether this ledger records a `.failed` request for the exact current artifact
+    /// version of `modelID` (NET-1 / RB-06). A superseded artifact from an earlier app
+    /// version (e.g. a 3.0 `.installed` request marked `.failed` on 3.1 launch via
+    /// `restoreAction(artifactIsCurrent: false, ...)`) must not count as a failure of
+    /// the current 3.1 artifact, or the RF-59 upgrade prompt would be suppressed.
+    public func isCurrentArtifactFailed(modelID: String, artifactVersion: String) -> Bool {
+        requests.first(where: { $0.modelID == modelID }).map { request in
+            request.artifactVersion == artifactVersion && request.status == .failed
+        } ?? false
+    }
+
     public func validated() throws -> Self {
         guard schemaVersion == Self.currentSchemaVersion else {
             throw IOSModelDownloadLedgerError.unsupportedSchema(schemaVersion)

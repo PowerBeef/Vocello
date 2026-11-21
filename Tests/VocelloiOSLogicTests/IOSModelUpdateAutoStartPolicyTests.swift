@@ -375,4 +375,130 @@ final class IOSModelUpdateAutoStartPolicyTests: XCTestCase {
             XCTAssertEqual(isolatedKey, canonical)
         }
     }
+
+    /// RB-12: subtracting verified 682 MB shared tokenizer bytes avoids triggering destructive
+    /// `makesRoomFirst` when the volume has room for the actual remaining bytes (~1.57 GB -> 3.14 GB).
+    func testSubtractingVerifiedSharedBytesAvoidsUnnecessaryMakeRoom() {
+        let fullArtifact: Int64 = 2_250_000_000
+        let sharedTokenizer: Int64 = 682_000_000
+        let effective = Policy.effectiveDownloadBytes(
+            estimatedBytes: fullArtifact,
+            reusableSharedBytes: sharedTokenizer
+        )
+        XCTAssertEqual(effective, fullArtifact - sharedTokenizer)
+        XCTAssertEqual(Policy.effectiveDownloadBytes(estimatedBytes: 100, reusableSharedBytes: 500), 0)
+
+        let availableBytes: Int64 = 3_500_000_000
+        XCTAssertEqual(
+            decide([candidate("pro_custom", bytes: fullArtifact)], available: availableBytes),
+            .ask(modelIDs: ["pro_custom"], totalBytes: fullArtifact, makesRoomFirst: true),
+            "overcounting the 682 MB shared tokenizer forces destructive Make Room at 3.5 GB free"
+        )
+        XCTAssertEqual(
+            decide([candidate("pro_custom", bytes: effective)], available: availableBytes),
+            .ask(modelIDs: ["pro_custom"], totalBytes: effective, makesRoomFirst: false),
+            "subtracting verified shared bytes keeps earlier models intact until the new model verifies"
+        )
+    }
+
+    /// RB-12: iOS mirrors macOS `afterMakingRoom`, refusing to start doomed downloads when
+    /// `removeRetiredFoldersBeforeUpdate()` removed nothing.
+    func testAfterMakingRoomRefusesToStartWhenNothingWasRemoved() {
+        XCTAssertEqual(
+            Policy.afterMakingRoom(RetiredModelReclamation(removed: [], failed: ["old": "locked"])),
+            .roomNotMade
+        )
+        XCTAssertEqual(
+            Policy.afterMakingRoom(RetiredModelReclamation(removed: ["old"], failed: [:])),
+            .startUpdate
+        )
+    }
+
+    /// RB-06 / RF-59: on a real 3.0 -> 3.1 upgrade, `restoreInFlightDownloadsIfNeeded()` marks the
+    /// prior 3.0 `.installed` ledger entry as `.failed` (`artifactIsCurrent: false`). Checking
+    /// `isCurrentArtifactFailed` against the 3.1 artifact version returns `false` so the RF-59
+    /// one-time Update prompt is still shown (and a real 3.1 `.failed` entry still suppresses it).
+    func testSupersededEarlierArtifactFailureInLedgerDoesNotSuppressUpgradePrompt() {
+        var earlierInstalled = IOSModelDownloadLedger.Request(
+            logicalRequestID: "req-3-0",
+            modelID: "pro_custom",
+            artifactVersion: "v3.0.0",
+            repo: "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+            revision: String(repeating: "a", count: 40),
+            targetFolder: "Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+            expectedFiles: ["model.safetensors"],
+            verifiedFiles: [],
+            retryCount: 0,
+            receivedBytes: 2_000_000_000,
+            totalBytes: 2_000_000_000,
+            status: .installed
+        )
+        XCTAssertEqual(
+            earlierInstalled.restoreAction(artifactIsCurrent: false, targetIsInstalled: false),
+            .markFailed
+        )
+        earlierInstalled.status = .failed
+        let ledgerAfterUpgradeRestore = IOSModelDownloadLedger(requests: [earlierInstalled])
+        let plan = ModelUpdatePlan(entries: [
+            .custom: .init(
+                mode: .custom,
+                retiredFolders: ["Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit"],
+                detectedAtUTC: "2026-11-21T00:00:00Z",
+                paused: false
+            ),
+        ])
+
+        let upgradeCandidate = Policy.Candidate(
+            modelID: "pro_custom",
+            estimatedBytes: 2_000_000_000,
+            mode: .custom,
+            plan: plan,
+            pausedThisSession: false,
+            transferring: false,
+            failedThisSession: ledgerAfterUpgradeRestore.isCurrentArtifactFailed(
+                modelID: "pro_custom",
+                artifactVersion: "v3.1.0"
+            )
+        )
+        XCTAssertFalse(upgradeCandidate.failed)
+        XCTAssertEqual(
+            decide([upgradeCandidate], consented: false),
+            .ask(modelIDs: ["pro_custom"], totalBytes: 2_000_000_000, makesRoomFirst: false),
+            "3.0 -> 3.1 upgrade must still present the RF-59 Update prompt"
+        )
+
+        let currentFailed = IOSModelDownloadLedger.Request(
+            logicalRequestID: "req-3-1",
+            modelID: "pro_custom",
+            artifactVersion: "v3.1.0",
+            repo: "patricedery/Qwen3-TTS-12Hz-1.7B-CustomVoice-Hybrid",
+            revision: String(repeating: "b", count: 40),
+            targetFolder: "Qwen3-TTS-12Hz-1.7B-CustomVoice-Hybrid",
+            expectedFiles: ["model.safetensors"],
+            verifiedFiles: [],
+            retryCount: 1,
+            receivedBytes: 500_000_000,
+            totalBytes: 2_000_000_000,
+            status: .failed
+        )
+        let currentFailedLedger = IOSModelDownloadLedger(requests: [currentFailed])
+        let failedCurrentCandidate = Policy.Candidate(
+            modelID: "pro_custom",
+            estimatedBytes: 2_000_000_000,
+            mode: .custom,
+            plan: plan,
+            pausedThisSession: false,
+            transferring: false,
+            failedThisSession: currentFailedLedger.isCurrentArtifactFailed(
+                modelID: "pro_custom",
+                artifactVersion: "v3.1.0"
+            )
+        )
+        XCTAssertTrue(failedCurrentCandidate.failed)
+        XCTAssertEqual(
+            decide([failedCurrentCandidate], consented: true),
+            .none,
+            "a genuine 3.1 failure waits for explicit Retry (NET-1)"
+        )
+    }
 }

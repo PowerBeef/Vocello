@@ -40,6 +40,31 @@ public enum IOSModelDownloadCancellationSequence {
         case tombstonePersistenceFailed
     }
 
+    public enum StartingOutcome: Equatable, Sendable {
+        /// Cancellation intent persisted (when a ledger entry exists) and the row
+        /// moved to `.cancelling`; the in-flight `beginDownload` / `install`
+        /// unwinds at its next cancellation barrier check without starting any transfer.
+        case cancelling
+        /// The `.cancelRequested` write failed: barrier was not left armed and the
+        /// request remains cancellable as queued.
+        case intentPersistenceFailed
+    }
+
+    /// A request currently awaiting its catalog / 682 MB shared-component delivery
+    /// plan before `inflight` insertion (RB-10).
+    public static func cancelStarting(
+        persistIntent: () -> Bool,
+        keepCancellable: () -> Void,
+        publishCancelling: () -> Void
+    ) -> StartingOutcome {
+        guard persistIntent() else {
+            keepCancellable()
+            return .intentPersistenceFailed
+        }
+        publishCancelling()
+        return .cancelling
+    }
+
     /// A queued request with no running transfer.
     /// - Parameters:
     ///   - persistIntent: durable `.cancelRequested`; `false` aborts before the queue changes.

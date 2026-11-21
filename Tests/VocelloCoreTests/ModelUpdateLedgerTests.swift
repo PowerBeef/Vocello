@@ -321,4 +321,40 @@ final class ModelUpdateLedgerTests: XCTestCase {
         XCTAssertEqual(plan.entries[.design]?.retiredFolders, ["design-4bit"])
         XCTAssertEqual(RetiredModelReclamation.reclaim(models: all, in: models) { _ in true }, .nothing)
     }
+
+    /// RB-12: typed `ModelUpdateFailure.classify(_:)` classifies POSIX `ENOSPC`/`EDQUOT`,
+    /// Carbon `dskFulErr` (`-34`), and `ModelUpdateFailureClassifiable` errors by type even
+    /// when their localized description is non-English.
+    func testFailureClassificationHandlesTypedSpaceErrorsAcrossLocales() {
+        struct LocalizedSpaceError: LocalizedError, ModelUpdateFailureClassifiable {
+            var modelUpdateFailureClass: ModelUpdateFailure { .space }
+            var errorDescription: String? { "Espace libre insuffisant sur cet iPhone." }
+        }
+        XCTAssertEqual(ModelUpdateFailure.classify(LocalizedSpaceError()), .space)
+        XCTAssertEqual(ModelUpdateFailure.classify(description: "Espace libre insuffisant sur cet iPhone."), .other)
+        XCTAssertEqual(ModelUpdateFailure.classify(NSError(domain: NSPOSIXErrorDomain, code: Int(ENOSPC))), .space)
+        XCTAssertEqual(ModelUpdateFailure.classify(NSError(domain: NSPOSIXErrorDomain, code: Int(EDQUOT))), .space)
+        XCTAssertEqual(ModelUpdateFailure.classify(NSError(domain: NSOSStatusErrorDomain, code: -34)), .space)
+        XCTAssertEqual(ModelUpdateFailure.classify(CocoaError(.fileWriteOutOfSpace)), .space)
+        XCTAssertEqual(
+            ModelUpdateFailure.classify(SharedModelComponentStoreError.filesystemFailure(operation: "atomic-swap", code: ENOSPC)),
+            .space
+        )
+        XCTAssertEqual(
+            ModelUpdateFailure.classify(SharedModelComponentStoreError.filesystemFailure(operation: "atomic-swap", code: EDQUOT)),
+            .space
+        )
+        XCTAssertEqual(
+            ModelUpdateFailure.classify(SharedModelComponentStoreError.digestMismatch(relativePath: "model.safetensors")),
+            .verification
+        )
+        XCTAssertEqual(
+            ModelUpdateFailure.classify(SharedModelComponentStoreError.backgroundAssertionUnavailable),
+            .other
+        )
+        XCTAssertFalse(
+            ModelDownloadRetryPolicy.isCancellation(SharedModelComponentStoreError.backgroundAssertionUnavailable),
+            "RunningBoard assertion refusal must not be misclassified as a transfer cancellation"
+        )
+    }
 }

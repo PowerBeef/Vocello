@@ -600,7 +600,7 @@ class DuplicateByteAllowanceTests(unittest.TestCase):
         self.assertIn("upgrade", MODULE.PASS_SCENARIOS)
         self.assertEqual(
             MODULE.missing_scenario_milestones([observation(milestone="queue-active")], "queue"),
-            ["queue-waiting"],
+            ["cancel-prepare-clean", "queue-relaunch-restored", "queue-waiting"],
         )
         self.assertEqual(
             MODULE.missing_scenario_milestones(

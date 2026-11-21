@@ -166,13 +166,16 @@ extension ContractBackedModelRegistry {
             )
         }
         // Nothing went (the plan could not be recorded): the earlier models still hold the blobs.
-        if result.removed.isEmpty { store.releaseUpdatePins() }
+        if result.removed.isEmpty { store.releaseUpdatePins(reclaimUnreferenced: false) }
         return result
     }
 
     /// Drops the pins `removeRetiredFoldersBeforeUpdate` made, once no update download needs them.
+    /// Runs blob reclamation off-actor (`reclamation: .background`) so `@MainActor` callers on
+    /// macOS never block on `flock(LOCK_EX)` or multi-hundred-MB unlinks (RB-09).
     public func releaseModelUpdatePins(in modelsDirectory: URL) {
-        SharedModelComponentStore(modelsRoot: modelsDirectory).releaseUpdatePins()
+        _ = SharedModelComponentStore(modelsRoot: modelsDirectory)
+            .releaseUpdatePins(reclamation: .background)
     }
 }
 

@@ -526,32 +526,45 @@ public struct LocalModelAssetStore: ModelAssetStore, Hashable, Sendable {
     /// model's install verifies at `depth` (on the iPhone, at launch and after each install: its files
     /// were verified against the catalog when downloaded). Checks nothing when no retired folder is
     /// left. Synchronous and possibly slow: call it off the main actor.
-    public func reclaimRetiredFolders(depth: ModelAssetIntegrityDepth = .manifestSizes) -> RetiredModelReclamation {
+    public func reclaimRetiredFolders(
+        depth: ModelAssetIntegrityDepth = .manifestSizes,
+        shouldStop: @Sendable () -> Bool = { false }
+    ) -> RetiredModelReclamation {
         RetiredModelReclamation.reclaim(
-            models: descriptors.map(\.model), in: rootDirectory, isVerified: verifier(depth: depth)
+            models: descriptors.map(\.model),
+            in: rootDirectory,
+            shouldStop: shouldStop,
+            isVerified: verifier(depth: depth)
         )
     }
 
     /// RF-59, a nearly full iPhone whose user agreed to remove the earlier models first: pins the
     /// shared components those folders hold (the new models reuse them), records the plan, then
     /// removes every retired folder now. `releaseModelUpdatePins()` drops the pins once a new model is
-    /// installed. Synchronous and possibly slow: call it off the main actor.
+    /// installed or no update download remains. Synchronous and possibly slow: call it off the main actor.
     public func removeRetiredFoldersBeforeUpdate(
-        depth: ModelAssetIntegrityDepth = .manifestSizes
+        depth: ModelAssetIntegrityDepth = .manifestSizes,
+        shouldStop: @Sendable () -> Bool = { false }
     ) -> RetiredModelReclamation {
+        guard !shouldStop() else { return .nothing }
         let models = descriptors.map(\.model)
         let store = SharedModelComponentStore(modelsRoot: rootDirectory)
         store.pinSharedComponents(ofModelFolders: RetiredModelReclamation.presentFolders(of: models, in: rootDirectory))
         let result = RetiredModelReclamation.reclaim(
-            models: models, in: rootDirectory, force: true, isVerified: verifier(depth: depth)
+            models: models,
+            in: rootDirectory,
+            force: true,
+            shouldStop: shouldStop,
+            isVerified: verifier(depth: depth)
         )
-        // Nothing went (the plan could not be recorded): the earlier models still hold the blobs.
-        if result.removed.isEmpty { store.releaseUpdatePins() }
+        // Nothing went (the plan could not be recorded or stopped before deleting):
+        // the earlier models still hold the blobs.
+        if result.removed.isEmpty { store.releaseUpdatePins(reclaimUnreferenced: false) }
         return result
     }
 
     public func releaseModelUpdatePins() {
-        SharedModelComponentStore(modelsRoot: rootDirectory).releaseUpdatePins()
+        _ = SharedModelComponentStore(modelsRoot: rootDirectory).releaseUpdatePins()
     }
 
     /// Whether a model's install verifies at `depth`, checked lazily per model.

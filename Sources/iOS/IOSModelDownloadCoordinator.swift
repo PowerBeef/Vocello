@@ -81,8 +81,139 @@ final class IOSModelDownloadCoordinator {
     /// happens, progress for this logical request follows the downloader's exact durable total
     /// instead of the older ledger high-water mark.
     private var retryProgressResetModels: Set<String> = []
+    /// Owns UIKit background-session completion-handler gating across initial restore,
+    /// `beginDownload` → `runDownload` handoff, terminal ledger writes, and Model 2 task
+    /// submission so iOS never suspends the app before durable postprocessing settles (RB-08).
+    private var backgroundCompletionCoordinator = IOSBackgroundSessionCompletionCoordinator()
+    /// Exact-once generation-and-request tokens for active runs whose initial task-submission
+    /// hold is still held (released either when `backgroundTasksSubmittedHandler` fires for that
+    /// exact `logicalRequestID` or when `runDownload` settles).
+    private var activeRunSubmissionHolds: [UInt64: String] = [:]
+    /// Waiters awaiting a `.preparing` or `.starting` admission window to finish unwinding so
+    /// `stopDownloadBeforeDeletion` never races `install`/`beginDownload` (RB-10).
+    private var admissionSettlementWaiters: [String: [CheckedContinuation<Void, Never>]] = [:]
 
     private lazy var downloader: HuggingFaceDownloader = makeSharedDownloader()
+
+    private var hasAnyActiveWork: Bool {
+        !inflight.isEmpty
+            || !pending.isEmpty
+            || !admission.startingModelIDs.isEmpty
+            || !admission.preparingModelIDs.isEmpty
+    }
+
+    /// Synchronous truth for whether `modelID` is preparing, queued, starting, or actively
+    /// transferring in this coordinator (RB-06).
+    func isActiveOrPending(_ modelID: String) -> Bool {
+        hasDownload(for: modelID) || admission.isClaimed(modelID)
+    }
+
+    /// Whether the durable download ledger records the current artifact version of `modelID` as
+    /// `.failed` (NET-1 / RB-06). A superseded artifact from an earlier app version (marked
+    /// `.failed` during launch restore) is ignored so 3.0 → 3.1 upgrades still prompt.
+    func isLedgerRequestFailed(_ modelID: String) -> Bool {
+        guard let currentArtifactVersion = modelAssetStore.descriptor(id: modelID)?.model.artifactVersion else {
+            return false
+        }
+        return (try? ledgerStore.load().isCurrentArtifactFailed(
+            modelID: modelID,
+            artifactVersion: currentArtifactVersion
+        )) ?? false
+    }
+
+    /// Eagerly instantiates the shared background `URLSession` so `nsurlsessiond` reassociates
+    /// background tasks immediately on launch/background wake (RB-08).
+    private func reconnectBackgroundSessionIfNeeded() {
+        _ = downloader
+    }
+
+    private func beginCoordinatorPostprocessing() {
+        backgroundCompletionCoordinator.beginPostprocessing()
+    }
+
+    private func endCoordinatorPostprocessing() {
+        if backgroundCompletionCoordinator.endPostprocessing() {
+            IOSModelDeliveryBackgroundEventRelay.complete(
+                forOwnedSessionIdentifier: configuration.backgroundSessionIdentifier
+            )
+        }
+    }
+
+    private func finishInitialRestore() {
+        if backgroundCompletionCoordinator.endInitialRestore(hasWork: hasAnyActiveWork) {
+            IOSModelDeliveryBackgroundEventRelay.complete(
+                forOwnedSessionIdentifier: configuration.backgroundSessionIdentifier
+            )
+        }
+    }
+
+    private func claimRunSubmissionHold(generation: UInt64, logicalRequestID: String) {
+        if activeRunSubmissionHolds[generation] == nil {
+            activeRunSubmissionHolds[generation] = logicalRequestID
+            backgroundCompletionCoordinator.beginPostprocessing()
+        }
+    }
+
+    private func releaseRunSubmissionHoldIfNeeded(generation: UInt64) {
+        guard activeRunSubmissionHolds.removeValue(forKey: generation) != nil else { return }
+        endCoordinatorPostprocessing()
+    }
+
+    private func handleBackgroundTasksSubmitted(logicalRequestID: String?) {
+        // Ignore stale callbacks from an already-completed or superseded run so Model 1's late
+        // callback can never release Model 2's submission hold (RB-08).
+        guard let logicalRequestID,
+              inflight.values.contains(where: { $0.logicalRequestID == logicalRequestID }) else {
+            return
+        }
+        let matchingGenerations = activeRunSubmissionHolds.compactMap { generation, requestID in
+            requestID == logicalRequestID ? generation : nil
+        }
+        var shouldComplete = false
+        if !matchingGenerations.isEmpty {
+            for generation in matchingGenerations {
+                activeRunSubmissionHolds.removeValue(forKey: generation)
+                if backgroundCompletionCoordinator.endPostprocessing() {
+                    shouldComplete = true
+                }
+            }
+        } else if backgroundCompletionCoordinator.flushIfReadyAfterTaskSubmission() {
+            shouldComplete = true
+        }
+        if shouldComplete {
+            IOSModelDeliveryBackgroundEventRelay.complete(
+                forOwnedSessionIdentifier: configuration.backgroundSessionIdentifier
+            )
+        }
+    }
+
+    private func handleBackgroundSessionDidFinishEvents(identifier: String) {
+        guard identifier == configuration.backgroundSessionIdentifier else { return }
+        if backgroundCompletionCoordinator.sessionDidFinishEvents(
+            hasPendingOrInFlightWork: hasAnyActiveWork
+        ) {
+            IOSModelDeliveryBackgroundEventRelay.complete(
+                forOwnedSessionIdentifier: configuration.backgroundSessionIdentifier
+            )
+        }
+    }
+
+    private func notifyAdmissionSettled(for modelID: String) {
+        guard !admission.isClaimed(modelID),
+              let waiters = admissionSettlementWaiters.removeValue(forKey: modelID) else {
+            return
+        }
+        for waiter in waiters {
+            waiter.resume()
+        }
+    }
+
+    private func waitUntilAdmissionSettled(for modelID: String) async {
+        guard admission.isClaimed(modelID) else { return }
+        await withCheckedContinuation { continuation in
+            admissionSettlementWaiters[modelID, default: []].append(continuation)
+        }
+    }
 
     init(
         modelAssetStore: LocalModelAssetStore,
@@ -120,15 +251,43 @@ final class IOSModelDownloadCoordinator {
         guard admission.claimPreparation(of: model.id, hasDownload: hasDownload(for: model.id)) else {
             return
         }
+        cancellationBarriers.remove(model.id)
         let queuedRequest: IOSModelDownloadLedger.Request
         do {
             queuedRequest = try await persistQueuedRequest(for: model)
         } catch {
+            if cancellationBarriers.contains(model.id) {
+                // RB-10: tombstone any pre-existing ledger entry (e.g. a prior `.failed`
+                // retry) before discarding staging so stale receivedBytes never outlive it.
+                if persistCancellationStatusIfPresent(modelID: model.id, status: .deleted) {
+                    discardStaging(modelID: model.id)
+                    cancellationBarriers.remove(model.id)
+                    publishTerminal(modelID: model.id, phase: .deleted)
+                } else {
+                    publishCancellationPersistenceFailure(modelID: model.id)
+                }
+                admission.releasePreparation(of: model.id)
+                notifyAdmissionSettled(for: model.id)
+                return
+            }
             admission.releasePreparation(of: model.id)
+            notifyAdmissionSettled(for: model.id)
             throw error
         }
-        // The model joins the queue in this same turn; from then on the queue refuses a duplicate.
-        admission.releasePreparation(of: model.id)
+        // RB-10: if the user cancelled while `persistQueuedRequest` hashed shared components,
+        // tombstone the request and never enqueue or start a transfer.
+        if cancellationBarriers.contains(model.id) {
+            if persistCancellationStatusIfPresent(modelID: model.id, status: .deleted) {
+                discardStaging(modelID: model.id)
+                cancellationBarriers.remove(model.id)
+                publishTerminal(modelID: model.id, phase: .deleted)
+            } else {
+                publishCancellationPersistenceFailure(modelID: model.id)
+            }
+            admission.releasePreparation(of: model.id)
+            notifyAdmissionSettled(for: model.id)
+            return
+        }
         if queuedRequest.retryCount > 0 {
             retryProgressResetModels.insert(model.id)
         } else {
@@ -147,8 +306,11 @@ final class IOSModelDownloadCoordinator {
             verifiedFileCount: queuedRequest.verifiedFiles.count,
             ledgerStatus: queuedRequest.status.rawValue
         )
-        cancellationBarriers.remove(model.id)
+        // The model joins the queue before releasing preparation so there is zero gap where
+        // `isActiveOrPending` could return false between prepare and queue ownership.
         pending.append(model)
+        admission.releasePreparation(of: model.id)
+        notifyAdmissionSettled(for: model.id)
         publishSnapshot(for: model, phase: .queued, downloadedBytes: queuedRequest.receivedBytes)
         await startPendingDownloads()
     }
@@ -165,6 +327,9 @@ final class IOSModelDownloadCoordinator {
             configuration: configuration
         )
         let delivery = try await productionDeliveryPlan(for: model, matching: entry)
+        if cancellationBarriers.contains(model.id) {
+            throw IOSModelDeliveryError.cancelled
+        }
         let downloadPaths = Set(delivery.filesToDownload.map(\.path))
         let bytesToFetch = resolveFiles(entry: entry)
             .filter { downloadPaths.contains($0.path) }
@@ -205,7 +370,14 @@ final class IOSModelDownloadCoordinator {
     @discardableResult
     func cancel(modelID: String) async -> Bool {
         traceCurrentState(layer: "coordinator", event: "cancellation-requested", modelID: modelID)
-        if let pendingIndex = pending.firstIndex(where: { $0.id == modelID }) {
+        let pendingIndex = pending.firstIndex(where: { $0.id == modelID })
+        switch admission.cancelTarget(
+            for: modelID,
+            isPending: pendingIndex != nil,
+            isActive: inflight[modelID] != nil
+        ) {
+        case .pending:
+            guard let pendingIndex else { return true }
             cancellationBarriers.insert(modelID)
             let outcome = IOSModelDownloadCancellationSequence.cancelPending(
                 persistIntent: {
@@ -243,6 +415,62 @@ final class IOSModelDownloadCoordinator {
                 cancellationBarriers.remove(modelID)
                 return true
             }
+        case .starting:
+            // RB-10: `beginDownload` popped `modelID` from `pending` and is awaiting catalog /
+            // 682 MB SHA-256 verification before inserting into `inflight`. Persist cancel intent
+            // and arm the barrier so `beginDownload` aborts cleanly after its await.
+            cancellationBarriers.insert(modelID)
+            let outcome = IOSModelDownloadCancellationSequence.cancelStarting(
+                persistIntent: {
+                    persistCancellationStatus(
+                        modelID: modelID,
+                        status: IOSModelDownloadProgressMapping.userCancelIntentStatus
+                    )
+                },
+                keepCancellable: {
+                    publishSnapshot(
+                        modelID: modelID,
+                        phase: .queued,
+                        downloadedBytes: ledgerReceivedBytes(modelID: modelID),
+                        totalBytes: modelAssetStore.descriptor(id: modelID)?.model.estimatedDownloadBytes,
+                        message: CancellationPersistenceError.privacySafeMessage,
+                        generation: beginOperation()
+                    )
+                },
+                publishCancelling: {
+                    publishSnapshot(
+                        modelID: modelID,
+                        phase: .cancelling,
+                        downloadedBytes: ledgerReceivedBytes(modelID: modelID),
+                        totalBytes: modelAssetStore.descriptor(id: modelID)?.model.estimatedDownloadBytes,
+                        message: nil,
+                        generation: beginOperation()
+                    )
+                }
+            )
+            if outcome == .intentPersistenceFailed {
+                cancellationBarriers.remove(modelID)
+                return false
+            }
+            return true
+        case .preparing:
+            // RB-10: `install(model:)` is preparing its request before writing the ledger entry.
+            // Arm the barrier so `install` tombstones and discards once preparation returns.
+            cancellationBarriers.insert(modelID)
+            publishSnapshot(
+                modelID: modelID,
+                phase: .cancelling,
+                downloadedBytes: ledgerReceivedBytes(modelID: modelID),
+                totalBytes: modelAssetStore.descriptor(id: modelID)?.model.estimatedDownloadBytes,
+                message: nil,
+                generation: beginOperation()
+            )
+            return true
+        case .none:
+            reconcileNoOpCancellation(modelID: modelID)
+            return true
+        case .active:
+            break
         }
         guard let active = inflight[modelID] else {
             reconcileNoOpCancellation(modelID: modelID)
@@ -312,19 +540,26 @@ final class IOSModelDownloadCoordinator {
     }
 
     /// A deletion's first step, run once the engine allowed it (`ModelDeletionSequence`, A5-01):
-    /// a download of the model is cancelled. `false` means its cancellation could not be recorded;
-    /// the download and the files stay, and the row already shows why.
+    /// a download of the model (including one in `.preparing` or `.starting`, RB-10) is cancelled
+    /// and awaited until settled. `false` means its cancellation could not be recorded; the
+    /// download and the files stay, and the row already shows why.
     func stopDownloadBeforeDeletion(modelID: String) async -> Bool {
         traceCurrentState(layer: "coordinator", event: "delete-requested", modelID: modelID)
-        guard hasDownload(for: modelID) else { return true }
-        return await cancel(modelID: modelID)
+        guard isActiveOrPending(modelID) else { return true }
+        guard await cancel(modelID: modelID) else { return false }
+        await waitUntilAdmissionSettled(for: modelID)
+        if hasDownload(for: modelID) {
+            guard await cancel(modelID: modelID) else { return false }
+        }
+        return !isActiveOrPending(modelID)
     }
 
     /// A deletion's last step, synchronous so it shares the main-actor turn of the deletion
     /// sequence's last engine read. Returns `false`, removing nothing, when a download of the
-    /// model started meanwhile: the row shows that download.
+    /// model started meanwhile (including `.preparing` / `.starting`, RB-10): the row shows that
+    /// download.
     func removeInstalledFiles(of model: ModelDescriptor) throws -> Bool {
-        guard !hasDownload(for: model.id) else { return false }
+        guard !isActiveOrPending(model.id) else { return false }
         let generation = beginOperation()
         publishSnapshot(
             modelID: model.id,
@@ -337,10 +572,12 @@ final class IOSModelDownloadCoordinator {
         let targetDir = model.installDirectory(in: AppPaths.modelsDir)
         // Staging first: its reuse pins would otherwise keep the blobs the delete releases.
         discardStaging(modelID: model.id)
-        try SharedModelComponentStore(modelsRoot: AppPaths.modelsDir).deleteModel(
-            modelFolder: targetDir.lastPathComponent,
-            reclamation: .background
-        )
+        try IOSBackgroundTime.holdSync("vocello.model-delivery.delete") {
+            try SharedModelComponentStore(modelsRoot: AppPaths.modelsDir).deleteModel(
+                modelFolder: targetDir.lastPathComponent,
+                reclamation: .background
+            )
+        }
         markLedgerTerminal(modelID: model.id, status: .deleted)
         publishTerminal(modelID: model.id, phase: .deleted)
         traceCurrentState(layer: "filesystem", event: "delete-completed", modelID: model.id, outcome: "target-absent")
@@ -352,11 +589,16 @@ final class IOSModelDownloadCoordinator {
     }
 
     func restoreInFlightDownloadsIfNeeded() async {
+        // RB-08: eagerly reconnect the background URLSession on launch / background wake before
+        // running catalog or SHA-256 work so `nsurlsessiond` immediately reassociates tasks.
+        reconnectBackgroundSessionIfNeeded()
+        beginCoordinatorPostprocessing()
+        defer { finishInitialRestore() }
         do {
             try prepareDirectories()
             try await migrateV1IfNeeded()
             var ledger = try loadLedgerRecoveringUnusableDocument()
-            var restored: [ModelDescriptor] = []
+            var restored: [(model: ModelDescriptor, receivedBytes: Int64)] = []
 
             for index in ledger.requests.indices {
                 let request = ledger.requests[index]
@@ -391,32 +633,35 @@ final class IOSModelDownloadCoordinator {
                         retryProgressResetModels.insert(request.modelID)
                     }
                     ledger.requests[index].status = .queued
-                    restored.append(currentDescriptor)
+                    restored.append((model: currentDescriptor, receivedBytes: request.receivedBytes))
                 }
             }
             try ledgerStore.save(ledger)
-            pending = restored
+            pending = restored.map(\.model)
+            // RB-06: publish `.queued` snapshots for every restored request before starting
+            // downloads so Models 2 & 3 render Cancel controls, `startModelUpdateIfNeeded` sees
+            // them as active, and `reclaimAfterInstall` keeps update pins alive.
+            for item in restored {
+                publishSnapshot(for: item.model, phase: .queued, downloadedBytes: item.receivedBytes)
+            }
             if restored.isEmpty {
                 await downloader.cancelAllSessionTasks()
-                IOSModelDeliveryBackgroundEventRelay.complete(
-                    forOwnedSessionIdentifier: configuration.backgroundSessionIdentifier
-                )
             } else {
                 await startPendingDownloads()
             }
         } catch {
             diagnosticsStore.recordFailure(classification: "ledger-restore", error: error)
             await downloader.cancelAllSessionTasks()
-            IOSModelDeliveryBackgroundEventRelay.complete(
-                forOwnedSessionIdentifier: configuration.backgroundSessionIdentifier
-            )
         }
     }
 
     func resumeBackgroundEventsIfNeeded() async {
-        let hasActiveWork: Bool
+        // RB-08: eagerly reconnect the background URLSession on background wake, but never
+        // flush UIKit's completion handler before `restoreInFlightDownloadsIfNeeded()` completes.
+        reconnectBackgroundSessionIfNeeded()
+        let hasLedgerActiveWork: Bool
         do {
-            hasActiveWork = try loadLedgerRecoveringUnusableDocument().requests.contains(where: {
+            hasLedgerActiveWork = try loadLedgerRecoveringUnusableDocument().requests.contains(where: {
                 ![.installed, .failed, .deleted].contains($0.status)
             })
         } catch {
@@ -426,7 +671,12 @@ final class IOSModelDownloadCoordinator {
             )
             return
         }
-        guard !hasActiveWork else { return }
+        guard backgroundCompletionCoordinator.canCompleteIdleWake(
+            hasLedgerActiveWork: hasLedgerActiveWork,
+            hasCoordinatorWork: hasAnyActiveWork
+        ) else {
+            return
+        }
         IOSModelDeliveryBackgroundEventRelay.complete(
             forOwnedSessionIdentifier: configuration.backgroundSessionIdentifier
         )
@@ -443,18 +693,42 @@ final class IOSModelDownloadCoordinator {
         }
     }
 
+    /// Finalizes a model whose Cancel arrived while `beginDownload` was awaiting catalog or
+    /// 682 MB shared-component hashing (RB-10). Returns `true` when cancelled.
+    private func finalizeCancelledStartIfNeeded(for model: ModelDescriptor) async -> Bool {
+        guard cancellationBarriers.contains(model.id) else { return false }
+        await downloader.cancelAllSessionTasks()
+        if persistCancellationStatus(modelID: model.id, status: .deleted) {
+            discardStaging(modelID: model.id)
+            cancellationBarriers.remove(model.id)
+            publishTerminal(modelID: model.id, phase: .deleted)
+            traceCurrentState(layer: "coordinator", event: "cancellation-completed", modelID: model.id, outcome: "deleted")
+        } else {
+            publishCancellationPersistenceFailure(modelID: model.id)
+        }
+        return true
+    }
+
     /// Starts `model`, whose start slot `startPendingDownloads` claimed. The claim ends when
-    /// this returns: the transfer is in `inflight` by then, or its start failed.
+    /// this returns: the transfer is in `inflight` by then, or its start failed/cancelled.
     private func beginDownload(_ model: ModelDescriptor) async {
-        defer { admission.releaseStart(of: model.id) }
+        beginCoordinatorPostprocessing()
+        defer {
+            admission.releaseStart(of: model.id)
+            notifyAdmissionSettled(for: model.id)
+            endCoordinatorPostprocessing()
+        }
         do {
+            if await finalizeCancelledStartIfNeeded(for: model) { return }
             let catalog = try await fetchCatalog()
+            if await finalizeCancelledStartIfNeeded(for: model) { return }
             let entry = try IOSModelDeliverySupport.matchingCatalogEntry(
                 for: model,
                 in: catalog,
                 configuration: configuration
             )
             let delivery = try await productionDeliveryPlan(for: model, matching: entry)
+            if await finalizeCancelledStartIfNeeded(for: model) { return }
             let installedFiles = resolveFiles(entry: entry)
             let downloadPaths = Set(delivery.filesToDownload.map(\.path))
             let files = installedFiles.filter { downloadPaths.contains($0.path) }
@@ -489,10 +763,14 @@ final class IOSModelDownloadCoordinator {
                 await downloader.cancelAllSessionTasks()
                 throw error
             }
+            if await finalizeCancelledStartIfNeeded(for: model) { return }
             let generation = beginOperation()
             updateRequest(model.id, in: &ledger) { $0.status = .downloading }
             try ledgerStore.save(ledger)
 
+            // RB-08 (Race B): synchronously claim `runDownload`'s submission hold BEFORE spawning
+            // the unstructured Task so `postprocessingDepth` never drops to 0 across the handoff.
+            claimRunSubmissionHold(generation: generation, logicalRequestID: request.logicalRequestID)
             let task = Task { @MainActor [weak self] in
                 guard let self else { return }
                 await self.runDownload(
@@ -528,8 +806,13 @@ final class IOSModelDownloadCoordinator {
             )
             startDiagnosticsHeartbeat(modelID: model.id, generation: generation)
         } catch {
+            if await finalizeCancelledStartIfNeeded(for: model) { return }
             markLedgerTerminal(modelID: model.id, status: .failed)
-            publishFailed(modelID: model.id, message: error.localizedDescription)
+            publishFailed(
+                modelID: model.id,
+                message: error.localizedDescription,
+                failureClass: ModelUpdateFailure.classify(error)
+            )
         }
     }
 
@@ -544,6 +827,11 @@ final class IOSModelDownloadCoordinator {
         installedFiles: [HuggingFaceDownloader.RepoFile],
         sharedComponentPlan: SharedComponentMigrationPlan?
     ) async {
+        // `beginDownload` synchronously claimed the submission hold for `generation` before
+        // spawning this Task (RB-08). That hold releases either once live tasks are handed off
+        // to `nsurlsessiond` (`handleBackgroundTasksSubmitted`) or right after `downloadFiles`
+        // settles below.
+        let downloadOutcome: Result<HuggingFaceDownloader.RepositoryTransferAccounting, any Error>
         do {
             let transferAccounting = try await downloader.downloadFiles(
                 files,
@@ -559,6 +847,19 @@ final class IOSModelDownloadCoordinator {
                 installedFiles: installedFiles,
                 sharedComponentPlan: sharedComponentPlan
             )
+            downloadOutcome = .success(transferAccounting)
+        } catch {
+            downloadOutcome = .failure(error)
+        }
+
+        // Hold postprocessing across terminal ledger write + Model 2 handoff (`startPendingDownloads`)
+        // before releasing any remaining submission hold so depth stays >= 1 across the transition.
+        beginCoordinatorPostprocessing()
+        releaseRunSubmissionHoldIfNeeded(generation: generation)
+        defer { endCoordinatorPostprocessing() }
+
+        switch downloadOutcome {
+        case .success(let transferAccounting):
             guard inflight[model.id]?.operationGeneration == generation,
                   !cancellationBarriers.contains(model.id) else { return }
             inflight.removeValue(forKey: model.id)
@@ -583,7 +884,7 @@ final class IOSModelDownloadCoordinator {
                 generation: generation
             )
             stopDiagnosticsHeartbeat(for: model.id)
-        } catch {
+        case .failure(let error):
             // E-02: the model's Cancel owns its outcome and a superseded run owns nothing.
             // Any other end is a failure the row shows with Retry, a `.cancelled` this
             // coordinator never asked for included, and the next queued model then starts.
@@ -624,7 +925,8 @@ final class IOSModelDownloadCoordinator {
             // no message, so the row shows the localized delivery failure.
             publishFailed(
                 modelID: model.id,
-                message: isCancellation ? nil : error.localizedDescription
+                message: isCancellation ? nil : error.localizedDescription,
+                failureClass: isCancellation ? .other : ModelUpdateFailure.classify(error)
             )
             stopDiagnosticsHeartbeat(for: model.id)
         }
@@ -679,7 +981,7 @@ final class IOSModelDownloadCoordinator {
         // recorded per transfer prove the path taken).
         sessionConfig.allowsCellularAccess = true
         engineConfig.cellularAccess = { IOSAppDefaults.cellularModelDownloadsAllowed }
-        let backgroundSessionIdentifier = configuration.backgroundSessionIdentifier
+        engineConfig.defersBackgroundEventCompletionToCaller = true
 
         return HuggingFaceDownloader(
             progressHandler: { [weak self] progress in
@@ -693,7 +995,7 @@ final class IOSModelDownloadCoordinator {
             transferMetricsHandler: { [diagnosticsStore] metrics in
                 diagnosticsStore.record(metrics: metrics)
             },
-            verifiedArtifactHandler: { @concurrent [weak self] receipt in
+            verifiedArtifactHandler: { @concurrent [weak self] (receipt: VerifiedArtifactReceipt) async in
                 await MainActor.run { [weak self] in self?.recordVerifiedFile(receipt) }
             },
             lifecycleEventHandler: { [diagnosticsStore] event in
@@ -712,12 +1014,14 @@ final class IOSModelDownloadCoordinator {
             rangeRetryHandler: { [diagnosticsStore] event in
                 diagnosticsStore.record(rangeRetry: event)
             },
-            backgroundSessionCompletionHandler: { identifier in
-                Task { @MainActor in
-                    guard identifier == backgroundSessionIdentifier else { return }
-                    IOSModelDeliveryBackgroundEventRelay.complete(
-                        forOwnedSessionIdentifier: backgroundSessionIdentifier
-                    )
+            backgroundSessionCompletionHandler: { [weak self] identifier in
+                Task { @MainActor [weak self] in
+                    self?.handleBackgroundSessionDidFinishEvents(identifier: identifier)
+                }
+            },
+            backgroundTasksSubmittedHandler: { [weak self] logicalRequestID in
+                Task { @MainActor [weak self] in
+                    self?.handleBackgroundTasksSubmitted(logicalRequestID: logicalRequestID)
                 }
             },
             artifactURLPolicy: ModelArtifactURLPolicy(
@@ -901,9 +1205,13 @@ final class IOSModelDownloadCoordinator {
             )
         }
         let modelsRoot = AppPaths.modelsDir
-        return try await Task.detached(priority: .utility) { @concurrent in
-            try catalog.deliveryPlan(for: artifact, modelsRoot: modelsRoot)
-        }.value
+        let outcome: Result<ProductionModelCatalog.ArtifactDeliveryPlan, any Error> =
+            await IOSBackgroundTime.hold("vocello.model-delivery.plan") {
+                await Task.detached(priority: .utility) { @concurrent () async -> Result<ProductionModelCatalog.ArtifactDeliveryPlan, any Error> in
+                    Result { try catalog.deliveryPlan(for: artifact, modelsRoot: modelsRoot) }
+                }.value
+            }
+        return try outcome.get()
     }
 
     private func makeLedgerRequest(
@@ -1066,6 +1374,30 @@ final class IOSModelDownloadCoordinator {
         }
     }
 
+    /// Tombstones a pre-existing ledger record when cancelling during `.preparing` (where a
+    /// brand-new install may not yet have written a ledger entry, whereas a Retry of a `.failed`
+    /// install does, RB-10). Returns `true` when no record exists or the update was saved.
+    private func persistCancellationStatusIfPresent(
+        modelID: String,
+        status: IOSModelDownloadLedger.Status
+    ) -> Bool {
+        do {
+            var ledger = try ledgerStore.load()
+            guard ledger.requests.contains(where: { $0.modelID == modelID }) else {
+                return true
+            }
+            updateRequest(modelID, in: &ledger) { $0.status = status }
+            try ledgerStore.save(ledger)
+            return true
+        } catch {
+            diagnosticsStore.recordFailure(
+                classification: "cancellation-ledger-write",
+                error: error
+            )
+            return false
+        }
+    }
+
     private func publishCancellationPersistenceFailure(modelID: String) {
         publishSnapshot(
             modelID: modelID,
@@ -1088,10 +1420,12 @@ final class IOSModelDownloadCoordinator {
             return true
         }
         do {
-            try SharedModelComponentStore(modelsRoot: AppPaths.modelsDir).deleteModel(
-                modelFolder: active.targetDir.lastPathComponent,
-                reclamation: .background
-            )
+            try IOSBackgroundTime.holdSync("vocello.model-delivery.rollback") {
+                try SharedModelComponentStore(modelsRoot: AppPaths.modelsDir).deleteModel(
+                    modelFolder: active.targetDir.lastPathComponent,
+                    reclamation: .background
+                )
+            }
             return true
         } catch {
             diagnosticsStore.recordFailure(
@@ -1225,6 +1559,7 @@ final class IOSModelDownloadCoordinator {
         estimatedSecondsRemaining: Double? = nil,
         retryCount: Int = 0,
         message: String?,
+        failureClass: ModelUpdateFailure? = nil,
         generation: UInt64,
         estimatedBytes: Int64? = nil
     ) {
@@ -1238,6 +1573,7 @@ final class IOSModelDownloadCoordinator {
             estimatedSecondsRemaining: estimatedSecondsRemaining,
             retryCount: retryCount,
             message: message,
+            failureClass: failureClass,
             operationGeneration: generation
         )
         let now = ProcessInfo.processInfo.systemUptime
@@ -1350,13 +1686,18 @@ final class IOSModelDownloadCoordinator {
         )
     }
 
-    private func publishFailed(modelID: String, message: String?) {
+    private func publishFailed(
+        modelID: String,
+        message: String?,
+        failureClass: ModelUpdateFailure? = nil
+    ) {
         publishSnapshot(
             modelID: modelID,
             phase: .failed,
             downloadedBytes: ledgerReceivedBytes(modelID: modelID),
             totalBytes: modelAssetStore.descriptor(id: modelID)?.model.estimatedDownloadBytes,
             message: message,
+            failureClass: failureClass,
             generation: beginOperation()
         )
     }

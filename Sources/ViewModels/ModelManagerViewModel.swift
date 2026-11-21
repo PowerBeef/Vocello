@@ -806,15 +806,23 @@ final class ModelManagerViewModel {
     private struct ModelUpdateDiskFacts: Sendable {
         let availableBytes: Int64?
         let holdsEarlierModels: Bool
+        let reusableSharedBytesByModelID: [String: Int64]
     }
 
     private func modelUpdateDiskFacts() async -> ModelUpdateDiskFacts? {
         guard let registry = updateRegistry else { return nil }
         let modelsDirectory = modelsDirectory
-        return await Task.detached(priority: .utility) { @concurrent in
-            ModelUpdateDiskFacts(
+        let catalog = Self.productionCatalog
+        return await Task.detached(priority: .utility) { @concurrent () async -> ModelUpdateDiskFacts in
+            let reusableSharedBytes = catalog?.reusableSharedComponentBytesByModelID(
+                for: registry.models,
+                platform: .macOS,
+                modelsRoot: modelsDirectory
+            ) ?? [:]
+            return ModelUpdateDiskFacts(
                 availableBytes: ModelDeliverySpace.availableBytes(at: modelsDirectory),
-                holdsEarlierModels: !RetiredModelReclamation.presentFolders(of: registry.models, in: modelsDirectory).isEmpty
+                holdsEarlierModels: !RetiredModelReclamation.presentFolders(of: registry.models, in: modelsDirectory).isEmpty,
+                reusableSharedBytesByModelID: reusableSharedBytes
             )
         }.value
     }
@@ -824,8 +832,10 @@ final class ModelManagerViewModel {
     ) -> MacModelUpdateAutoStart.Decision {
         MacModelUpdateAutoStart.decide(
             candidates: models.map { model in
-                MacModelUpdateAutoStart.Candidate(
-                    modelID: model.id, estimatedBytes: model.estimatedDownloadBytes ?? 0,
+                let reusable = max(Int64(0), facts.reusableSharedBytesByModelID[model.id] ?? 0)
+                let effectiveBytes = max(Int64(0), (model.estimatedDownloadBytes ?? 0) - reusable)
+                return MacModelUpdateAutoStart.Candidate(
+                    modelID: model.id, estimatedBytes: effectiveBytes,
                     paused: updatePlan.isPaused(model.mode), active: isDownloadActive(model.id),
                     failure: updatePlan.failure(model.mode)
                 )

@@ -342,6 +342,117 @@ final class ProductionModelCatalogTests: XCTestCase {
         ))
     }
 
+    /// RB-12: launch preflight reports verified shared-component bytes (without mutating the store)
+    /// so models sharing an already-installed speech tokenizer do not overcount 682 MB.
+    func testReusableSharedComponentBytesReportsVerifiedComponentWithoutMutation() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-rb12-reusable-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let modelsRoot = root.appendingPathComponent("models", isDirectory: true)
+        let sourceRoot = root.appendingPathComponent("source", isDirectory: true)
+        let componentData = Data(repeating: 0x42, count: 1_024)
+        let componentFileURL = sourceRoot.appendingPathComponent("speech_tokenizer/model.safetensors")
+        try FileManager.default.createDirectory(at: componentFileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try componentData.write(to: componentFileURL)
+        let componentFile = try SharedComponentFileIdentity.verify(
+            relativePath: "speech_tokenizer/model.safetensors",
+            fileURL: componentFileURL
+        )
+        let content = try SharedComponentContentIdentity(files: [componentFile])
+        let compatibility = try SharedComponentCompatibilityIdentity(
+            contentDigest: content.digest,
+            componentSchemaVersion: 1,
+            loaderABI: "qwen3-loader-v1",
+            runtimeProfileSignature: "qwen3-runtime-v1",
+            encoderCapability: .decoderOnly
+        )
+        let configData = Data("{\"ok\":true}".utf8)
+        let configURL = sourceRoot.appendingPathComponent("config.json")
+        try configData.write(to: configURL)
+        let configFile = try SharedComponentFileIdentity.verify(relativePath: "config.json", fileURL: configURL)
+        var catalogDocument = try makeV2Catalog(
+            content: content,
+            compatibility: compatibility,
+            configurationFile: configFile
+        )
+        if var artifacts = catalogDocument["artifacts"] as? [[String: Any]], var second = artifacts.first {
+            second["modelID"] = "pro_design"
+            second["folder"] = "Design-8bit"
+            second["repo"] = "org/design-8bit"
+            second["baseURL"] = "https://huggingface.co/org/design-8bit/resolve/\(String(repeating: "a", count: 40))"
+            artifacts.append(second)
+            catalogDocument["artifacts"] = artifacts
+        }
+        let catalogURL = try writeCatalog(catalogDocument)
+        let catalog = try ProductionModelCatalog(contentsOf: catalogURL)
+        let customDescriptor = ModelDescriptor(
+            id: "pro_custom",
+            name: "Custom",
+            tier: "pro",
+            folder: "Custom-8bit",
+            mode: .custom,
+            huggingFaceRepo: "org/custom-8bit",
+            huggingFaceRevision: String(repeating: "a", count: 40),
+            artifactVersion: "v1",
+            iosDownloadEligible: false,
+            estimatedDownloadBytes: componentFile.byteCount + configFile.byteCount,
+            outputSubfolder: "Custom",
+            requiredRelativePaths: ["config.json", "speech_tokenizer/model.safetensors"]
+        )
+        let designDescriptor = ModelDescriptor(
+            id: "pro_design",
+            name: "Design",
+            tier: "pro",
+            folder: "Design-8bit",
+            mode: .design,
+            huggingFaceRepo: "org/design-8bit",
+            huggingFaceRevision: String(repeating: "a", count: 40),
+            artifactVersion: "v1",
+            iosDownloadEligible: false,
+            estimatedDownloadBytes: componentFile.byteCount + configFile.byteCount,
+            outputSubfolder: "Design",
+            requiredRelativePaths: ["config.json", "speech_tokenizer/model.safetensors"]
+        )
+
+        // Before shared component is published: 0 reusable bytes, store stays uncreated.
+        XCTAssertEqual(
+            catalog.reusableSharedComponentBytesByModelID(
+                for: [customDescriptor, designDescriptor],
+                platform: .macOS,
+                modelsRoot: modelsRoot
+            ),
+            [:]
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: modelsRoot.path))
+
+        // After publishing verified component: both descriptors sharing the same componentID
+        // receive the exact reusable byte count (verified once and deduplicated).
+        let store = SharedModelComponentStore(modelsRoot: modelsRoot)
+        _ = try store.publish(content: content, from: sourceRoot)
+        XCTAssertEqual(
+            catalog.reusableSharedComponentBytesByModelID(
+                for: [customDescriptor, designDescriptor],
+                platform: .macOS,
+                modelsRoot: modelsRoot
+            ),
+            ["pro_custom": 1_024, "pro_design": 1_024]
+        )
+
+        // Tampering with the stored blob fails closed to 0 reusable bytes so space checks
+        // never underestimate required free storage.
+        let blobURL = try store.blobURL(for: componentFile.sha256)
+        try FileManager.default.setAttributes([.posixPermissions: NSNumber(value: Int16(0o644))], ofItemAtPath: blobURL.path)
+        try Data(repeating: 0x11, count: 1_024).write(to: blobURL)
+        XCTAssertEqual(
+            catalog.reusableSharedComponentBytesByModelID(
+                for: [customDescriptor, designDescriptor],
+                platform: .macOS,
+                modelsRoot: modelsRoot
+            ),
+            [:]
+        )
+    }
+
     private func makeCatalog() -> [String: Any] {
         let revision = String(repeating: "a", count: 40)
         return [

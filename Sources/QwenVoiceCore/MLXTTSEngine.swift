@@ -1015,9 +1015,13 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         normalizedCloneReferenceDirectory: URL,
         outputsDirectory: URL
     ) {
-        Task.detached(priority: .background) { @concurrent in
-            _ = try? SharedModelComponentStore(modelsRoot: modelsDirectory)
-                .reclaimUnreferencedComponents()
+        Task.detached(priority: .background) { @concurrent () async in
+            await SharedStorageBackgroundActivity.runBestEffort(
+                reason: "vocello.startup.storage-reclamation"
+            ) { _ in
+                _ = try? SharedModelComponentStore(modelsRoot: modelsDirectory)
+                    .reclaimUnreferencedComponents()
+            }
             NativePreparedCloneConditioningCache.pruneTransientClonePromptArtifacts(
                 in: voicesDirectory
             )

@@ -1,48 +1,5 @@
 import SwiftUI
-
-private struct IOSAttributionManifest: Decodable {
-    struct License: Decodable, Identifiable {
-        let id: String
-        let text: String
-    }
-
-    struct Component: Decodable, Identifiable {
-        let id: String
-        let displayName: String
-        let version: String
-        let revision: String?
-        let sourceURL: String
-        let licenseID: String
-        let copyrightNotice: String?
-        let notice: String?
-        let origins: String?
-        let licenseTextOverride: String?
-    }
-
-    struct ModelArtifact: Decodable, Identifiable {
-        let id: String
-        let displayName: String
-        let variantID: String
-        let repo: String
-        let revision: String
-        let modelCardSHA256: String
-        let licenseID: String
-        let baseRepo: String
-        let baseRevision: String
-        let sourceURL: String
-    }
-
-    let licenses: [License]
-    let components: [Component]
-    let modelArtifacts: [ModelArtifact]
-
-    static func load() throws -> Self {
-        guard let url = Bundle.main.url(forResource: "third_party_attributions", withExtension: "json") else {
-            throw CocoaError(.fileNoSuchFile)
-        }
-        return try JSONDecoder().decode(Self.self, from: Data(contentsOf: url))
-    }
-}
+import VocelloiOSPolicies
 
 /// Offline software and model attribution browser generated from exact repository resolutions.
 struct OpenSourceLicensesScreen: View {
@@ -118,7 +75,7 @@ struct OpenSourceLicensesScreen: View {
                                     sourceURL: model.sourceURL,
                                     licenseID: model.licenseID,
                                     copyrightNotice: nil,
-                                    notice: "Model card SHA-256: \(model.modelCardSHA256)\n\nBase: \(model.baseRepo) @ \(model.baseRevision)",
+                                    notice: model.attributionNoticeText,
                                     origins: nil,
                                     licenseText: manifest.licenses.first(where: { $0.id == model.licenseID })?.text ?? ""
                                 )

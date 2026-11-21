@@ -800,6 +800,197 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         XCTAssertFalse(eventsFirst.completionDelivered)
         XCTAssertFalse(eventsFirst.markPostprocessingFinished())
         XCTAssertTrue(eventsFirst.markEventsFinished())
+
+        // RB-08: coordinator-deferred completion defaults false for standalone callers and
+        // preserves an already-delivered events signal across a request reset until postprocessing ends.
+        XCTAssertFalse(HuggingFaceDownloader.Configuration().defersBackgroundEventCompletionToCaller)
+        var deferred = ModelDownloadBackgroundCompletionGate()
+        XCTAssertFalse(deferred.markEventsFinished())
+        deferred.resetForRequest()
+        XCTAssertTrue(deferred.eventsFinished, "undelivered background wake must survive request reset")
+        XCTAssertTrue(deferred.markPostprocessingFinished(), "flushes once coordinator postprocessing completes")
+        XCTAssertFalse(deferred.markPostprocessingFinished(), "never delivers twice")
+    }
+
+    /// RB-06 / NET-1: a superseded 3.0 `.installed` request marked `.failed` during 3.1 launch
+    /// restore (`restoreAction(artifactIsCurrent: false, ...) == .markFailed`) must NOT count as
+    /// a failure of the current 3.1 artifact, or the RF-59 upgrade prompt is silently suppressed.
+    func testLedgerCurrentArtifactFailedIgnoresSupersededAppVersionArtifact() {
+        var superseded = ledgerRequest(
+            logicalRequestID: "req-v30",
+            artifactVersion: "v3.0",
+            status: .installed,
+            receivedBytes: 42,
+            verifiedFiles: [ledgerVerifiedFile]
+        )
+        XCTAssertEqual(
+            superseded.restoreAction(artifactIsCurrent: false, targetIsInstalled: false),
+            .markFailed
+        )
+        superseded.status = .failed
+        let upgradedLedger = IOSModelDownloadLedger(requests: [superseded])
+        XCTAssertFalse(
+            upgradedLedger.isCurrentArtifactFailed(modelID: "model-a", artifactVersion: "v3.1"),
+            "superseded 3.0 failure record must never suppress 3.1 upgrade prompt"
+        )
+        XCTAssertTrue(
+            upgradedLedger.isCurrentArtifactFailed(modelID: "model-a", artifactVersion: "v3.0")
+        )
+
+        let currentFailed = ledgerRequest(
+            logicalRequestID: "req-v31",
+            artifactVersion: "v3.1",
+            status: .failed,
+            receivedBytes: 10,
+            verifiedFiles: []
+        )
+        let currentLedger = IOSModelDownloadLedger(requests: [currentFailed])
+        XCTAssertTrue(
+            currentLedger.isCurrentArtifactFailed(modelID: "model-a", artifactVersion: "v3.1")
+        )
+    }
+
+    /// RB-08: drives `HuggingFaceDownloader.urlSessionDidFinishEvents(forBackgroundURLSession:)`
+    /// and `finishRun` directly without duplicating background session identifiers or leaking
+    /// session delegates. Verifies:
+    /// 1. `defersBackgroundEventCompletionToCaller == true` forwards `urlSessionDidFinishEvents`
+    ///    immediately to the coordinator handler and does NOT double-flush in `finishRun`.
+    /// 2. `defersBackgroundEventCompletionToCaller == false` gates `urlSessionDidFinishEvents`
+    ///    until `finishRun` completes postprocessing.
+    func testDeferredBackgroundEventCompletionForwardsDidFinishEventsDirectly() async {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-rb08-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+        let unauthenticatedFile = HuggingFaceDownloader.RepoFile(
+            path: "model.safetensors",
+            size: 16,
+            sha256: nil
+        )
+
+        // 1. Deferred mode (iOS coordinator owns completion): forwards didFinishEvents directly,
+        //    and finishRun does not flush a second time even if the internal gate is marked.
+        let deferredID = "com.patricedery.vocello.test.rb08.deferred.\(UUID().uuidString)"
+        var deferredEngineConfig = HuggingFaceDownloader.Configuration()
+        deferredEngineConfig.defersBackgroundEventCompletionToCaller = true
+        let deferredReceived = Mutex<[String]>([])
+        let deferredDownloader = HuggingFaceDownloader(
+            progressHandler: nil,
+            sessionConfiguration: .background(withIdentifier: deferredID),
+            engineConfiguration: deferredEngineConfig,
+            backgroundSessionCompletionHandler: { identifier in
+                deferredReceived.withLock { $0.append(identifier) }
+            }
+        )
+        defer { deferredDownloader.invalidateSessions() }
+        deferredDownloader.urlSessionDidFinishEvents(
+            forBackgroundURLSession: deferredDownloader.primarySession
+        )
+        XCTAssertEqual(
+            deferredReceived.withLock { $0 },
+            [deferredID],
+            "defersBackgroundEventCompletionToCaller=true must forward didFinishEvents directly"
+        )
+        deferredReceived.withLock { $0.removeAll() }
+        _ = await deferredDownloader.state.markBackgroundEventsFinished()
+        do {
+            _ = try await deferredDownloader.downloadFiles(
+                [unauthenticatedFile],
+                repo: "org/model",
+                revision: String(repeating: "a", count: 40),
+                to: tempDir.appendingPathComponent("deferred", isDirectory: true)
+            )
+            XCTFail("expected fail-closed integrity error before network I/O")
+        } catch {}
+        XCTAssertEqual(
+            deferredReceived.withLock { $0 },
+            [],
+            "finishRun must NOT flush background completion when defersBackgroundEventCompletionToCaller=true"
+        )
+
+        // 2. Non-deferred mode (standalone caller): gates didFinishEvents until finishRun runs.
+        let gatedID = "com.patricedery.vocello.test.rb08.gated.\(UUID().uuidString)"
+        var gatedEngineConfig = HuggingFaceDownloader.Configuration()
+        gatedEngineConfig.defersBackgroundEventCompletionToCaller = false
+        let gatedReceived = Mutex<[String]>([])
+        let gatedDownloader = HuggingFaceDownloader(
+            progressHandler: nil,
+            sessionConfiguration: .background(withIdentifier: gatedID),
+            engineConfiguration: gatedEngineConfig,
+            backgroundSessionCompletionHandler: { identifier in
+                gatedReceived.withLock { $0.append(identifier) }
+            }
+        )
+        defer { gatedDownloader.invalidateSessions() }
+        gatedDownloader.urlSessionDidFinishEvents(
+            forBackgroundURLSession: gatedDownloader.primarySession
+        )
+        try? await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(
+            gatedReceived.withLock { $0 },
+            [],
+            "defersBackgroundEventCompletionToCaller=false must stay gated until finishRun completes"
+        )
+        do {
+            _ = try await gatedDownloader.downloadFiles(
+                [unauthenticatedFile],
+                repo: "org/model",
+                revision: String(repeating: "a", count: 40),
+                to: tempDir.appendingPathComponent("gated", isDirectory: true)
+            )
+            XCTFail("expected fail-closed integrity error before network I/O")
+        } catch {}
+        XCTAssertEqual(
+            gatedReceived.withLock { $0 },
+            [gatedID],
+            "finishRun must flush gated background completion when defersBackgroundEventCompletionToCaller=false"
+        )
+    }
+
+    /// RB-08: directly exercises `DownloadStateRegistry` background submission flushing across:
+    /// - Path A: failed attempt 0 (unclaimed slot) followed by live retry attempt 1 on the same slot.
+    /// - Path B: >6-file rollover live task submitted while initial slots are still draining/verifying.
+    func testDownloadStateRegistryBackgroundSubmissionFlushHandlesRetriesAndRollover() async {
+        let registry = HuggingFaceDownloader.DownloadStateRegistry(repositoryProgressHandler: nil)
+
+        // Path A: attempt 0 fails before claiming slot (dead adopted task), attempt 1 submits live task.
+        await registry.resetForNewRepositoryDownload(preserveUnclaimedCompletions: false)
+        await registry.setLogicalRequestID("req-retry")
+        await registry.beginBackgroundSubmissionBatch(slots: 1)
+        let retryFlush = await registry.completeBackgroundSubmissionSlot(submittedLiveTask: true)
+        XCTAssertEqual(
+            retryFlush,
+            .init(shouldFlush: true, logicalRequestID: "req-retry")
+        )
+        let duplicateAfterRetry = await registry.completeBackgroundSubmissionSlot(submittedLiveTask: false)
+        XCTAssertFalse(duplicateAfterRetry.shouldFlush, "never double-flushes after retry submission")
+
+        // Path B: rollover file 7 submits live task while initial files 2..6 are still draining & verifying.
+        await registry.resetForNewRepositoryDownload(preserveUnclaimedCompletions: false)
+        await registry.setLogicalRequestID("req-rollover")
+        await registry.beginBackgroundSubmissionBatch(slots: 2)
+        let file1Drained = await registry.completeBackgroundSubmissionSlot(submittedLiveTask: false)
+        XCTAssertFalse(file1Drained.shouldFlush, "parked file drain alone must not flush")
+
+        // Rollover file 7 starts and submits live task before file 2 finishes verifying.
+        await registry.beginFileVerification()
+        let rolloverWhileBusy = await registry.recordLiveBackgroundTaskSubmitted()
+        XCTAssertFalse(
+            rolloverWhileBusy.shouldFlush,
+            "rollover live submission must latch until remaining initial slots & verification finish"
+        )
+        let file2SlotDoneWhileVerifying = await registry.completeBackgroundSubmissionSlot(submittedLiveTask: false)
+        XCTAssertFalse(
+            file2SlotDoneWhileVerifying.shouldFlush,
+            "must still wait for active file verification to finish"
+        )
+        let flushedAfterVerify = await registry.endFileVerification()
+        XCTAssertEqual(
+            flushedAfterVerify,
+            .init(shouldFlush: true, logicalRequestID: "req-rollover"),
+            "latched rollover live submission must flush as soon as verification drains"
+        )
+        let noDoubleFlush = await registry.endFileVerification()
+        XCTAssertFalse(noDoubleFlush.shouldFlush, "latched rollover flush must fire exactly once")
     }
 
     func testVerifiedReceiptInvalidatesOnProcessOrMetadataChange() {

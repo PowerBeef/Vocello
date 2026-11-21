@@ -131,6 +131,11 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         /// the CLI). The iPhone allows cellular on its background session and passes the
         /// user's opt-in here (RF-35), so a request built while it is off stays on Wi-Fi.
         public var cellularAccess: (@Sendable () -> Bool)?
+        /// Background sessions only (RB-08): when `true`, `finishRun` leaves background
+        /// session completion-handler flushing to the caller (`IOSModelDownloadCoordinator`),
+        /// and `urlSessionDidFinishEvents` forwards directly to `backgroundSessionCompletionHandler`
+        /// so the coordinator can flush strictly after terminal ledger writes and queue advancement.
+        public var defersBackgroundEventCompletionToCaller = false
         public init() {}
     }
 
@@ -498,6 +503,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         private var expectedEntriesByKey: [String: (url: URL, identity: ModelDownloadTaskIdentity)] = [:]
         private var adoptedTasksByKey: [String: URLSessionDownloadTask] = [:]
         private var backgroundCompletionGate = ModelDownloadBackgroundCompletionGate()
+        private var pendingInitialBackgroundSlots = 0
+        private var pendingBackgroundSubmissionFlush = false
+        private var currentLogicalRequestID: String?
         private var verifiedReceiptsByPath: [String: VerifiedArtifactReceipt] = [:]
         /// The run's first file failure seen while nothing had asked for cancellation: what
         /// the run reports, so the `.cancelled` its stopped siblings end with cannot hide it
@@ -566,6 +574,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             for task in adoptedTasksByKey.values { task.cancel() }
             adoptedTasksByKey.removeAll()
             backgroundCompletionGate.resetForRequest()
+            pendingInitialBackgroundSlots = 0
+            pendingBackgroundSubmissionFlush = false
+            currentLogicalRequestID = nil
             verifiedReceiptsByPath.removeAll()
             heartbeatTask?.cancel()
             heartbeatTask = nil
@@ -855,6 +866,68 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             backgroundCompletionGate.markPostprocessingFinished()
         }
 
+        struct BackgroundSubmissionFlushDecision: Equatable, Sendable {
+            let shouldFlush: Bool
+            let logicalRequestID: String?
+        }
+
+        func setLogicalRequestID(_ logicalRequestID: String?) {
+            currentLogicalRequestID = logicalRequestID
+        }
+
+        func logicalRequestID() -> String? {
+            currentLogicalRequestID
+        }
+
+        func beginBackgroundSubmissionBatch(slots: Int) {
+            pendingInitialBackgroundSlots = max(0, slots)
+            pendingBackgroundSubmissionFlush = false
+        }
+
+        func expandBackgroundSubmissionBatch(additionalSlots: Int) {
+            guard additionalSlots > 0 else { return }
+            pendingInitialBackgroundSlots += additionalSlots
+        }
+
+        /// Decrements one slot from the initial background submission batch and latches a flush
+        /// request when `submittedLiveTask == true`. Returns `shouldFlush == true` once every
+        /// initial slot has settled, no unclaimed completions remain, and no file verification is
+        /// active (RB-08).
+        func completeBackgroundSubmissionSlot(
+            submittedLiveTask: Bool
+        ) -> BackgroundSubmissionFlushDecision {
+            if submittedLiveTask {
+                pendingBackgroundSubmissionFlush = true
+            }
+            if pendingInitialBackgroundSlots > 0 {
+                pendingInitialBackgroundSlots -= 1
+            }
+            return consumeBackgroundSubmissionFlushIfReady()
+        }
+
+        /// Records a live `URLSessionDownloadTask` submitted outside an unclaimed initial slot
+        /// (e.g. >6-file rollover or resume-data fallback). Latches the flush so even if initial
+        /// slots or file verification are still finishing, the flush fires as soon as they drain
+        /// (RB-08).
+        func recordLiveBackgroundTaskSubmitted() -> BackgroundSubmissionFlushDecision {
+            pendingBackgroundSubmissionFlush = true
+            return consumeBackgroundSubmissionFlushIfReady()
+        }
+
+        private func consumeBackgroundSubmissionFlushIfReady() -> BackgroundSubmissionFlushDecision {
+            guard pendingBackgroundSubmissionFlush,
+                  pendingInitialBackgroundSlots == 0,
+                  unclaimedCompletionsByKey.isEmpty,
+                  verifyingFileCount == 0 else {
+                return BackgroundSubmissionFlushDecision(shouldFlush: false, logicalRequestID: nil)
+            }
+            pendingBackgroundSubmissionFlush = false
+            return BackgroundSubmissionFlushDecision(
+                shouldFlush: true,
+                logicalRequestID: currentLogicalRequestID
+            )
+        }
+
         func recordVerifiedReceipt(_ receipt: VerifiedArtifactReceipt) {
             verifiedReceiptsByPath[receipt.relativePath] = receipt
         }
@@ -1007,12 +1080,14 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             }
         }
 
-        func endFileVerification() {
+        @discardableResult
+        func endFileVerification() -> BackgroundSubmissionFlushDecision {
             verifyingFileCount = max(0, verifyingFileCount - 1)
             if verifyingFileCount == 0, statusMessage == "Verifying downloaded files" {
                 statusMessage = nil
                 emitRepositoryProgress(isStalled: false, force: true)
             }
+            return consumeBackgroundSubmissionFlushIfReady()
         }
 
         func finishRepositoryDownload() {
@@ -1335,7 +1410,15 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     private let oversizedTasksBox = Mutex<Set<Int>>([])
     /// A foreground downloader runs once (CORE-14); set by its first `downloadFiles`.
     private let foregroundRunClaimed = Mutex(false)
-    private let state: DownloadStateRegistry
+    let state: DownloadStateRegistry
+    /// Internal read/teardown hooks for deterministic unit tests (avoids duplicating background
+    /// `URLSession` identifiers or leaking session delegates across XCTest cases).
+    var primarySession: URLSession { unsafe session }
+
+    func invalidateSessions() {
+        unsafe session.invalidateAndCancel()
+        invalidateChunkSessions(cancelling: true)
+    }
     /// The one time source for the delegate ingress gate and the registry's windows.
     private let progressClock: ProgressClock
     private let delegateProgressGate = Mutex(ModelDownloadDelegateProgressGate())
@@ -1347,10 +1430,31 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     private let isBackgroundSession: Bool
     private let durableTemporaryDirectory: URL
     private let verificationProcessGeneration = UUID().uuidString
+    /// Exact-once tracker for one file or chunk slot in a background session's initial task
+    /// submission batch (RB-08). Guarantees every primed slot reports once whether it submits a
+    /// live `URLSessionDownloadTask`, drains a parked completion, or exits early.
+    private final class BackgroundSubmissionSlot: Sendable {
+        private let reported = Mutex(false)
+
+        func claimReport() -> Bool {
+            reported.withLock { alreadyReported in
+                guard !alreadyReported else { return false }
+                alreadyReported = true
+                return true
+            }
+        }
+    }
+
     /// Invoked from `urlSessionDidFinishEvents(forBackgroundURLSession:)` (background sessions
     /// only) with the session's identifier so iOS can flush its app-delegate completion handler.
     /// macOS/CLI pass `nil` (foreground sessions never trigger this callback).
     private let backgroundSessionCompletionHandler: (@Sendable (String) -> Void)?
+    /// Background sessions only (RB-08): invoked with the run's `logicalRequestID` once the
+    /// initial batch of live `URLSessionDownloadTask`s for that run (or rollover tasks after a
+    /// suspended wake) have been submitted and resumed in `nsurlsessiond`, so the coordinator
+    /// can release only that run's submission hold and flush any latched background-wake
+    /// completion handler promptly without affecting a subsequent queued model.
+    private let backgroundTasksSubmittedHandler: (@Sendable (String?) -> Void)?
     private let transferMetricsHandler: TransferMetricsHandlerBox?
     private let verifiedArtifactHandler: VerifiedArtifactHandlerBox?
     private let lifecycleEventHandler: LifecycleEventHandlerBox?
@@ -1563,6 +1667,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         lifecycleEventHandler: (@Sendable (LifecycleEvent) -> Void)? = nil,
         rangeRetryHandler: (@Sendable (RangeRetryEvent) -> Void)? = nil,
         backgroundSessionCompletionHandler: (@Sendable (String) -> Void)? = nil,
+        backgroundTasksSubmittedHandler: (@Sendable (String?) -> Void)? = nil,
         artifactURLPolicy: ModelArtifactURLPolicy? = nil
     ) {
         let progressBox = progressHandler.map(RepositoryProgressHandlerBox.init)
@@ -1578,6 +1683,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         self.fileManagerBox = FileManagerBox(fileManager)
         self.engineConfiguration = engineConfiguration
         self.backgroundSessionCompletionHandler = backgroundSessionCompletionHandler
+        self.backgroundTasksSubmittedHandler = backgroundTasksSubmittedHandler
         self.transferMetricsHandler = transferMetricsHandler.map(TransferMetricsHandlerBox.init)
         self.verifiedArtifactHandler = verifiedArtifactHandler.map(VerifiedArtifactHandlerBox.init)
         self.lifecycleEventHandler = lifecycleBox
@@ -1704,7 +1810,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             await state.requestCancellation()
         }
         await state.finishRepositoryDownload()
-        await completeBackgroundEventsAfterPostprocessing()
+        if !engineConfiguration.defersBackgroundEventCompletionToCaller {
+            await completeBackgroundEventsAfterPostprocessing()
+        }
         guard !isBackgroundSession else { return }
         if succeeded {
             unsafe session.finishTasksAndInvalidate()
@@ -1773,14 +1881,21 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
 
         var files = files
         if let sharedComponentPlan {
-            files = try Self.pinReusedSharedComponents(
-                downloadFiles: files,
-                installedFiles: installedFiles,
-                plan: sharedComponentPlan,
-                store: SharedModelComponentStore(modelsRoot: targetDir.deletingLastPathComponent()),
-                filesRoot: filesRoot
-            )
+            let currentFiles = files
+            let modelsRoot = targetDir.deletingLastPathComponent()
+            files = try await SharedStorageBackgroundActivity.runRequired(
+                reason: "vocello.downloader.pin-shared-components"
+            ) { _ in
+                try Self.pinReusedSharedComponents(
+                    downloadFiles: currentFiles,
+                    installedFiles: installedFiles,
+                    plan: sharedComponentPlan,
+                    store: SharedModelComponentStore(modelsRoot: modelsRoot),
+                    filesRoot: filesRoot
+                )
+            }
         }
+        await state.setLogicalRequestID(requestIdentity?.logicalRequestID)
         let reusedFiles = installedFiles.filter { file in !files.contains { $0.path == file.path } }
         let totalBytes = installedFiles.reduce(Int64(0)) { $0 + $1.size }
         await state.beginRepositoryDownload(
@@ -1877,19 +1992,25 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         await state.setPhase(.installing)
         try await throwIfCancellationRequested()
         if let sharedComponentPlan {
-            let store = SharedModelComponentStore(modelsRoot: targetDir.deletingLastPathComponent())
-            _ = try store.installStagedModel(
-                sharedComponentPlan,
-                stagedModelURL: filesRoot
-            ) { stagedModel in
-                try Self.validateStagedRepository(
-                    at: stagedModel,
-                    repo: repo,
-                    revision: revision,
-                    targetFolder: targetDir.lastPathComponent,
-                    files: installedFiles,
-                    sharedComponentManifest: sharedComponentPlan.manifest
-                )
+            let modelsRoot = targetDir.deletingLastPathComponent()
+            let targetFolder = targetDir.lastPathComponent
+            _ = try await SharedStorageBackgroundActivity.runRequired(
+                reason: "vocello.downloader.install-staged-model"
+            ) { _ in
+                let store = SharedModelComponentStore(modelsRoot: modelsRoot)
+                return try store.installStagedModel(
+                    sharedComponentPlan,
+                    stagedModelURL: filesRoot
+                ) { stagedModel in
+                    try Self.validateStagedRepository(
+                        at: stagedModel,
+                        repo: repo,
+                        revision: revision,
+                        targetFolder: targetFolder,
+                        files: installedFiles,
+                        sharedComponentManifest: sharedComponentPlan.manifest
+                    )
+                }
             }
         } else {
             try installStagedRepository(filesRoot: filesRoot, targetDir: targetDir)
@@ -2043,6 +2164,31 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             .appendingPathComponent(validatedRelativePath)
     }
 
+    @concurrent private func finishBackgroundSubmissionSlot(
+        _ slot: BackgroundSubmissionSlot?,
+        submittedLiveTask: Bool
+    ) async {
+        guard isBackgroundSession, let backgroundTasksSubmittedHandler else { return }
+        let decision: DownloadStateRegistry.BackgroundSubmissionFlushDecision
+        if let slot, slot.claimReport() {
+            decision = await state.completeBackgroundSubmissionSlot(submittedLiveTask: submittedLiveTask)
+        } else if submittedLiveTask {
+            decision = await state.recordLiveBackgroundTaskSubmitted()
+        } else {
+            return
+        }
+        if decision.shouldFlush {
+            backgroundTasksSubmittedHandler(decision.logicalRequestID)
+        }
+    }
+
+    @concurrent private func endFileVerificationAndFlushIfNeeded() async {
+        let decision = await state.endFileVerification()
+        if decision.shouldFlush, isBackgroundSession {
+            backgroundTasksSubmittedHandler?(decision.logicalRequestID)
+        }
+    }
+
     // MARK: - Private: Download Files
 
     /// Download every file concurrently (up to `maxConcurrentFileDownloads` at a time),
@@ -2064,6 +2210,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         // `downloadTemporaryFile`. macOS has no pause/resume UI, so we never surface a
         // "Resuming" phase — that was a vestige of the discarded pause/resume feature.
         let maxConcurrent = min(max(1, engineConfiguration.maxConcurrentFiles), files.count)
+        let tracksBackgroundSubmission = isBackgroundSession && backgroundTasksSubmittedHandler != nil
+        if tracksBackgroundSubmission {
+            await state.beginBackgroundSubmissionBatch(slots: maxConcurrent)
+        }
 
         try await withThrowingTaskGroup(of: Void.self) { @concurrent group in
             // Largest first: the multi-gigabyte long pole dominates total transfer time,
@@ -2076,6 +2226,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             // Prime the group with up to `maxConcurrent` file downloads.
             for _ in 0..<maxConcurrent {
                 guard let (index, file) = fileIterator.next() else { break }
+                let initialSlot = tracksBackgroundSubmission ? BackgroundSubmissionSlot() : nil
                 group.addTask { @concurrent [self] in
                     try await self.downloadOneFileCancelingPeers(
                         file,
@@ -2085,7 +2236,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                         artifactVersion: artifactVersion,
                         filesRoot: filesRoot,
                         partialRoot: partialRoot,
-                        resumeRoot: resumeRoot
+                        resumeRoot: resumeRoot,
+                        initialSubmissionSlot: initialSlot
                     )
                 }
             }
@@ -2105,7 +2257,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                         artifactVersion: artifactVersion,
                         filesRoot: filesRoot,
                         partialRoot: partialRoot,
-                        resumeRoot: resumeRoot
+                        resumeRoot: resumeRoot,
+                        initialSubmissionSlot: nil
                     )
                 }
             }
@@ -2122,9 +2275,11 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         artifactVersion: String,
         filesRoot: URL,
         partialRoot: URL,
-        resumeRoot: URL
+        resumeRoot: URL,
+        initialSubmissionSlot: BackgroundSubmissionSlot? = nil
     ) async throws {
         if await state.cancellationRequested() {
+            await finishBackgroundSubmissionSlot(initialSubmissionSlot, submittedLiveTask: false)
             throw DownloadError.cancelled
         }
 
@@ -2157,6 +2312,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 expectedSize: file.size,
                 wasTransferred: false
             )
+            await finishBackgroundSubmissionSlot(initialSubmissionSlot, submittedLiveTask: false)
             return
         }
 
@@ -2182,7 +2338,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             expectedSize: file.size,
             sha256: file.sha256,
             fileIndex: fileIndex,
-            relativePath: relativePath
+            relativePath: relativePath,
+            initialSubmissionSlot: initialSubmissionSlot
         )
 
         try await recordVerifiedReceipt(
@@ -2194,6 +2351,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         )
 
         await state.reportFileCompleted(fileIndex: fileIndex, expectedSize: file.size)
+        await finishBackgroundSubmissionSlot(initialSubmissionSlot, submittedLiveTask: false)
     }
 
     /// Wraps `downloadOneFile` so that when any file fails it immediately cancels every
@@ -2207,7 +2365,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         artifactVersion: String,
         filesRoot: URL,
         partialRoot: URL,
-        resumeRoot: URL
+        resumeRoot: URL,
+        initialSubmissionSlot: BackgroundSubmissionSlot? = nil
     ) async throws {
         do {
             try await downloadOneFile(
@@ -2218,9 +2377,11 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 artifactVersion: artifactVersion,
                 filesRoot: filesRoot,
                 partialRoot: partialRoot,
-                resumeRoot: resumeRoot
+                resumeRoot: resumeRoot,
+                initialSubmissionSlot: initialSubmissionSlot
             )
         } catch {
+            await finishBackgroundSubmissionSlot(initialSubmissionSlot, submittedLiveTask: false)
             await state.recordFailureAndCancelPeers(error)
             throw error
         }
@@ -2234,7 +2395,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         expectedSize: Int64,
         sha256: String?,
         fileIndex: Int,
-        relativePath: String
+        relativePath: String,
+        initialSubmissionSlot: BackgroundSubmissionSlot? = nil
     ) async throws {
         if fileIsValid(at: partialURL, expectedSize: expectedSize, sha256: sha256) {
             try? fileManager.removeItem(at: Self.chunkSidecarURL(forPartial: partialURL))
@@ -2267,7 +2429,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                     fileIndex: fileIndex,
                     relativePath: relativePath,
                     avoidChunking: avoidChunking,
-                    isFirstAttempt: retryNumber == 0
+                    isFirstAttempt: retryNumber == 0,
+                    initialSubmissionSlot: initialSubmissionSlot
                 )
                 return
             } catch {
@@ -2345,7 +2508,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         fileIndex: Int,
         relativePath: String,
         avoidChunking: Bool,
-        isFirstAttempt: Bool
+        isFirstAttempt: Bool,
+        initialSubmissionSlot: BackgroundSubmissionSlot? = nil
     ) async throws {
         // Large LFS files (known size + sha256) download as parallel byte-range chunks so
         // the biggest file is no longer a single-connection long pole. Smaller / non-LFS
@@ -2361,7 +2525,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 sha256: sha256,
                 fileIndex: fileIndex,
                 relativePath: relativePath,
-                recoveredRangesCountAsReuse: isFirstAttempt
+                recoveredRangesCountAsReuse: isFirstAttempt,
+                initialSubmissionSlot: initialSubmissionSlot
             )
             return
         }
@@ -2387,7 +2552,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             from: url,
             existingBytes: completedBytes,
             resumeDataURL: resumeDataURL,
-            fileIndex: fileIndex
+            fileIndex: fileIndex,
+            initialSubmissionSlot: initialSubmissionSlot
         )
 
         if await state.cancellationRequested() {
@@ -2415,10 +2581,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 sha256: sha256
             )
         } catch {
-            await state.endFileVerification()
+            await endFileVerificationAndFlushIfNeeded()
             throw error
         }
-        await state.endFileVerification()
+        await endFileVerificationAndFlushIfNeeded()
         try? fileManager.removeItem(at: resumeDataURL)
         try publishDownloadedFile(partialURL, to: destination)
     }
@@ -2526,7 +2692,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         sha256: String?,
         fileIndex: Int,
         relativePath: String,
-        recoveredRangesCountAsReuse: Bool
+        recoveredRangesCountAsReuse: Bool,
+        initialSubmissionSlot: BackgroundSubmissionSlot? = nil
     ) async throws {
         let sidecarURL = Self.chunkSidecarURL(forPartial: partialURL)
         // The sidecar is the only trustworthy record of which ranges landed: a sparse
@@ -2590,7 +2757,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                     url: url,
                     fileIndex: fileIndex,
                     relativePath: relativePath,
-                    assembly: assembly
+                    assembly: assembly,
+                    initialSubmissionSlot: initialSubmissionSlot
                 )
                 try await assembly.close()
             } catch {
@@ -2605,10 +2773,10 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         do {
             try Self.validateDownloadedFile(at: partialURL, expectedSize: expectedSize, sha256: sha256)
         } catch {
-            await state.endFileVerification()
+            await endFileVerificationAndFlushIfNeeded()
             throw error
         }
-        await state.endFileVerification()
+        await endFileVerificationAndFlushIfNeeded()
         try? fileManager.removeItem(at: sidecarURL)
         try publishDownloadedFile(partialURL, to: destination)
     }
@@ -2632,11 +2800,17 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         url: URL,
         fileIndex: Int,
         relativePath: String,
-        assembly: ChunkAssemblyCoordinator
+        assembly: ChunkAssemblyCoordinator,
+        initialSubmissionSlot: BackgroundSubmissionSlot? = nil
     ) async throws {
         if isBackgroundSession, engineConfiguration.backgroundInFlightRangeLimit == nil {
+            let expandInitialSlots = initialSubmissionSlot?.claimReport() == true
+            if expandInitialSlots, missing.count > 1 {
+                await state.expandBackgroundSubmissionBatch(additionalSlots: missing.count - 1)
+            }
             try await withThrowingTaskGroup(of: (any Error)?.self) { @concurrent group in
                 for range in missing {
+                    let chunkSlot = expandInitialSlots ? BackgroundSubmissionSlot() : nil
                     group.addTask { @concurrent [self] in
                         do {
                             unsafe try await self.downloadOneChunkWithRetry(
@@ -2645,10 +2819,13 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                                 fileIndex: fileIndex,
                                 relativePath: relativePath,
                                 assembly: assembly,
-                                transferSession: session
+                                transferSession: session,
+                                initialSubmissionSlot: chunkSlot
                             )
+                            await self.finishBackgroundSubmissionSlot(chunkSlot, submittedLiveTask: false)
                             return nil
                         } catch {
+                            await self.finishBackgroundSubmissionSlot(chunkSlot, submittedLiveTask: false)
                             guard Self.isTransientRangeFailure(error) else { throw error }
                             return error
                         }
@@ -2668,13 +2845,21 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             ? engineConfiguration.backgroundInFlightRangeLimit ?? engineConfiguration.chunkWorkerCount
             : engineConfiguration.chunkWorkerCount
         let workerCount = max(1, min(poolSize, missing.count))
+        let expandInitialSlots = initialSubmissionSlot?.claimReport() == true
+        if expandInitialSlots, workerCount > 1 {
+            await state.expandBackgroundSubmissionBatch(additionalSlots: workerCount - 1)
+        }
         do {
             try await withThrowingTaskGroup(of: (any Error)?.self) { @concurrent group in
                 for workerIndex in 0..<workerCount {
                     let workerSession = chunkTransferSession(forWorker: workerIndex)
+                    let workerSlot = expandInitialSlots ? BackgroundSubmissionSlot() : nil
                     group.addTask { @concurrent [self] in
+                        var firstRangeSlot = workerSlot
                         while let range = await queue.next() {
                             try Task.checkCancellation()
+                            let slotForRange = firstRangeSlot
+                            firstRangeSlot = nil
                             do {
                                 try await self.downloadOneChunkWithRetry(
                                     url: url,
@@ -2682,15 +2867,19 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                                     fileIndex: fileIndex,
                                     relativePath: relativePath,
                                     assembly: assembly,
-                                    transferSession: workerSession
+                                    transferSession: workerSession,
+                                    initialSubmissionSlot: slotForRange
                                 )
+                                await self.finishBackgroundSubmissionSlot(slotForRange, submittedLiveTask: false)
                             } catch {
+                                await self.finishBackgroundSubmissionSlot(slotForRange, submittedLiveTask: false)
                                 guard Self.isTransientRangeFailure(error) else { throw error }
                                 // Stop dispatching; siblings finish their current range.
                                 await queue.abort()
                                 return error
                             }
                         }
+                        await self.finishBackgroundSubmissionSlot(firstRangeSlot, submittedLiveTask: false)
                         return nil
                     }
                 }
@@ -2745,7 +2934,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         fileIndex: Int,
         relativePath: String,
         assembly: ChunkAssemblyCoordinator,
-        transferSession: URLSession
+        transferSession: URLSession,
+        initialSubmissionSlot: BackgroundSubmissionSlot? = nil
     ) async throws {
         var retryNumber = 0
         while true {
@@ -2756,7 +2946,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                     fileIndex: fileIndex,
                     relativePath: relativePath,
                     assembly: assembly,
-                    transferSession: transferSession
+                    transferSession: transferSession,
+                    initialSubmissionSlot: initialSubmissionSlot
                 )
                 return
             } catch {
@@ -2808,7 +2999,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         fileIndex: Int,
         relativePath: String,
         assembly: ChunkAssemblyCoordinator,
-        transferSession: URLSession
+        transferSession: URLSession,
+        initialSubmissionSlot: BackgroundSubmissionSlot? = nil
     ) async throws {
         let chunkKey = ModelDownloadTaskIdentity.chunkReconciliationKey(
             relativePath: relativePath,
@@ -2851,7 +3043,13 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                         fileIndex: fileIndex,
                         existingBytes: existingBytes
                     )
-                    if shouldResume, task.state == .suspended { task.resume() }
+                    if shouldResume {
+                        if task.state == .suspended { task.resume() }
+                        await self.finishBackgroundSubmissionSlot(
+                            initialSubmissionSlot,
+                            submittedLiveTask: true
+                        )
+                    }
                 }
             }
         } onCancel: {
@@ -3072,7 +3270,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         from url: URL,
         existingBytes: Int64,
         resumeDataURL: URL,
-        fileIndex: Int
+        fileIndex: Int,
+        initialSubmissionSlot: BackgroundSubmissionSlot? = nil
     ) async throws -> DownloadedTemporaryFile {
         if Task.isCancelled {
             throw DownloadError.cancelled
@@ -3094,8 +3293,14 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                         fileIndex: fileIndex,
                         existingBytes: receivedBytes
                     )
-                    if shouldResume, adoptedTask.state == .suspended {
-                        adoptedTask.resume()
+                    if shouldResume {
+                        if adoptedTask.state == .suspended {
+                            adoptedTask.resume()
+                        }
+                        await self.finishBackgroundSubmissionSlot(
+                            initialSubmissionSlot,
+                            submittedLiveTask: true
+                        )
                     }
                 }
             }
@@ -3128,7 +3333,13 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                                 fileIndex: fileIndex,
                                 existingBytes: existingBytes
                             )
-                            if shouldResume { task.resume() }
+                            if shouldResume {
+                                task.resume()
+                                await self.finishBackgroundSubmissionSlot(
+                                    initialSubmissionSlot,
+                                    submittedLiveTask: true
+                                )
+                            }
                         }
                     }
                 } catch {
@@ -3167,7 +3378,13 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                     fileIndex: fileIndex,
                     existingBytes: existingBytes
                 )
-                if shouldResume { task.resume() }
+                if shouldResume {
+                    task.resume()
+                    await self.finishBackgroundSubmissionSlot(
+                        initialSubmissionSlot,
+                        submittedLiveTask: true
+                    )
+                }
             }
         }
     }
@@ -3507,7 +3724,11 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
     /// Foreground sessions (macOS/CLI) never trigger this, so they're unaffected.
     public func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
         guard let identifier = session.configuration.identifier else { return }
-        Task { @concurrent in
+        if engineConfiguration.defersBackgroundEventCompletionToCaller {
+            backgroundSessionCompletionHandler?(identifier)
+            return
+        }
+        Task { @concurrent () async in
             if await state.markBackgroundEventsFinished() {
                 backgroundSessionCompletionHandler?(identifier)
             }

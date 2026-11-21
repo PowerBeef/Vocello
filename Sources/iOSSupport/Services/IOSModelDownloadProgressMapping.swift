@@ -27,6 +27,10 @@ public struct IOSModelDeliverySnapshot: Equatable, Sendable {
     public let estimatedSecondsRemaining: Double?
     public let retryCount: Int
     public let message: String?
+    /// Typed failure class populated from the underlying `Error` when `phase == .failed`
+    /// so non-English locales classify `ENOSPC` / verification / network failures without
+    /// relying on English-only substring matching (RB-12).
+    public let failureClass: ModelUpdateFailure?
     public let operationGeneration: UInt64
 
     public init(
@@ -39,6 +43,7 @@ public struct IOSModelDeliverySnapshot: Equatable, Sendable {
         estimatedSecondsRemaining: Double? = nil,
         retryCount: Int = 0,
         message: String?,
+        failureClass: ModelUpdateFailure? = nil,
         operationGeneration: UInt64
     ) {
         self.modelID = modelID
@@ -50,6 +55,7 @@ public struct IOSModelDeliverySnapshot: Equatable, Sendable {
         self.estimatedSecondsRemaining = estimatedSecondsRemaining
         self.retryCount = retryCount
         self.message = message
+        self.failureClass = failureClass
         self.operationGeneration = operationGeneration
     }
 }
@@ -133,5 +139,92 @@ public enum IOSModelDownloadProgressMapping {
     /// failure, a `.cancelled` the coordinator never asked for included.
     public static func runEnd(runIsCurrent: Bool, userCancelIntent: Bool) -> RunEnd {
         runIsCurrent && !userCancelIntent ? .reportFailure : .leaveToOwner
+    }
+}
+
+/// Coordinates UIKit background `URLSession` completion-handler flushing across launch
+/// restore, coordinator postprocessing (`beginDownload` → `runDownload` → terminal ledger
+/// write → `startPendingDownloads`), and live task submission to `nsurlsessiond` (RB-08).
+///
+/// Prevents both premature-flush races:
+/// - **Race A (wake before initial restore):** `urlSessionDidFinishEvents` and idle-wake
+///   reconciliation never flush while `hasCompletedInitialRestore == false`.
+/// - **Race B (`beginDownload` → unstructured `Task { runDownload }` handoff):** `beginDownload`
+///   synchronously claims a submission hold before spawning `runDownload`, so `postprocessingDepth`
+///   never drops to 0 across the task boundary or during Model 1 → Model 2 handoff. Once live
+///   tasks are submitted to `nsurlsessiond` (or postprocessing settles with no further work),
+///   the latched wake flushes promptly instead of hanging UIKit across a multi-minute transfer.
+public struct IOSBackgroundSessionCompletionCoordinator: Equatable, Sendable {
+    public private(set) var hasCompletedInitialRestore = false
+    public private(set) var postprocessingDepth = 0
+    public private(set) var eventsFinished = false
+
+    public init() {}
+
+    /// Records `urlSessionDidFinishEvents(forBackgroundURLSession:)`.
+    /// Returns `true` only when initial restore has completed, no postprocessing hold is active,
+    /// and no queued/in-flight work owns pending verification or queue handoff.
+    public mutating func sessionDidFinishEvents(hasPendingOrInFlightWork: Bool) -> Bool {
+        eventsFinished = true
+        guard hasCompletedInitialRestore, postprocessingDepth == 0, !hasPendingOrInFlightWork else {
+            return false
+        }
+        eventsFinished = false
+        return true
+    }
+
+    /// Claims a synchronous postprocessing or task-submission hold.
+    public mutating func beginPostprocessing() {
+        postprocessingDepth += 1
+    }
+
+    /// Releases one postprocessing or task-submission hold. Returns `true` when depth reaches 0,
+    /// initial restore has finished, and a latched wake event is ready to flush.
+    public mutating func endPostprocessing() -> Bool {
+        postprocessingDepth = max(0, postprocessingDepth - 1)
+        guard hasCompletedInitialRestore, postprocessingDepth == 0, eventsFinished else {
+            return false
+        }
+        eventsFinished = false
+        return true
+    }
+
+    /// Ends the initial restore's postprocessing hold and marks initial restore complete.
+    /// Returns `true` to flush when no postprocessing hold remains and either a wake event was
+    /// latched (`eventsFinished`) or no work remains active (`!hasWork`).
+    public mutating func endInitialRestore(hasWork: Bool) -> Bool {
+        hasCompletedInitialRestore = true
+        postprocessingDepth = max(0, postprocessingDepth - 1)
+        guard postprocessingDepth == 0 else { return false }
+        if eventsFinished || !hasWork {
+            eventsFinished = false
+            return true
+        }
+        return false
+    }
+
+    /// Flushes a latched background-wake event once live rollover tasks are submitted to
+    /// `nsurlsessiond` and no coordinator postprocessing hold is active.
+    public mutating func flushIfReadyAfterTaskSubmission() -> Bool {
+        guard hasCompletedInitialRestore, postprocessingDepth == 0, eventsFinished else {
+            return false
+        }
+        eventsFinished = false
+        return true
+    }
+
+    /// Whether an idle `resumeBackgroundEventsIfNeeded()` wake may flush immediately.
+    /// Never flushes before `hasCompletedInitialRestore` so Race A cannot suspend the app before
+    /// `restoreInFlightDownloadsIfNeeded()` runs.
+    public mutating func canCompleteIdleWake(
+        hasLedgerActiveWork: Bool,
+        hasCoordinatorWork: Bool
+    ) -> Bool {
+        guard hasCompletedInitialRestore, postprocessingDepth == 0,
+              !hasLedgerActiveWork, !hasCoordinatorWork else {
+            return false
+        }
+        eventsFinished = false
+        return true
     }
 }

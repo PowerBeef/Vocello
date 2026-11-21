@@ -50,9 +50,24 @@ final class IOSModelInstallerViewModel {
     @ObservationIgnored private var sessionUpdateModeCount = 0
     /// Modes stopped this session, honored even when the ledger could not record it.
     @ObservationIgnored private var sessionPausedModes = Set<GenerationMode>()
+    /// Mirrors macOS `ModelUpdatePins.mayRelease(...)` guards (RB-09): while Make Room or
+    /// serialized update queuing is in progress, shared-component update pins stay protected.
+    @ObservationIgnored private var isMakingRoomForModelUpdate = false
+    @ObservationIgnored private var isStartingModelUpdate = false
+    /// Serializes background update-pin release so it can never run concurrently with a new
+    /// Make Room pass and unlink freshly created pins (RB-09).
+    @ObservationIgnored private var pinReleaseTask: Task<Void, Never>?
     /// A model whose removal the engine refused because it was busy; the Voice
     /// Models screen explains it in the localized busy alert (A5-01).
     private(set) var blockedDeletionModelID: String?
+
+    private static let productionCatalog: ProductionModelCatalog? = {
+        guard let url = Bundle.main.url(
+            forResource: "qwenvoice_production_model_catalog",
+            withExtension: "json"
+        ) else { return nil }
+        return try? ProductionModelCatalog(contentsOf: url)
+    }()
 
     private let modelAssetStore: LocalModelAssetStore?
     private let modelManager: ModelManagerViewModel
@@ -98,6 +113,7 @@ final class IOSModelInstallerViewModel {
         sessionHadModelUpdate = !updatePlan.isEmpty
         sessionUpdateModeCount = updatePlan.modes.count
         Task {
+            await reconcileLaunchUpdatePlanAndReclaim()
             await refreshModelInventory(modelID: nil, event: "initial-refresh")
             await coordinator.restoreInFlightDownloadsIfNeeded()
             // RF-59: strictly after the restore, so a resumed request is seen as running.
@@ -106,6 +122,31 @@ final class IOSModelInstallerViewModel {
     }
 
     // MARK: - Model update (RF-59)
+
+    /// RB-07: reconciles the RF-59 update plan and reclaims eligible retired folders off the main
+    /// actor inside `IOSBackgroundTime.hold`, propagating expiration so no new file lock is taken
+    /// after iOS ends the background grant.
+    private func reconcileLaunchUpdatePlanAndReclaim() async {
+        guard let modelAssetStore else { return }
+        let outcome = await IOSBackgroundTime.hold("vocello.model-update.launch-reclaim") { expiration in
+            guard !expiration.isExpired else {
+                return (modelAssetStore.modelUpdatePlan(), RetiredModelReclamation.nothing)
+            }
+            return await Task.detached(priority: .utility) { @concurrent () async -> (ModelUpdatePlan, RetiredModelReclamation) in
+                guard !expiration.isExpired else { return (modelAssetStore.modelUpdatePlan(), .nothing) }
+                let plan = (try? modelAssetStore.reconcileModelUpdatePlan()) ?? modelAssetStore.modelUpdatePlan()
+                guard !expiration.isExpired else { return (plan, .nothing) }
+                let reclaimed = modelAssetStore.reclaimRetiredFolders(shouldStop: { expiration.isExpired })
+                return (plan, reclaimed)
+            }.value
+        }
+        updatePlan = outcome.0
+        if !outcome.0.isEmpty {
+            sessionHadModelUpdate = true
+            sessionUpdateModeCount = max(sessionUpdateModeCount, outcome.0.modes.count)
+        }
+        modelUpdateFreedBytes += outcome.1.freedBytes
+    }
 
     /// The models the update still has to install, one per mode in the plan.
     private func modelUpdateCandidates() -> [TTSModel] {
@@ -122,41 +163,69 @@ final class IOSModelInstallerViewModel {
         let plan: ModelUpdatePlan
         let availableBytes: Int64?
         let holdsEarlierModels: Bool
+        let reusableSharedBytesByModelID: [String: Int64]
     }
 
     /// At launch: asks once, then resumes on its own (`IOSModelUpdateAutoStartPolicy`).
     func startModelUpdateIfNeeded() async {
         guard let modelAssetStore else { return }
-        let facts = await IOSBackgroundTime.hold("vocello.model-update.launch") {
-            await Task.detached(priority: .utility) { @concurrent in
-            UpdateDiskFacts(
-                plan: modelAssetStore.modelUpdatePlan(),
-                availableBytes: IOSModelUpdateAutoStartPolicy.resolvedAvailableBytes(
-                    systemAvailableBytes: (try? modelAssetStore.rootDirectory.resourceValues(
-                        forKeys: [.volumeAvailableCapacityForImportantUsageKey]
-                    ).volumeAvailableCapacityForImportantUsage).map { Int64($0) }
-                ),
-                holdsEarlierModels: !RetiredModelReclamation.presentFolders(
-                    of: modelAssetStore.descriptors.map(\.model), in: modelAssetStore.rootDirectory
-                ).isEmpty
-            )
+        let catalog = Self.productionCatalog
+        let facts = await IOSBackgroundTime.hold("vocello.model-update.launch") { expiration in
+            await Task.detached(priority: .utility) { @concurrent () async -> UpdateDiskFacts in
+                let plan = modelAssetStore.modelUpdatePlan()
+                let descriptors = modelAssetStore.descriptors.map(\.model)
+                let reusableSharedBytes: [String: Int64]
+                if !plan.isEmpty, !expiration.isExpired, let catalog {
+                    reusableSharedBytes = catalog.reusableSharedComponentBytesByModelID(
+                        for: descriptors,
+                        platform: .iOS,
+                        modelsRoot: modelAssetStore.rootDirectory
+                    )
+                } else {
+                    reusableSharedBytes = [:]
+                }
+                return UpdateDiskFacts(
+                    plan: plan,
+                    availableBytes: IOSModelUpdateAutoStartPolicy.resolvedAvailableBytes(
+                        systemAvailableBytes: (try? modelAssetStore.rootDirectory.resourceValues(
+                            forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+                        ).volumeAvailableCapacityForImportantUsage).map { Int64($0) }
+                    ),
+                    holdsEarlierModels: !RetiredModelReclamation.presentFolders(
+                        of: descriptors, in: modelAssetStore.rootDirectory
+                    ).isEmpty,
+                    reusableSharedBytesByModelID: reusableSharedBytes
+                )
             }.value
         }
         updatePlan = facts.plan
         let models = modelUpdateCandidates()
         let candidates = models.map { model in
-            IOSModelUpdateAutoStartPolicy.Candidate(
+            let effectiveBytes = IOSModelUpdateAutoStartPolicy.effectiveDownloadBytes(
+                estimatedBytes: model.estimatedDownloadBytes,
+                reusableSharedBytes: facts.reusableSharedBytesByModelID[model.id] ?? 0
+            )
+            let stateFailed: Bool = {
+                if case .failed = states[model.id] { return true }
+                return false
+            }()
+            return IOSModelUpdateAutoStartPolicy.Candidate(
                 modelID: model.id,
-                estimatedBytes: model.estimatedDownloadBytes ?? 0,
+                estimatedBytes: effectiveBytes,
                 mode: model.mode,
                 plan: updatePlan,
                 pausedThisSession: sessionPausedModes.contains(model.mode),
-                transferring: isTransferring(states[model.id]),
-                // NET-1: a failed update waits for the user's Retry; a launch never restarts it.
-                failedThisSession: { if case .failed = states[model.id] { return true }; return false }()
+                // RB-06: consult synchronous coordinator state too, not just UI `states`.
+                transferring: isModelTransferring(model.id),
+                // NET-1 / RB-08: also check the download ledger so a background suspension
+                // between transfer failure and `ModelUpdateLedger.recordFailure` never restarts it.
+                failedThisSession: stateFailed || (coordinator?.isLedgerRequestFailed(model.id) ?? false)
             )
         }
-        guard !candidates.isEmpty else { return }
+        guard !candidates.isEmpty else {
+            releaseModelUpdatePinsIfUnused()
+            return
+        }
         let consented = Set(IOSAppDefaults.modelUpdateConsentedArtifacts)
         // Only the models this launch would start must be covered by the consent.
         let ready = zip(models, candidates).filter { !$1.paused && !$1.active && !$1.failed }.map(\.0)
@@ -170,6 +239,7 @@ final class IOSModelInstallerViewModel {
         )
         switch decision {
         case .none:
+            releaseModelUpdatePinsIfUnused()
             return
         case .ask(let modelIDs, let totalBytes, let makesRoomFirst):
             modelUpdatePrompt = ModelUpdatePrompt(modelIDs: modelIDs, totalBytes: totalBytes, makesRoomFirst: makesRoomFirst)
@@ -179,14 +249,22 @@ final class IOSModelInstallerViewModel {
     }
 
     /// The alert's Update, with the prompt the alert presented (SwiftUI may clear the binding
-    /// before the action runs). The consent names these artifacts, for later launches.
+    /// before the action runs). The consent names these artifacts, for later launches; when Make
+    /// Room must remove earlier models first, consent is persisted only after room is actually
+    /// freed so a failed Make Room never triggers doomed auto-starts on the next launch (RB-12).
     func confirmModelUpdate(_ prompt: ModelUpdatePrompt) {
         modelUpdatePrompt = nil
-        let models = TTSModel.all.filter { prompt.modelIDs.contains($0.id) }
+        if !prompt.makesRoomFirst {
+            persistModelUpdateConsent(for: prompt.modelIDs)
+        }
+        Task { await runModelUpdate(modelIDs: prompt.modelIDs, makingRoomFirst: prompt.makesRoomFirst) }
+    }
+
+    private func persistModelUpdateConsent(for modelIDs: [String]) {
+        let models = TTSModel.all.filter { modelIDs.contains($0.id) }
         IOSAppDefaults.modelUpdateConsentedArtifacts = Array(
             Set(IOSAppDefaults.modelUpdateConsentedArtifacts).union(models.map(Self.consentKey))
         ).sorted()
-        Task { await runModelUpdate(modelIDs: prompt.modelIDs, makingRoomFirst: prompt.makesRoomFirst) }
     }
 
     /// The alert's Later: those modes stop, so no later launch asks again; their rows and Studio
@@ -198,6 +276,7 @@ final class IOSModelInstallerViewModel {
             for model in TTSModel.all where prompt.modelIDs.contains(model.id) {
                 await changeModelUpdatePlan(.pause(model.mode))
             }
+            releaseModelUpdatePinsIfUnused()
         }
     }
 
@@ -207,19 +286,45 @@ final class IOSModelInstallerViewModel {
 
     private func runModelUpdate(modelIDs: [String], makingRoomFirst: Bool) async {
         guard let modelAssetStore else { return }
+        isStartingModelUpdate = true
+        defer {
+            isStartingModelUpdate = false
+            releaseModelUpdatePinsIfUnused()
+        }
+        // RB-09: drain any in-flight background pin release before Make Room creates fresh pins.
+        await pinReleaseTask?.value
         if makingRoomFirst {
-            let result = await IOSBackgroundTime.hold("vocello.model-update.make-room") {
-                await Task.detached(priority: .userInitiated) { @concurrent in
-                    modelAssetStore.removeRetiredFoldersBeforeUpdate()
+            isMakingRoomForModelUpdate = true
+            let result = await IOSBackgroundTime.hold("vocello.model-update.make-room") { expiration in
+                await Task.detached(priority: .userInitiated) { @concurrent () async -> RetiredModelReclamation in
+                    modelAssetStore.removeRetiredFoldersBeforeUpdate(shouldStop: { expiration.isExpired })
                 }.value
             }
+            isMakingRoomForModelUpdate = false
             modelUpdateFreedBytes += result.freedBytes
+            // RB-12: mirror macOS `afterMakingRoom` — if no retired folder could be removed,
+            // do not launch doomed transfers against the same full volume, leave consent
+            // unpersisted so Make Room is offered again next launch, and show localized Retry UX.
+            guard IOSModelUpdateAutoStartPolicy.afterMakingRoom(result) == .startUpdate else {
+                diagnosticsStore.recordEvent(
+                    layer: "view-model",
+                    event: "make-room-failed",
+                    outcome: "no-folders-removed"
+                )
+                for modelID in modelIDs {
+                    states[modelID] = .failed(IOSInterfaceText.deliveryFailed)
+                }
+                return
+            }
+            persistModelUpdateConsent(for: modelIDs)
         }
+        // RB-12: queue candidates serially so `install` does not hash the same 682 MB shared
+        // tokenizer 3x in parallel during launch/update confirmation.
         for model in TTSModel.all where modelIDs.contains(model.id) {
             if let change = updatePlan.changeBeforeUpdating(model.mode) {
                 await changeModelUpdatePlan(change)
             }
-            install(model)
+            await installAsync(model)
         }
     }
 
@@ -227,9 +332,15 @@ final class IOSModelInstallerViewModel {
     /// this session, and the failure is recorded.
     private func changeModelUpdatePlan(_ change: ModelUpdateLedger.Change) async {
         guard let modelAssetStore else { return }
-        let outcome: Result<ModelUpdatePlan, any Error> = await IOSBackgroundTime.hold("vocello.model-update.plan") {
-            await Task.detached(priority: .userInitiated) { @concurrent in
-                Result { try modelAssetStore.reconcileModelUpdatePlan(change: change) }
+        let outcome: Result<ModelUpdatePlan, any Error> = await IOSBackgroundTime.hold("vocello.model-update.plan") { expiration in
+            guard !expiration.isExpired else {
+                return .failure(SharedModelComponentStoreError.backgroundAssertionUnavailable)
+            }
+            return await Task.detached(priority: .userInitiated) { @concurrent () async -> Result<ModelUpdatePlan, any Error> in
+                guard !expiration.isExpired else {
+                    return .failure(SharedModelComponentStoreError.backgroundAssertionUnavailable)
+                }
+                return Result { try modelAssetStore.reconcileModelUpdatePlan(change: change) }
             }.value
         }
         switch outcome {
@@ -249,30 +360,61 @@ final class IOSModelInstallerViewModel {
     /// After a verified install: every retired folder goes once one new model is in place; the
     /// update pins go once no update download is left; the done note follows the last mode.
     private func reclaimAfterInstall() async {
-        await IOSBackgroundTime.hold("vocello.model-update.reclaim") { await reclaimAfterInstallHoldingTime() }
+        await IOSBackgroundTime.hold("vocello.model-update.reclaim") { expiration in
+            await reclaimAfterInstallHoldingTime(expiration: expiration)
+        }
     }
 
-    private func reclaimAfterInstallHoldingTime() async {
+    private func reclaimAfterInstallHoldingTime(expiration: StorageBackgroundExpirationFlag) async {
         guard let modelAssetStore else { return }
-        let updateStillDownloading = TTSModel.all.contains {
-            updatePlan.needsUpdate($0.mode) && isTransferring(states[$0.id])
-        }
-        let result = await Task.detached(priority: .utility) { @concurrent in
-            let result = modelAssetStore.reclaimRetiredFolders()
-            if !updateStillDownloading { modelAssetStore.releaseModelUpdatePins() }
-            return result
+        let result = await Task.detached(priority: .utility) { @concurrent () async -> RetiredModelReclamation in
+            modelAssetStore.reclaimRetiredFolders(shouldStop: { expiration.isExpired })
         }.value
         modelUpdateFreedBytes += result.freedBytes
         await modelManager.refresh()
-        updatePlan = await Task.detached(priority: .utility) { @concurrent in
+        updatePlan = await Task.detached(priority: .utility) { @concurrent () async -> ModelUpdatePlan in
             modelAssetStore.modelUpdatePlan()
         }.value
+        if !expiration.isExpired {
+            releaseModelUpdatePinsIfUnused()
+        }
         if sessionHadModelUpdate, updatePlan.isEmpty, modelUpdateCompletion == nil {
             sessionHadModelUpdate = false
             modelUpdateCompletion = modelUpdateFreedBytes
             // Nothing is left to update: a later set of models asks again.
             IOSAppDefaults.modelUpdateConsentedArtifacts = []
         }
+    }
+
+    private func canReleaseModelUpdatePins() -> Bool {
+        ModelUpdatePins.mayRelease(
+            makingRoom: isMakingRoomForModelUpdate,
+            setupPending: isStartingModelUpdate,
+            updateDownloadActive: TTSModel.all.contains {
+                updatePlan.needsUpdate($0.mode) && isModelTransferring($0.id)
+            }
+        )
+    }
+
+    /// RB-09: mirrors macOS `ModelManagerViewModel.releaseModelUpdatePinsIfUnused()`, ensuring
+    /// pinned 682 MB blobs are released and reclaimed whenever a low-space update cancels, fails,
+    /// or settles idle with no active update downloads. Serialized through `pinReleaseTask` and
+    /// re-checked on `@MainActor` before unlinking so it never races a subsequent Make Room pass.
+    private func releaseModelUpdatePinsIfUnused() {
+        guard let modelAssetStore, canReleaseModelUpdatePins() else { return }
+        let previousTask = pinReleaseTask
+        let task = Task { @MainActor [weak self] in
+            await previousTask?.value
+            guard let self, self.canReleaseModelUpdatePins() else { return }
+            await IOSBackgroundTime.hold("vocello.model-update.release-pins") { expiration in
+                guard !expiration.isExpired else { return }
+                await Task.detached(priority: .utility) { @concurrent () async in
+                    guard !expiration.isExpired else { return }
+                    modelAssetStore.releaseModelUpdatePins()
+                }.value
+            }
+        }
+        pinReleaseTask = task
     }
 
     /// RF-59: the banner's progress while the update runs: the modes updated since launch, of
@@ -282,13 +424,17 @@ final class IOSModelInstallerViewModel {
             remaining: modelUpdateCandidates().map { model in
                 ModelUpdateBannerState.Remaining(
                     paused: updatePlan.isPaused(model.mode) || sessionPausedModes.contains(model.mode),
-                    active: isTransferring(states[model.id]), fraction: nil
+                    active: isModelTransferring(model.id), fraction: nil
                 )
             },
             sessionModeCount: sessionUpdateModeCount, completionFreedBytes: nil, needsRoom: false
         )
         guard case .updating(let completed, let total, _) = state else { return nil }
         return (completed, total)
+    }
+
+    private func isModelTransferring(_ modelID: String) -> Bool {
+        isTransferring(states[modelID]) || (coordinator?.isActiveOrPending(modelID) ?? false)
     }
 
     private func isTransferring(_ state: OperationState?) -> Bool {
@@ -352,6 +498,10 @@ final class IOSModelInstallerViewModel {
     }
 
     func install(_ model: TTSModel) {
+        Task { await installAsync(model) }
+    }
+
+    private func installAsync(_ model: TTSModel) async {
         if let unavailableMessage = IOSNativeDeviceFeatureGate.unavailableMessage(for: model) {
             states[model.id] = .unavailable(unavailableMessage)
             return
@@ -361,27 +511,26 @@ final class IOSModelInstallerViewModel {
             return
         }
 
-        Task {
-            do {
-                if let change = updatePlan.changeBeforeUpdating(model.mode) {
-                    await changeModelUpdatePlan(change)
-                }
-                try await coordinator.install(model: model)
-            } catch {
-                let generation = (lastAcceptedGeneration[model.id] ?? 0) + 1
-                lastAcceptedGeneration[model.id] = generation
-                apply(
-                    IOSModelDeliverySnapshot(
-                        modelID: model.id,
-                        phase: .failed,
-                        downloadedBytes: 0,
-                        totalBytes: model.estimatedDownloadBytes,
-                        estimatedBytes: model.estimatedDownloadBytes,
-                        message: error.localizedDescription,
-                        operationGeneration: generation
-                    )
-                )
+        do {
+            if let change = updatePlan.changeBeforeUpdating(model.mode) {
+                await changeModelUpdatePlan(change)
             }
+            try await coordinator.install(model: model)
+        } catch {
+            let generation = (lastAcceptedGeneration[model.id] ?? 0) + 1
+            lastAcceptedGeneration[model.id] = generation
+            apply(
+                IOSModelDeliverySnapshot(
+                    modelID: model.id,
+                    phase: .failed,
+                    downloadedBytes: 0,
+                    totalBytes: model.estimatedDownloadBytes,
+                    estimatedBytes: model.estimatedDownloadBytes,
+                    message: error.localizedDescription,
+                    failureClass: ModelUpdateFailure.classify(error),
+                    operationGeneration: generation
+                )
+            )
         }
     }
 
@@ -394,6 +543,7 @@ final class IOSModelInstallerViewModel {
             }
             await coordinator.cancel(modelID: model.id)
             await refreshModelInventory(modelID: model.id, event: "cancel-refresh")
+            releaseModelUpdatePinsIfUnused()
         }
     }
 
@@ -566,19 +716,23 @@ final class IOSModelInstallerViewModel {
         case .failed:
             states[snapshot.modelID] = .failed(snapshot.message ?? IOSInterfaceText.deliveryFailed)
             let failedModel = TTSModel.all.first { $0.id == snapshot.modelID }
-            let failure = ModelUpdateFailure.classify(description: snapshot.message ?? "")
+            // RB-12: prefer typed `failureClass` carried from the underlying error so non-English
+            // locales classify `ENOSPC` as `.space` instead of falling back to English strings.
+            let failure = snapshot.failureClass ?? ModelUpdateFailure.classify(description: snapshot.message ?? "")
             Task {
                 // RF-59: a failed update waits for the user's Retry; no launch restarts it.
                 if let failedModel, let change = updatePlan.changeAfterFailure(failedModel.mode, failure) {
                     await changeModelUpdatePlan(change)
                 }
                 await refreshModelInventory(modelID: snapshot.modelID, event: "failed-refresh")
+                releaseModelUpdatePinsIfUnused()
             }
         case .deleted:
             states.removeValue(forKey: snapshot.modelID)
             lastAcceptedGeneration.removeValue(forKey: snapshot.modelID)
             Task {
                 await refreshModelInventory(modelID: snapshot.modelID, event: "deleted-refresh")
+                releaseModelUpdatePinsIfUnused()
             }
         }
         let now = ProcessInfo.processInfo.systemUptime

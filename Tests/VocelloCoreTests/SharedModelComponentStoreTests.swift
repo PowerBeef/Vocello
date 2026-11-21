@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import os
 @testable import QwenVoiceCore
 import XCTest
 
@@ -983,6 +984,146 @@ final class SharedModelComponentStoreTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: foreign.path))
         let trash = store.storeRoot.appendingPathComponent("trash", isDirectory: true)
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: trash.path), [])
+    }
+
+    /// RB-09: releasing RF-59 `pins/model-update/` hard links immediately reclaims the orphaned
+    /// shared blobs they held (even inside the ordinary 15-minute grace window), while leaving
+    /// unrelated recent blobs protected by the grace period.
+    func testReleaseUpdatePinsImmediatelyReclaimsUnreferencedSharedBlobs() throws {
+        let fixture = try migratedFixture(label: "rb09-pin-release")
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let store = fixture.store
+        let pinnedBlob = try store.blobURL(for: fixture.file.sha256)
+
+        // Publish an unrelated fresh blob that must stay protected by the grace period.
+        let unrelatedSource = fixture.root.appendingPathComponent("unrelated", isDirectory: true)
+        try write(Data("unrelated-fresh-blob".utf8), to: unrelatedSource.appendingPathComponent("fresh.bin"))
+        let unrelated = try SharedComponentFileIdentity.verify(
+            relativePath: "fresh.bin",
+            fileURL: unrelatedSource.appendingPathComponent("fresh.bin")
+        )
+        _ = try store.publish(content: SharedComponentContentIdentity(files: [unrelated]), from: unrelatedSource)
+        let unrelatedBlob = try store.blobURL(for: unrelated.sha256)
+
+        // Pin the retired folder's shared component, then delete the retired folder (simulating
+        // Make Room on a low-space iPhone). The blob stays alive via the update pin alone.
+        XCTAssertEqual(store.pinSharedComponents(ofModelFolders: [fixture.model.lastPathComponent]), 1)
+        try store.deleteModel(modelFolder: fixture.model.lastPathComponent)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: pinnedBlob.path), "update pin keeps blob alive")
+
+        // User cancels/fails: releasing update pins immediately frees the 682 MB blob while
+        // preserving unrelated fresh blobs.
+        let released = store.releaseUpdatePins()
+        XCTAssertEqual(released, [fixture.file.sha256])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: pinnedBlob.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: unrelatedBlob.path))
+    }
+
+    /// RB-09: fallback age sweep inside `reclaimUnreferencedComponents` removes abandoned
+    /// `pins/model-update/` hard links and their orphaned blobs once past `updatePinGracePeriod`,
+    /// while preserving young update pins of an active update.
+    func testReclaimUnreferencedComponentsSweepsAbandonedUpdatePinsPastGracePeriod() throws {
+        let fixture = try migratedFixture(label: "rb09-pin-age-sweep")
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let store = fixture.store
+        let pinnedBlob = try store.blobURL(for: fixture.file.sha256)
+
+        XCTAssertEqual(store.pinSharedComponents(ofModelFolders: [fixture.model.lastPathComponent]), 1)
+        try store.deleteModel(modelFolder: fixture.model.lastPathComponent)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: pinnedBlob.path))
+
+        // Young update pin stays protected even if regular gracePeriod is 0.
+        let kept = try store.reclaimUnreferencedComponents(gracePeriod: 0, updatePinGracePeriod: 3_600)
+        XCTAssertEqual(kept.preservedDigests, [fixture.file.sha256])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: pinnedBlob.path))
+
+        // Past updatePinGracePeriod, the abandoned pin directory and its orphaned blob are swept.
+        let swept = try store.reclaimUnreferencedComponents(gracePeriod: 3_600, updatePinGracePeriod: 0)
+        XCTAssertEqual(swept.removedDigests, [fixture.file.sha256])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: pinnedBlob.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: store.updatePinsRoot.path))
+    }
+
+    /// RB-07: multi-folder retired reclamation stops before taking another publication lock when
+    /// the background-time expiration flag turns true.
+    func testReclaimRetiredFoldersStopsWhenExpirationFlagFires() throws {
+        let root = try temporaryDirectory("rb07-expiration-stop")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let models = root.appendingPathComponent("models", isDirectory: true)
+        let first = models.appendingPathComponent("retired-a", isDirectory: true)
+        let second = models.appendingPathComponent("retired-b", isDirectory: true)
+        try write(Data("a".utf8), to: first.appendingPathComponent("model.safetensors"))
+        try write(Data("b".utf8), to: second.appendingPathComponent("model.safetensors"))
+
+        let flag = StorageBackgroundExpirationFlag()
+        let store = SharedModelComponentStore(modelsRoot: models)
+        let alreadyExpired = StorageBackgroundExpirationFlag()
+        alreadyExpired.markExpired()
+        let skipped = store.reclaimRetiredFolders(["retired-a", "retired-b"], shouldStop: { alreadyExpired.isExpired })
+        XCTAssertEqual(skipped.removed, [])
+        XCTAssertTrue(FileManager.default.fileExists(atPath: first.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: second.path))
+
+        // Expire after the first check allows folder 1 so folder 2 is left untouched.
+        let checkCount = OSAllocatedUnfairLock(initialState: 0)
+        let partial = store.reclaimRetiredFolders(["retired-a", "retired-b"], shouldStop: {
+            let count = checkCount.withLock { value -> Int in
+                value += 1
+                return value
+            }
+            if count >= 2 { flag.markExpired() }
+            return flag.isExpired
+        })
+        XCTAssertEqual(partial.removed, ["retired-a"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: first.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: second.path))
+    }
+
+    /// RB-07: if background time expires during `deleteModel`'s tombstone unlink, the immediate
+    /// post-tombstone `reclaimUnreferencedComponents` pass (which would take a second publication
+    /// lock) is skipped instead of risking `0xDEAD10CC`.
+    func testDeleteModelSkipsImmediateReclamationWhenShouldStopTurnsTrue() throws {
+        let fixture = try migratedFixture(label: "rb07-delete-stop")
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let store = fixture.store
+        let blob = try store.blobURL(for: fixture.file.sha256)
+
+        try store.deleteModel(
+            modelFolder: fixture.model.lastPathComponent,
+            reclamation: .immediate,
+            shouldStop: { true }
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fixture.model.path))
+        XCTAssertTrue(
+            FileManager.default.fileExists(atPath: blob.path),
+            "expired deleteModel must skip post-tombstone immediate reclamation lock"
+        )
+    }
+
+    /// RB-09: background pin release unlinks `pins/model-update/` synchronously (keeping ordering
+    /// atomic with `@MainActor` checks on macOS) and reclaims orphaned blobs asynchronously off-actor.
+    func testReleaseUpdatePinsBackgroundScheduleUnlinksPinsAndReclaimsOffActor() async throws {
+        let fixture = try migratedFixture(label: "rb09-pin-release-bg")
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let store = fixture.store
+        let pinnedBlob = try store.blobURL(for: fixture.file.sha256)
+
+        XCTAssertEqual(store.pinSharedComponents(ofModelFolders: [fixture.model.lastPathComponent]), 1)
+        try store.deleteModel(modelFolder: fixture.model.lastPathComponent)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: pinnedBlob.path))
+
+        let released = store.releaseUpdatePins(reclaimUnreferenced: true, reclamation: .background)
+        XCTAssertEqual(released, [fixture.file.sha256])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: store.updatePinsRoot.path))
+
+        let deadline = ContinuousClock.now + .seconds(5)
+        while FileManager.default.fileExists(atPath: pinnedBlob.path), ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(25))
+        }
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: pinnedBlob.path),
+            "background pin reclamation must free orphaned shared blob asynchronously"
+        )
     }
 
     /// PA-22 / CORE-08: a model loaded by an earlier build carries the engine's overlay of

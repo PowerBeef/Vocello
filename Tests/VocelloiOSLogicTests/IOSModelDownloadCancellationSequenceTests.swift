@@ -150,4 +150,32 @@ final class IOSModelDownloadCancellationSequenceTests: XCTestCase {
         XCTAssertEqual(outcome, .tombstonePersistenceFailed)
         XCTAssertEqual(steps, [.persistIntent, .dequeue, .persistTombstone])
     }
+
+    /// RB-10: cancelling a model in the `beginDownload` start window persists `.cancelRequested`
+    /// before publishing `.cancelling`, and keeps the row cancellable if ledger persistence fails.
+    func testStartingCancellationPersistsIntentBeforePublishingCancelling() {
+        var steps: [Step] = []
+        let ok = IOSModelDownloadCancellationSequence.cancelStarting(
+            persistIntent: {
+                steps.append(.persistIntent)
+                return true
+            },
+            keepCancellable: { steps.append(.keepCancellable) },
+            publishCancelling: { steps.append(.publishCancelling) }
+        )
+        XCTAssertEqual(ok, .cancelling)
+        XCTAssertEqual(steps, [.persistIntent, .publishCancelling])
+
+        var failSteps: [Step] = []
+        let failed = IOSModelDownloadCancellationSequence.cancelStarting(
+            persistIntent: {
+                failSteps.append(.persistIntent)
+                return false
+            },
+            keepCancellable: { failSteps.append(.keepCancellable) },
+            publishCancelling: { failSteps.append(.publishCancelling) }
+        )
+        XCTAssertEqual(failed, .intentPersistenceFailed)
+        XCTAssertEqual(failSteps, [.persistIntent, .keepCancellable])
+    }
 }

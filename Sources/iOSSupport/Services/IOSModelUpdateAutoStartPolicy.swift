@@ -171,6 +171,23 @@ enum IOSModelUpdateAutoStartPolicy {
         case start(modelIDs: [String])
     }
 
+    /// Mirrors `MacModelUpdateAutoStart.AfterMakingRoom` (RB-12): if removing earlier models
+    /// deleted nothing (plan unwritable or folder deletion failed), do not start doomed transfers.
+    enum AfterMakingRoom: Equatable, Sendable {
+        case startUpdate
+        case roomNotMade
+    }
+
+    static func afterMakingRoom(_ removal: RetiredModelReclamation) -> AfterMakingRoom {
+        removal.removed.isEmpty ? .roomNotMade : .startUpdate
+    }
+
+    /// Remaining bytes to fetch for one candidate after subtracting verified shared components
+    /// already present in `SharedModelComponentStore` (RB-12).
+    static func effectiveDownloadBytes(estimatedBytes: Int64?, reusableSharedBytes: Int64) -> Int64 {
+        max(0, (estimatedBytes ?? 0) - max(0, reusableSharedBytes))
+    }
+
     static func decide(
         candidates: [Candidate],
         consented: Bool,

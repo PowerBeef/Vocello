@@ -167,7 +167,7 @@ struct IOSModelCatalogFile: Codable, Hashable, Sendable {
     let url: URL?
 }
 
-enum IOSModelDeliveryError: LocalizedError, Equatable, Sendable {
+enum IOSModelDeliveryError: LocalizedError, ModelUpdateFailureClassifiable, Equatable, Sendable {
     case invalidConfiguration(String)
     case invalidCatalog(String)
     case missingCatalogEntry(modelID: String, artifactVersion: String)
@@ -178,6 +178,19 @@ enum IOSModelDeliveryError: LocalizedError, Equatable, Sendable {
     case fileHashMismatch(relativePath: String)
     case httpError(statusCode: Int)
     case cancelled
+
+    var modelUpdateFailureClass: ModelUpdateFailure {
+        switch self {
+        case .insufficientDiskSpace:
+            return .space
+        case .fileHashMismatch, .missingRequiredFiles, .unexpectedFile:
+            return .verification
+        case .httpError:
+            return .network
+        case .invalidConfiguration, .invalidCatalog, .missingCatalogEntry, .notEligibleForIOS, .cancelled:
+            return .other
+        }
+    }
 
     var errorDescription: String? {
         switch self {

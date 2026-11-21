@@ -197,19 +197,9 @@ extension QVoiceiOSApp {
         if seedResult.shouldClearConsent {
             IOSAppDefaults.modelUpdateConsentedArtifacts = []
         }
-        // RF-59: records which modes an earlier Vocello installed (a few small files, never model
-        // weights) before the first statuses, so those modes read "Update Required"; then, off the
-        // launch path, every retired Speed folder goes once any new model verifies.
-        _ = try? modelAssetStore.reconcileModelUpdatePlan()
-        // Holds background time: the reclaim takes file locks, also on a background relaunch for
-        // a download session's events.
-        Task {
-            await IOSBackgroundTime.hold("vocello.model-update.launch-reclaim") {
-                _ = await Task.detached(priority: .utility) { @concurrent in
-                    modelAssetStore.reclaimRetiredFolders()
-                }.value
-            }
-        }
+        // RF-59 / RB-07: launch plan reconciliation and retired-folder reclamation run off the
+        // main actor inside `IOSModelInstallerViewModel` under `IOSBackgroundTime.hold` so no
+        // App Group `flock(LOCK_EX)` is taken synchronously during launch or suspension.
 
         let modelManager = ModelManagerViewModel(
             modelRegistry: registry,

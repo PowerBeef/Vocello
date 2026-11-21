@@ -100,6 +100,15 @@ public struct ModelUpdatePlan: Equatable, Sendable {
     }
 }
 
+/// Typed failure classification hook for domain errors defined outside
+/// `ModelUpdateLedger` (e.g. `IOSModelDeliveryError` in
+/// `Sources/iOSSupport/Services/IOSModelDeliverySupport.swift` and
+/// `SharedModelComponentStoreError`) so `ModelUpdateFailure.classify(_:)` never
+/// depends on English-only localized messages across non-English locales (RB-12).
+public protocol ModelUpdateFailureClassifiable: Error {
+    var modelUpdateFailureClass: ModelUpdateFailure { get }
+}
+
 /// RF-59: why an update attempt failed, as recorded in the ledger: a class, never a path or message.
 public enum ModelUpdateFailure: String, Codable, Equatable, Sendable {
     /// Not enough free space for the download.
@@ -113,6 +122,9 @@ public enum ModelUpdateFailure: String, Codable, Equatable, Sendable {
     /// The class of `error` (a download or install failure), read from its type, its underlying
     /// errors and, last, its description.
     public static func classify(_ error: any Error) -> ModelUpdateFailure {
+        if let classifiable = error as? any ModelUpdateFailureClassifiable {
+            return classifiable.modelUpdateFailureClass
+        }
         if let download = error as? HuggingFaceDownloader.DownloadError {
             switch download {
             case .fileDownloadFailed(_, let underlying): return classify(underlying)
@@ -124,7 +136,11 @@ public enum ModelUpdateFailure: String, Codable, Equatable, Sendable {
         }
         let nsError = error as NSError
         if nsError.domain == NSCocoaErrorDomain, nsError.code == NSFileWriteOutOfSpaceError { return .space }
-        if nsError.domain == NSPOSIXErrorDomain, nsError.code == Int(ENOSPC) { return .space }
+        if nsError.domain == NSPOSIXErrorDomain,
+           nsError.code == Int(ENOSPC) || nsError.code == Int(EDQUOT) {
+            return .space
+        }
+        if nsError.domain == NSOSStatusErrorDomain, nsError.code == -34 { return .space }
         // The cause first: a transfer that could not write its file wraps the disk's error.
         if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
             let inner = classify(underlying)

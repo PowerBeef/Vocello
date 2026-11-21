@@ -274,7 +274,11 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # topping up the shared debug History (737 rows by November, past the
     # 500-row page); history-filter marks its three cycles; history-filter-paged
     # joins at 700 rows; delivery-menu launches with proactive warms suppressed.
-    ("ui-perf", "macos"): 2,
+    # 3 (2026-11-20, BKL-77 / DW-03, commit 81b0dbf8): delivery-menu drives
+    # delivery_tonePicker via window-anchored coordinate clicks + keyboard
+    # instead of XCUITest accessibility snapshot walks and marks action phases,
+    # removing the ~79% harness-snapshot observer cost from its hitch rate.
+    ("ui-perf", "macos"): 3,
     # 2 (2026-09-25, audit #45/#56): the iPhone gate's generation step and the
     # memory-qualification wait no longer copy the whole diagnostics tree from
     # the phone every 10 s while the take runs; they poll only their markers.

@@ -1968,6 +1968,7 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-11-21 | [`macos-xcui-perf-20261121-021029-38fc6c5f`](runs/ui-perf/macos-xcui-perf-20261121-021029-38fc6c5f.json) | canonical | canonical | passed | not-applicable | 12 | — | `e073bbb8c5c3` | `4f558fd338d5` | baseline | bkl77-cal-1 |
+| 2026-11-21 | [`macos-xcui-perf-20261121-022535-5f431af8`](runs/ui-perf/macos-xcui-perf-20261121-022535-5f431af8.json) | canonical | canonical | passed | not-applicable | 12 | — | `8f412666ccb1` | `4f558fd338d5` | vs macos-xcui-perf-20261121-021029-38fc6c5f: compatible | bkl77-cal-2 |
 
 ## ui-perf / macos / mac-mini-m6-16gb / config `684283851ab3`
 

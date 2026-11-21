@@ -24,9 +24,10 @@ sourceOfTruth:
 > [`reference/development-workflow.md`](reference/development-workflow.md); the
 > [October 18 development-workflow audit](audits/2026-10-18-dev-workflow-audit.md) is the current
 > review of that workflow. The Codex harness was retired on 2026-10-12
-> ([Claude Code takeover audit](audits/2026-10-12-claude-code-takeover-audit.md)), so the
+> ([Claude Code takeover audit](audits/2026-10-12-claude-code-takeover-audit.md)), and the
+> November 20 Antigravity cutover (`RF-67`) retired Claude Code and `.claude/`; the
 > [October 10 Codex workflow audit](audits/2026-10-10-codex-workflow-audit.md) and its coverage map
-> are historical. Earlier checkpoints remain in Git history.
+> and the October 12 takeover audit are historical. Earlier checkpoints remain in Git history.
 
 ## TL;DR
 
@@ -51,8 +52,9 @@ hardware is separately defined as Mac mini M6 16 GB (since 2026-09-22; the retir
 8 GB records stay history) and iPhone 17 Pro.
 Release identities live in [`project.yml`](../project.yml) (`MARKETING_VERSION`,
 `CURRENT_PROJECT_VERSION`); public facts live in `config/public-product-facts.json`: the stable
-macOS release is **Vocello 3.0.0**, the Mac app with the signed `vocello` CLI package, and the iPhone
-app is a **public TestFlight beta** until its 3.0 App Store release.
+macOS release is **Vocello 3.1.0**, the Mac app with the signed `vocello` CLI package, and the iPhone
+app is a **public TestFlight beta** until its **3.1.0** App Store release (there is no 3.0 App Store
+release).
 
 > For repo conventions,
 > build commands, engine invariants, and release process, read [`AGENTS.md`](../AGENTS.md).
@@ -137,7 +139,7 @@ for the exact link graph.)
 | `QwenVoiceBackendCore` | framework.static | iOS + macOS | `QwenVoiceBackendCore` | `com.qwenvoice.backend-core` | Backend provenance, generation defaults and policy vocabulary, finish reason, and the minimal synthesis abstraction. MLX loading, synthesis, and codecs live in `QwenVoiceCore` and the owned Qwen3 runtime. |
 | `VocelloSharedPolicies` | framework.static | iOS + macOS | `VocelloSharedPolicies` | `com.qwenvoice.shared-policies` | Pure platform-neutral runtime-release, generation-ownership, Studio attempt-authority, foreground-exit, retry-policy, handoff and notification types compiled once instead of 4-5x by path across `QwenVoice`, `VocelloiOS`, `VocelloDesktopCore`, `VocelloCoreTests` and `VocelloiOSLogicTests` (P2-3 / DW-03). |
 | `VocelloCoreTests` | bundle.unit-test | macOS | `VocelloCoreTests` | `com.qwenvoice.core.tests` | Core semantics, typed telemetry compatibility, atomic/readable output contracts, the host-runnable iOS policy assertions from `Tests/VocelloiOSLogicTests`, which this target also compiles, and the shared orchestrators compiled by path (engine store over a fake engine, Studio coordinator, History database service, export gate, iPhone model inventory, long-form coordinator and runner). |
-| `VocelloiOSLogicTests` | bundle.unit-test | iOS | `VocelloiOSLogicTests` | `com.patricedery.vocello.logic-tests` | Duplicate standalone, app-host-free platform policy compile for catalog/ledger, memory, cancellation, storage gating, and privacy-safe diagnostics. Ordinary CI compiles this bundle for the physical-device SDK. Xcode 26 does not support executing a tool-hosted app-free bundle on a physical-device destination, so this target is compile-only; its shared assertions execute in `VocelloCoreTests`. |
+| `VocelloiOSLogicTests` | bundle.unit-test | iOS | `VocelloiOSLogicTests` | `com.patricedery.vocello.logic-tests` | Duplicate standalone, app-host-free platform policy compile for catalog/ledger, memory, cancellation, storage gating, and privacy-safe diagnostics. Ordinary CI compiles this bundle for the physical-device SDK. Xcode 27 (`27.2`) does not support executing a tool-hosted app-free bundle on a physical-device destination, so this target is compile-only; its shared assertions execute in `VocelloCoreTests`. |
 | `VocelloMacUITests` | bundle.ui-testing | macOS | `VocelloMacUITests` | `com.qwenvoice.app.uitests` | Explicit native-app smoke and benchmark XCUITest lanes. |
 | `VocelloiOSUITests` | bundle.ui-testing | iOS | `VocelloiOSUITests` | `com.patricedery.vocello.uitests` | Explicit paired-physical-iPhone smoke/benchmark lanes plus the isolated opt-in model-delivery lifecycle proof; never Simulator. |
 | `VocelloiOSCandidateUITests` | bundle.ui-testing | iOS | `VocelloiOSCandidateUITests` | `com.patricedery.vocello.candidateuitests` | Standalone black-box runner; no target-app dependency, no diagnostics, and no replacement of the preinstalled distribution app. |
@@ -160,7 +162,8 @@ The loop around this table is short. `scripts/dev.sh check` runs lint, contracts
 tests and the native lanes the dirty tree touches, and is advisory. `check --dry-run --json`
 provides the same routing without execution; `doctor` inventories prerequisites and `triage`
 reads retained evidence. Direct repository guards preserve whitespace, privacy, generated-file,
-cache, and Git policy. Claude Code hooks add bounded startup context and invoke those guards;
+cache, and Git policy. Antigravity hooks (`.agents/hooks.json` / `scripts/hooks/agy_hook_adapter.py`)
+add bounded startup context and invoke those guards;
 an inactive hook does not prove a check passed. Scoped local commits and agent worktrees are
 allowed; pushes require an explicit request. Push CI on `main` is the gate —
 `scripts/ci/classify_changes.py` routes each push into the `contracts`, `python`, `macos-tests`,
@@ -198,9 +201,11 @@ and never executes that standalone bundle; it compiles the `VocelloMacUI` and `V
 
 ### Key layering rule
 
-`QwenVoiceBackendCore` ← `QwenVoiceCore` ← {apps, CLI}. BackendCore is a narrow,
-dependency-light contract/provenance layer; `QwenVoiceCore` and the owned Qwen3 runtime implement model loading,
-synthesis, streaming, and codecs. Every host reaches the engine in-process through
+`QwenVoiceBackendCore` ← `QwenVoiceCore` ← `VocelloSharedPolicies` ← `{apps, VocelloDesktopCore ← VocelloCLICore ← CLI}`.
+BackendCore is a narrow, dependency-light contract/provenance layer; `QwenVoiceCore` and the owned
+Qwen3 runtime implement model loading, synthesis, streaming, and codecs; `VocelloSharedPolicies`
+compiles pure multiplatform runtime, Studio, ownership and retry policies once for both apps,
+desktop core and unit tests. Every host reaches the engine in-process through
 `QwenVoiceCore` alone; the platform differences live in the bootstraps
 (`MacEngineBootstrap`, `QVoiceiOSApp.makeBackend`, `CLIRuntime`), never in a second engine module.
 
@@ -789,7 +794,7 @@ and again on demand before the take. A primed reference does not hold the model:
 releases it, and the screen primes the same reference again only once it changes or the screen is
 entered again. Request assembly for every mode is centralized in the pure
 `MacStudioGenerationRequestFactory`, which preserves the exact UI language, reference
-transcript/voice identity, prompt, seed, variation, and generation identity before the engine call.
+transcript/voice identity, prompt, seed, and generation identity before the engine call.
 Clone Auto is then resolved by shared `GenerationSemantics` from the target text; reference-language
 metadata never selects output language.
 
@@ -797,7 +802,7 @@ metadata never selects output language.
 
 ## 6. Request lifecycle — iOS
 
-iOS links only `QwenVoiceCore`; the engine is in-process behind
+iOS links `QwenVoiceCore` and `VocelloSharedPolicies`; the engine is in-process behind
 `Sources/iOS/TTSEngineStore.swift`, the store the macOS app shares since 2026-09-15.
 
 ```mermaid
@@ -982,15 +987,20 @@ machine-readable (a path, or JSON with `--json`); progress goes to stderr. Full 
 - **`Sources/iOSSupport/`** is the iOS counterpart to macOS `Services/`: runtime helpers + model wrappers
   coordinating through the **App Group** container
   (`group.com.patricedery.vocello.shared`) and a `UserDefaults` suite, plus the pure ordering
-  types the `@MainActor` iOS classes drive (`IOSGenerationOwnershipAuthority`,
-  `IOSModelDownloadCancellationSequence`, `CriticalMemoryReliefExecutor`), which is what lets
+  types the `@MainActor` iOS classes drive (`IOSModelDownloadCancellationSequence`,
+  `CriticalMemoryReliefExecutor`, and the seven multiplatform policy files compiled once in
+  `VocelloSharedPolicies`: `IOSGenerationOwnershipAuthority`, `RuntimeReleaseCoordinator`,
+  `IOSBackgroundGenerationPolicy`, `SavedVoicesBusyRetryPolicy`, `StudioGenerationAttemptAuthority`,
+  `AppNotifications`, and `PendingVoiceCloningHandoff`), which is what lets
   `Tests/VocelloiOSLogicTests` characterize them without an app host.
-- macOS uses `Sources/Services/` plus the iOS engine-hosting files it compiles by
-  path (`TTSEngineStore`, the ownership authority, the release coordinator, the
-  diagnostics recorder, the notification names, the History `DatabaseService` with
-  `Generation`/`Voice`, the saved-voices view model, `StudioGenerationCoordinator`, the
-  single-take executor, the long-form project and the generation drafts — listed in
-  `project.yml`); iOS uses `Sources/iOS/` + `iOSSupport/`. Plan
+- macOS links `VocelloSharedPolicies` (so `IOSGenerationOwnershipAuthority`,
+  `RuntimeReleaseCoordinator`, `AppNotifications`, and the other shared policies are no longer
+  compiled by path into `QwenVoice`) and uses `Sources/Services/` plus the remaining shared
+  `Sources/iOS/` and `Sources/iOSSupport/` files it compiles by path (`TTSEngineStore`, the
+  diagnostics recorder, the History `DatabaseService` with `Generation`/`Voice`, the saved-voices
+  view model, `StudioGenerationCoordinator`, the single-take executor, the long-form project and
+  the generation drafts — listed in `project.yml`); iOS links `VocelloSharedPolicies` and uses
+  `Sources/iOS/` + `iOSSupport/`. Plan
   `macos-ios-convergence-2026-09` completed on 2026-09-15.
 - Both frontends persist the reviewed transcript source and separately confirmed reference
   language as `PreparedVoiceEnrollmentMetadata`. The legacy prepared-candidate command remains
@@ -1130,7 +1140,7 @@ CLI, `scripts/build.sh cli-enhanced-security`, never benchmarked), `build/cache/
 native lock (`hostNativeLock`, outside the checkout so agent worktrees share it). The owned Qwen3 Core runtime uses its separate
 policy-owned SwiftPM scratch cache and must not leave `.build` state in the source tree.
 
-Release, XcodeBuildMCP, package-resolution, CI, and compile-safety DerivedData are isolated below
+Release, MobileBuildMCP (`build/scratch/derived-data/xcodebuildmcp/`), package-resolution, CI, and compile-safety DerivedData are isolated below
 `build/scratch/`; no unregistered persistent cache is permitted. Validator-owned telemetry,
 profiles, UI results, crash data, and UUID-matched current dSYMs live below `build/artifacts/`.
 Signing, archives, exports, and packages live below `build/dist/` and are never removed by routine
@@ -1366,7 +1376,9 @@ on a platform whose per-mode bounds a consented run has calibrated (the policy r
 Successful lanes
 publish `memory-qualification`; `profile --kind memory` records an exact-PID CPU sampler (Time
 Profiler on the Mac since 2026-09-26, CPU Profiler on the iPhone), Allocations, VM Tracker, and
-signposts. iOS and macOS MetricKit daily aggregates are bounded, local-only field
+signposts, and `profile --kind metal` records `Metal System Trace` + `os_signpost` (keeping raw
+traces by default like `memory`, whereas `cpu` and `witness` discard them unless `--keep-trace` is
+passed). iOS and macOS MetricKit daily aggregates are bounded, local-only field
 diagnostics and are never attributed to a benchmark take.
 
 ---
@@ -1487,7 +1499,7 @@ Most-frequent imports across `Sources/**/*.swift`:
 ## 17. Related documents
 
 - [`development-progress.md`](development-progress.md) — active checkpoint: deterministic development status, the completed XCUITest stack, and the agent resume route.
-- [`CLAUDE.md`](../CLAUDE.md) — repo operating instructions and links to native/tooling safeguards.
+- [`AGENTS.md`](../AGENTS.md) — repo operating instructions and links to native/tooling safeguards.
 - [`reference/development-workflow.md`](reference/development-workflow.md) — the current local loop, commit lint, CI routing, agents and tool routing.
 - [`audits/2026-10-18-dev-workflow-audit.md`](audits/2026-10-18-dev-workflow-audit.md) — the current development-workflow audit and its phased improvement programme.
 - [`audits/2026-10-12-claude-code-takeover-audit.md`](audits/2026-10-12-claude-code-takeover-audit.md) — the return to Claude Code: harness changes, live observations and open follow-ups (DA-15).
@@ -1519,8 +1531,8 @@ Playwright browser smoke. Native compilation cannot validate web rendering or au
 website inputs outside `website/` must still select the web CI lane.
 
 [`scripts/dev.sh`](../scripts/dev.sh) is the local routing interface. Repository instructions,
-`.claude/skills`, read-only review/triage agents, and the `.claude/settings.json` hooks point back to
-canonical scripts. Optional MCP servers and verified Axiom diagnostic helpers supply discovery, research,
+`.agents/plugins/vocello/` (domain rules, workspace skills, and read-only review/triage agents), and
+the `.agents/hooks.json` hooks point back to canonical scripts. Optional MCP servers and verified Axiom diagnostic helpers supply discovery, research,
 debugging, and retained-log/trace analysis; they do not define a second source of build provenance,
 native serialization, performance admissibility, or release authority. Scripts remain usable on
 CI and on hosts without personal plugins.

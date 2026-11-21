@@ -121,8 +121,9 @@ rules they enforce:
   stay, no file under `benchmarks/` changes, the run directory holds `publication-skipped.json`, and
   `python3 scripts/benchmark_history.py record --artifact-dir <run-dir>` publishes it later; no
   other lane accepts the flag. Successful profiles
-  publish their digest and summary first; a CPU profile's raw trace is then deleted (`--keep-trace` is
-  explicit), while a memory profile keeps its trace by default (`keptByDefault`).
+  publish their digest and summary first; a CPU or witness profile's raw trace is then deleted
+  (`--keep-trace` is explicit), while memory (`--kind memory`) and Metal (`--kind metal`) profiles
+  keep their traces by default (`keptByDefault`).
 - **Records measure what they claim.** `rtf` is wall ÷ audio (lower is faster) and every RTF-bearing
   record since 2026-09-12 declares `run.rtfDefinition` (`ui-perf` publishes no RTF); legacy records
   are never rewritten and never share a comparison key with new ones. A comparison key names what its
@@ -195,7 +196,10 @@ rules they enforce:
   `scripts/check_macos_ui_perf.py`): a hitch or max-gap breach in an enforced scenario fails the run
   (exit 1, report status `failed`, no evidence manifest, so nothing is published). An enforced
   scenario must have both ceilings, or the contract is refused at load; ceilings may cover scenarios
-  outside the confirmatory set, and the committed `enforce` list is empty. A recalibration derives the
+  outside the confirmatory set. The committed `enforce` list in `config/ui-perf-thresholds.json`
+  enforces seven macOS scenarios (`idle-baseline`, `sidebar-navigation`, `delivery-menu`,
+  `settings-scroll`, `composer-typing`, `history-filter`, `history-filter-paged`), while
+  `history-scroll`, `window-resize` and `sidebar-navigation-warms` remain warn-only. A recalibration derives the
   ceilings from the run-to-run spread of at least three counted runs with a 1.25-1.3x floor
   (`--derive-thresholds`, with `--scenarios` for a list other than the confirmatory one). A run off
   the contract's calibration profile or refresh interval, or under a contract marked

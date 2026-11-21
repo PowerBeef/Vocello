@@ -872,7 +872,7 @@ knobs, including the iPhone cache and memory-limit overrides, are registered in
 - [`mimi-codec-guide.md`](mimi-codec-guide.md) — the neural audio codec implementation.
 - [`ios-engine-optimization.md`](ios-engine-optimization.md) — historical iPhone memory/streaming program notes (current policy lives in `NativeMemoryPolicyResolver` and `docs/reference/native-engineering.md`).
 - [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) — telemetry schema and benchmark procedure.
-- [`CLAUDE.md`](../../CLAUDE.md) — build system, architecture, and critical invariants.
+- [`AGENTS.md`](../../AGENTS.md) — build system, architecture, and critical invariants.
 - Apple: [Explore Swift performance (WWDC 2024)](https://developer.apple.com/videos/play/wwdc2024/10217)
 - Apple: [Improve memory usage and performance with Swift (WWDC 2025)](https://developer.apple.com/videos/play/wwdc2025/312)
 - Apple: [Consume noncopyable types in Swift (WWDC 2024)](https://developer.apple.com/videos/play/wwdc2024/10170)

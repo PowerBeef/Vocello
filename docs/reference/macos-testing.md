@@ -158,7 +158,7 @@ run and perform no automatic retry.
 ## Explicit XCUITest lanes
 
 Run them at a coherent checkpoint, the smallest lane that covers the change (local validation lanes
-are authorized; `CLAUDE.md`). `test01_NavigationAndReadiness` (the whole
+are authorized; `AGENTS.md`). `test01_NavigationAndReadiness` (the whole
 `localization` lane, and the second journey of the full `smoke` lane, after
 `test00_WindowSizesAndSettingsScene`; smoke sets `QVOICE_MAC_SKIP_LANGUAGE_WALK=1` and skips its
 ten-language walk of about 21 minutes, which only the localization lane runs) launches the app with Foundation's
@@ -315,8 +315,10 @@ shared debug History, which other lanes fill and nothing erases, never sets the 
 the list they measure. Each asserts its last seeded row before the window opens, the
 setup stamp carries the seeded count (`archiveCount`), and the folders are removed when
 the class finishes. The isolated profile, the History cycle marks, the paged scenario and
-delivery-menu's suppressed warms are measurement version 2 of Mac `ui-perf` (2026-11-15,
-`scripts/lib/lineage_identity.py`), a lineage of its own.
+delivery-menu's suppressed warms were measurement version 2 of Mac `ui-perf` (2026-11-15); switching
+`test05DeliveryMenu` to window-anchored coordinate clicks plus keyboard (`BKL-77`, 2026-11-20,
+eliminating accessibility snapshot walks) bumped Mac `ui-perf` to measurement version 3
+(`scripts/lib/lineage_identity.py`), a lineage of its own.
 
 Registry posture (UI-7): the structural gate is unchanged (every scenario
 present once, probe coverage ≥90% of each window, monotonic blocks, sane
@@ -326,18 +328,21 @@ A breach is a warning that marks the run `passedWithWarnings`, unless the contra
 list names the scenario: there a hitch or max-gap breach fails the run (exit 1, report status
 `failed`, no evidence manifest). An enforced scenario must have both ceilings, ceilings may cover
 scenarios outside the confirmatory set, and an uncalibrated run enforces nothing. The committed
-`enforce` list is empty, so every ceiling warns. The contract names the profile and
+`enforce` list enforces seven scenarios (`idle-baseline`, `sidebar-navigation`, `delivery-menu`,
+`settings-scroll`, `composer-typing`, `history-filter`, `history-filter-paged`), while
+`history-scroll`, `window-resize` and `sidebar-navigation-warms` remain warn-only. The contract names the profile and
 refresh interval its ceilings were derived on (`calibrationProfile`,
 `calibrationRefreshIntervalMS`); a run on any other carries one `uiperf.uncalibrated:<profile>`
 code instead of ceiling verdicts. A contract whose scenarios changed meaning after its derivation
 names why in `calibrationStale`, and its runs carry the same code on any profile; a derived contract
 never carries the field. The committed contract is calibrated on `mac-mini-m6-16gb` at 16.67 ms
-with no `calibrationStale`: AV-17 step 3 re-derived it on 2026-09-27 from three counted M6 runs of
-the 2026-09-25 driver (`calibrationRuns`), for the five confirmatory scenarios idle-baseline,
-sidebar-navigation, delivery-menu, settings-scroll and composer-typing. It supersedes the
-baseline-v3 M2 ceilings, which judged quantities that driver no longer measures (sidebar-navigation
-became pure UI with warms suppressed and phased polls, and `uiMaxGapMS` became clipped to the
-window; audit #32, #33, #81). A re-derivation runs
+with no `calibrationStale`: `BKL-77` re-derived it on 2026-11-21 from three counted M6 runs of the
+measurement-version-3 driver (`calibrationRuns`), covering the five confirmatory scenarios
+(`idle-baseline`, `sidebar-navigation`, `delivery-menu`, `settings-scroll`, `composer-typing`) plus
+the History, window-resize and warm-navigation scenarios. It supersedes earlier M2 and v2 ceilings,
+including the pre-2026-09-25 M2 baseline-v3 ceilings that judged quantities the driver no longer
+measures (sidebar-navigation became pure UI with warms suppressed and phased polls, and `uiMaxGapMS`
+became clipped to the window; audit #32, #33, #81). A re-derivation runs
 `python3 scripts/check_macos_ui_perf.py --derive-thresholds <run IDs...> --write
 config/ui-perf-thresholds.json` (rule `spread-v1`: per confirmatory scenario, max(1.3 × the
 median, the median + 3 × the run-to-run range), which is the median times max(1.3, 1 + 3 × the
@@ -496,6 +501,9 @@ scripts/macos_test.sh profile custom:speed:
 # Time Profiler + Allocations + VM Tracker + signposts (keeps its raw trace by default)
 scripts/macos_test.sh profile --kind memory custom:speed:
 
+# Metal System Trace + signposts (1 cold + 1 warm medium take, 120 s cap, keeps its raw trace by default)
+scripts/macos_test.sh profile --kind metal custom:speed:
+
 # Explicit diagnostic exception: retain a CPU profile's raw Instruments document.
 scripts/macos_test.sh profile --keep-trace custom:speed:
 
@@ -508,7 +516,10 @@ sustained-generation peaks. It uses Apple's Allocations template, which contains
 with automatic VM snapshots disabled; standalone VM Tracker auto-snapshots suspend the target and
 would legitimately blind its memory sampler (250 ms on the M6). Publication verifies that setting
 from the captured trace and still enforces the unobserved-gap gate unmodified. The default 180-second safety
-cap accommodates a cold long take, while target exit ends recording early. `scripts/macos_test.sh
+cap accommodates a cold long take, while target exit ends recording early. The Metal profile
+(`--kind metal`) uses Apple's `Metal System Trace` template plus `os_signpost` across 1 cold + 1
+warm medium take (120-second default cap) to capture MLX GPU command buffers and shader kernels for
+Instruments or `axiom_xcprof` analysis while keeping trace size bounded. `scripts/macos_test.sh
 memory` owns the repeated retained-growth qualification.
 
 The CPU and memory kinds sample with Time Profiler (since 2026-09-26, measurement version 4):
@@ -516,21 +527,21 @@ CPU Profiler's hardware counters need root on macOS 27, and its records are neve
 Time Profiler's. Every kind first refuses a template or instrument that `xcrun xctrace list`
 does not list.
 
-Both commands build the exact CLI, suspend one owned process, attach Instruments to that exact PID,
+All profile kinds build the exact CLI, suspend one owned process, attach Instruments to that exact PID,
 resume it only after xctrace reports recording, and validate the exported trace table of contents.
 The memory lane enables verbose per-sample telemetry and remains PASS-only. Headless CLI profiles
 report the owning engine process; UI benchmarks merge the app and engine samples of their one
 process into one series.
-The tracer stage requires at least 5 GiB free for CPU profiles and 15 GiB for memory profiles before
-it launches the target. The prerequisite CLI build uses the shared 8 GiB development-build floor,
-so a complete CPU-profile command effectively requires 8 GiB; memory remains 15 GiB. After
-successful trace validation and history publication, a CPU profile's raw trace is
-deleted by default; the record retains its digest, capture settings, extracted summary, original
-ephemeral path, and retention status. `--keep-trace` is the explicit diagnostic exception. A memory
-profile keeps its raw trace by default (`keptByDefault`, several GB; prune it by hand), because
-xctrace cannot export its allocation and VM tables and the trace is its only memory evidence. A
-failure retains only the newest raw failure for that platform/profile kind. Sidecars and retained
-diagnostics remain under `build/` and untracked.
+The tracer stage requires at least 5 GiB free for CPU and witness profiles and 15 GiB for memory and
+Metal profiles before it launches the target. The prerequisite CLI build uses the shared 8 GiB
+development-build floor, so a complete CPU or witness profile command effectively requires 8 GiB;
+memory and Metal remain 15 GiB. After successful trace validation and history publication, a CPU or
+witness profile's raw trace is deleted by default; the record retains its digest, capture settings,
+extracted summary, original ephemeral path, and retention status. `--keep-trace` is the explicit
+diagnostic exception. Memory and Metal profiles keep their raw traces by default (`keptByDefault`,
+several GB; prune by hand), because xctrace cannot export allocation/VM tables or Metal GPU shader
+tables and the trace is their only evidence. A failure retains only the newest raw failure for that
+platform/profile kind. Sidecars and retained diagnostics remain under `build/` and untracked.
 
 Other heavy macOS lanes also use the manifest-owned build-storage preflight before creating output:
 8 GiB for deterministic/runtime builds, 12 GiB for telemetry-overhead and UI smoke, and 15 GiB for

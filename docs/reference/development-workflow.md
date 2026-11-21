@@ -674,7 +674,7 @@ the `SessionStart` banner ("AGENTS.md: Start here"); `AGENTS.md` loaded (and no 
 `vocello-*` skills and both read-only subagents discoverable; harmless guard fixtures denied
 (`git switch -c smoke`, an `edit_file` on `docs/ROADMAP.md`, `call_mcp_tool` to `mobilebuildmcp`
 `list_sims` or `cua-driver_cua-driver` `list_apps`); an external write (`git push --dry-run` or
-`huggingface` `dynamic_space`) triggering an `ask` prompt; and `scripts/dev.sh doctor --json` reporting
+`huggingface` `dynamic_space`) triggering a `force_ask` prompt; and `scripts/dev.sh doctor --json` reporting
 the Antigravity harness configured.
 
 | Work | Authoritative route | Optional assistance |

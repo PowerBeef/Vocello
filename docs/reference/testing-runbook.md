@@ -40,16 +40,16 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 | Release / submission programme | [Release-first plan](release-first-execution-2026-09.md) | Implementation, candidate verification, publication approval are separate |
 | Gate or contract changes | [Development workflow](development-workflow.md), `docs/reference/tooling-and-evidence.md` | Add a check only for a product invariant; prove rejection as well as success; never assert another file's wording |
 
-## Claude Code QA shortcuts
+## Antigravity QA shortcuts
 
-Routine edits use `scripts/dev.sh`; no skill is required. The six `/vocello-*` skills select the
-existing iOS, macOS UI, device diagnostics, benchmark, debugging and read-only release-readiness
-procedures; they add no gate or authority
-([tool routing](development-workflow.md#claude-code-setup-and-tool-routing)).
+Routine edits use `scripts/dev.sh`; no skill is required. The six `vocello-*` workspace skills in
+`.agents/plugins/vocello/skills/` select the existing iOS, macOS UI, device diagnostics, benchmark,
+debugging and read-only release-readiness procedures; they add no gate or authority
+([tool routing](development-workflow.md#antigravity-setup-and-tool-routing)).
 
 ### Read a finished run
 
-Claude Code reads the artifacts directly, or hands the run directory to the read-only `vocello-xcresult-triage`
+Antigravity reads the artifacts directly, or hands the run directory to the read-only `vocello-xcresult-triage`
 subagent, and stops when the deciding evidence is clear:
 
 1. Read `run.json`, the required-step ledger and aggregate result. A missing required step is not PASS.

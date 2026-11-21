@@ -191,13 +191,13 @@ physical-device or macOS XCUITest lane at a coherent checkpoint.
 - **Strict memory safety is on** (`SWIFT_STRICT_MEMORY_SAFETY`):
   - Mark every unsafe construct with `unsafe`.
   - A `@preconcurrency import` needs `@unsafe` as well.
-  - Swift 6.4 (local Xcode 27) annotates `Array.withUnsafeBufferPointer`,
-    `withUnsafeMutableBufferPointer`, `withUnsafeBytes(of:)`, `withUnsafePointer(to:)` and
-    `withUnsafeMutablePointer(to:)` `@safe`, while CI's Swift 6.3 (Xcode 26.6) does not, so a marker
-    one compiler needs the other rejects. Call the toolchain-neutral forwards in
-    `Sources/QwenVoiceCore/ToolchainNeutralUnsafeAccess.swift` (`withBufferPointer`,
+  - `Sources/QwenVoiceCore/ToolchainNeutralUnsafeAccess.swift` (`withBufferPointer`,
     `withMutableBufferPointer`, `withValueBytes(of:)`, `withValuePointer(to:)`,
-    `withMutableValuePointer(to:)`) until CI moves to Xcode 27.
+    `withMutableValuePointer(to:)`) is a historical compatibility helper added when CI pinned Swift
+    6.3 (Xcode 26.6) while local Macs ran Swift 6.4 (Xcode 27), whose `@safe` annotations on those
+    five standard-library methods disagreed. Since `DW-04` (2026-11-20), CI pins `Xcode 27.2` /
+    `Swift 6.4.2` (`config/toolchain.json`), matching the local toolchain, though existing callers
+    still use the forwards safely.
 - **MemberImportVisibility is on:** import every module whose members a file uses; a transitive import
   no longer makes them visible.
 - **Flaky tests are quarantined, not deleted or retried:** list the test in
@@ -217,7 +217,7 @@ physical-device or macOS XCUITest lane at a coherent checkpoint.
   NonisolatedNonsendingByDefault is on: such a function, closure or function type now runs on its
   caller's actor, so heavy work called from the main actor stalls the UI (the macOS stall gate
   catches it late). Write `@concurrent` closures with an explicit `async`
-  (`{ @concurrent () async -> T in`), the form CI's Xcode 26.6 also accepts.
+  (`{ @concurrent () async -> T in`).
 - Conforming a `@MainActor` type to an Objective-C delegate a framework calls off the main actor
   (`AVAudioRecorderDelegate`, `CXCallObserverDelegate` and the like) without writing
   `nonisolated` on the conformance. With InferIsolatedConformances on, the conformance is inferred
@@ -231,11 +231,12 @@ physical-device or macOS XCUITest lane at a coherent checkpoint.
   not, so hop with `await MainActor.run`. A failed CI run names its failing tests or compile errors
   in the job summary (`scripts/ci/summarize_test_failures.py`); the full logs are in the run's
   `macos-deterministic-test-artifacts` artifact.
-- Trusting the local Xcode 27 compile for what CI's pinned Xcode 26.6 accepts: 26.6 flags a
-  `withUnsafeContinuation` over `Never` as "will never be executed" (loop on `Task.sleep` instead), its
-  region-isolation checker rejects a throwing `Task { … }` returning a value (return `(any Error)?`
-  from a non-throwing task, as the runtime tests do), and it disagrees on five `@safe` annotations
-  (Build hygiene, above).
+- Assuming a newer local Xcode matches CI when `config/toolchain.json` pins an older one: `DW-04`
+  (2026-11-20) cut CI over to `Xcode 27.2` / `Swift 6.4.2`, matching the local development Mac, so
+  the earlier Xcode 26.6 quirks (`withUnsafeContinuation` over `Never`, throwing `Task { … }`
+  region-isolation rejections, and the five `@safe` annotation disagreements in Build hygiene above)
+  no longer block CI; whenever local Xcode moves ahead of `config/toolchain.json` again, verify
+  against the pinned CI compiler before assuming a local build will pass.
 - AppKit/SwiftUI traps: an `NSScrollView` representable without `sizeThatFits` (it must answer an
   infinite proposal); two same-named files in one target (they collide on `.stringsdata`, which is why
   the macOS `AppPaths.swift`/`AppDefaults` cannot join `VocelloCoreTests`, which compiles the iOS copy);

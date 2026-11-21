@@ -63,10 +63,13 @@ release, what each differing record was built with, and the reason. `validate` t
 it accepts exactly the differences the manifest names, for exactly that release, and refuses a
 manifest whose list is missing, longer, shorter or about another release. `create` refuses the
 option when no record differs, so an acceptance cannot linger once the toolchains agree. The
-3.1 Mac release is the case it was added for (maintainer decision of 2026-11-15): the release is
-built with the pinned Xcode 26.6, which Apple supports on macOS 26.x, and the benchmark Mac runs
-macOS 27 with Xcode 27.2. An accepted difference does not make the evidence equivalent: the records
-prove the same source under another compiler and SDK, and the promotion record says so.
+`v3.1.0` Mac and CLI release is the historical case it was added for (maintainer decision of
+2026-11-15): that release was built with Xcode 26.6, which Apple supported on macOS 26.x, while
+the benchmark Mac ran macOS 27 with Xcode 27.2. Since `DW-04` (2026-11-20), `config/toolchain.json`
+pins `Xcode 27.2` / `Swift 6.4.2`, so local and CI toolchains match on new promotions and the
+override is only needed if a future toolchain split arises. An accepted difference does not make
+the evidence equivalent: the records prove the same source under another compiler and SDK, and the
+promotion record says so.
 
 Generation records are schema v3 and `ui-perf` records schema v2; every record published since 2026-09-12 declares
 `run.rtfDefinition: "wall/audio"` (`rtf` is synthesis wall time divided by audio duration, lower is

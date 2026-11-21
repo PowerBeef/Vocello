@@ -177,10 +177,12 @@ release-readiness and artifact checks.
    [`quality-promotion.md`](quality-promotion.md) on the clean tag checkout. Produce the canonical
    Mac generation matrix and every path-classified engine, retained-memory, UI-performance, or
    model-delivery lane; assemble and validate `quality-promotion.json`; then upload it to the draft.
-   For 3.1 the records are built on the benchmark Mac with Xcode 27.2 while the release is built
-   with the pinned Xcode 26.6, which that Mac's macOS does not run (maintainer decision of
-   2026-11-15): pass `create --accept-toolchain-difference "REASON"`, so the manifest names the
-   difference and why. Without it `create` refuses those records.
+   Historically, `v3.1.0` was built on CI with Xcode 26.6 while measured on the benchmark Mac with
+   Xcode 27.2 (maintainer decision of 2026-11-15), which required passing
+   `create --accept-toolchain-difference "REASON"` so the manifest named the difference and why.
+   Since `DW-04` (2026-11-20), `config/toolchain.json` pins `Xcode 27.2` (`Swift 6.4.2`), matching
+   the local development Mac, so new promotions match toolchains directly (`create` refuses
+   `--accept-toolchain-difference` when no record differs).
    Dispatch `promote-release.yml` from the tag itself (`gh workflow run promote-release.yml --ref
    <tag> -f tag=<tag>`; any other ref is refused). It runs under the reviewer-gated `release`
    environment, verifies every DMG and installer package the release evidence names (both DMGs and
@@ -350,9 +352,10 @@ rewrite was needed by the initial relocation proof.
 This deterministic smoke does not run synthesis. `cli_package.py qualify` additionally qualifies
 all three modes, French Design with a pinned seed, Clone, one two-item batch in a single process,
 cancellation, generation-error exit status, and resource loading during real inference on the
-copied **signed candidate** ([CLI reference](cli.md#build--run)); the shipped 3.0.0 CLI passed it
-(RF-10, still in flight for its remaining lanes). Record those results separately; neither a
-development CLI smoke nor a valid manifest closes RF-10 or authorizes publication.
+copied **signed candidate** ([CLI reference](cli.md#build--run)); both the shipped 3.0.0 CLI
+(`RF-10`, closed 2026-11-01) and the shipped 3.1.0 CLI (`RF-61`, closed 2026-11-17) passed it.
+Record those results separately for each release; neither a development CLI smoke nor a valid
+manifest substitutes for signed-candidate qualification or authorizes publication.
 Cancellation qualification requires the command's cleanup acknowledgement, exit 130, and absence
 of both the cancelled destination and its UUID staging WAV. A forced exit or host-side deletion
 cannot produce PASS. Keep failed output and the partial report for investigation. Native signal

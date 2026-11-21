@@ -147,7 +147,7 @@ Maintained macOS subtrees and preferences:
   manifest/database commit. Superseded joined outputs and replaced segment takes retain visible History rows and are deleted
   only through ordinary user-directed History deletion; no background garbage collector removes
   audio that might still be playing or exporting.
-- Active macOS model-quality choices are stored in app preferences, keyed per generation mode. `DebugMode` isolates preferences to `com.qwenvoice.app.debug`; Release builds use `UserDefaults.standard`.
+- macOS model-quality choices were retired by `RF-59` (one hybrid model per mode; legacy preference keys remain inert in app defaults). `DebugMode` isolates preferences to `com.qwenvoice.app.debug`; Release builds use `UserDefaults.standard`.
 - Software updates (RF-23): Sparkle keeps its own preferences in the app's defaults (`SUEnableAutomaticChecks`, set by its permission prompt on the second launch or by Settings > Updates, and its last-check time) and stages an update it downloads under `~/Library/Caches/com.qwenvoice.app/org.sparkle-project.Sparkle/` until the install finishes. A check requests the signed `appcast.xml` from the latest GitHub release over HTTPS, at most once a day with automatic checks on, and sends no system profile; an update is offered in Sparkle's window, never installed silently (`SUAllowsAutomaticUpdates` off).
 
 Outside the app support root, a process that hosts the engine records itself in
@@ -168,7 +168,7 @@ Delete local macOS app data by quitting the app and removing the app support roo
 subtree above. Use the model manager for an individual model so shared components still referenced
 by another installed manifest remain valid. Deleting the whole `models/` root removes both model
 folders and the component store and requires downloading them again; it does not by itself clear
-normal app preferences such as the active model-quality choice.
+normal app preferences stored in `UserDefaults` (note that macOS model-quality choice is retired under `RF-59`).
 
 Saved Voice operations hold one nonblocking OS file lock (`.voice-store.lock`) over reconciliation
 and mutation for app/CLI coexistence; contention returns a typed busy error. The lock inode is
@@ -325,8 +325,8 @@ physical iPhone.
 
 ### Device proof on the signed candidate (ASR-06)
 
-Written on 2026-11-07 for the phone session on the processed candidate, which is build 30 since
-2026-11-10. Candidate runs never pull a distribution app's private data container
+Written on 2026-11-07 for the phone session on the processed candidate (originally build 30 on
+2026-11-10; apply to the current processed 3.1 TestFlight candidate). Candidate runs never pull a distribution app's private data container
 ([ios-device-testing.md](ios-device-testing.md)), and a development or
 diagnostics build never stands in for the candidate. So the proof uses what the candidate exposes:
 - an iPhone backup made on the Mac, whose `Manifest.db` lists every backed-up file with its data
@@ -339,9 +339,9 @@ diagnostics build never stands in for the candidate. So the proof uses what the 
 | Step | Proves | Who |
 |---|---|---|
 | 1. Baseline storage | The starting size, to measure deletion against | The maintainer, in iPhone Settings |
-| 2. Backup read | Which governed paths are in the backup and which are left out, and the protection class of every backed-up file | The maintainer makes the backup; Claude reads it |
+| 2. Backup read | Which governed paths are in the backup and which are left out, and the protection class of every backed-up file | The maintainer makes the backup; Antigravity reads it |
 | 3. Locked delivery | Downloads keep writing while the phone is locked, which the chosen class allows and `NSFileProtectionComplete` would not | The maintainer locks and unlocks the phone |
-| 4. Deletion | Deleting a model, a take and a saved voice frees and removes their files | Claude, with a second backup read |
+| 4. Deletion | Deleting a model, a take and a saved voice frees and removes their files | Antigravity, with a second backup read |
 | 5. Relaunch and restart | Startup's protection pass succeeds again and nothing is lost after a relaunch and a restart | The maintainer restarts and enters the passcode |
 
 **Before starting:**
@@ -355,7 +355,7 @@ diagnostics build never stands in for the candidate. So the proof uses what the 
 **1. Baseline.** In Settings → General → iPhone Storage → Vocello, record App Size and Documents &
 Data.
 
-**2. Backup read.** The maintainer chooses Back Up Now for the iPhone in Finder. Claude then reads
+**2. Backup read.** The maintainer chooses Back Up Now for the iPhone in Finder. Antigravity then reads
 the backup's `Manifest.plist` and `Manifest.db` read-only. The read takes only these rows:
 - domain `AppDomainGroup-group.com.patricedery.vocello.shared`, which holds the data root `Vocello/`;
 - domain `AppDomain-com.patricedery.vocello`, which holds the Studio drafts in preferences (SEC-4).
@@ -375,16 +375,16 @@ If something blocks the read:
   approval to install), or the step falls back to the weaker check below.
 - **Shell can't read the backup folder:** if the shell is refused without Full Disk Access, the
   maintainer copies `Manifest.plist` and `Manifest.db` from the backup folder in Finder to a folder
-  Claude can read, rather than granting access.
+  Antigravity can read, rather than granting access.
 - **Weaker fallback:** with iCloud Backup on, Settings → Apple Account → iCloud → Manage Account
   Storage → Backups shows Vocello's backup size, which must be far below the size of the
-  installed models: the three Speed models are about 6.17 GB in the catalog and about 4.8 GB on
-  disk, because the 682 MB speech tokenizer is stored once
+  installed models: the three 3.1 hybrid models are about 6.70 GB in the catalog and about 5.34 GB on
+  disk, because the 682 MB speech tokenizer is stored once via hard links
   ([`model-delivery.md`](model-delivery.md#shared-component-store)). That proves the models are
   left out, and nothing about protection classes.
 
 **3. Locked delivery.** In Settings → Models & Files → Voice Models:
-1. Delete Voice Design. iPhone Storage should drop by about 1.4 GB, which is part of step 4. The
+1. Delete Voice Design. iPhone Storage should drop by about 1.54 GB, which is part of step 4. The
    model's 682 MB speech tokenizer is shared with the other installed models, so it stays, and the
    reinstall shows about a third done from the start (RF-35, BKL-39).
 2. Tap Install, then Download in the confirmation (RF-41), lock the phone within 30 seconds, and
@@ -523,10 +523,11 @@ unowned root or a tracked command that bypasses the contract.
 
 Assistant transcripts, memory, credentials and personal settings are user-scoped developer-tool
 data, not Vocello app data or repository build output. Repository workflows never read, edit,
-track or prune them. Claude Code keeps personal state outside the tracked project configuration.
-Only shared instructions (`CLAUDE.md`, `website/CLAUDE.md`) and the reviewed `.claude/settings.json`,
-rules, skills and agent definitions are tracked; the retired Codex configuration is absent from Git.
-Personal `.claude/settings.local.json` and agent worktrees under `.claude/worktrees/` stay ignored.
+track or prune them. Antigravity keeps personal state and external agent worktrees outside the
+tracked project configuration. Only shared instructions (`AGENTS.md`, `website/AGENTS.md`) and the
+reviewed `.agents/**` definitions (`.agents/hooks.json`, `.agents/plugins/vocello/`,
+`.agents/workflows/`) are tracked; the retired Claude Code (`.claude/`) and Codex (`.codex/`)
+configurations are absent from Git.
 
 The table below is rendered from the manifest by
 `python3 scripts/build_output_policy.py status --markdown`. Policy validation compares the marked
@@ -584,7 +585,7 @@ The public `build/Vocello.app` and `build/vocello` paths are manifest-owned syml
 canonical macOS products; they are not independent application or CLI copies.
 
 Every Xcode invocation supplies an explicit DerivedData and cloned-package path. Local macOS outputs
-are arm64-only. XcodeBuildMCP uses its own managed scratch DerivedData and never becomes a third
+are arm64-only. MobileBuildMCP uses its own managed scratch DerivedData (`build/scratch/derived-data/xcodebuildmcp/`) and never becomes a third
 persistent cache. Xcode GUI DerivedData outside the repository is report-only; cleanup touches it
 only through `--external-xcode --yes` after exact project matching.
 
@@ -596,10 +597,8 @@ checked-in `VocelloCLI` and `VocelloiOSLogic` templates; project-input validatio
 or stale result. Supported commands therefore use explicit schemes and managed DerivedData rather
 than leaking state through scheme-less `-target` invocations.
 
-Successful CPU profiles publish compact evidence and discard the raw trace unless `--keep-trace` is
-explicit. Memory profiles keep theirs by default, because it is their only allocation and VM
-evidence, and an exact-PID Allocations trace can grow by multiple gigabytes during one cold model
-run: prune kept memory traces by hand. Use
+Successful CPU and witness profiles publish compact evidence and discard the raw trace unless `--keep-trace` is
+explicit. Memory (`--kind memory`) and Metal (`--kind metal`) profiles keep theirs by default (`keptByDefault`), because `xctrace` cannot export allocation/VM tables or Metal GPU shader tables and the trace is their only evidence, and an exact-PID Allocations or Metal System Trace document can grow by multiple gigabytes during one run: prune kept traces by hand. Use
 `scripts/clean_build_caches.sh` for a read-only inventory and `--routine --dry-run` for the bounded
 cleanup preview. Inventory reports filesystem free space, automatically eligible bytes, blocked
 evidence, and failed-profile bytes that require explicit acknowledgement. `--routine` removes
@@ -650,7 +649,7 @@ scripts/clean_build_caches.sh --cache runtime --dry-run
 
 Heavy local lanes read their minimum free-space requirement and cleanup hint from the same manifest.
 They fail before regeneration, compilation, target launch, or evidence creation when the floor is
-not met. Profile tracer stages retain their 5 GiB CPU and 15 GiB memory checks; their prerequisite
+not met. Profile tracer stages retain their 5 GiB CPU/witness and 15 GiB memory/metal checks; their prerequisite
 macOS/iOS builds still require 8 GiB and 10 GiB respectively, making those the effective full CPU
 command floors. No runner
 automatically applies a global routine or cache cleanup after success; UI/profile runners only apply

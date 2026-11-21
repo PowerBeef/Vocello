@@ -89,12 +89,15 @@ def lane_phases(
         previous = _ledger_time(ledger.get("startedAt"))
         steps = []
         ordered = sorted(
-            ((step, entry) for step, entry in ledger["results"].items()
-             if isinstance(entry, dict) and _ledger_time(entry.get("completedAt"))),
-            key=lambda item: _ledger_time(item[1]["completedAt"]),
+            (
+                (step, entry, completed)
+                for step, entry in ledger["results"].items()
+                if isinstance(entry, dict)
+                and (completed := _ledger_time(entry.get("completedAt"))) is not None
+            ),
+            key=lambda item: item[2],
         )
-        for step, entry in ordered:
-            completed = _ledger_time(entry["completedAt"])
+        for step, entry, completed in ordered:
             steps.append({
                 "step": step,
                 "status": entry.get("status"),

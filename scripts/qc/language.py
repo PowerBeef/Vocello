@@ -171,6 +171,7 @@ def build_takes(*, platform: str, run_id: str, plan: Path, corpus: Path, diagnos
                 raise LanguageBenchError(f"{cell_id}: expected one engine row, found {len(matches)}")
             digest = (matches[0].get("notes") or {}).get("samplingWAVDigest")
             generation_id = str(matches[0].get("generationID"))
+            assert wav_dir is not None
             audio = Path(wav_dir) / f"{cell_id}.wav"
             what = "the engine's published digest"
         else:
@@ -182,7 +183,7 @@ def build_takes(*, platform: str, run_id: str, plan: Path, corpus: Path, diagnos
             generation_id = str(record.get("generationID"))
             audio = Path(sentinel_path).parent / "output.wav"
             what = "the sentinel's digest"
-        if not is_sha256(digest):
+        if not isinstance(digest, str) or not is_sha256(digest):
             raise LanguageBenchError(f"{child}: no published WAV digest to bind the take to")
         if not audio.is_file() or store.sha256_file(audio) != digest:
             raise LanguageBenchError(f"{child}: the output WAV is missing or differs from {what}")
@@ -234,7 +235,8 @@ def recognition(take: dict[str, Any], result: dict[str, Any], family: str,
                 recognizer: dict[str, Any]) -> dict[str, Any]:
     """One family's recognition of one take, in the shape `qc_take_verdict` and the publisher score."""
 
-    outputs = result.get("outputs") if isinstance(result.get("outputs"), dict) else {}
+    raw_outputs = result.get("outputs")
+    outputs = raw_outputs if isinstance(raw_outputs, dict) else {}
     transcript = str(outputs.get("text") or "").strip()
     probabilities = language_probabilities(outputs.get("languageProbs"))
     detected = language_name(outputs.get("language"))

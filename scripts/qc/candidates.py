@@ -52,8 +52,12 @@ def _span(item, duration):
     if not isinstance(item, dict):
         return None
     start, end = item.get("start"), item.get("end")
-    if (any(type(v) not in (int, float) or not math.isfinite(v) for v in (start, end))
-            or not 0 <= start < end <= duration):
+    if (
+        not isinstance(start, (int, float)) or isinstance(start, bool)
+        or not isinstance(end, (int, float)) or isinstance(end, bool)
+        or not math.isfinite(start) or not math.isfinite(end)
+        or not 0 <= start < end <= duration
+    ):
         return None
     return start, end
 

@@ -644,6 +644,7 @@ def validate_device_plan(
     )
     if (
         expected_count is None
+        or not isinstance(profile, str)
         or not isinstance(takes, list)
         or len(takes) != expected_count
         or plan.get("takeCount") != expected_count
@@ -694,7 +695,7 @@ def load_private_device_map(path: Path, plan: dict[str, Any], contract: dict[str
             raise ReliabilityError("private device map row is malformed")
         alias = row.get("alias")
         voice_id = row.get("voiceID")
-        if alias not in expected or alias in resolved:
+        if not isinstance(alias, str) or alias not in expected or alias in resolved:
             raise ReliabilityError("private device map aliases are invalid")
         if not isinstance(voice_id, str) or not voice_id.strip() or len(voice_id) > 128:
             raise ReliabilityError(f"{alias}: private saved-voice ID is invalid")
@@ -1113,7 +1114,7 @@ def execute_plan(
     by_take: dict[str, dict[str, Any]] = {}
     for observation in observations:
         take_id = observation.get("takeID")
-        if take_id in by_take or observation.get("planDigest") != plan["planDigest"]:
+        if not isinstance(take_id, str) or take_id in by_take or observation.get("planDigest") != plan["planDigest"]:
             raise ReliabilityError("observation stream is duplicated or cross-run")
         by_take[take_id] = observation
     references = {row["alias"]: row for row in private["references"]}
@@ -1496,7 +1497,7 @@ def run_analysis(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     parser.add_argument("--contract", type=Path, default=DEFAULT_CONTRACT)
     sub = parser.add_subparsers(dest="command", required=True)
     prepare = sub.add_parser("prepare-bundle")

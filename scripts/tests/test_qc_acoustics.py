@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import sys
+from typing import Any
 import unittest
 from unittest.mock import patch
 
@@ -130,7 +131,7 @@ class AcousticControlsTests(unittest.TestCase):
                 json.dumps(value, allow_nan=False)
 
     def test_invalid_short_nonfinite_and_over_limit_audio_abstain(self):
-        for signal, rate, options, reason in (
+        cases: tuple[tuple[Any, int, dict[str, Any], str], ...] = (
             (np.zeros(20), RATE, {}, "audio-shorter-than-analysis-window"),
             (np.full(RATE, np.nan), RATE, {}, "nonfinite-audio"),
             (np.full(RATE, np.inf), RATE, {}, "nonfinite-audio"),
@@ -141,7 +142,8 @@ class AcousticControlsTests(unittest.TestCase):
             (tone() * 10, RATE, {}, "audio-must-be-normalized-pcm"),
             (np.full(RATE, np.iinfo(np.int64).min), RATE, {}, "audio-must-be-normalized-pcm"),
             ([[1], [1, 2]], RATE, {}, "audio-must-be-mono-real-numeric"),
-        ):
+        )
+        for signal, rate, options, reason in cases:
             with self.subTest(reason=reason):
                 value = acoustics.analyze(signal, rate, **options)
                 self.assertEqual(value["inputStatus"], "unavailable")
@@ -168,9 +170,10 @@ class AcousticControlsTests(unittest.TestCase):
         self.assertIsNone(compared["pitchWitnessRegisterShiftSt"])
 
     def test_invalid_windows_are_retained_and_window_collection_is_bounded(self):
-        value = acoustics.analyze(tone(), RATE, expected_windows=[
+        invalid_windows: Any = [
             {"start": "bad", "end": .4}, {"start": .1, "end": float("nan")},
-            {"start": -.1, "end": .4}, {"start": .1, "end": 1.1}, None])
+            {"start": -.1, "end": .4}, {"start": .1, "end": 1.1}, None]
+        value = acoustics.analyze(tone(), RATE, expected_windows=invalid_windows)
         self.assertEqual(len(value["expectedWindows"]), 5)
         self.assertTrue(all(window["inputStatus"] == "unavailable" for window in value["expectedWindows"]))
         json.dumps(value, allow_nan=False)
@@ -187,7 +190,8 @@ class AcousticControlsTests(unittest.TestCase):
         compared = acoustics.compare(take, reference)
         self.assertEqual(compared["inputStatus"], "unavailable")
         self.assertEqual(compared["reason"], "malformed-audio-summary")
-        value = acoustics.analyze(tone(), RATE, expected_windows=4)
+        invalid_collection: Any = 4
+        value = acoustics.analyze(tone(), RATE, expected_windows=invalid_collection)
         self.assertEqual(value["expectedWindows"][0]["reason"], "invalid-window-collection")
         self.assertEqual(value["decision"], "not-assessed")
 

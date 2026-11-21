@@ -104,7 +104,7 @@ def validate_seeds(cohort: dict[str, Any] | None) -> list[int | None]:
     raw = cohort.get("seeds")
     if not isinstance(raw, list) or not raw:
         raise EvidenceError("diagnostic cohort must contain a non-empty seeds array")
-    seeds: list[int] = []
+    seeds: list[int | None] = []
     for value in raw:
         if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= UINT64_MAX:
             raise EvidenceError(f"invalid UInt64 cohort seed: {value!r}")
@@ -262,9 +262,10 @@ def build_plan(
             for cell in cells
         ]
     else:
+        cohort_seeds = [seed for seed in seeds if seed is not None]
         take_pairs = [
             (seed_index, seed, cell)
-            for seed_index, seed in enumerate(seeds)
+            for seed_index, seed in enumerate(cohort_seeds)
             for cell in cells
         ]
     for seed_index, seed, cell in take_pairs:
@@ -687,7 +688,8 @@ def collect(
             unexpected: list[str] = []
             for row in iter_jsonl(jsonl):
                 generation = row.get("generationID")
-                notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+                raw_notes = row.get("notes")
+                notes: dict[str, Any] = raw_notes if isinstance(raw_notes, dict) else {}
                 if generation in expected_generations:
                     by_generation[generation].append(row)
                 elif notes.get("benchRunID") == plan["runID"]:
@@ -704,7 +706,8 @@ def collect(
                         f"{layer}: generation {generation} expected 1 row, got {len(matches)}"
                     )
                 row = matches[0]
-                notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+                raw_notes = row.get("notes")
+                notes = raw_notes if isinstance(raw_notes, dict) else {}
                 if not isinstance(row.get("schemaVersion"), int) or row["schemaVersion"] < 7:
                     raise EvidenceError(
                         f"{layer}: generation {generation} is older than telemetry schema v7"

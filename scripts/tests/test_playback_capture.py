@@ -96,6 +96,7 @@ class HelperTests(unittest.TestCase):
         signal[4000:4030] = np.where(np.arange(30) % 2 == 0, 0.2, -0.2)
         count, start_ms = pc.step_burst_peak(signal, 24_000)
         self.assertEqual(count, 29)
+        assert start_ms is not None
         self.assertAlmostEqual(start_ms, 4001 * 1000 / 24_000, delta=0.05)
         self.assertEqual(pc.step_burst_peak(0.3 * np.sin(np.arange(24_000) / 10), 24_000)[0], 0)
 
@@ -103,13 +104,17 @@ class HelperTests(unittest.TestCase):
         capture = np.zeros(24_000)
         capture[12_000:] = 0.1
         sidecar = {"captureStartEpochMS": 1_000.0, "submitClickEpochMS": 800.0}
-        self.assertAlmostEqual(pc.first_audible_ms(capture, 24_000, sidecar), 700.0, delta=pc.FRAME_MS)
+        first = pc.first_audible_ms(capture, 24_000, sidecar)
+        assert first is not None
+        self.assertAlmostEqual(first, 700.0, delta=pc.FRAME_MS)
         # The WAV starts at the first delivered buffer, which wins over the arming time.
-        self.assertAlmostEqual(pc.first_audible_ms(capture, 24_000, {**sidecar, "firstBufferEpochMS": 1_500.0}),
-                               1_200.0, delta=pc.FRAME_MS)
+        first_buffer = pc.first_audible_ms(capture, 24_000, {**sidecar, "firstBufferEpochMS": 1_500.0})
+        assert first_buffer is not None
+        self.assertAlmostEqual(first_buffer, 1_200.0, delta=pc.FRAME_MS)
         # The app's own submit wall clock replaces the runner's click when known.
-        self.assertAlmostEqual(pc.first_audible_ms(capture, 24_000, sidecar, submit_epoch_ms=1_100.0),
-                               400.0, delta=pc.FRAME_MS)
+        first_submit = pc.first_audible_ms(capture, 24_000, sidecar, submit_epoch_ms=1_100.0)
+        assert first_submit is not None
+        self.assertAlmostEqual(first_submit, 400.0, delta=pc.FRAME_MS)
         self.assertIsNone(pc.first_audible_ms(np.zeros(24_000), 24_000, sidecar))
         self.assertIsNone(pc.first_audible_ms(capture, 24_000, {}))
 

@@ -242,7 +242,8 @@ def validate(args: argparse.Namespace) -> dict[str, Any]:
     engine_rows = rows_by_generation(load_engine_rows(args.diagnostics), generation_ids)
     for index, (row, take) in enumerate(zip(engine_rows, takes), start=1):
         successful_row(row)
-        notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+        raw_notes = row.get("notes")
+        notes = raw_notes if isinstance(raw_notes, dict) else {}
         if (
             int(row.get("schemaVersion", 0)) < 8
             or row.get("layer") != "engine"

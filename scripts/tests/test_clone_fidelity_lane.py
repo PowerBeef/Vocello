@@ -200,11 +200,14 @@ class CloneFidelityLaneTests(unittest.TestCase):
 
     def test_separation_is_measured_from_the_similarities(self):
         result = separation([0.9, 0.85, 0.8], [0.2, 0.3, 0.25, 0.1, 0.4, 0.3, 0.2, 0.15])
+        assert result is not None
         self.assertEqual(result["auc"], 1.0)
         self.assertEqual(result["equalErrorRate"], 0.0)
         self.assertTrue(result["bandCalibrationReady"])
         self.assertIsNone(separation([0.9], []))
-        self.assertFalse(separation([0.9], [0.95])["bandCalibrationReady"])
+        single = separation([0.9], [0.95])
+        assert single is not None
+        self.assertFalse(single["bandCalibrationReady"])
 
     def test_qc_scoring_runs_after_every_take_and_a_fail_or_error_fails_the_lane(self):
         import clone_fidelity_lane as lane

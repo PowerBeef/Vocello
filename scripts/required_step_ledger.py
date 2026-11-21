@@ -12,6 +12,7 @@ import re
 import secrets
 import signal
 import subprocess
+import sys
 import tempfile
 from typing import Any
 from lib import jsonio  # noqa: E402
@@ -228,7 +229,7 @@ def _template_matches(template: dict[str, Any], command: list[str]) -> bool:
     return True
 
 
-def bind_command(workflow: dict[str, Any], step: str, command: list[str]) -> dict[str, str] | None:
+def bind_command(workflow: dict[str, Any], step: str, command: list[str]) -> dict[str, Any] | None:
     templates = workflow.get("commandTemplates")
     if templates is None:
         return None
@@ -436,7 +437,7 @@ def run_managed_step(
     if payload.get("commandContractDigest") != expected_command_contract_digest:
         raise LedgerError("ledger command contract differs from the current orchestration contract")
     command_binding = bind_command(workflow, step, command)
-    declared_outputs = [] if command_binding is None else command_binding.pop("declaredOutputs")
+    declared_outputs: list[str] = [] if command_binding is None else command_binding.pop("declaredOutputs")
 
     manifest_relative = Path("steps") / f"{step}.json"
     manifest_path = path.parent / manifest_relative
@@ -531,7 +532,7 @@ def run_managed_step(
     ]
     atomic_write(path, payload)
     if output_error is not None:
-        print(f"error: {output_error}", file=os.sys.stderr)
+        print(f"error: {output_error}", file=sys.stderr)
     return exit_code
 
 
@@ -620,7 +621,7 @@ def main() -> int:
         if args.command == "fault-requested":
             return 0 if fault_requested(args.contract, args.workflow, args.step) else 1
     except (LedgerError, OSError) as error:
-        print(f"error: {error}", file=os.sys.stderr)
+        print(f"error: {error}", file=sys.stderr)
         return 2
     return 2
 

@@ -238,6 +238,7 @@ class AlignTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             features = phones.load_phone_features(write_feature_table(Path(temporary)))
             self.assertIsNotNone(features)
+            assert features is not None
             self.assertEqual(features.distance("b", "b"), 0.0)
             self.assertLess(features.distance("b", "p"), features.distance("b", "a"))
             self.assertLess(features.distance("a", nfd("ɑ̃")), features.distance("a", "t"))

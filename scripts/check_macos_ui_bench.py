@@ -476,10 +476,10 @@ def run_hardware_context(rows: list[dict], profile_id: str) -> dict:
         for row in rows
     ]
     result: dict = {"profileID": profile_id}
-    loads = [env.get("loadAverage1Minute") for env in environments if isinstance(env.get("loadAverage1Minute"), (int, float))]
-    free = [env.get("freeStorageBytes") for env in environments if isinstance(env.get("freeStorageBytes"), int)]
-    uptime = [env.get("uptimeSeconds") for env in environments if isinstance(env.get("uptimeSeconds"), (int, float))]
-    low_power = [env.get("lowPowerModeEnabled") for env in environments if isinstance(env.get("lowPowerModeEnabled"), bool)]
+    loads = [val for env in environments if isinstance((val := env.get("loadAverage1Minute")), (int, float))]
+    free = [val for env in environments if isinstance((val := env.get("freeStorageBytes")), int)]
+    uptime = [val for env in environments if isinstance((val := env.get("uptimeSeconds")), (int, float))]
+    low_power = [val for env in environments if isinstance((val := env.get("lowPowerModeEnabled")), bool)]
     thermal = []
     for row, env in zip(rows, environments, strict=True):
         snapshot = row.get("thermalState") or {}
@@ -491,7 +491,7 @@ def run_hardware_context(rows: list[dict], profile_id: str) -> dict:
     if uptime: result["uptimeSeconds"] = min(uptime)
     if low_power: result["lowPowerMode"] = any(low_power)
     known = [value for value in thermal if value in THERMAL_RANK]
-    if known: result["thermalState"] = max(known, key=THERMAL_RANK.get)
+    if known: result["thermalState"] = max(known, key=lambda value: THERMAL_RANK[value])
     return result
 
 
@@ -834,7 +834,10 @@ def memory_trim_metrics(engine: dict) -> tuple[int, int]:
         for mark in marks
         if isinstance(mark, dict) and mark.get("stage") == "memory_trim"
     ]
-    return len(trim_levels), max((TRIM_SEVERITY.get(level, 0) for level in trim_levels), default=0)
+    return len(trim_levels), max(
+        (TRIM_SEVERITY.get(level, 0) for level in trim_levels if isinstance(level, str)),
+        default=0,
+    )
 
 
 def tracked_metrics(engine: dict, app: dict) -> dict[str, float | int]:
@@ -1670,8 +1673,11 @@ def main() -> int:
             actual_cells.append(cell)
         else:
             failures.append(f"generation {row.get('generationID', '?')} has no valid benchCell")
+        raw_index = notes.get("benchTakeIndex")
         try:
-            actual_indices.append(int(notes.get("benchTakeIndex")))
+            if raw_index is None:
+                raise TypeError("missing benchTakeIndex")
+            actual_indices.append(int(raw_index))
         except (TypeError, ValueError):
             failures.append(f"generation {row.get('generationID', '?')} has no valid benchTakeIndex")
         if row.get("generationID") in refused_ids:
@@ -1801,7 +1807,8 @@ def main() -> int:
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             failures.append(f"app generation {gid or '?'} has invalid {statistic}={value!r}")
             continue
-        cell = notes.get("benchCell") if isinstance(notes.get("benchCell"), str) else f"take {index}"
+        raw_cell = notes.get("benchCell")
+        cell = raw_cell if isinstance(raw_cell, str) else f"take {index}"
         stall_observed.append((cell, value))
         censored = (app_row.get("frontendMetrics") or {}).get("censoredHeartbeatCount")
         if isinstance(censored, int) and not isinstance(censored, bool) and censored > 0:

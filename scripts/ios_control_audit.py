@@ -1109,7 +1109,7 @@ def validate_device_evidence(
             # Blocked or explicitly failed rows are terminal composition
             # evidence, but have no successful engine request to correlate.
             continue
-        if take_id not in planned:
+        if not isinstance(take_id, str) or take_id not in planned:
             raise AuditError(f"device observation has unknown takeID {take_id!r}")
         if take_id in generation_observations:
             raise AuditError(f"device observations duplicate takeID {take_id}")
@@ -1210,7 +1210,8 @@ def validate_device_evidence(
                 issues.append("missing_decoded_audio_boundary")
             if "startup.first_published_stream_chunk" not in stages:
                 issues.append("missing_published_audio_boundary")
-            notes = terminal.get("notes") if isinstance(terminal.get("notes"), dict) else {}
+            raw_notes = terminal.get("notes")
+            notes = raw_notes if isinstance(raw_notes, dict) else {}
             if notes.get("promptDigest") != take["scriptDigest"]:
                 issues.append("script_digest_mismatch")
             if notes.get("quality_registry_outcome") not in {"pass", "warning"}:

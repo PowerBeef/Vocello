@@ -274,7 +274,7 @@ def cycle_hitch_rates(marker: dict, blocks: list[dict]) -> list[float] | None:
     return rates
 
 
-def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str]) -> dict:
+def summarize_scenario(marker: dict, rows: list[dict], *, exploratory: set[str]) -> tuple[dict, float]:
     start = int(marker["windowStartEpochMS"])
     end = int(marker["windowEndEpochMS"])
     if end <= start:
@@ -475,7 +475,7 @@ def run_hardware_context(
     ]
     known = [state for state in thermal if state in THERMAL_RANK]
     if known:
-        hardware["thermalState"] = max(known, key=THERMAL_RANK.get)
+        hardware["thermalState"] = max(known, key=THERMAL_RANK.__getitem__)
     return hardware
 
 
@@ -704,7 +704,7 @@ def derive_thresholds_main(argv: list[str]) -> int:
 def main() -> int:
     if "--derive-thresholds" in sys.argv[1:]:
         return derive_thresholds_main(sys.argv[1:])
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--xcodebuild-log", required=True)
     parser.add_argument("--diagnostics", required=True)
     parser.add_argument("--run-id", required=True)
@@ -754,7 +754,7 @@ def main() -> int:
             if env_scenarios - {name}:
                 raise GateError(
                     f"scenario '{name}': probe rows carry mismatched scenario names "
-                    f"{sorted(env_scenarios)}"
+                    f"{sorted(env_scenarios, key=str)}"
                 )
             summary, coverage = summarize_scenario(markers[name], rows, exploratory=exploratory)
             if name == GENERATION_SCENARIO:

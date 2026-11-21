@@ -687,6 +687,7 @@ class ConfirmTests(unittest.TestCase):
 class CommandLineTests(unittest.TestCase):
     def test_calibrate_and_confirm_commands(self):
         spec = importlib.util.spec_from_file_location("qc_cli_calibrate", SCRIPTS / "qc.py")
+        assert spec is not None and spec.loader is not None
         cli = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cli)
         with tempfile.TemporaryDirectory() as directory:

@@ -994,9 +994,12 @@ def test_delivery_prosody_effect_column_is_the_paired_effect():
         "dF0Std": 1.0, "dRateCV": 0.01, "dPauseRatio": -0.02, "dRoughness": 0.01,
     }
     summary = sgt.prosody_for_delivery([row, dict(row, pairedProsodyEffect=0.6)], "custom", "m", "happy.strong")
+    assert summary is not None
     assert summary["effect"] == 0.5
     legacy = {key: value for key, value in row.items() if key != "pairedProsodyEffect"}
-    assert sgt.prosody_for_delivery([legacy], "custom", "m", "happy.strong")["effect"] is None
+    legacy_summary = sgt.prosody_for_delivery([legacy], "custom", "m", "happy.strong")
+    assert legacy_summary is not None
+    assert legacy_summary["effect"] is None
 
 
 def test_prosody_sidecar_keeps_only_the_selected_run_and_reports_parse_errors():
@@ -1017,6 +1020,7 @@ def test_prosody_sidecar_keeps_only_the_selected_run_and_reports_parse_errors():
         assert rows == [row]
         assert output.getvalue().strip()  # the dropped rows are reported
         summary = sgt.prosody_for_delivery(rows, "custom", "m", "happy.strong")
+        assert summary is not None
         assert summary["effect"] == 0.4 and summary["n"] == 1
 
         with open(path, "w", encoding="utf-8") as handle:

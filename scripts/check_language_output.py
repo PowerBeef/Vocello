@@ -190,8 +190,8 @@ def validate_structured_verification(
         if not isinstance(repetition, dict):
             failures.append(f"{identity}: recognition repetition {position} is malformed")
             continue
-        index = repetition.get("passIndex")
-        if nonnegative_int(index) is None:
+        index = nonnegative_int(repetition.get("passIndex"))
+        if index is None:
             failures.append(f"{identity}: recognition repetition {position} lacks an index")
         else:
             indexes.append(index)
@@ -460,8 +460,10 @@ def main() -> int:
     # carries no seed, and a normal plan's Auto take draws its own seed.
     equivalence: dict[str, list[tuple[str, str]]] = {}
     for cell in expected:
-        cell_id = cell.get("cellID", cell.get("id"))
-        identity = cell.get("childRunID", cell_id)
+        raw_cell_id = cell.get("cellID", cell.get("id"))
+        cell_id = raw_cell_id if isinstance(raw_cell_id, str) else ""
+        raw_identity = cell.get("childRunID", cell_id)
+        identity = raw_identity if isinstance(raw_identity, str) else cell_id
         expected_hint = cell["expectedHint"]
         expected_script = corpus_by_id.get(cell.get("scriptLang"))
         if not isinstance(expected_script, str):

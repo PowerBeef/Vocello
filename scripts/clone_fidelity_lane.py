@@ -60,6 +60,7 @@ import os
 import random
 import subprocess
 import sys
+from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -270,6 +271,7 @@ def equal_error_rate(positives, negatives):
         candidate = (abs(false_accept - false_reject), (false_accept + false_reject) / 2.0, threshold)
         if best is None or candidate[:2] < best[:2]:
             best = candidate
+    assert best is not None
     return best[1], best[2]
 
 
@@ -393,7 +395,7 @@ def fidelity_report(plan, run_id, *, layout=None):
                 if row["identity"].get("similarity") is not None]
 
     positives = scores("clone")
-    similarity = {"metric": "redimnet2-plus-cosine-to-reference"}
+    similarity: dict[str, Any] = {"metric": "redimnet2-plus-cosine-to-reference"}
     negatives = []
     for kind, key in (("control", "controlSeparation"), ("cross-clone", "crossCloneSeparation")):
         if by_kind[kind]:

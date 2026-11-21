@@ -79,10 +79,12 @@ def _round_up(value: float, step: float) -> float:
 
 def record_takes(record: dict[str, Any]) -> tuple[str, str, list[dict[str, Any]]]:
     """(platform, run ID, takes) of a contract-v2 memory-qualification record."""
-    run = record.get("run") if isinstance(record.get("run"), dict) else {}
+    raw_run = record.get("run")
+    run: dict[str, Any] = raw_run if isinstance(raw_run, dict) else {}
     if run.get("kind") != "memory-qualification":
         raise CalibrationError("the record is not a memory-qualification record")
-    evidence = record.get("evidence") if isinstance(record.get("evidence"), dict) else {}
+    raw_evidence = record.get("evidence")
+    evidence: dict[str, Any] = raw_evidence if isinstance(raw_evidence, dict) else {}
     if evidence.get("memoryContractVersion") != 2:
         raise CalibrationError(
             "the record predates memory contract v2: its takes carry no unobserved gap "
@@ -122,7 +124,8 @@ def derive_gap_bound(
     covering = MINIMUM_GAP_MULTIPLE
     tier_floor = floor_ms
     for take in takes:
-        metrics = take.get("metrics") if isinstance(take.get("metrics"), dict) else {}
+        raw_metrics = take.get("metrics")
+        metrics: dict[str, Any] = raw_metrics if isinstance(raw_metrics, dict) else {}
         location = f"take {take.get('takeIndex')}"
         gap = _number(metrics.get("samplerMaximumUnobservedGapMS"), f"{location} samplerMaximumUnobservedGapMS")
         cadence = _number(metrics.get("samplerTargetIntervalMS"), f"{location} samplerTargetIntervalMS")
@@ -237,7 +240,7 @@ def apply_to_policy(policy: dict[str, Any], report: dict[str, Any]) -> dict[str,
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
     parser.add_argument("record", type=Path, help="published memory-qualification record (JSON)")
     parser.add_argument("--policy", type=Path, default=POLICY_PATH)
     parser.add_argument("--margin", type=float, default=DEFAULT_MARGIN,

@@ -11,6 +11,7 @@ import threading
 import unittest
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "scripts"
@@ -47,13 +48,17 @@ class SamplerTests(unittest.TestCase):
         self.manifests = [synthetic_manifest("run-a"), synthetic_manifest("run-b")]
         by_id = {take["takeID"]: take for take in self.manifests[0]["takes"]}
         self.enriched_ids = sorted(take_id for take_id in by_id if take_id.endswith("--dylan"))[:30]
-        self.enrichment = {(None, take_id): {"reasons": ["register-outlier"], "certain": False}
-                           for take_id in self.enriched_ids}
+        self.enrichment: dict[tuple[str | None, str], dict[str, Any]] = {
+            (None, take_id): {"reasons": ["register-outlier"], "certain": False}
+            for take_id in self.enriched_ids
+        }
         self.enrichment[("run-a", "fr-0003--serena")] = {"reasons": ["named"], "certain": True}
 
-    def sample(self, **overrides):
-        options = dict(name="batch-1", size=96, languages=["french", "english"], enrichment=self.enrichment,
-                       blind=0.1, seed=7)
+    def sample(self, **overrides: Any):
+        options: dict[str, Any] = dict(
+            name="batch-1", size=96, languages=["french", "english"], enrichment=self.enrichment,
+            blind=0.1, seed=7,
+        )
         options.update(overrides)
         return label.sample_batch(self.manifests, **options)
 

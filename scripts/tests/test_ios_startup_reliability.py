@@ -12,8 +12,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("ios_startup_reliability", ROOT / "scripts" / "ios_startup_reliability.py")
+assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
-assert SPEC.loader
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
@@ -501,7 +501,8 @@ class IOSStartupReliabilityTests(unittest.TestCase):
         result["publishedAudioCaptureRequired"] = True
         self.assertEqual(validate()["failedTakeCount"], 1)
         # Copy before the terminal barrier; a later audio write fails ordering.
-        os.utime(capture, ns=(terminal.stat().st_mtime_ns + 10**10,) * 2)
+        later_ns = terminal.stat().st_mtime_ns + 10**10
+        os.utime(capture, ns=(later_ns, later_ns))
         with self.assertRaisesRegex(MODULE.ContractError, "sentinel"):
             MODULE.validate_result(self.plan_path, root, "run-1")
         capture.unlink()

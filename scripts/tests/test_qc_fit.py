@@ -31,6 +31,7 @@ class StatisticsTests(unittest.TestCase):
         self.assertEqual(fit.clopper_pearson(5, 10), (0.1871, 0.8129))
         self.assertEqual(fit.clopper_pearson(0, 0), (None, None))
         lower, upper = fit.clopper_pearson(7.5, 12.3)  # effective counts
+        assert lower is not None and upper is not None
         self.assertTrue(0 < lower < 7.5 / 12.3 < upper < 1)
 
     def test_weighted_rate_uses_the_effective_sample_size(self):

@@ -9,6 +9,7 @@ import plistlib
 from pathlib import Path
 import sys
 import tempfile
+from typing import Any
 import unittest
 
 
@@ -56,8 +57,8 @@ def translated_fixture(english: dict, locale: str) -> dict:
     return result
 
 
-def valid_catalog() -> dict[str, object]:
-    strings: dict[str, object] = {}
+def valid_catalog() -> dict[str, Any]:
+    strings: dict[str, Any] = {}
     for key in localization_contract.REQUIRED_KEYS:
         if key in localization_contract.REQUIRED_PLURAL_KEYS:
             english: dict[str, object] = {

@@ -166,8 +166,11 @@ class SignalFeatureTests(unittest.TestCase):
         np.testing.assert_allclose(a2, [1.0, -1.99004745483398, 0.99007225036621], atol=1e-8)
         for rate in (48000, RATE):
             sine = np.sin(2 * np.pi * 997 * np.arange(rate * 4) / rate)
-            self.assertAlmostEqual(features.integrated_loudness(sine, rate), -3.01, delta=0.05)
-            self.assertAlmostEqual(features.integrated_loudness(0.1 * sine, rate), -23.01, delta=0.05)
+            loud_full = features.integrated_loudness(sine, rate)
+            loud_quiet = features.integrated_loudness(0.1 * sine, rate)
+            assert loud_full is not None and loud_quiet is not None
+            self.assertAlmostEqual(loud_full, -3.01, delta=0.05)
+            self.assertAlmostEqual(loud_quiet, -23.01, delta=0.05)
         quiet = features.loudness_features(0.05 * np.sin(2 * np.pi * 300 * np.arange(RATE * 4) / RATE), RATE)
         self.assertGreater(quiet["level.lufs_deviation"]["value"], 4)
         self.assertAlmostEqual(quiet["level.true_peak_dbtp"]["value"], 20 * np.log10(0.05), delta=0.1)
@@ -200,7 +203,9 @@ class SignalFeatureTests(unittest.TestCase):
             self.assertEqual((piece_rate, piece.size), (RATE, int(0.25 * RATE)))
             np.testing.assert_array_equal(piece, samples[int(0.25 * RATE):int(0.5 * RATE)])
         self.assertEqual(features.transcript_distance("le chat dort", "le chat dort", "french"), 0.0)
-        self.assertAlmostEqual(features.transcript_distance("le chat dort", "le dort", "french"), 1 / 3)
+        distance = features.transcript_distance("le chat dort", "le dort", "french")
+        assert distance is not None
+        self.assertAlmostEqual(distance, 1 / 3)
 
 
 class ModelFeatureTests(unittest.TestCase):

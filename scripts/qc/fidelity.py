@@ -41,7 +41,11 @@ def _identities(layout: Layout, features: dict[str, Any]) -> dict[str, tuple[dic
             current = runtime.runner_identity(layout, model) if model else None
         except runtime.RunnerError:
             current = None
-        out[role] = (model, runner_sha) if current == runner_sha and runner_sha else None
+        out[role] = (
+            (model, runner_sha)
+            if model is not None and isinstance(runner_sha, str) and current == runner_sha and runner_sha
+            else None
+        )
     return out
 
 
@@ -94,6 +98,7 @@ def pitch_section(take_tracks: tuple[Any, Any] | None, reference_tracks: tuple[A
     return {
         "available": median is not None and reference_median is not None,
         "qualification": "uncalibrated", "decision": "uncertain" if median is not None and reference_median is not None
+            and reference_summary is not None
             and summary["agreement"]["agreeingSeconds"] >= assessment.MIN_AGREEING_SECONDS
             and reference_summary["agreement"]["agreeingSeconds"] >= assessment.MIN_AGREEING_SECONDS else "not-assessed",
         "agreeingSeconds": _round(summary["agreement"]["agreeingSeconds"]),
@@ -144,11 +149,16 @@ def take_fidelity(layout: Layout, run_id: str) -> list[dict[str, Any]]:
     identities = _identities(layout, features)
     rows = []
     for take in manifest["takes"]:
-        tracks = tuple(_outputs(layout, identities[role], take["audioSHA256"], None) for role in ("pitchA", "pitchB"))
+        tracks = (
+            _outputs(layout, identities["pitchA"], take["audioSHA256"], None),
+            _outputs(layout, identities["pitchB"], take["audioSHA256"], None),
+        )
         reference_tracks = None
         if take.get("referenceSHA256"):
-            reference_tracks = tuple(_outputs(layout, identities[role], take["referenceSHA256"], None)
-                                     for role in ("pitchA", "pitchB"))
+            reference_tracks = (
+                _outputs(layout, identities["pitchA"], take["referenceSHA256"], None),
+                _outputs(layout, identities["pitchB"], take["referenceSHA256"], None),
+            )
         speaker_identity = identities["speaker"]
         variant = store.take_variant(speaker_identity[0], take) if speaker_identity else None
         speaker = _outputs(layout, speaker_identity, take["audioSHA256"], variant)
@@ -165,7 +175,7 @@ def take_fidelity(layout: Layout, run_id: str) -> list[dict[str, Any]]:
     return rows
 
 
-def distribution(values: list[float]) -> dict[str, float] | None:
+def distribution(values: list[float]) -> dict[str, int | float | None] | None:
     values = [float(value) for value in values if value is not None]
     if not values:
         return None

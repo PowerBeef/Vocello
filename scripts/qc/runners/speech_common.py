@@ -91,7 +91,8 @@ def _write_atomic(path: Path, write: Callable[[Any], None], mode: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     handle, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     try:
-        with os.fdopen(handle, mode, **({"encoding": "utf-8"} if "b" not in mode else {})) as stream:
+        stream_cm = os.fdopen(handle, mode) if "b" in mode else os.fdopen(handle, mode, encoding="utf-8")
+        with stream_cm as stream:
             write(stream)
         os.replace(temporary, path)
     except BaseException:

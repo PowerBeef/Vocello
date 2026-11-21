@@ -15,8 +15,8 @@ if str(REPO / "scripts") not in sys.path:
     sys.path.insert(0, str(REPO / "scripts"))
 MODULE_PATH = REPO / "scripts/voice_identity_language_reliability.py"
 SPEC = importlib.util.spec_from_file_location("voice_identity_language_reliability", MODULE_PATH)
+assert SPEC is not None and SPEC.loader is not None
 VLR = importlib.util.module_from_spec(SPEC)
-assert SPEC.loader is not None
 SPEC.loader.exec_module(VLR)
 
 

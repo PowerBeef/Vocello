@@ -234,7 +234,7 @@ def python_test_selection(paths: list[str], *, root: Path | None = None) -> dict
         if not (root / changed).is_file():
             return {"mode": "full", "tests": [], "reason": "deleted or missing tooling input"}
         # The selector loads the router at run time, so their consumers are shared.
-        seeds = set(ROUTING_SOURCES) if changed in ROUTING_SOURCES else {changed}
+        seeds: set[str] = set(ROUTING_SOURCES) if changed in ROUTING_SOURCES else {changed}
         tests = _test_consumers(_with_importers(seeds, importers, root), test_texts)
         if not tests:
             pattern = _mentions({Path(changed).name})
@@ -616,10 +616,12 @@ def primary_plan_lines(data: dict, archived_ids: set[str], today: datetime.date)
         lines.append(f"focusLock: since {lock.get('decided')}; live work only in {primary}, "
                      f"at most {lock.get('maxInFlight')} in flight")
     if ready:
-        shown = [f"{item['id']} ({item['status']}" + (f", due {due(item).isoformat()}" if due(item) else "") + ")"
-                 for item in ready[:5]]
+        shown = [
+            f"{item['id']} ({item['status']}" + (f", due {item_due.isoformat()}" if (item_due := due(item)) else "") + ")"
+            for item in ready[:5]
+        ]
         lines.append("next: " + ", ".join(shown) + (" …" if len(ready) > 5 else ""))
-    overdue = sorted(item["id"] for item in live if due(item) and due(item) < today)
+    overdue = sorted(item["id"] for item in live if (item_due := due(item)) and item_due < today)
     if overdue:
         lines.append("overdue: " + ", ".join(overdue)
                      + " (cut scope, move the date with a recorded decision, or close it)")
@@ -649,7 +651,7 @@ def print_status() -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0] if __doc__ else None)
     sub = parser.add_subparsers(dest="command", required=True)
     check = sub.add_parser("check", help="lint, contracts, selected tests and the native lanes the dirty tree touches")
     check.add_argument("--dry-run", action="store_true", help="print the commands without running them")

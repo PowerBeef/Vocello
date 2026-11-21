@@ -196,9 +196,9 @@ def sample_batch(
         population = sorted((take for take in takes if take.get("language") == language), key=lambda t: t["token"])
         if not population:
             continue
-        enriched = [take for take in population if enrichment_for(take)]
-        certain = [take for take in enriched if enrichment_for(take)["certain"]]
-        optional = [take for take in enriched if not enrichment_for(take)["certain"]]
+        enriched = [(take, info) for take in population if (info := enrichment_for(take))]
+        certain = [take for take, info in enriched if info["certain"]]
+        optional = [take for take, info in enriched if not info["certain"]]
         enrich_count = max(len(certain), min(round(ENRICH_FRACTION * quota), len(enriched)))
         draw = min(len(optional), enrich_count - len(certain))
         enrich_pick = certain + (rng.sample(optional, draw) if draw > 0 else [])
@@ -496,7 +496,9 @@ class LabelServer(http.server.ThreadingHTTPServer):
         # HTTPServer.server_bind resolves the host name (socket.getfqdn), which can
         # stall for half a minute on a Mac; the page needs only the bound address.
         socketserver.TCPServer.server_bind(self)
-        self.server_name, self.server_port = self.server_address[:2]
+        assert isinstance(self.server_address, tuple)
+        self.server_name = str(self.server_address[0])
+        self.server_port = int(self.server_address[1])
 
     def take_for(self, token: str) -> dict[str, Any] | None:
         if not TOKEN_RE.fullmatch(token) or token not in self.items:

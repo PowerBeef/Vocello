@@ -337,12 +337,12 @@ def _execute(validator: Validator, root: Path, environment: dict[str, str]) -> R
 def run(validators: Sequence[Validator], *, root: Path = ROOT, changed: Sequence[str] | None = None,
         local: bool = False, jobs: int | None = None, out: IO[bytes] | None = None) -> int:
     """Run the selected validators; print each one's output as one block in declaration order."""
-    out = out if out is not None else sys.stdout.buffer
+    stream: IO[bytes] = out if out is not None else sys.stdout.buffer
     selected, note = select(validators, changed, local=local)
 
     def say(line: str) -> None:
-        out.write(f"==> {line}\n".encode())
-        out.flush()
+        stream.write(f"==> {line}\n".encode())
+        stream.flush()
 
     if note:
         say(f"local contract selection: {note}")
@@ -363,13 +363,13 @@ def run(validators: Sequence[Validator], *, root: Path = ROOT, changed: Sequence
                 continue
             result = futures[index].result()
             results.append((validator, result))
-            out.write(result.output)
+            stream.write(result.output)
             if result.output and not result.output.endswith(b"\n"):
-                out.write(b"\n")
+                stream.write(b"\n")
             if result.returncode != 0:
                 failures.append(validator.name)
                 say(f"FAILED (exit {result.returncode}, {result.seconds:.1f}s): {validator.name}")
-            out.flush()
+            stream.flush()
     except BaseException:
         pool.shutdown(wait=False, cancel_futures=True)
         raise

@@ -350,11 +350,16 @@ def contrast_ratio(first: tuple[float, float, float], second: tuple[float, float
     return (max(one, two) + 0.05) / (min(one, two) + 0.05)
 
 
-def average(values: Iterable[tuple[int, int, int]]) -> tuple[float, float, float]:
-    values = list(values)
-    if not values:
-        return (0, 0, 0)
-    return tuple(sum(pixel[index] for pixel in values) / len(values) for index in range(3))
+def average(values: Iterable[tuple[float, float, float]]) -> tuple[float, float, float]:
+    items = list(values)
+    if not items:
+        return (0.0, 0.0, 0.0)
+    count = len(items)
+    return (
+        sum(pixel[0] for pixel in items) / count,
+        sum(pixel[1] for pixel in items) / count,
+        sum(pixel[2] for pixel in items) / count,
+    )
 
 
 def color_distance(first: tuple[float, float, float], second: tuple[float, float, float]) -> float:

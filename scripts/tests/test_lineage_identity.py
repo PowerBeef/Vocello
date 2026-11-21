@@ -109,6 +109,7 @@ class LineagePathTests(unittest.TestCase):
     def test_lineage_inputs_stamp_the_contract_and_measurement_versions(self) -> None:
         files = {"project.yml": PROJECT.encode("utf-8")}
         stamped = lineage.lineage_inputs("ui-generation", "macos", files.get)
+        assert stamped is not None
         self.assertEqual(stamped["lineageContractVersion"], lineage.LINEAGE_CONTRACT_VERSION)
         self.assertEqual(
             stamped["lineageMeasurementVersion"],
@@ -116,6 +117,7 @@ class LineagePathTests(unittest.TestCase):
         )
         self.assertEqual(stamped["lineageProjectHash"], subset_hash(PROJECT))
         prosody = lineage.lineage_inputs("prosody-calibration", "macos", files.get)
+        assert prosody is not None
         self.assertEqual(prosody["lineageProjectHash"], lineage.NOT_APPLICABLE)
         self.assertIsNone(lineage.lineage_inputs("prosody-calibration", "ios", files.get))
 

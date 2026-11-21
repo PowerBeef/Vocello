@@ -10,12 +10,13 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from typing import Any
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "supply_chain_contract.py"
 SPEC = importlib.util.spec_from_file_location("supply_chain_contract", SCRIPT)
 assert SPEC and SPEC.loader
-module = importlib.util.module_from_spec(SPEC)
+module: Any = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(module)
 
 

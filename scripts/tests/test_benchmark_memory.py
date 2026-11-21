@@ -97,7 +97,7 @@ def row(generation_id: str, sample_rows: list[dict], *, layer: str, ios: bool) -
     resident = [sample["residentMB"] for sample in sample_rows]
     compressed = [sample["compressedMB"] for sample in sample_rows]
     gpu = [sample["gpuAllocatedMB"] for sample in sample_rows]
-    headroom = [sample.get("headroomMB") for sample in sample_rows if "headroomMB" in sample]
+    headroom = [sample["headroomMB"] for sample in sample_rows if "headroomMB" in sample]
     boundaries = [sample["boundary"] for sample in sample_rows if sample["kind"] == "boundary"]
     required_names = ENGINE_BOUNDARY_NAMES if layer == "engine" else ["app-submit", "app-terminal"]
     coverage = {
@@ -688,7 +688,7 @@ class MemoryEvidenceTests(unittest.TestCase):
 
     def qualify_ios_budget(
         self, footprint: float, headroom: float, *, remaining_offset: float | None = None,
-    ) -> object:
+    ) -> Any:
         """Qualify one iPhone take; the fixture's footprint rises and its
         headroom falls by one MB per sample, over about twenty samples."""
         sidecar = samples(

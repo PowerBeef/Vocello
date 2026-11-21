@@ -2478,7 +2478,8 @@ def require_digest(value: Any, location: str, *, allow_na: bool = True) -> None:
 
 def language_families(record: dict[str, Any]) -> list[str]:
     """The recognizer families a language record cites; legacy records are Apple Speech."""
-    evidence = record.get("evidence") if isinstance(record.get("evidence"), dict) else {}
+    raw_evidence = record.get("evidence")
+    evidence = raw_evidence if isinstance(raw_evidence, dict) else {}
     verification = evidence.get("languageVerification")
     if not isinstance(verification, dict) or "families" not in verification:
         return list(LEGACY_LANGUAGE_FAMILIES)
@@ -3985,17 +3986,19 @@ def validate_retained_memory_v2(block: Any, takes: list[dict[str, Any]]) -> None
     ):
         raise HistoryError("retainedMemoryV2 identity is invalid")
     for mode in RETAINED_MEMORY_V2_MODES:
-        ends = [
+        raw_ends = [
             (take.get("metrics") or {}).get("mlxEndActiveMB")
             for take in takes
             if take.get("mode") == mode and "/retained#" in str(take.get("cell"))
         ]
-        if len(ends) < 2 or not all(
-            isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
-            for value in ends
-        ):
+        ends = [
+            float(value)
+            for value in raw_ends
+            if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+        ]
+        if len(ends) < 2 or len(ends) != len(raw_ends):
             raise HistoryError(f"retainedMemoryV2 mode {mode} lacks end-of-take MLX values")
-        expected = max(0.0, max(float(value) for value in ends[1:]) - float(ends[0]))
+        expected = max(0.0, max(ends[1:]) - ends[0])
         if not math.isclose(float(growth_by_mode[mode]), expected, rel_tol=0, abs_tol=1e-6):
             raise HistoryError(f"retainedMemoryV2 growth for {mode} does not match its takes")
     if not math.isclose(
@@ -4094,12 +4097,13 @@ def sampled_peak_misses(record: dict[str, Any]) -> dict[str, Any]:
     missed: list[dict[str, Any]] = []
     footprint_missed = 0
     for take in record.get("takes", []):
-        metrics = take.get("metrics") if isinstance(take.get("metrics"), dict) else {}
+        raw_metrics = take.get("metrics")
+        metrics = raw_metrics if isinstance(raw_metrics, dict) else {}
         exact = metrics.get("mlxPeakMB")
         sampled = metrics.get("peakGPUAllocatedMB")
-        if not all(
-            isinstance(value, (int, float)) and not isinstance(value, bool)
-            for value in (exact, sampled)
+        if (
+            not isinstance(exact, (int, float)) or isinstance(exact, bool)
+            or not isinstance(sampled, (int, float)) or isinstance(sampled, bool)
         ):
             continue
         compared += 1

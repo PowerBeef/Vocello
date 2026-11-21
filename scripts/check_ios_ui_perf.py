@@ -399,7 +399,7 @@ def run_hardware_context(
     ]
     known = [state for state in thermal if state in THERMAL_RANK]
     if known:
-        hardware["thermalState"] = max(known, key=THERMAL_RANK.get)
+        hardware["thermalState"] = max(known, key=THERMAL_RANK.__getitem__)
     return hardware
 
 
@@ -551,7 +551,7 @@ def main() -> int:
             sys.argv[1:], platform="ios", default_thresholds=DEFAULT_THRESHOLDS_PATH,
             load_thresholds=load_thresholds, runs_root=UI_PERF_RUNS,
         )
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--xcodebuild-log", required=True)
     parser.add_argument("--diagnostics", required=True,
                         help="pulled device diagnostics root (contains ui-perf/ "
@@ -613,7 +613,7 @@ def main() -> int:
             if env_scenarios - {name}:
                 raise GateError(
                     f"scenario '{name}': probe rows carry mismatched scenario names "
-                    f"{sorted(env_scenarios)}"
+                    f"{sorted(env_scenarios, key=str)}"
                 )
             summary, coverage = summarize_scenario(markers[name], rows, exploratory=exploratory)
             if name == GENERATION_SCENARIO:
@@ -712,7 +712,7 @@ def main() -> int:
             f"coverage {row['probeCoverage']:.0%}  [{row['designation']}]{flag}"
         )
 
-    if evidence_profile is not None:
+    if evidence_profile is not None and hardware_context is not None:
         manifest = build_evidence_manifest(
             run_id=args.run_id,
             label=args.label,

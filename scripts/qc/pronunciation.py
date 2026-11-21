@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import itertools
 import math
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, TypeGuard
 
 import numpy as np
 
@@ -25,7 +25,7 @@ def _narrow(items: Sequence[str]) -> list[str]:
     return [part for token in items for part in phones.segment_ipa(token)]
 
 
-def _valid_tokens(value: Any, limit: int) -> bool:
+def _valid_tokens(value: Any, limit: int) -> TypeGuard[Sequence[str]]:
     return (isinstance(value, (list, tuple)) and len(value) <= limit
             and all(isinstance(p, str) and 0 < len(p) <= 64 for p in value))
 
@@ -242,8 +242,13 @@ def _posterior(data: Mapping[str, Any] | None, paths: list[dict], limits: dict) 
                  "posterior-budget-exceeded", "invalid-log-posteriors", "unnormalized-log-posteriors"}
         result["reason"] = str(error) if str(error) in known else "malformed-posteriors"
         return result
-    seconds = data.get("frameSeconds")
-    seconds = (float(seconds) if type(seconds) in (int, float) and math.isfinite(seconds) and seconds > 0 else None)
+    raw_seconds = data.get("frameSeconds")
+    seconds = (
+        float(raw_seconds)
+        if isinstance(raw_seconds, (int, float)) and not isinstance(raw_seconds, bool)
+        and math.isfinite(raw_seconds) and raw_seconds > 0
+        else None
+    )
     probabilities = np.exp(raw)
     with np.errstate(invalid="ignore"):
         entropy = -np.sum(np.where(probabilities > 0, probabilities * raw, 0.0), axis=1)
@@ -351,8 +356,19 @@ def analyze(expected: Sequence[str] | None, words: Sequence[Mapping[str, Any]] |
                     valid = False
                     break
                 start, end = item.get("start"), item.get("end")
-                if any(v is not None and (type(v) not in (int, float) or not math.isfinite(v) or v < 0)
-                       for v in (start, end)) or (start is not None and end is not None and end < start):
+                start_ok = start is None or (
+                    isinstance(start, (int, float)) and not isinstance(start, bool)
+                    and math.isfinite(start) and start >= 0
+                )
+                end_ok = end is None or (
+                    isinstance(end, (int, float)) and not isinstance(end, bool)
+                    and math.isfinite(end) and end >= 0
+                )
+                if (
+                    not start_ok
+                    or not end_ok
+                    or (isinstance(start, (int, float)) and isinstance(end, (int, float)) and end < start)
+                ):
                     valid = False
                     break
                 for part in phones.segment_ipa(item["phone"]):

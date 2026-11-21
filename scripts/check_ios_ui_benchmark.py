@@ -67,10 +67,10 @@ def exact_model_variant(identity: dict, row: dict) -> str | None:
 def run_hardware_context(rows: list[dict]) -> dict:
     environments = [(row.get("summary") or {}).get("runEnvironment") or {} for row in rows]
     result: dict = {"profileID": "iphone-17-pro"}
-    loads = [env.get("loadAverage1Minute") for env in environments if isinstance(env.get("loadAverage1Minute"), (int, float))]
-    free = [env.get("freeStorageBytes") for env in environments if isinstance(env.get("freeStorageBytes"), int)]
-    uptime = [env.get("uptimeSeconds") for env in environments if isinstance(env.get("uptimeSeconds"), (int, float))]
-    low_power = [env.get("lowPowerModeEnabled") for env in environments if isinstance(env.get("lowPowerModeEnabled"), bool)]
+    loads = [value for env in environments if isinstance((value := env.get("loadAverage1Minute")), (int, float))]
+    free = [value for env in environments if isinstance((value := env.get("freeStorageBytes")), int)]
+    uptime = [value for env in environments if isinstance((value := env.get("uptimeSeconds")), (int, float))]
+    low_power = [value for env in environments if isinstance((value := env.get("lowPowerModeEnabled")), bool)]
     thermal = []
     for row, env in zip(rows, environments, strict=True):
         snapshot = row.get("thermalState") or {}
@@ -81,7 +81,7 @@ def run_hardware_context(rows: list[dict]) -> dict:
     if uptime: result["uptimeSeconds"] = min(uptime)
     if low_power: result["lowPowerMode"] = any(low_power)
     known = [value for value in thermal if value in THERMAL_RANK]
-    if known: result["thermalState"] = max(known, key=THERMAL_RANK.get)
+    if known: result["thermalState"] = max(known, key=THERMAL_RANK.__getitem__)
     return result
 
 
@@ -289,7 +289,10 @@ def memory_trim_metrics(engine: dict) -> tuple[int, int]:
         for mark in marks
         if isinstance(mark, dict) and mark.get("stage") == "memory_trim"
     ]
-    return len(trim_levels), max((TRIM_SEVERITY.get(level, 0) for level in trim_levels), default=0)
+    return len(trim_levels), max(
+        (TRIM_SEVERITY.get(level, 0) if isinstance(level, str) else 0 for level in trim_levels),
+        default=0,
+    )
 
 
 def tracked_metrics(engine: dict, app: dict) -> dict[str, float | int]:
@@ -439,8 +442,8 @@ def build_manifest(
     expected = len(cells)
     hardware = run_hardware_context(engine_rows)
     recorded = sorted(
-        row.get("recordedAt") for row in engine_rows
-        if isinstance(row.get("recordedAt"), str) and row.get("recordedAt")
+        recorded_at for row in engine_rows
+        if isinstance((recorded_at := row.get("recordedAt")), str) and recorded_at
     )
     now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     started_at = recorded[0] if recorded else now
@@ -788,6 +791,8 @@ def main() -> int:
             # short prompt could publish under a long cell unnoticed.
             prompt_chars = notes.get("promptChars")
             try:
+                if prompt_chars is None:
+                    raise TypeError
                 bucket = length_bucket(int(prompt_chars))
             except (TypeError, ValueError):
                 failures.append(f"take {index + 1} engine row has no promptChars to prove its length cell")

@@ -86,6 +86,7 @@ def validate_config(config: Any, *, class_ids: set[str] | None = None) -> None:
     require(isinstance(config.get("version"), int) and config["version"] >= 1, "version must be a positive integer")
     roles = config.get("models")
     require(isinstance(roles, dict) and set(roles) <= set(ROLES), f"models must map roles among {', '.join(ROLES)}")
+    assert isinstance(roles, dict)
     seen: set[str] = set()
     for detector in config.get("detectors", []):
         label = f"detector {detector.get('id')!r}"
@@ -98,7 +99,7 @@ def validate_config(config: Any, *, class_ids: set[str] | None = None) -> None:
             require(class_ids is None or detector.get("class") in class_ids, f"{label}: unknown class")
         rule = detector.get("provisional")
         if rule is not None:
-            require(isinstance(rule, dict) and rule and set(rule) <= {"all", "any", "none"},
+            require(isinstance(rule, dict) and bool(rule) and set(rule) <= {"all", "any", "none"},
                     f"{label}: provisional takes all, any and none lists")
             for conditions in rule.values():
                 for condition in conditions:
@@ -132,7 +133,7 @@ def validate_config(config: Any, *, class_ids: set[str] | None = None) -> None:
         require(isinstance(lane, dict) and isinstance(lane.get("description"), str) and lane["description"],
                 f"lane {name!r}: a description is required")
         models = lane.get("models")
-        require(isinstance(models, list) and models and len(set(models)) == len(models)
+        require(isinstance(models, list) and bool(models) and len(set(models)) == len(models)
                 and set(models) <= set(roles), f"lane {name!r}: models must list roles of the models map once")
 
 
@@ -450,7 +451,7 @@ def score(detector: dict[str, Any], features: dict[str, Any], language: str,
         rule = detector.get("provisional")
         own = language_norms(norms, language)
         holds = rule_holds(rule, features, own) if rule else None
-        if holds is not None:
+        if holds is not None and rule is not None:
             return {"score": 1.0 if holds else 0.0, "cut": 1.0, "scope": "provisional", "present": present,
                     "rule": rule_thresholds(rule, own)}
         return {"score": uncalibrated(detector, features, language, norm) if present else None,

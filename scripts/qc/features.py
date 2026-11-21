@@ -691,7 +691,7 @@ def _language_mismatch(take: dict[str, Any], asr: dict[str, Any] | None) -> floa
             if name and isinstance(probability, (int, float)):
                 normalized[name] = normalized.get(name, 0.0) + float(probability)
         if normalized:
-            return 1.0 - normalized.get(expected, 0.0)
+            return 1.0 - (normalized.get(expected, 0.0) if isinstance(expected, str) else 0.0)
     detected = asr_language(asr.get("language"))
     return None if detected is None else float(detected != expected)
 
@@ -724,12 +724,14 @@ def asr_features(take: dict[str, Any], results: dict[str, Any]) -> dict[str, Fea
     # Both families must hear the error: the smaller rate, localized where that family found it.
     best = min(present, key=lambda edit: edit["value"]) if len(present) == 2 else None
     language = take.get("language")
+    present_asrs = [asr for asr in asrs if asr is not None]
+    both_asrs = len(present_asrs) == len(asrs)
     return {
         "asr.edit_rate_min": best or feature(),
-        "asr.language_mismatch_min": feature(_min(_language_mismatch(take, asr) for asr in asrs)
-                                             if all(asr is not None for asr in asrs) else None),
-        "asr.script_mismatch_min": feature(_min(script_mismatch(asr.get("text") or "", language) for asr in asrs)
-                                           if all(asr is not None for asr in asrs) else None),
+        "asr.language_mismatch_min": feature(_min(_language_mismatch(take, asr) for asr in present_asrs)
+                                             if both_asrs else None),
+        "asr.script_mismatch_min": feature(_min(script_mismatch(asr.get("text") or "", language) for asr in present_asrs)
+                                           if both_asrs else None),
     }
 
 

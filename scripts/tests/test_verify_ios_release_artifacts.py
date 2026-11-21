@@ -9,6 +9,7 @@ import unittest
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 from unittest import mock
 
 
@@ -68,7 +69,7 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
             },
         }
 
-    def snapshot(self, **overrides: object) -> module.BundleSnapshot:
+    def snapshot(self, **overrides: object) -> Any:
         arguments = {
             "label": "archive",
             "info": self.info,
@@ -164,7 +165,7 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
 
     def test_development_signed_archive_is_valid_and_may_allow_debugging(self) -> None:
         entitlements = dict(self.entitlements, **{"get-task-allow": True})
-        profile = dict(self.profile, ProvisionedDevices=["fixture-device"])
+        profile: dict[str, Any] = {**self.profile, "ProvisionedDevices": ["fixture-device"]}
         profile["Entitlements"] = dict(self.profile["Entitlements"], **{"get-task-allow": True})
         snapshot = self.snapshot(entitlements=entitlements, profile=profile)
         self.assertTrue(snapshot.signing_authority_verified)
@@ -209,14 +210,14 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
         entitlements = dict(self.entitlements, **{
             "application-identifier": f"{prefix}.{self.BUNDLE}",
         })
-        profile = dict(self.profile, ApplicationIdentifierPrefix=[prefix])
+        profile: dict[str, Any] = {**self.profile, "ApplicationIdentifierPrefix": [prefix]}
         profile["Entitlements"] = dict(self.profile["Entitlements"], **{
             "application-identifier": f"{prefix}.{self.BUNDLE}",
         })
         snapshot = self.snapshot(entitlements=entitlements, profile=profile)
         self.assertTrue(snapshot.application_identifier_verified)
 
-        mismatched = dict(profile)
+        mismatched: dict[str, Any] = dict(profile)
         mismatched["Entitlements"] = dict(profile["Entitlements"], **{
             "application-identifier": f"{self.TEAM}.{self.BUNDLE}",
         })

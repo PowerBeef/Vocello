@@ -788,6 +788,7 @@ def load_for_edit(root: pathlib.Path) -> tuple[dict, dict, dict[str, str | None]
     back from an empty fallback would erase the finished work.
     """
     roadmap_text, data = _read_json(root, ROADMAP_PATH, required=True)
+    assert data is not None
     archive_text, archive = _read_json(root, ARCHIVE_PATH, required=False)
     render_path = root / RENDER_PATH
     before = {
@@ -922,7 +923,11 @@ def edit_note(data: dict, archive: dict, item_id: str, today: _dt.date, *, text:
     item = _live_item(data, archive, item_id)
     if (text is None) == (append is None):
         raise EditError("note takes TEXT to replace the notes, or --append TEXT to add to them")
-    notes = _text(text, "TEXT") if text is not None else _appended(item.get("notes"), _text(append, "--append"))
+    if text is not None:
+        notes = _text(text, "TEXT")
+    else:
+        assert append is not None
+        notes = _appended(item.get("notes"), _text(append, "--append"))
     _check_notes(item_id, notes)
     before = copy.deepcopy(item)
     _set_key(item, "notes", notes)
@@ -1100,7 +1105,8 @@ def _edit(root: pathlib.Path, args) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0], epilog=__doc__[__doc__.index("Usage:"):],
+    doc = __doc__ or ""
+    parser = argparse.ArgumentParser(description=doc.splitlines()[0], epilog=doc[doc.index("Usage:"):],
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--root", default=str(REPO_ROOT), help="repository root (default: this checkout)")
     # Also accepted after the command, as the flat parser this replaced allowed.

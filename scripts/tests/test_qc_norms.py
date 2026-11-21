@@ -164,6 +164,7 @@ class NormsComputationTests(PoolFixture):
         second = norms.write(self.layout, document)
         self.assertEqual((first.name, second.name), ("norms-v1.json", "norms-v2.json"))
         loaded = norms.load(self.layout)
+        assert loaded is not None
         self.assertEqual((loaded["file"], loaded["version"]), ("norms-v2.json", 2))
         (self.layout.config / "norms-v3.json").write_text("{}")
         with self.assertRaises(ValueError):
@@ -171,6 +172,7 @@ class NormsComputationTests(PoolFixture):
 
     def test_the_command(self):
         spec = importlib.util.spec_from_file_location("qc_cli_norms", SCRIPTS / "qc.py")
+        assert spec is not None and spec.loader is not None
         cli = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cli)
         arguments = ["norms", "--takes", str(self.manifest), "--min-count", "3"]
@@ -181,7 +183,9 @@ class NormsComputationTests(PoolFixture):
         with redirect_stdout(io.StringIO()) as output, redirect_stderr(io.StringIO()):
             self.assertEqual(cli.main(arguments, layout=self.layout), 0)
         self.assertIn("norms-v1.json", output.getvalue())
-        self.assertEqual(norms.load(self.layout)["counts"], {"french": 5, "japanese": 5})
+        loaded = norms.load(self.layout)
+        assert loaded is not None
+        self.assertEqual(loaded["counts"], {"french": 5, "japanese": 5})
 
 
 class RateFeatureTests(unittest.TestCase):
@@ -213,7 +217,9 @@ class RateFeatureTests(unittest.TestCase):
         self.assertAlmostEqual(rates[0], rates[1], delta=0.1)
 
     def test_speech_span_skips_the_leading_and_trailing_silence(self):
-        start, end = features.speech_span(synth(0.3, 0), RATE)
+        span = features.speech_span(synth(0.3, 0), RATE)
+        assert span is not None
+        start, end = span
         self.assertAlmostEqual(start, 0.1, delta=0.03)
         self.assertGreater(end, 0.1 + 10 * 0.18 + 0.3 + 0.05)
         self.assertIsNone(features.speech_span(np.zeros(RATE), RATE))

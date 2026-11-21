@@ -256,9 +256,14 @@ def derive(
         )
     costs = take_costs(records, phases, overhead_seconds)
     canonical_warm, canonical_allocation = version_matrix(config, config["canonicalVersion"])
+
+    def _canonical_repetitions(cell: str) -> int:
+        mode, length = cell.split("/")
+        return warm_repetitions(mode, length, canonical_warm, canonical_allocation)
+
     if budget_seconds is None:
         budget_seconds = sum(
-            warm_repetitions(*cell.split("/"), canonical_warm, canonical_allocation) * costs[cell]
+            _canonical_repetitions(cell) * costs[cell]
             for cell in sorted(expected)
         )
     sd = {cell: spreads[cell]["logSD"] for cell in spreads}
@@ -273,8 +278,7 @@ def derive(
             "repetitions": allocation[cell],
             "medianRelativeSE": round(MEDIAN_EFFICIENCY * sd[cell] / math.sqrt(allocation[cell]), 5),
             "canonicalMedianRelativeSE": round(
-                MEDIAN_EFFICIENCY * sd[cell]
-                / math.sqrt(warm_repetitions(*cell.split("/"), canonical_warm, canonical_allocation)),
+                MEDIAN_EFFICIENCY * sd[cell] / math.sqrt(_canonical_repetitions(cell)),
                 5,
             ),
         }

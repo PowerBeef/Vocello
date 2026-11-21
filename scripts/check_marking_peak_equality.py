@@ -77,8 +77,12 @@ def check_exact_mlx_peak(take: dict, row: dict | None, tolerance_mb: float,
     if isinstance(stages, dict):
         before = (stages.get("before_marking") or {}).get("peakMB")
         after = (stages.get("after_marking") or {}).get("peakMB")
-    if not all(isinstance(value, (int, float)) and not isinstance(value, bool)
-               for value in (before, after)):
+    if (
+        not isinstance(before, (int, float))
+        or isinstance(before, bool)
+        or not isinstance(after, (int, float))
+        or isinstance(after, bool)
+    ):
         reason = ("no engine row" if row is None
                   else "no engine MLX stages" if not isinstance(stages, dict)
                   else "no MLX marking snapshots")
@@ -127,8 +131,14 @@ def check_take(take: dict, sidecar: Path, pct: float, floor: float,
             f"publish as marking evidence")
         return False
     before = marks["before_marking"]
-    pre = [footprint(r) for r in rows if r["capturedUptimeNS"] <= before]
-    post = [footprint(r) for r in rows if r["capturedUptimeNS"] > before]
+    pre = [
+        value for r in rows
+        if r["capturedUptimeNS"] <= before and (value := footprint(r)) is not None
+    ]
+    post = [
+        value for r in rows
+        if r["capturedUptimeNS"] > before and (value := footprint(r)) is not None
+    ]
     if not pre or not post:
         errors.append(f"{label}: sidecar has no samples on one side of the marking boundary")
         return True

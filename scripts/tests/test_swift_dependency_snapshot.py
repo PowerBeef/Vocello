@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "swift_dependency_snapshot.py"
@@ -82,7 +83,7 @@ let package = Package(
     def _write_lock(path: Path, pins: list[dict[str, object]]) -> None:
         path.write_text(json.dumps({"originHash": "0" * 64, "pins": pins, "version": 3}), encoding="utf-8")
 
-    def snapshot(self) -> dict[str, object]:
+    def snapshot(self) -> dict[str, Any]:
         return module.build_snapshot(
             self.root,
             sha="e" * 40,

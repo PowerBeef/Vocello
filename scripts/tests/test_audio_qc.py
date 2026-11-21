@@ -54,15 +54,21 @@ class AudioQCTests(unittest.TestCase):
         self.assertIsNone(audio_qc.output_failure(row()))
         self.assertIsNone(audio_qc.audio_qc_failure(row()))
         cancelled = row(finishReason="cancelled")
-        self.assertIn("finishReason", audio_qc.output_failure(cancelled))
+        cancelled_failure = audio_qc.output_failure(cancelled)
+        assert cancelled_failure is not None
+        self.assertIn("finishReason", cancelled_failure)
         unreadable = row(outputMetrics={"readableWAV": False, "atomicallyPublished": True, "durationSeconds": 1.0})
-        self.assertIn("readableWAV", audio_qc.output_failure(unreadable))
+        unreadable_failure = audio_qc.output_failure(unreadable)
+        assert unreadable_failure is not None
+        self.assertIn("readableWAV", unreadable_failure)
         failed = row()
         failed["audioQC"].update({"verdict": "fail", "flags": ["clipping"]})
         self.assertEqual(audio_qc.audio_qc_failure(failed), "failed: ['clipping']")
         self.assertEqual(audio_qc.output_failure(failed), "audioQC failed: ['clipping']")
         missing = row(audioQC={})
-        self.assertIn("missing or invalid", audio_qc.audio_qc_failure(missing))
+        missing_failure = audio_qc.audio_qc_failure(missing)
+        assert missing_failure is not None
+        self.assertIn("missing or invalid", missing_failure)
         nested = row(audioQC=None)
         nested["outputMetrics"]["audioQC"] = {"verdict": "warn"}
         self.assertIsNone(audio_qc.audio_qc_failure(nested))

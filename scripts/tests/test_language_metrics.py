@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+from typing import Any
 import unicodedata
 import unittest
 from unittest import mock
@@ -716,9 +717,9 @@ class EdgeCoverageTests(unittest.TestCase):
 class RecognitionQualificationTests(unittest.TestCase):
     SCRIPT = "The quiet garden is open today."
 
-    def qualify(self, entry: dict, **kwargs) -> list[str]:
-        defaults = dict(audio_sha256="a" * 64, script=self.SCRIPT, script_sha256=sha(self.SCRIPT),
-                        language="english", duration_seconds=2.0)
+    def qualify(self, entry: Any, **kwargs: Any) -> list[str]:
+        defaults: dict[str, Any] = dict(audio_sha256="a" * 64, script=self.SCRIPT, script_sha256=sha(self.SCRIPT),
+                                        language="english", duration_seconds=2.0)
         defaults.update(kwargs)
         return metrics.recognition_issues(entry, **defaults)
 

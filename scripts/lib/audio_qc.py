@@ -78,7 +78,8 @@ def finite_number(value: Any) -> float | None:
 
 def raw_audio_qc(row: dict[str, Any]) -> dict[str, Any]:
     """The engine's report, whether it sits at the row root or under outputMetrics."""
-    output = row.get("outputMetrics") if isinstance(row.get("outputMetrics"), dict) else {}
+    raw_output = row.get("outputMetrics")
+    output = raw_output if isinstance(raw_output, dict) else {}
     qc = row.get("audioQC") or output.get("audioQC") or {}
     return qc if isinstance(qc, dict) else {}
 
@@ -88,7 +89,8 @@ def qc_metrics(raw_qc: dict[str, Any]) -> dict[str, float]:
     for source, target in QC_METRIC_MAP:
         if (value := finite_number(raw_qc.get(source))) is not None:
             metrics[target] = value
-    signal = raw_qc.get("signal") if isinstance(raw_qc.get("signal"), dict) else {}
+    raw_signal = raw_qc.get("signal")
+    signal = raw_signal if isinstance(raw_signal, dict) else {}
     for source, target in QC_SIGNAL_METRIC_MAP:
         if (value := finite_number(signal.get(source))) is not None:
             metrics[target] = value
@@ -112,7 +114,8 @@ def audio_qc_failure(row: dict[str, Any]) -> str | None:
 
 def output_failure(row: dict[str, Any]) -> str | None:
     """The full per-take output predicate: finish, atomic readable WAV, duration, QC."""
-    output = row.get("outputMetrics") if isinstance(row.get("outputMetrics"), dict) else {}
+    raw_output = row.get("outputMetrics")
+    output = raw_output if isinstance(raw_output, dict) else {}
     if not finish_succeeded(row.get("finishReason")):
         return f"unsuccessful finishReason={row.get('finishReason')!r}"
     if output.get("readableWAV") is not True:
@@ -158,7 +161,8 @@ def quality_identity_fields(row: dict[str, Any]) -> dict[str, Any]:
     publishes at schema v2. A run mixing both is refused by
     `history_record_schema_version`.
     """
-    notes = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+    raw_notes = row.get("notes")
+    notes = raw_notes if isinstance(raw_notes, dict) else {}
     outcome = notes.get("quality_registry_outcome")
     gates = notes.get("quality_registry_required_gates")
     if not isinstance(outcome, str) or not isinstance(gates, str) or not gates:

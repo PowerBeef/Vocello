@@ -192,7 +192,7 @@ def receipt_artifacts(document: dict[str, Any], descriptors: list[dict[str, Any]
     models = document.get("models")
     if not isinstance(models, list):
         raise CatalogContractError("artifact receipt source has no models array")
-    allowed_hosts = set(ALLOWED_HOSTS)
+    allowed_hosts: set[str] = set(ALLOWED_HOSTS)
     results: dict[str, dict[str, Any]] = {}
     for entry in models:
         repo, revision = parse_base_url(entry.get("baseURL"), allowed_hosts)
@@ -395,13 +395,12 @@ def validate_catalog(root: Path = REPO_ROOT, require_complete: bool = False) -> 
         files = artifact.get("files")
         if not isinstance(files, list) or not files or any(
             not isinstance(file, dict)
-            or
-            not is_safe_relative_path(file.get("relativePath"))
-            or not isinstance(file.get("sizeBytes"), int)
-            or isinstance(file.get("sizeBytes"), bool)
-            or file.get("sizeBytes") <= 0
-            or not isinstance(file.get("sha256"), str)
-            or not HEX_64.fullmatch(file.get("sha256"))
+            or not is_safe_relative_path(file.get("relativePath"))
+            or not isinstance((size := file.get("sizeBytes")), int)
+            or isinstance(size, bool)
+            or size <= 0
+            or not isinstance((digest := file.get("sha256")), str)
+            or not HEX_64.fullmatch(digest)
             for file in files
         ):
             errors.append(f"production catalog artifact {artifact_identity(artifact)} lacks exact file evidence")

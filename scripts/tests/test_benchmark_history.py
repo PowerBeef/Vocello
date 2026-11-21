@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import copy
 import importlib.util
 import json
 import sys
 import tempfile
 from types import SimpleNamespace
+from typing import Any
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -334,7 +336,7 @@ class HostProbeParsingTests(unittest.TestCase):
     """The only host probes `build_record` runs, parsed from canned output."""
 
     def test_mac_probe_parses_thermal_state_and_low_power(self) -> None:
-        answers = {
+        answers: dict[tuple[str, ...], str] = {
             ("sw_vers", "-productName"): "macOS",
             ("sw_vers", "-productVersion"): "26.6.2",
             ("sw_vers", "-buildVersion"): "25G99",
@@ -2323,7 +2325,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
         trace_path.mkdir(parents=True)
         (trace_path / "fixture.data").write_bytes(b"synthetic trace")
         summary = {**(summary or time_profiler_trace_summary()), "artifact": f"build/{run_id}.trace"}
-        args = SimpleNamespace(
+        args = argparse.Namespace(
             trace=trace_path, run_id=run_id, template=template,
             duration=10.0, target_process="vocello", profile_kind=profile_kind,
             retention_policy=policy,
@@ -2445,7 +2447,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
                 output.write_text("<trace-query-result/>", encoding="utf-8")
             return SimpleNamespace(returncode=0, stdout="", stderr="")
 
-        args = SimpleNamespace(
+        args = argparse.Namespace(
             trace=trace, toc=toc, template="Time Profiler + os_signpost", duration=3.0,
             target_process="sleep", target_pid=82861, run_id="profile-run", profile_kind="cpu",
             retention_policy="summaryOnly",
@@ -2550,7 +2552,7 @@ class BenchmarkHistoryTests(unittest.TestCase):
             summary.pop(key)
             return summary
 
-        for name, kwargs in (
+        invalid_cases: tuple[tuple[str, dict[str, Any]], ...] = (
             # A witness carrying a sampler's evidence is no witness.
             ("witness-cpu-fields", {
                 "profile_kind": "witness", "template": "os_signpost",
@@ -2572,7 +2574,8 @@ class BenchmarkHistoryTests(unittest.TestCase):
             # Every other kind still needs its CPU sampler fields.
             ("cpu-no-samples", {"summary": cpu_summary_without("cpuSampleCount")}),
             ("cpu-no-span", {"summary": cpu_summary_without("cpuSampleSpanMS")}),
-        ):
+        )
+        for name, kwargs in invalid_cases:
             candidate = f"{run_id}-{name}"
             manifest = self.profile_producer_manifest(
                 candidate, quality=True, policy="summaryOnly", **kwargs,

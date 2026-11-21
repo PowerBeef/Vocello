@@ -301,14 +301,17 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
     if thresholds_path is not None and thresholds is not None:
         mismatch = _thresholds_mismatch(thresholds, identities, scoring["sha256"])
         reason = None if mismatch is None else f"{thresholds_path.name} {mismatch}"
-    applicable = thresholds is not None and reason is None
-    levels = fit_lib.levels_for(layout, thresholds_path) if applicable else {}
-    if applicable and not levels:
+    active_thresholds = (
+        thresholds if thresholds_path is not None and thresholds is not None and reason is None else None
+    )
+    applicable = active_thresholds is not None
+    levels = fit_lib.levels_for(layout, thresholds_path) if applicable and thresholds_path is not None else {}
+    if applicable and thresholds_path is not None and not levels:
         reason = f"{thresholds_path.name} has no evaluation"
     names = detector_lib.feature_names(config)
     run_norm = detector_lib.normalization(rows, names)
     # A human-reference file has no z-score statistics: its fallbacks rank on the run's own.
-    norm = thresholds.get("normalization", run_norm) if applicable else run_norm
+    norm = active_thresholds.get("normalization", run_norm) if active_thresholds is not None else run_norm
     gated = detector_lib.gated_detectors(config, lane)
     pool_norms = norms_lib.load(layout)  # the provisional rules' per-language percentiles
     out_takes, errors = [], []
@@ -317,7 +320,7 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
         control = row["token"] in controls
         flags, scores, raw, assessments = [], {}, {}, {}
         for detector in config["detectors"]:
-            fitted = thresholds["detectors"].get(detector["id"]) if applicable else None
+            fitted = active_thresholds["detectors"].get(detector["id"]) if active_thresholds is not None else None
             if fitted and fitted.get("reportOnly"):
                 fitted = None
             outcome = detector_lib.score(detector, row["features"], row["language"], fitted, norm, norms=pool_norms)
@@ -361,7 +364,7 @@ def score_run(layout: Layout, config: dict[str, Any], rows: list[dict[str, Any]]
     return {
         "schema": FLAGS_SCHEMA, "createdAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "thresholds": thresholds_path.name if thresholds_path else None, "thresholdsApplied": applicable,
-        "thresholdsMethod": thresholds.get("method", "logistic") if applicable else None,
+        "thresholdsMethod": active_thresholds.get("method", "logistic") if active_thresholds is not None else None,
         "thresholdsReason": reason, "scoringSHA256": scoring["sha256"], "norms": (pool_norms or {}).get("file"),
         "levelsFromEval": bool(levels), "takes": out_takes, "errors": errors, "summary": summary,
         "assessment": assessment_lib.summarize(out_takes, errors),

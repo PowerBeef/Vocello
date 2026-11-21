@@ -40,7 +40,8 @@ def _joins(expected, words):
         values = word.get("phones")
         narrow = _tokens(values)
         marked = word.get("optional", [])
-        if (narrow is None or not isinstance(marked, (list, tuple)) or len(marked) > len(values)
+        if (narrow is None or not isinstance(values, (list, tuple))
+                or not isinstance(marked, (list, tuple)) or len(marked) > len(values)
                 or any(type(j) is not int or not 0 <= j < len(values) for j in marked)
                 or len(set(marked)) != len(marked)):
             return None

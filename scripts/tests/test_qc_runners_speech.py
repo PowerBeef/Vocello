@@ -193,8 +193,11 @@ class CommonTests(unittest.TestCase):
         def fail(job):
             raise OSError("model files missing")
 
+        def unused_process(engine, context, options):
+            raise AssertionError("process must not run when setup fails")
+
         with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()) as stderr:
-            self.assertEqual(common.main(["--job", str(path)], build_engine=fail, process=None), 2)
+            self.assertEqual(common.main(["--job", str(path)], build_engine=fail, process=unused_process), 2)
         self.assertIn("model load failed (OSError)", stderr.getvalue())
         self.assertNotIn("missing", stderr.getvalue())
         with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
@@ -203,7 +206,7 @@ class CommonTests(unittest.TestCase):
         self.assertEqual(self.space.result(take["audioSHA256"])["outputs"], {"engine": "engine"})
         path.write_text("{}", encoding="utf-8")
         with redirect_stderr(io.StringIO()):
-            self.assertEqual(common.main(["--job", str(path)], build_engine=fail, process=None), 2)
+            self.assertEqual(common.main(["--job", str(path)], build_engine=fail, process=unused_process), 2)
 
 
 class FakeTokenizer:
@@ -258,6 +261,7 @@ class Qwen3AsrTests(unittest.TestCase):
         row = np.full(11, -30.0)
         row[[1, 2, 3]] = np.log([0.6, 0.2, 0.1])
         probs = qwen3_asr.language_probs(row, candidates)
+        assert probs is not None
         self.assertEqual(list(probs), ["french", "english", "chinese"])
         self.assertAlmostEqual(sum(probs.values()), 1.0, places=5)
         self.assertAlmostEqual(probs["french"], 0.6 / 0.9, places=5)
@@ -277,7 +281,8 @@ class Qwen3AsrTests(unittest.TestCase):
         row = np.full(11, -30.0)
         row[[1, 2, 3, 4]] = np.log([0.7, 0.2, 0.05, 0.05])
         engine = object.__new__(qwen3_asr.Qwen3AsrEngine)
-        engine.mx, engine.tokenizer = None, tokenizer
+        setattr(engine, "mx", None)
+        engine.tokenizer = tokenizer
         engine.model = FakeQwenModel(tokenizer, script, row)
         engine.candidates = qwen3_asr.first_token_candidates(["French", "English", "Chinese", "Cantonese"],
                                                              engine._encode)

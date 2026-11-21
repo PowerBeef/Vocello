@@ -129,8 +129,10 @@ def analyze(take, results, context, *, layout, model_ids, expected, words, audio
     reference_outputs = {role: value["outputs"] for role, value in reference.items()
                          if isinstance(value, dict) and not value.get("error") and isinstance(value.get("outputs"), dict)}
     try:
-        result["clonePitch"] = fidelity.pitch_section(tuple(outputs.get(role) for role in ("pitchA", "pitchB")),
-                                                     tuple(reference_outputs.get(role) for role in ("pitchA", "pitchB")))
+        result["clonePitch"] = fidelity.pitch_section(
+            (outputs.get("pitchA"), outputs.get("pitchB")),
+            (reference_outputs.get("pitchA"), reference_outputs.get("pitchB")),
+        )
     except (TypeError, ValueError, KeyError, AttributeError):
         result["clonePitch"] = {"available": False, "reason": "invalid-pitch-tracks", "decision": "not-assessed"}
     try:
@@ -149,7 +151,7 @@ def events_document(run_id, scoring_sha, models, takes, rows):
         duration = evidence.get("audioDurationSeconds")
         if duration is None:
             duration = (evidence.get("localAcoustics") or {}).get("durationSeconds")
-        if type(duration) not in (int, float) or not math.isfinite(duration) or duration <= 0:
+        if not isinstance(duration, (int, float)) or isinstance(duration, bool) or not math.isfinite(duration) or duration <= 0:
             duration = None
         # Preserve single-witness disagreements separately from consensus. Missing
         # timing stays in pronunciation evidence; it cannot be localized here.
@@ -186,7 +188,11 @@ def events_document(run_id, scoring_sha, models, takes, rows):
                     rejected += 1
                     continue
                 start, end = candidate.get("start"), candidate.get("end")
-                if not all(type(x) in (int, float) and math.isfinite(x) for x in (start, end)):
+                if (
+                    not isinstance(start, (int, float)) or isinstance(start, bool)
+                    or not isinstance(end, (int, float)) or isinstance(end, bool)
+                    or not math.isfinite(start) or not math.isfinite(end)
+                ):
                     rejected += 1
                     continue
                 if duration is None or not 0 <= start < end <= duration:

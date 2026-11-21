@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Cut the next iPhone TestFlight candidate tag: sign it, verify it, push only it.
 
-On the maintainer's request this is the one route by which Claude Code writes a release tag
-(CLAUDE.md: Hard boundaries); every other tag stays maintainer-run. It refuses unless the
+On the maintainer's request this is the one route by which Antigravity writes a release tag
+(AGENTS.md: Hard boundaries); every other tag stays maintainer-run. It refuses unless the
 working tree is clean, HEAD is local `main` and exactly `origin/main`, the latest `CI required`
 check of a push to main succeeded on that commit, and App Store Connect has no iOS build with
 project.yml's build number. It then creates `v<MARKETING_VERSION>-ios.<N>` (the next free N)

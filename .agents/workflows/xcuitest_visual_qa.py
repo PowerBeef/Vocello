@@ -9,7 +9,7 @@ runs:
 
 Args (JSON object):
   - run_dir (str, required): path to a finished `scripts/ui_test.sh` run directory
-    (absolute or repo-relative, e.g. `build/artifacts/macos/ui/macos-xcui-smoke-...`).
+    (absolute or repo-relative, e.g. `build/artifacts/ui-tests/macos/macos-xcui-smoke-...`).
   - max_screenshots (int, optional): cap on screenshots inspected (default: 16).
 """
 

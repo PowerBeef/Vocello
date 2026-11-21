@@ -841,7 +841,7 @@ def policy_violation(invocation: GitInvocation) -> tuple[str, str]:
         return "config", f"`{invocation.config_env}` injects git configuration"
     if "$" in sub or "`" in sub:
         return "push", "the git subcommand is computed at run time"
-    # Staging and stashing (CLAUDE.md: stage explicit paths, never stash or broadly stage). The
+    # Staging and stashing (AGENTS.md: stage explicit paths, never stash or broadly stage). The
     # permission rules deny the literal prefixes; these catch every other spelling (`git add -- .`,
     # `git add -v -A`, `git commit -m x -a`, `git -C . stash`).
     if sub in ADD_COMMANDS:
@@ -897,7 +897,7 @@ def policy_violation(invocation: GitInvocation) -> tuple[str, str]:
         if action == "add":
             return "worktree", "`git worktree add` makes a hand-made worktree"
         if action == "move":
-            return "worktree", "`git worktree move` bypasses Claude Code worktree management"
+            return "worktree", "`git worktree move` bypasses Antigravity worktree management"
         if action == "remove" and any(_long(a, "--force") or _short_has(a, "f") for a in args[2:]):
             return "worktree", ("put --force right after `git worktree remove` so discarding agent "
                                 "work asks first")

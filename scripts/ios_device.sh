@@ -316,7 +316,7 @@ resolve_device() {
   fi
   local tmp; tmp="$(mktemp)"
   xcrun devicectl list devices --json-output "$tmp" >/dev/null 2>&1 \
-    || die "devicectl could not list devices (is Xcode 26 installed?)"
+    || die "devicectl could not list devices (is Xcode 27 installed?)"
   local id
   id="$(python3 - "$tmp" <<'PY'
 import json, sys

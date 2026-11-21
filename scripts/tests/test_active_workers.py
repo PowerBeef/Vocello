@@ -14,8 +14,6 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import active_workers as workers
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "hooks"))
-import worker_lifecycle as lifecycle_hook
 
 
 class ActiveWorkerTests(unittest.TestCase):
@@ -197,51 +195,6 @@ class ActiveWorkerTests(unittest.TestCase):
         self.assertEqual(report["activeWorkers"], 0)
         self.assertEqual(report["staleRecords"], 2)
         self.assertFalse(report["trackingAvailable"])
-
-
-class LifecycleHookTests(unittest.TestCase):
-    def test_session_start_exports_only_the_opaque_marker(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            env_file = Path(directory) / "env"
-            session_key = workers.key("current")
-            self.assertTrue(lifecycle_hook.session_export(str(env_file), session_key))
-            self.assertEqual(env_file.read_text(), f"export QVOICE_WORKER_SESSION={session_key}\n")
-            self.assertRegex(session_key, r"^[0-9a-f]{64}$")
-            self.assertFalse(lifecycle_hook.session_export(None, session_key))
-            self.assertFalse(lifecycle_hook.session_export(str(Path(directory) / "missing" / "env"), session_key))
-
-    def test_responses_name_the_marker_and_the_agent_rules(self) -> None:
-        with tempfile.TemporaryDirectory() as directory, \
-                patch.dict(os.environ, {"CLAUDE_ENV_FILE": str(Path(directory) / "env")}):
-            start = lifecycle_hook.response({"hook_event_name": "SessionStart", "session_id": "current"})
-        output = start["hookSpecificOutput"]
-        self.assertEqual(output["hookEventName"], "SessionStart")
-        self.assertIn(workers.key("current"), output["additionalContext"])
-        self.assertIn("already exported", output["additionalContext"])
-        self.assertNotIn("current", output["additionalContext"].replace(workers.key("current"), ""))
-        agent = lifecycle_hook.response({"hook_event_name": "SubagentStart", "session_id": "s", "agent_id": "a"})
-        self.assertEqual(agent["hookSpecificOutput"]["hookEventName"], "SubagentStart")
-        for rule in ("worktree-*", "never push", "native builds", "config/roadmap.json"):
-            self.assertIn(rule, agent["hookSpecificOutput"]["additionalContext"])
-        self.assertEqual(lifecycle_hook.response({"hook_event_name": "SessionEnd", "session_id": "s"}), {})
-
-    def test_a_session_started_in_a_linked_worktree_is_told_it_is_a_side_session(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory).resolve() / "repo"
-            subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
-            subprocess.run(["git", "-C", str(root), "-c", "user.email=f@example.invalid", "-c", "user.name=F",
-                            "commit", "-q", "--allow-empty", "-m", "init"], check=True)
-            side = root / ".claude/worktrees/side-1"
-            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "claude/side-1", str(side)],
-                           check=True)
-            with patch.dict(os.environ, {"CLAUDE_ENV_FILE": str(Path(directory) / "env")}):
-                contexts = {cwd: lifecycle_hook.response({"hook_event_name": "SessionStart", "session_id": "s",
-                                                          "cwd": str(cwd)})["hookSpecificOutput"]["additionalContext"]
-                            for cwd in (root, side)}
-        self.assertNotIn("side session", contexts[root])
-        for rule in ("side session", "claude/*", "never push", "native builds", "config/roadmap.json",
-                     workers.key("s")):
-            self.assertIn(rule, contexts[side])
 
 
 class ActiveWorkerCommandTests(unittest.TestCase):

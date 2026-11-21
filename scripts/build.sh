@@ -105,7 +105,7 @@ build_app() {
     # empty array as an unbound variable under `set -u`.
     local -a build_tail=(build)
     if [ "$CODEQL_BUILD_PHASE" = "trace" ]; then
-        # CodeQL's translated tracing shell cannot execute Xcode 26's Metal
+        # CodeQL's translated tracing shell cannot execute Xcode 27's Metal
         # compiler. codeql-prepare has already built the exact native Metal
         # products in this DerivedData; exclude only their source files while
         # the tracing shell recompiles repository-owned Swift.
@@ -227,7 +227,7 @@ cmd_codeql() {
     configure_codeql_build trace
     # The native prebuild materializes MLX's Metal outputs. Only owned Swift
     # needs to be newer for the translated CodeQL shell, whose tracer cannot
-    # execute Xcode 26's optional Metal compiler.
+    # execute Xcode 27's optional Metal compiler.
     touch_codeql_sources
     build_app "scripts/build.sh codeql"
 }

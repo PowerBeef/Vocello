@@ -25,8 +25,8 @@ Check, and cite the rule for each finding:
    `nonisolated async` work that must leave the caller's actor is `@concurrent` (with an explicit
    `async` on closures); with InferIsolatedConformances on, an Objective-C delegate conformance a
    framework calls off the main actor is written `nonisolated`.
-   Strict memory safety: new unsafe constructs are marked `unsafe`, using the toolchain-neutral
-   forwards (`ToolchainNeutralUnsafeAccess.swift`) where Swift 6.4 and CI's 6.3 disagree. A new
+   Strict memory safety: new unsafe constructs are marked `unsafe` (using
+   `ToolchainNeutralUnsafeAccess.swift` where cross-version Swift safety annotations diverge). A new
    `@preconcurrency import` carries `@unsafe` and is justified. With MemberImportVisibility on, a file
    imports every module whose members it uses.
 3. MLX facade: product targets import only `VocelloQwen3Core`, never `MLXAudio*` implementation

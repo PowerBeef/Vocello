@@ -265,9 +265,6 @@ class EditGuardTests(unittest.TestCase):
                 with self.subTest(path=path, cwd=cwd):
                     result = invoke("generated_file_guard.sh", edit(path), root=root, cwd=cwd)
                     self.assertEqual(result.returncode, 2, result.stderr)
-            result = invoke("project_yml_reminder.sh", edit(str(worktree / "project.yml")),
-                            event="PostToolUse", root=root)
-            self.assertIn("regenerate_project.sh --fast", result.stdout)
 
     def test_case_variants_of_a_generated_path_are_the_same_file(self):
         for path in ("docs/roadmap.md", "DOCS/ROADMAP.MD", "qwenvoice.xcodeproj/project.pbxproj"):
@@ -318,21 +315,6 @@ class EditGuardTests(unittest.TestCase):
                 result = subprocess.run(["bash", str(HOOKS / "generated_file_guard.sh")], input=payload, text=True,
                                         capture_output=True, check=False, timeout=20)
                 self.assertEqual(result.returncode, 2)
-
-    def test_regeneration_reminder_follows_specification_and_membership_inputs(self):
-        for path in ("project.yml", str(ROOT / "project.yml"), "Sources/Fixture.swift", "Tests/New Test.swift"):
-            for tool in EDIT_TOOLS:
-                with self.subTest(path=path, tool=tool):
-                    result = invoke("project_yml_reminder.sh", edit(path, tool), tool_name=tool, event="PostToolUse")
-                    self.assertEqual(result.returncode, 0, result.stderr)
-                    output = json.loads(result.stdout)["hookSpecificOutput"]
-                    self.assertEqual(output["hookEventName"], "PostToolUse")
-                    self.assertIn("regenerate_project.sh --fast", output["additionalContext"])
-        for path in ("fixtures/project.yml", "website/project.yml", "docs/ok.md"):
-            with self.subTest(path=path):
-                result = invoke("project_yml_reminder.sh", edit(path), event="PostToolUse")
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertEqual(result.stdout, "")
 
 
 def invoke_agy(mode, payload, *, cwd=None, root=ROOT):
@@ -399,19 +381,12 @@ class HooksWiringTests(unittest.TestCase):
         system = shutil.which("python3", path="/usr/bin:/bin")
         if system:
             interpreters.add(system)
-        cases = [("worker_lifecycle.py", {"hook_event_name": event, "session_id": "fixture", "agent_id": "a"}, 0)
-                 for event in ("SessionStart", "SubagentStart", "SubagentStop", "SessionEnd")]
-        cases += [("simulator_tool_guard.py", {"tool_name": "mcp__x__list_schemes"}, 0),
-                  ("simulator_tool_guard.py", {"tool_name": "mcp__x__boot" + SIM_SUFFIX}, 2),
-                  ("connector_write_guard.py", {"tool_name": "mcp__x__get_me"}, 0),
-                  ("connector_write_guard.py", {"tool_name": "mcp__x__push_files"}, 0),
-                  ("connector_write_guard.py", {"tool_name": "mcp__x__push_files", "agent_id": "a"}, 2),
-                  ("agent_guard.py", {"tool_name": "Bash", "agent_id": "a", "cwd": str(ROOT),
-                                      "tool_input": {"command": "scripts/dev.sh build"}}, 2),
-                  ("agent_guard.py", {"tool_name": "Bash", "agent_id": "a", "cwd": str(ROOT),
-                                      "tool_input": {"command": "git status"}}, 0),
-                  ("agent_guard.py", {"tool_name": "Bash", "agent_id": "a", "cwd": str(ROOT),
-                                      "tool_input": {"command": "scripts/ui_test.sh help && xcodebuild -version"}}, 0)]
+        cases = [("agent_guard.py", {"tool_name": "Bash", "agent_id": "a", "cwd": str(ROOT),
+                                     "tool_input": {"command": "scripts/dev.sh build"}}, 2),
+                 ("agent_guard.py", {"tool_name": "Bash", "agent_id": "a", "cwd": str(ROOT),
+                                     "tool_input": {"command": "git status"}}, 0),
+                 ("agent_guard.py", {"tool_name": "Bash", "agent_id": "a", "cwd": str(ROOT),
+                                     "tool_input": {"command": "scripts/ui_test.sh help && xcodebuild -version"}}, 0)]
         for interpreter in sorted(interpreters):
             for name, payload, expected in cases:
                 with self.subTest(interpreter=interpreter, hook=name, payload=payload), \
@@ -419,12 +394,9 @@ class HooksWiringTests(unittest.TestCase):
                     result = subprocess.run(
                         [interpreter, str(HOOKS / name)], input=json.dumps(payload), text=True,
                         capture_output=True, timeout=20,
-                        env=dict(os.environ, QVOICE_WORKER_DIRECTORY=workers,
-                                 CLAUDE_ENV_FILE=str(Path(workers) / "env")))
+                        env=dict(os.environ, QVOICE_WORKER_DIRECTORY=workers))
                     self.assertEqual(result.returncode, expected, result.stderr)
                     self.assertNotIn("Traceback", result.stderr)
-                    if name == "worker_lifecycle.py":
-                        json.loads(result.stdout)
             for mode, agy_payload, expected_decision in (
                 ("pre-command", {"toolCall": {"name": "run_command", "args": {"CommandLine": "git status"}}, "cwd": str(ROOT)}, "allow"),
                 ("pre-command", {"toolCall": {"name": "run_command", "args": {"CommandLine": "git switch -c smoke"}}, "cwd": str(ROOT)}, "deny"),
@@ -806,37 +778,7 @@ class AntigravityPolicyTests(unittest.TestCase):
         self.assertEqual(self.mcp("sosumi", "searchAppleDocumentation"), "allow")
 
 
-class SimulatorToolGuardTests(unittest.TestCase):
-    def test_physical_device_only_mcp_routes_preserve_device_discovery(self):
-        for tool in ("mcp__xcodebuildmcp__build" + SIM_SUFFIX, "mcp__XcodeBuildMCP__boot" + SIM_SUFFIX,
-                     "mcp__xcodebuildmcp__debug_attach" + SIM_SUFFIX, "mcp__xcodebuildmcp__simctl",
-                     "mcp__MobileBuildMCP__list" + SIM_SUFFIX + "s",
-                     "mcp__MobileBuildMCP__record" + SIM_SUFFIX + "_video",
-                     "mcp__MobileBuildMCP__get" + SIM_SUFFIX + "_app_path"):
-            with self.subTest(tool=tool):
-                result = invoke("simulator_tool_guard.py", {}, tool_name=tool)
-                self.assertEqual(result.returncode, 2, result.stderr)
-        for tool in ("mcp__xcodebuildmcp__list_devices", "mcp__xcodebuildmcp__build_device",
-                     "mcp__sosumi__search", "mcp__xcodebuildmcp__build_macos",
-                     "mcp__MobileBuildMCP__list_schemes", "mcp__github__find_similar_issues"):
-            with self.subTest(tool=tool):
-                result = invoke("simulator_tool_guard.py", {}, tool_name=tool)
-                self.assertEqual(result.returncode, 0, result.stderr)
-
-    def test_desktop_simulator_panel_is_refused_but_computer_use_is_not(self):
-        """The desktop app's iOS Simulator server is an unsupported destination. Computer use may reach the
-        Mac app and a mirrored iPhone (maintainer decision 2026-10-24); XCUITest alone yields evidence."""
-        result = invoke("simulator_tool_guard.py", {"action": "attach"}, tool_name=f"mcp__Claude_Code_iOS_{SIM}__control")
-        self.assertEqual(result.returncode, 2, result.stderr)
-        for tool, tool_input in (("request_access", {"apps": ["Vocello", "iPhone Mirroring"], "reason": "x"}),
-                                 ("open_application", {"app": "com.qwenvoice.app"}),
-                                 ("app_click", {"app": "com.apple.ScreenContinuity"}), ("screenshot", {})):
-            with self.subTest(tool=tool):
-                result = invoke("simulator_tool_guard.py", tool_input, tool_name="mcp__computer-use__" + tool)
-                self.assertEqual(result.returncode, 0, result.stderr)
-
-
-# The GitHub connector's tools as the desktop app offered them on 2026-11-16 (True: writes).
+# The GitHub connector's tools (True: writes).
 GITHUB_CONNECTOR_TOOLS = {
     **dict.fromkeys(("add_comment_to_pending_review", "add_issue_comment", "add_reply_to_pull_request_comment",
                      "create_branch", "create_or_update_file", "create_pull_request", "create_repository",
@@ -850,61 +792,29 @@ GITHUB_CONNECTOR_TOOLS = {
                      "pull_request_read", "run_secret_scanning", "search_code", "search_commits", "search_issues",
                      "search_pull_requests", "search_repositories", "search_users"), False),
 }
-# The connector's server name is the client's: a per-install UUID in the desktop app (a stand-in here),
-# `claude_ai_Github` in the CLI.
-GITHUB_SERVERS = ("mcp__0f1e2d3c-4b5a-4697-8877-665544332211__", "mcp__claude_ai_Github__", "mcp__github__")
+GITHUB_SERVERS = ("mcp__0f1e2d3c-4b5a-4697-8877-665544332211__", "mcp__github__")
 
 
 class ConnectorWriteGuardTests(unittest.TestCase):
-    """BKL-62: a GitHub connector write asks or is blocked whatever the connector's server name."""
+    """BKL-62: a GitHub connector write triggers force_ask or deny whatever the connector's server name."""
 
     def setUp(self):
         self.adapter = importlib_module(HOOKS / "agy_hook_adapter.py")
+        self.guard_mod = importlib_module(HOOKS / "connector_write_guard.py")
 
-    def guard(self, tool_name, *, agent=False):
-        payload = {"hook_event_name": "PreToolUse", "tool_name": tool_name, "tool_input": {}, "cwd": str(ROOT),
-                   **({"agent_id": "agent-1"} if agent else {})}
-        return [subprocess.run(["python3", str(HOOKS / "connector_write_guard.py")],
-                               input=json.dumps(payload), text=True, capture_output=True,
-                               cwd=ROOT, timeout=20)]
-
-    @staticmethod
-    def decision(results):
-        if any(result.returncode == 2 for result in results):
-            return "deny"
-        answers = [json.loads(result.stdout) for result in results if result.stdout.strip()]
-        return next((a["hookSpecificOutput"]["permissionDecision"] for a in answers), "")
-
-    def test_connector_writes_ask_under_any_server_name_and_reads_pass(self):
-        names = [(server + tool, write) for server in GITHUB_SERVERS for tool, write in GITHUB_CONNECTOR_TOOLS.items()]
-        for (name, write), results in run_all(lambda item: self.guard(item[0]), names):
-            with self.subTest(tool=name):
-                self.assertTrue(all(result.returncode in (0, 2) for result in results), results)
-                self.assertEqual(self.decision(results), "ask" if write else "")
-                if write:
-                    answer = json.loads(next(r.stdout for r in results if r.stdout.strip()))["hookSpecificOutput"]
-                    self.assertEqual(answer["hookEventName"], "PreToolUse")
-                    self.assertIn("explicit request", answer["permissionDecisionReason"])
-
-    def test_a_subagents_connector_write_is_refused(self):
+    def test_connector_writes_classified_under_any_server_name_and_reads_pass(self):
         for server in GITHUB_SERVERS:
-            with self.subTest(server=server):
-                results = self.guard(server + "create_pull_request", agent=True)
-                self.assertEqual(self.decision(results), "deny")
-                self.assertIn("agents never write outside their worktree", "".join(r.stderr for r in results))
-                self.assertEqual(self.decision(self.guard(server + "pull_request_read", agent=True)), "")
+            for tool, write in GITHUB_CONNECTOR_TOOLS.items():
+                name = server + tool
+                with self.subTest(tool=name):
+                    self.assertEqual(self.guard_mod.github_write(name), tool if write else "")
 
-    def test_other_servers_tools_and_malformed_input_pass(self):
+    def test_other_servers_and_non_mcp_names_pass(self):
         for name in ("mcp__1a2b3c4d-0000-4000-8000-000000000001__create_draft", "mcp__drive__create_file",
                      "mcp__ccd_sidebar__create_group", "mcp__computer-use__request_access",
                      "mcp__plugin_huggingface-skills_huggingface-skills__hf_fs", "push_files", "mcp__push_files"):
             with self.subTest(tool=name):
-                self.assertEqual(self.decision(self.guard(name)), "")
-        for raw in ("not json", "[]", '{"tool_name": 3}'):
-            with self.subTest(payload=raw):
-                result = subprocess.run(["python3", str(HOOKS / "connector_write_guard.py")], input=raw, text=True,
-                                        capture_output=True, timeout=20)
-                self.assertEqual((result.returncode, result.stdout), (0, ""), result.stderr)
+                self.assertEqual(self.guard_mod.github_write(name), "")
 
     def test_antigravity_adapter_asks_on_github_writes_and_allows_reads(self):
         for server in ("github", "0f1e2d3c-4b5a-4697-8877-665544332211"):
@@ -914,6 +824,19 @@ class ConnectorWriteGuardTests(unittest.TestCase):
                                "cwd": str(ROOT)}
                     decision = self.adapter.handle_pre_mcp(payload, ROOT)["decision"]
                     self.assertEqual(decision, "force_ask" if write else "allow")
+
+    def test_antigravity_adapter_denies_subagent_worktree_github_writes(self):
+        with tempfile.TemporaryDirectory(prefix="vocello connector worktree ") as tmp:
+            root = Path(tmp).resolve() / "repo"
+            initialize_repo(root)
+            wt = root.parent / "wt-1"
+            subprocess.run(["git", "-C", str(root), "worktree", "add", "-q", "-b", "subagent-1", str(wt)], check=True)
+            write_payload = {"toolCall": {"name": "call_mcp_tool", "args": {"ServerName": "github", "ToolName": "create_pull_request"}},
+                             "cwd": str(wt)}
+            read_payload = {"toolCall": {"name": "call_mcp_tool", "args": {"ServerName": "github", "ToolName": "pull_request_read"}},
+                            "cwd": str(wt)}
+            self.assertEqual(self.adapter.handle_pre_mcp(write_payload, root)["decision"], "deny")
+            self.assertEqual(self.adapter.handle_pre_mcp(read_payload, root)["decision"], "allow")
 
 
 class PolicyGuardTests(unittest.TestCase):

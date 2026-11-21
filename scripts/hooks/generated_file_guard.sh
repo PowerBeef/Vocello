@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude Code PreToolUse file guard (Edit, Write, MultiEdit, NotebookEdit), also
+# Antigravity PreToolUse file guard (called via agy_hook_adapter.py), also
 # callable with a hook JSON payload on stdin.
 #
 # Reads the normalized edit path and refuses (exit 2) direct edits of files the

@@ -443,7 +443,7 @@ def parser_failure(parser: str, error: Exception) -> int:
     Until 2026-11-15 the three policy checks ignored a parser exception and allowed the
     command, so a spelling that broke the parser also passed the guard (audit B7).
     policy_guard.sh runs under `set -e`: the failed substitution ends the hook with this
-    status and Claude Code shows the text. Only the command the parser cannot read is refused."""
+    status and Antigravity surfaces the reason. Only the command the parser cannot read is refused."""
     print(f"policy guard: BLOCKED — the {parser} check could not parse this command ({error!r}), so it "
           "cannot be judged against the repository rules.", file=sys.stderr)
     print("Run it in a simpler form: one command per call, without nested quoting or substitutions. If a "
@@ -461,24 +461,19 @@ def main() -> int:
     except (ValueError, TypeError):
         # Preserve the historical shell hooks' permissive handling of absent
         # input. File guards must not silently skip an unreadable edit.
-        if mode not in ("paths", "relative-paths"):
+        if mode != "relative-paths":
             return 0
         print("file guard: cannot inspect malformed hook input", file=sys.stderr)
         return 2
     try:
         root = Path(os.environ.get("VOCELLO_PROJECT_ROOT") or Path(__file__).resolve().parents[2])
-        if mode in ("paths", "relative-paths"):
+        if mode == "relative-paths":
             for path in edit_paths(payload, root):
-                if mode == "paths":
-                    print(path)
-                else:
-                    parent = Path(path).parent
-                    while not parent.exists() and parent != parent.parent:
-                        parent = parent.parent
-                    checkout = checkout_root(parent, root)
-                    print(os.path.relpath(path, checkout))
-        elif mode == "checkout":
-            print(checkout_root(Path(payload.get("cwd") or root), root))
+                parent = Path(path).parent
+                while not parent.exists() and parent != parent.parent:
+                    parent = parent.parent
+                checkout = checkout_root(parent, root)
+                print(os.path.relpath(path, checkout))
         elif mode == "git-actions":
             for line in git_actions(payload, root):
                 print(line)

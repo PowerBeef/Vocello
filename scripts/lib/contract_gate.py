@@ -190,6 +190,7 @@ VALIDATORS: tuple[Validator, ...] = (
         "Sources/", "Packages/")),
     _reads(PYTHON, "scripts/ios_control_audit.py", "validate", inputs=(
         "scripts/ios_control_audit.py", *JSONIO, "config/ios-control-audit.json",
+        "config/ios-control-audit-corpus.json",
         "config/ios-control-audit-schema-v1.json", SPEAKER_CONTRACT,
         "Sources/Resources/qwenvoice_production_model_catalog.json",
         "Sources/QwenVoiceCore/EmotionPreset.swift", "Sources/QwenVoiceCore/SemanticTypes.swift",

@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MATRIX_PATH="$SCRIPT_DIR/../config/apple-platform-capability-matrix.json"
 EXPECT_SIGNED_RELEASE="${QWENVOICE_EXPECT_SIGNED_RELEASE:-0}"
 # A local operator without a GUI session may explicitly skip step [3/4].
-# Candidate CI is never allowed to do so: release.yml runs on macos-26 and
+# Candidate CI is never allowed to do so: release.yml runs on xcode-27 and
 # must prove that both the staged app and the copy extracted from the DMG
 # survive external startup.
 SKIP_LAUNCH_SMOKE="${QWENVOICE_SKIP_LAUNCH_SMOKE:-0}"

@@ -266,7 +266,7 @@ public final class TransformerLayer: Module {
             fatalError("unsupported norm type \(cfg.norm)")
         }
 
-        if let _ = cfg.layerScale {
+        if cfg.layerScale != nil {
             self._layer_scale_1 = ModuleInfo(wrappedValue: LayerScale(dim: cfg.dModel))
             self._layer_scale_2 = ModuleInfo(wrappedValue: LayerScale(dim: cfg.dModel))
         } else {
@@ -357,7 +357,7 @@ public final class ProjectedTransformer: Module {
 
         xs = transformer(xs, cache: cache)
 
-        if output_projs.compactMap({ $0 }).count == 0 {
+        if output_projs.compactMap({ $0 }).isEmpty {
             return [swappedAxes(xs, 1, 2)]
         } else {
             var outs: [MLXArray] = []

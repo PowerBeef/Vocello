@@ -1,4 +1,4 @@
-// swift-tools-version:6.1
+// swift-tools-version:6.2
 import PackageDescription
 
 // Vocello-specialized fork: Qwen3-TTS only (2026-06-09).
@@ -54,7 +54,10 @@ let package = Package(
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "HuggingFace", package: "swift-huggingface"),
             ],
-            path: "Sources/VocelloQwen3Core"
+            path: "Sources/VocelloQwen3Core",
+            swiftSettings: [
+                .treatAllWarnings(as: .error),
+            ]
         ),
 
         // MARK: - MLXAudioCore
@@ -68,7 +71,7 @@ let package = Package(
             ],
             path: "Sources/MLXAudioCore",
             swiftSettings: [
-                .unsafeFlags(["-Xfrontend", "-warn-concurrency"], .when(configuration: .debug))
+                .treatAllWarnings(as: .error),
             ]
         ),
 
@@ -83,7 +86,10 @@ let package = Package(
                 .product(name: "MLXLMCommon", package: "mlx-swift-lm"),
                 .product(name: "HuggingFace", package: "swift-huggingface"),
             ],
-            path: "Sources/MLXAudioCodecs"
+            path: "Sources/MLXAudioCodecs",
+            swiftSettings: [
+                .treatAllWarnings(as: .error),
+            ]
         ),
 
         // MARK: - MLXAudioMark
@@ -94,10 +100,16 @@ let package = Package(
             dependencies: [
                 .product(name: "MLX", package: "mlx-swift"),
             ],
-            path: "Sources/MLXAudioMark"
+            path: "Sources/MLXAudioMark",
+            swiftSettings: [
+                .treatAllWarnings(as: .error),
+            ]
         ),
 
         // MARK: - MLXAudioTTS
+        // `.treatAllWarnings(as: .error)` is deferred on MLXAudioTTS until upstream
+        // `mlx-swift` marks `MLXArray` Sendable (DW-03); the other four owned runtime
+        // targets enforce warnings-as-errors directly.
         .target(
             name: "MLXAudioTTS",
             dependencies: [
@@ -114,7 +126,10 @@ let package = Package(
                 .product(name: "Hub", package: "swift-transformers"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
             ],
-            path: "Sources/MLXAudioTTS"
+            path: "Sources/MLXAudioTTS",
+            exclude: [
+                "Models/Qwen3TTS/README.md",
+            ]
         ),
 
         // Curated deterministic coverage for the owned Qwen3 runtime. Keep this

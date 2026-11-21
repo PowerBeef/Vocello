@@ -8,7 +8,7 @@
     },
     {
       "path": "Package.swift",
-      "sha256": "8d9a505eee9bd50a9119b96001216ff711c978615700752061881b214b29d00b",
+      "sha256": "fbc022009182009e6d9b884d66e0f76ec3cf5e121d2fbfa71b1fb9ca436f8849",
       "upstreamStatus": "modified"
     },
     {
@@ -28,7 +28,7 @@
     },
     {
       "path": "Sources/MLXAudioCodecs/Mimi/Transformer.swift",
-      "sha256": "c1b51811294df8810a837e88bab8f24c83260659f3bde16cba81a5b04d7fad3b",
+      "sha256": "fb551af92c7b4ac6a1ce60757dfb09195a8c951d0ca5f86e7c09cdb6482aef91",
       "upstreamStatus": "modified"
     },
     {
@@ -48,7 +48,7 @@
     },
     {
       "path": "Sources/MLXAudioCore/ModelUtils.swift",
-      "sha256": "13c4e5802d3bda6775cb1242607da03d0a8d4c6f50a883261277f3ca3c44204d",
+      "sha256": "c70ae7fd2537d4cbea94435bee9d8938e4a58597dacac4f0025230ed709899f8",
       "upstreamStatus": "modified"
     },
     {
@@ -267,6 +267,11 @@
       "upstreamStatus": "added"
     },
     {
+      "path": "Tests/Qwen3RuntimeTests/Qwen3PropertyInvariantTests.swift",
+      "sha256": "63a0e0b9a13489178c24aa053282909c0069b296ab118b4f283e22803c10170e",
+      "upstreamStatus": "added"
+    },
+    {
       "path": "Tests/Qwen3RuntimeTests/Qwen3QualityFirstDecodeWindowTests.swift",
       "sha256": "d1b7160465edd2de614add5fba626bdc37889600a0b5ecf1a9b041ab066ea572",
       "upstreamStatus": "added"
@@ -342,11 +347,11 @@
     "Examples/**"
   ],
   "summary": {
-    "added": 48,
+    "added": 49,
     "identical": 5,
     "modified": 13,
     "removed": 0,
-    "retained": 66
+    "retained": 67
   },
   "upstreamBaselineSHA256": "6136a2c2b2d56590deca279ef4ae809a11aff41132916a73619caf2012ef362a"
 }

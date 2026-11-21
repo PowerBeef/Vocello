@@ -3,7 +3,7 @@
   "componentID": "vocello-qwen3-core",
   "package": {
     "name": "MLXAudio",
-    "swiftToolsVersion": "6.1",
+    "swiftToolsVersion": "6.2",
     "minimumPlatforms": {
       "macOS": "14",
       "iOS": "17"

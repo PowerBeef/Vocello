@@ -102,7 +102,7 @@ public enum ModelUtils {
                 let configPath = modelDir.appendingPathComponent("config.json")
                 if FileManager.default.fileExists(atPath: configPath.path) {
                     if let configData = try? Data(contentsOf: configPath),
-                       let _ = try? JSONSerialization.jsonObject(with: configData) {
+                       (try? JSONSerialization.jsonObject(with: configData)) != nil {
                         logger.debug("Using a verified cached model")
                         return modelDir
                     } else {

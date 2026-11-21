@@ -3,6 +3,7 @@
 # shrinks (scripts/lint_baseline.py swiftlint); scripts/dev.sh lint runs them on changed files.
 # `included` and `excluded` stay block lists of paths: the gate reads them to pick its files.
 only_rules:
+  - custom_rules
   - duplicate_imports
   - empty_count
   - legacy_constructor
@@ -12,7 +13,14 @@ only_rules:
   - unused_optional_binding
   - trailing_whitespace
 excluded:
-  - Packages
   - build
   - website
   - QwenVoice.xcodeproj
+  # Upstream-identical Mimi file kept byte-identical to upstream (qwen3_core_contract.py).
+  - Packages/VocelloQwen3Core/Sources/MLXAudioCodecs/Mimi/Conv.swift
+custom_rules:
+  no_if_debug:
+    name: "No #if DEBUG"
+    regex: "^[ \\t]*#(?:el)?if\\b.*\\bDEBUG\\b"
+    message: "Vocello is Release-only; gate internal diagnostics with VOCELLO_INTERNAL_DIAGNOSTICS and QWENVOICE_DEBUG=1."
+    severity: error

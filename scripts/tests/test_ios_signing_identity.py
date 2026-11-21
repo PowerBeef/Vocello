@@ -4,6 +4,7 @@ import importlib.util
 from pathlib import Path
 import subprocess
 import sys
+from typing import Any
 import unittest
 
 from shell_stubs import LaneShell
@@ -24,7 +25,7 @@ class IOSSigningIdentityTests(unittest.TestCase):
         fingerprint: str = "A" * 40,
         team: str = "TEAM123456",
         expired: bool = False,
-    ) -> signing.CertificateRecord:
+    ) -> Any:
         return signing.CertificateRecord(fingerprint, team, expired)
 
     def test_identity_parser_selects_only_apple_development(self) -> None:
@@ -121,8 +122,9 @@ class DeviceLaneSigningTests(unittest.TestCase):
                 body = (
                     "derive_team() { printf 'TEAMFIXTURE\\n'; }\n"
                     "resolve_device() { printf 'fixture-device\\n'; }\n"
+                    "require_ios_xcode_platform() { return 0; }\n"
                     "qv_stub guard_device_state\n"
-                    'mkdir -p "$APP_PATH"\n'
+                    'mkdir -p "$APP_PATH" "$APP_PATH.dSYM"\n'
                     "cmd_preflight\n"
                 )
                 completed = shell.run(body)

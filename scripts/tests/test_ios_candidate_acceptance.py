@@ -243,7 +243,10 @@ class CandidateAcceptanceTests(unittest.TestCase):
         scheme = ET.parse(ROOT / "QwenVoice.xcodeproj/xcshareddata/xcschemes/VocelloiOSCandidateUI.xcscheme")
         references = scheme.findall(".//BuildActionEntries//BuildableReference")
         self.assertEqual([r.attrib["BlueprintName"] for r in references], [candidate.TARGET])
-        self.assertEqual(scheme.find("TestAction").attrib["buildConfiguration"], "Release")
+        test_action = scheme.find("TestAction")
+        self.assertIsNotNone(test_action)
+        assert test_action is not None
+        self.assertEqual(test_action.attrib["buildConfiguration"], "Release")
 
 
 if __name__ == "__main__":

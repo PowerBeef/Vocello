@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 import QwenVoiceCore
 import VocelloSharedPolicies
+import VocelloiOSPolicies
 
 /// Top-level iOS root view. Replaces the legacy `QVoiceiOSRootView`
 /// switch-on-tab tree. Reads everything from the injected `AppModel`

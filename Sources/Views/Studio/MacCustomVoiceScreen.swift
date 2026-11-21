@@ -1,6 +1,7 @@
 import AppKit
 import QwenVoiceCore
 import SwiftUI
+import VocelloSharedPolicies
 
 /// Built-in Voice on the iOS Studio canvas (`IOSCustomVoiceView`): the
 /// composer, the Voice / Delivery / Language chips (menus on the desktop),

@@ -259,6 +259,13 @@ def validate_contract(contract: dict[str, Any], root: pathlib.Path = ROOT) -> di
         for family_id in sorted(family_ids):
             if f'"{family_id}"' not in test_text:
                 errors.append(f"XCUITest owner does not bind control family {family_id}")
+        base_case_path = UI_TEST_PATH.parent / "VocelloiOSUITestCase.swift"
+        combined_ui_tests = test_text + (
+            "\n" + base_case_path.read_text(encoding="utf-8") if base_case_path.exists() else ""
+        )
+        for token in ("iosModelAttributionRow_", "iosAttributionDetailBackButton"):
+            if token not in combined_ui_tests:
+                errors.append(f"iOS XCUITest suite does not assert model attribution token {token}")
     else:
         errors.append(f"missing {UI_TEST_PATH.relative_to(ROOT)}")
 

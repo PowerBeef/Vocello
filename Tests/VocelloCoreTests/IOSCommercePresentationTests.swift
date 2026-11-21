@@ -1,5 +1,6 @@
 import Foundation
 import XCTest
+import VocelloiOSPolicies
 
 final class IOSCommercePresentationTests: XCTestCase {
     func testProductAvailabilityNoticeUsesActualAccessWithoutChangingOtherOutcomes() {

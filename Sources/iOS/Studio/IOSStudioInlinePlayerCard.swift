@@ -3,6 +3,7 @@ import Combine
 import Observation
 import QwenVoiceCore
 import SwiftUI
+import VocelloiOSPolicies
 
 /// Studio dock hero player — a SINGLE card that serves both the **live streaming
 /// preview** (during generation) and the **completed take** (after), so the

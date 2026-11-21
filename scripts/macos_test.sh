@@ -906,7 +906,7 @@ cmd_models() {
     check)
       check_mac_test_models || {
         note "Install once: $0 models ensure  (or $0 models install for canonical only)"
-        note "Last resort: Vocello.app → Settings → Model Downloads"
+        note "Last resort: Vocello.app → Settings → Models & Files"
         return 1
       }
       ;;

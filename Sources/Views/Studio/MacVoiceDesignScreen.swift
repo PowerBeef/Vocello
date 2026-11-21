@@ -1,6 +1,7 @@
 import AppKit
 import QwenVoiceCore
 import SwiftUI
+import VocelloSharedPolicies
 
 private struct VoiceDesignActionAlert: Identifiable {
     let id = UUID()

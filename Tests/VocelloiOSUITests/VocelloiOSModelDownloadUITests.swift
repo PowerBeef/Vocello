@@ -48,6 +48,9 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         let visibleText: String
     }
     private let isolatedSupportRoot = "model-download-acceptance"
+    /// Dedicated support root for RF-59 upgrade journeys so `.qwenvoice-model-update.json`
+    /// never leaks into `acceptance`/`diagnose`/`queue`/`recover`.
+    private let isolatedUpgradeRoot = "model-upgrade-acceptance"
     private let modelID = "pro_custom"
     private let modelIDs = ["pro_custom", "pro_design", "pro_clone"]
     private var capturedProgressMilestones: [String: Set<Int>] = [:]
@@ -60,6 +63,7 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         switch scenario {
         case "diagnose": runDiagnosticScenario()
         case "queue": runQueueScenario()
+        case "upgrade": runUpgradeScenario()
         case "recover": runRecoveryScenario()
         case "soak":
             let raw = ProcessInfo.processInfo.environment["QVOICE_IOS_MODEL_MANAGEMENT_ITERATIONS"] ?? "3"
@@ -272,11 +276,194 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         recordObservation(modelID: "pro_custom", milestone: "queue-active")
         recordObservation(modelID: "pro_design", milestone: "queue-waiting")
         cancelDownload(modelID: "pro_design")
-        XCTAssertTrue(element("iosModelCancel_pro_custom").exists)
-        cancelDownload(modelID: "pro_custom")
+        resetIsolatedDeliveryForFreshLifecycle()
         launchApp()
         openVoiceModels()
         assertCanonicalDeliveryMatches(canonicalSnapshot)
+    }
+
+    /// Hermetic RF-59 upgrade coverage on its own isolated support root (`isolatedUpgradeRoot`):
+    /// 1. Normal free space with earlier Vocello retired folders -> one-time Update prompt ->
+    ///    Later pauses both modes, Voice Models shows Update Required + Update (and Download for
+    ///    never-installed Design), and relaunch does not prompt again.
+    /// 2. Simulated low free space (`QVOICE_IOS_SIMULATED_AVAILABLE_BYTES`) -> distinct Make Room
+    ///    prompt -> confirming Update removes retired folders and enters active delivery -> clean
+    ///    cancellation restores quiescent upgrade state and preserves canonical delivery untouched.
+    private func runUpgradeScenario() {
+        beginSession()
+        defer { endSession() }
+        openVoiceModels()
+        let canonicalSnapshot = snapshotQuiescentCanonicalDelivery()
+
+        let retiredSeed = "reset:Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit,Qwen3-TTS-12Hz-1.7B-Base-4bit"
+        let baseEnvironment = modelManagementEnvironment(supportRoot: isolatedUpgradeRoot)
+
+        // Phase 1: normal free space -> regular replace prompt -> Later persists across relaunch.
+        var normalUpgradeEnv = baseEnvironment
+        normalUpgradeEnv["QVOICE_IOS_SEED_RETIRED_MODELS"] = retiredSeed
+        launchAppForExplicitModelUpdatePrompt(additionalEnvironment: normalUpgradeEnv)
+
+        XCTAssertTrue(
+            VocelloUIWait.condition("normal Update Voice Models alert to appear", timeout: 45) {
+                self.alertButton(id: "iosModelUpdatePromptConfirm", englishLabel: "Update").exists
+                    && self.alertButton(id: "iosModelUpdatePromptLater", englishLabel: "Later").exists
+            },
+            "Normal upgrade must show Update Voice Models alert"
+        )
+        let normalAlert = app.alerts.firstMatch
+        XCTAssertTrue(
+            normalAlert.staticTexts.allElementsBoundByIndex.contains { $0.label.contains("replaced, then removed") },
+            "Normal upgrade prompt must show replace copy, not Make Room copy"
+        )
+        VocelloUIScreenshot.attach(app, named: "ios-model-upgrade-prompt-normal")
+
+        let laterButton = alertButton(id: "iosModelUpdatePromptLater", englishLabel: "Later")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: laterButton, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.condition("normal upgrade alert to dismiss", timeout: 20) {
+            !self.alertButton(id: "iosModelUpdatePromptConfirm", englishLabel: "Update").exists
+        })
+        openVoiceModels()
+        assertModelActionContract(modelID: "pro_custom", status: "Update Required", expectedAction: "Update")
+        assertModelActionContract(modelID: "pro_clone", status: "Update Required", expectedAction: "Update")
+        assertModelActionContract(modelID: "pro_design", status: "Not Installed", expectedAction: "Download")
+        recordObservation(modelID: "pro_custom", milestone: "upgrade-later-paused")
+        VocelloUIScreenshot.attach(app, named: "ios-model-upgrade-later-rows")
+
+        // Relaunch without re-seeding: Later must persist in the update ledger and never ask again.
+        launchAppForExplicitModelUpdatePrompt(additionalEnvironment: baseEnvironment)
+        XCTAssertTrue(VocelloUIWait.exists(element("screen_studio"), timeout: 30))
+        let unexpectedPrompt = VocelloUIWait.settles("no model-update prompt after Later", timeout: 6) {
+            self.alertButton(id: "iosModelUpdatePromptConfirm", englishLabel: "Update").exists
+        }
+        XCTAssertFalse(unexpectedPrompt, "Paused RF-59 upgrade must not re-prompt on subsequent launch")
+        openVoiceModels()
+        assertModelActionContract(modelID: "pro_custom", status: "Update Required", expectedAction: "Update")
+        assertModelActionContract(modelID: "pro_clone", status: "Update Required", expectedAction: "Update")
+        recordObservation(modelID: "pro_custom", milestone: "upgrade-later-persisted")
+
+        // Phase 2: simulated low free space -> Make Room prompt -> Confirm -> clean cancellation.
+        var makeRoomEnv = baseEnvironment
+        makeRoomEnv["QVOICE_IOS_SEED_RETIRED_MODELS"] = retiredSeed
+        makeRoomEnv["QVOICE_IOS_SIMULATED_AVAILABLE_BYTES"] = "500000000"
+        launchAppForExplicitModelUpdatePrompt(additionalEnvironment: makeRoomEnv)
+
+        XCTAssertTrue(
+            VocelloUIWait.condition("low-space Make Room alert to appear", timeout: 45) {
+                self.alertButton(id: "iosModelUpdatePromptConfirm", englishLabel: "Update").exists
+            },
+            "Low-space upgrade must show Make Room alert"
+        )
+        let makeRoomAlert = app.alerts.firstMatch
+        XCTAssertTrue(
+            makeRoomAlert.staticTexts.allElementsBoundByIndex.contains { $0.label.contains("To make room") },
+            "Low-space upgrade prompt must clearly tell the user earlier models are removed first"
+        )
+        VocelloUIScreenshot.attach(app, named: "ios-model-upgrade-prompt-make-room")
+
+        let confirmButton = alertButton(id: "iosModelUpdatePromptConfirm", englishLabel: "Update")
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: confirmButton, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.condition("Make Room alert to dismiss", timeout: 20) {
+            !self.alertButton(id: "iosModelUpdatePromptConfirm", englishLabel: "Update").exists
+        })
+        openVoiceModels()
+        // Wait until BOTH retired modes expose active/installed delivery controls AND at least
+        // one advances past queuing into transfer/install so (a) neither concurrent install task
+        // can race past teardown and (b) HuggingFaceDownloader emits a progress record into
+        // `attempts/$run_id` for post-run model-download diagnostics.
+        XCTAssertTrue(
+            VocelloUIWait.condition("both retired modes to enter active Make Room delivery", timeout: 120) {
+                let customActive = self.element("iosModelCancel_pro_custom").exists
+                    || self.element("iosModelDelete_pro_custom").exists
+                let cloneActive = self.element("iosModelCancel_pro_clone").exists
+                    || self.element("iosModelDelete_pro_clone").exists
+                return customActive && cloneActive
+            },
+            "Confirming Make Room update must start delivery for both retired modes"
+        )
+        XCTAssertTrue(
+            VocelloUIWait.condition("at least one retired mode to emit measurable transfer progress", timeout: 180) {
+                self.observeProgress(modelID: "pro_custom") > 0
+                    || self.observeProgress(modelID: "pro_clone") > 0
+                    || self.element("iosModelDelete_pro_custom").exists
+                    || self.element("iosModelDelete_pro_clone").exists
+            },
+            "At least one Make Room download must reach measurable progress before cancellation"
+        )
+        recordObservation(modelID: "pro_custom", milestone: "upgrade-make-room-confirmed")
+        VocelloUIScreenshot.attach(app, named: "ios-model-upgrade-make-room-active")
+
+        cleanupIsolatedUpgradeRoot()
+        launchApp()
+        openVoiceModels()
+        assertCanonicalDeliveryMatches(canonicalSnapshot)
+    }
+
+    /// Cancels or deletes any in-flight/installed models inside `isolatedUpgradeRoot`,
+    /// accepting `iosModelUpdate_<id>` (which cancelling an RF-59 update transitions to)
+    /// as well as `iosModelDownload_<id>`.
+    private func cleanupIsolatedUpgradeRoot() {
+        for candidate in modelIDs.reversed() {
+            let install = element("iosModelDownload_\(candidate)")
+            let update = element("iosModelUpdate_\(candidate)")
+            let remove = element("iosModelDelete_\(candidate)")
+            let cancel = element("iosModelCancel_\(candidate)")
+            let retry = element("iosModelRetry_\(candidate)")
+
+            XCTAssertTrue(VocelloUIWait.condition(
+                "isolated upgrade \(candidate) to expose a stable lifecycle action",
+                timeout: 300
+            ) {
+                install.exists || update.exists || remove.exists || cancel.exists || retry.exists
+            })
+
+            if remove.exists {
+                XCTAssertTrue(revealSettingsElement(remove, swipingUp: candidate == "pro_clone"))
+                XCTAssertTrue(VocelloUIPrimaryAction.perform(on: remove, timeout: 20))
+                let confirm = element("deleteModelSheet_confirm")
+                XCTAssertTrue(VocelloUIWait.exists(confirm, timeout: 20))
+                XCTAssertTrue(VocelloUIPrimaryAction.perform(on: confirm, timeout: 20))
+                XCTAssertTrue(VocelloUIWait.condition("deleted upgrade \(candidate) to settle", timeout: 300) {
+                    install.exists || update.exists
+                })
+            } else if cancel.exists {
+                cancelUpgradeDelivery(candidate, install: install, update: update)
+            } else if retry.exists {
+                XCTAssertTrue(revealSettingsElement(retry, swipingUp: candidate == "pro_clone"))
+                XCTAssertTrue(VocelloUIPrimaryAction.perform(on: retry, timeout: 20))
+                XCTAssertTrue(VocelloUIWait.condition(
+                    "retried upgrade \(candidate) to become cancellable or installed",
+                    timeout: 120
+                ) {
+                    cancel.exists || remove.exists
+                })
+                if remove.exists {
+                    XCTAssertTrue(revealSettingsElement(remove, swipingUp: candidate == "pro_clone"))
+                    XCTAssertTrue(VocelloUIPrimaryAction.perform(on: remove, timeout: 20))
+                    let confirm = element("deleteModelSheet_confirm")
+                    XCTAssertTrue(VocelloUIWait.exists(confirm, timeout: 20))
+                    XCTAssertTrue(VocelloUIPrimaryAction.perform(on: confirm, timeout: 20))
+                    XCTAssertTrue(VocelloUIWait.condition("deleted upgrade \(candidate) to settle", timeout: 300) {
+                        install.exists || update.exists
+                    })
+                } else {
+                    cancelUpgradeDelivery(candidate, install: install, update: update)
+                }
+            }
+        }
+    }
+
+    private func cancelUpgradeDelivery(_ modelID: String, install: XCUIElement, update: XCUIElement) {
+        let cancel = element("iosModelCancel_\(modelID)")
+        XCTAssertTrue(VocelloUIWait.exists(cancel, timeout: 120))
+        XCTAssertTrue(revealSettingsElement(cancel, swipingUp: modelID == "pro_clone"))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: cancel, timeout: 20))
+        let confirm = element("iosModelCancelDownloadConfirmButton")
+        XCTAssertTrue(VocelloUIWait.exists(confirm, timeout: 20))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: confirm, timeout: 20))
+        XCTAssertTrue(VocelloUIWait.condition("cancelled upgrade \(modelID) to settle", timeout: 300) {
+            install.exists || update.exists
+        })
+        XCTAssertFalse(element("iosModelProgress_\(modelID)").exists)
     }
 
     private func runRecoveryScenario() {
@@ -710,8 +897,8 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         )
     }
 
-    private func modelManagementEnvironment() -> [String: String] {
-        var environment = ["QVOICE_APP_SUPPORT_DIR": isolatedSupportRoot]
+    private func modelManagementEnvironment(supportRoot: String? = nil) -> [String: String] {
+        var environment = ["QVOICE_APP_SUPPORT_DIR": supportRoot ?? isolatedSupportRoot]
         let runner = ProcessInfo.processInfo.environment
         if let runID = runner["QVOICE_IOS_MODEL_MANAGEMENT_RUN_ID"], !runID.isEmpty {
             environment["QVOICE_IOS_MODEL_MANAGEMENT_RUN_ID"] = runID

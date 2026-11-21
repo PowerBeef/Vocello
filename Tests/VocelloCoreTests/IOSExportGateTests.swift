@@ -1,5 +1,6 @@
 import Foundation
 import XCTest
+import VocelloiOSPolicies
 
 /// A StoreKit boundary whose entitlement scan the test controls.
 @MainActor

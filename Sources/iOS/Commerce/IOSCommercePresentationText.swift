@@ -1,4 +1,5 @@
 import Foundation
+import VocelloiOSPolicies
 
 /// iOS-only purchase copy; live prices always come from StoreKit.
 extension VocelloPresentationText {

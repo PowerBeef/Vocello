@@ -3,6 +3,7 @@ import Foundation
 @testable import QwenVoiceCore
 import VocelloQwen3Core
 import XCTest
+import VocelloiOSPolicies
 
 final class StartupReliabilityDiagnosticsV2Tests: XCTestCase {
     func testReferencePrimedReplayPreservesGeneratedTokensAndPartitions() throws {

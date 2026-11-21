@@ -9,6 +9,119 @@ import QwenVoiceCore
 /// Low Data Mode; one that failed for want of space while earlier models hold some is offered again,
 /// with their removal first. Pure, so both iOS test bundles drive it.
 enum IOSModelUpdateAutoStartPolicy {
+    static let simulatedAvailableBytesKey = "QVOICE_IOS_SIMULATED_AVAILABLE_BYTES"
+    static let seedRetiredModelsKey = "QVOICE_IOS_SEED_RETIRED_MODELS"
+
+    struct SeedResult: Equatable, Sendable {
+        let didResetLedger: Bool
+        let seededFolders: [String]
+
+        var shouldClearConsent: Bool {
+            didResetLedger || !seededFolders.isEmpty
+        }
+
+        static let none = SeedResult(didResetLedger: false, seededFolders: [])
+    }
+
+    /// Resolves launch free space, honouring the registered internal-diagnostics
+    /// override (`QVOICE_IOS_SIMULATED_AVAILABLE_BYTES`) when valid so RF-59
+    /// low-space Make Room tests never need to drain real device storage.
+    static func resolvedAvailableBytes(
+        systemAvailableBytes: Int64?,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        internalDiagnosticsAvailable: Bool = RuntimeDebugGate.internalDiagnosticsAvailable
+    ) -> Int64? {
+        guard internalDiagnosticsAvailable,
+              let raw = RuntimeDebugGate.value(for: simulatedAvailableBytesKey, environment: environment)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            let override = Int64(raw),
+            override >= 0 else {
+            return systemAvailableBytes
+        }
+        return override
+    }
+
+    /// Seeds tiny earlier-Vocello retired model folders into an explicitly
+    /// isolated `QVOICE_APP_SUPPORT_DIR` (validated by `AppPaths.isolatedModelDeliverySupportRoot`)
+    /// when `QVOICE_IOS_SEED_RETIRED_MODELS` is active under `RuntimeDebugGate`.
+    /// Never writes to the canonical root, accepts only contract-listed folder names,
+    /// validates requested folders before resetting the isolated ledger, and is
+    /// idempotent once `.qwenvoice-model-update.json` already exists.
+    @discardableResult
+    static func seedRetiredModelsIfConfigured(
+        modelsDirectory: URL,
+        allowedRetiredFolders: Set<String>,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        fileManager: FileManager = .default,
+        internalDiagnosticsAvailable: Bool = RuntimeDebugGate.internalDiagnosticsAvailable
+    ) -> SeedResult {
+        guard internalDiagnosticsAvailable,
+              AppPaths.isolatedModelDeliverySupportRoot(environment: environment) != nil,
+              let raw = RuntimeDebugGate.value(for: seedRetiredModelsKey, environment: environment) else {
+            return .none
+        }
+        let trimmedRaw = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let shouldResetLedger = trimmedRaw.hasPrefix("reset:")
+        let folderList = shouldResetLedger ? String(trimmedRaw.dropFirst("reset:".count)) : trimmedRaw
+        let requested = folderList
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && allowedRetiredFolders.contains($0) && !$0.contains("/") && $0 != "." && $0 != ".." }
+        guard !requested.isEmpty else { return .none }
+
+        let ledgerURL = modelsDirectory.appendingPathComponent(".qwenvoice-model-update.json", isDirectory: false)
+        var didResetLedger = false
+        if shouldResetLedger {
+            if fileManager.fileExists(atPath: ledgerURL.path) {
+                do {
+                    try fileManager.removeItem(at: ledgerURL)
+                } catch {
+                    return .none
+                }
+            }
+            didResetLedger = true
+        } else if fileManager.fileExists(atPath: ledgerURL.path) {
+            return .none
+        }
+
+        let fakeDigest = String(repeating: "ab", count: 32)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        var seeded: [String] = []
+        for folder in requested {
+            let directory = modelsDirectory.appendingPathComponent(folder, isDirectory: true)
+            let manifestURL = directory.appendingPathComponent(ModelAssetIntegrityManifest.filename, isDirectory: false)
+            guard !fileManager.fileExists(atPath: manifestURL.path) else { continue }
+            do {
+                let manifest = ModelAssetIntegrityManifest(
+                    repo: "mlx-community/\(folder)",
+                    revision: "earlier",
+                    targetFolder: folder,
+                    createdAtUTC: "2026-09-14T00:00:00Z",
+                    files: [
+                        ModelAssetIntegrityManifest.FileEntry(
+                            path: "model.safetensors",
+                            size: 7,
+                            sha256: fakeDigest
+                        ),
+                    ]
+                )
+                let manifestData = try encoder.encode(manifest)
+                try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+                try Data("earlier".utf8).write(
+                    to: directory.appendingPathComponent("model.safetensors", isDirectory: false),
+                    options: .atomic
+                )
+                try manifestData.write(to: manifestURL, options: .atomic)
+                seeded.append(folder)
+            } catch {
+                try? fileManager.removeItem(at: directory)
+                continue
+            }
+        }
+        return SeedResult(didResetLedger: didResetLedger, seededFolders: seeded)
+    }
+
     struct Candidate: Equatable, Sendable {
         let modelID: String
         let estimatedBytes: Int64

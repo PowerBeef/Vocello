@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import QwenVoiceCore
+import VocelloiOSPolicies
 
 @MainActor
 @Observable
@@ -130,9 +131,11 @@ final class IOSModelInstallerViewModel {
             await Task.detached(priority: .utility) { @concurrent in
             UpdateDiskFacts(
                 plan: modelAssetStore.modelUpdatePlan(),
-                availableBytes: (try? modelAssetStore.rootDirectory.resourceValues(
-                    forKeys: [.volumeAvailableCapacityForImportantUsageKey]
-                ).volumeAvailableCapacityForImportantUsage).map { Int64($0) },
+                availableBytes: IOSModelUpdateAutoStartPolicy.resolvedAvailableBytes(
+                    systemAvailableBytes: (try? modelAssetStore.rootDirectory.resourceValues(
+                        forKeys: [.volumeAvailableCapacityForImportantUsageKey]
+                    ).volumeAvailableCapacityForImportantUsage).map { Int64($0) }
+                ),
                 holdsEarlierModels: !RetiredModelReclamation.presentFolders(
                     of: modelAssetStore.descriptors.map(\.model), in: modelAssetStore.rootDirectory
                 ).isEmpty

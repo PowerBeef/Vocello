@@ -1,5 +1,6 @@
 import Foundation
 import XCTest
+import VocelloiOSPolicies
 
 /// PA-21 / IOS-09: Studio drafts survive termination in the background.
 final class IOSStudioDraftPersistenceTests: XCTestCase {

@@ -1,24 +1,43 @@
 import Foundation
 import Observation
 
-struct IOSExportProduct: Equatable, Sendable {
-    let id: String
-    let displayPrice: String
+public struct IOSExportProduct: Equatable, Sendable {
+    public let id: String
+    public let displayPrice: String
+
+    public init(id: String, displayPrice: String) {
+        self.id = id
+        self.displayPrice = displayPrice
+    }
 }
 
-struct IOSExportTransaction: Equatable, Sendable {
-    let id: UInt64
-    let productID: String
-    let verified: Bool
-    let nonConsumable: Bool
-    let revoked: Bool
+public struct IOSExportTransaction: Equatable, Sendable {
+    public let id: UInt64
+    public let productID: String
+    public let verified: Bool
+    public let nonConsumable: Bool
+    public let revoked: Bool
 
-    var grantsUnlock: Bool {
+    public init(
+        id: UInt64,
+        productID: String,
+        verified: Bool,
+        nonConsumable: Bool,
+        revoked: Bool
+    ) {
+        self.id = id
+        self.productID = productID
+        self.verified = verified
+        self.nonConsumable = nonConsumable
+        self.revoked = revoked
+    }
+
+    public var grantsUnlock: Bool {
         verified && nonConsumable && !revoked && productID == IOSExportAccessPolicy.productID
     }
 }
 
-enum IOSExportPurchaseResult: Sendable {
+public enum IOSExportPurchaseResult: Sendable {
     case success(IOSExportTransaction)
     case cancelled
     case pending
@@ -26,13 +45,13 @@ enum IOSExportPurchaseResult: Sendable {
 
 /// Restore's App Store sync: completed, or the Apple Account prompt the user
 /// dismissed (A4-02). Every other outcome is a thrown failure.
-enum IOSExportSyncResult: Sendable {
+public enum IOSExportSyncResult: Sendable {
     case synced
     case cancelled
 }
 
 @MainActor
-protocol IOSExportPurchaseClient: AnyObject {
+public protocol IOSExportPurchaseClient: AnyObject {
     func product() async throws -> IOSExportProduct?
     func currentEntitlements() async -> [IOSExportTransaction]
     func purchase() async throws -> IOSExportPurchaseResult
@@ -44,15 +63,15 @@ protocol IOSExportPurchaseClient: AnyObject {
 /// One app-lifetime owner, with an injectable StoreKit boundary for deterministic
 /// tests. Entitlements are rebuilt from verified StoreKit data, never preferences.
 @MainActor @Observable
-final class IOSExportPurchaseState {
-    enum Access: Equatable { case checking, locked, unlocked }
-    enum Operation: Equatable { case idle, loading, purchasing, restoring }
-    enum Notice: Equatable { case pending, cancelled, failed, unavailable, unverified, restored, notOwned, restoreCancelled }
+public final class IOSExportPurchaseState {
+    public enum Access: Equatable, Sendable { case checking, locked, unlocked }
+    public enum Operation: Equatable, Sendable { case idle, loading, purchasing, restoring }
+    public enum Notice: Equatable, Sendable { case pending, cancelled, failed, unavailable, unverified, restored, notOwned, restoreCancelled }
 
-    private(set) var access: Access = .checking
-    private(set) var operation: Operation = .idle
-    private(set) var product: IOSExportProduct?
-    private(set) var notice: Notice?
+    public private(set) var access: Access = .checking
+    public private(set) var operation: Operation = .idle
+    public private(set) var product: IOSExportProduct?
+    public private(set) var notice: Notice?
     private let client: any IOSExportPurchaseClient
     private var revision = 0
     /// IOS-19: one entitlement scan runs at a time and every `refresh()` joins
@@ -66,10 +85,10 @@ final class IOSExportPurchaseState {
     @ObservationIgnored private var revokedTransactions: Set<UInt64> = []
     @ObservationIgnored private var listener: Task<Void, Never>?
 
-    init(client: any IOSExportPurchaseClient) { self.client = client }
+    public init(client: any IOSExportPurchaseClient) { self.client = client }
     deinit { listener?.cancel() }
 
-    func start() {
+    public func start() {
         guard listener == nil else { return }
         let client = client
         listener = Task { [weak self] in
@@ -81,7 +100,7 @@ final class IOSExportPurchaseState {
 
     /// Returns once a scan that began after this call has settled `access`
     /// (or a newer transaction decided it), so the caller acts on current state.
-    func refresh() async {
+    public func refresh() async {
         start()
         requestedScans += 1
         let request = requestedScans
@@ -113,7 +132,7 @@ final class IOSExportPurchaseState {
         access = ownedTransactions.isEmpty ? .locked : .unlocked
     }
 
-    func loadProduct() async {
+    public func loadProduct() async {
         guard operation == .idle else { return }
         operation = .loading
         defer { operation = .idle }
@@ -124,7 +143,7 @@ final class IOSExportPurchaseState {
         } catch { product = nil; notice = .unavailable }
     }
 
-    func purchase() async {
+    public func purchase() async {
         guard operation == .idle, product?.id == IOSExportAccessPolicy.productID else { return }
         operation = .purchasing
         notice = nil
@@ -138,7 +157,7 @@ final class IOSExportPurchaseState {
         } catch { notice = .failed }
     }
 
-    func restore() async {
+    public func restore() async {
         guard operation == .idle else { return }
         operation = .restoring
         notice = nil
@@ -156,7 +175,7 @@ final class IOSExportPurchaseState {
         } catch { notice = .failed }
     }
 
-    func permits(_ items: [IOSExportProvenance]) -> Bool {
+    public func permits(_ items: [IOSExportProvenance]) -> Bool {
         IOSExportAccessPolicy.permits(items, unlocked: access == .unlocked)
     }
 

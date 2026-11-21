@@ -8,13 +8,17 @@ description: Inspect or debug the paired physical iPhone through the repository 
 Apply this procedure to the verb and options the user asked for from `scripts/ios_device.sh help`.
 
 Read `docs/reference/ios-device-testing.md` and `docs/reference/native-engineering.md`. Use
-`scripts/ios_device.sh help` to select its current verb; begin with `doctor` or `device-state` when
-the environment is uncertain. Prefer retained logs and crashes first. Run only the relevant
-`scripts/ios_device.sh <verb> <options>`; this driver is headless, not a native UI driver.
+`scripts/ios_device.sh help` to select its current verb; begin with `doctor`, `preflight`, or
+`device-state --json-v2` when the environment is uncertain. Prefer retained logs and crashes first.
+Run only the relevant `scripts/ios_device.sh <verb> <options>` (for profiling, use
+`profile --kind cpu|memory|metal|witness`, where `metal` captures an Instruments Metal System Trace
+and `witness` captures an untimed signpost witness, and analyze retained `.trace` bundles with
+`axiom_xcprof_analyze`); this driver is headless, not a native UI driver.
 
-Use a quiet committed checkpoint for measured bench, lang-bench, memory and profile lanes, after
-joining all subagents (`manage_subagents list`, `swarm status`) and confirming no other host sessions
-are active, declaring `QVOICE_LEAD_ONLY=1` when worker tracking is unavailable. No new models or
+Use a quiet committed checkpoint for measured `bench`, `lang-bench`, `memory`, and `profile` lanes
+(all build `-O wholemodule` in the optimized iOS arena), after joining all subagents
+(`manage_subagents list`, `swarm status`) and confirming no other host sessions are active, passing
+`--lead-only` (or `QVOICE_LEAD_ONLY=1`) when worker tracking is unavailable. No new models or
 downloads, distribution-candidate install/launch or external publication without specific
 authorization. Candidate acceptance uses the documented preinstalled-candidate route.
 

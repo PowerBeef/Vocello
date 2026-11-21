@@ -1,5 +1,6 @@
 import XCTest
 import QwenVoiceCore
+import VocelloiOSPolicies
 
 /// The automatic "Saved outputs" folder copy is an outward export surface: it
 /// must consult the export policy with the saved row's mode and never move a

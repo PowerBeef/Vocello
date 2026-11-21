@@ -1,6 +1,7 @@
 import SwiftUI
 import QwenVoiceCore
 import VocelloSharedPolicies
+import VocelloiOSPolicies
 
 /// Top-level History tab entry point. Reads/writes `AppModel` directly
 /// so RootView doesn't need binding plumbing.

@@ -3,8 +3,8 @@ import QwenVoiceCore
 
 /// What an iPhone model row shows. `IOSModelDownloadCoordinator` publishes it and
 /// `IOSModelInstallerViewModel` applies it in operation-generation order.
-struct IOSModelDeliverySnapshot: Equatable, Sendable {
-    enum Phase: String, Codable, Sendable {
+public struct IOSModelDeliverySnapshot: Equatable, Sendable {
+    public enum Phase: String, Codable, Sendable {
         case queued
         case waitingForConnectivity
         case downloading
@@ -18,18 +18,18 @@ struct IOSModelDeliverySnapshot: Equatable, Sendable {
         case deleted
     }
 
-    let modelID: String
-    let phase: Phase
-    let downloadedBytes: Int64
-    let totalBytes: Int64?
-    let estimatedBytes: Int64?
-    let bytesPerSecond: Int64?
-    let estimatedSecondsRemaining: Double?
-    let retryCount: Int
-    let message: String?
-    let operationGeneration: UInt64
+    public let modelID: String
+    public let phase: Phase
+    public let downloadedBytes: Int64
+    public let totalBytes: Int64?
+    public let estimatedBytes: Int64?
+    public let bytesPerSecond: Int64?
+    public let estimatedSecondsRemaining: Double?
+    public let retryCount: Int
+    public let message: String?
+    public let operationGeneration: UInt64
 
-    init(
+    public init(
         modelID: String,
         phase: Phase,
         downloadedBytes: Int64,
@@ -68,18 +68,26 @@ struct IOSModelDeliverySnapshot: Equatable, Sendable {
 ///
 /// Pure and Foundation-level, so `IOSModelDownloadProgressMappingTests` runs it in both logic
 /// bundles; the coordinator stays the owner of the side effects.
-enum IOSModelDownloadProgressMapping {
+public enum IOSModelDownloadProgressMapping {
     /// What one progress event changes for the model it belongs to.
-    struct Update: Equatable, Sendable {
+    public struct Update: Equatable, Sendable {
         /// The phase the row shows.
-        let displayPhase: IOSModelDeliverySnapshot.Phase
+        public let displayPhase: IOSModelDeliverySnapshot.Phase
         /// The status the ledger records (the coordinator throttles the writes); never
         /// `cancelRequested`, which only the user's Cancel writes.
-        let ledgerStatus: IOSModelDownloadLedger.Status
+        public let ledgerStatus: IOSModelDownloadLedger.Status
+
+        public init(
+            displayPhase: IOSModelDeliverySnapshot.Phase,
+            ledgerStatus: IOSModelDownloadLedger.Status
+        ) {
+            self.displayPhase = displayPhase
+            self.ledgerStatus = ledgerStatus
+        }
     }
 
     /// How the coordinator settles a transfer that ended with an error.
-    enum RunEnd: Equatable, Sendable {
+    public enum RunEnd: Equatable, Sendable {
         /// Record `failed`, show Failed with Retry, and start the next queued model.
         case reportFailure
         /// Change nothing: the run was superseded, or the model's Cancel owns the outcome and
@@ -88,7 +96,7 @@ enum IOSModelDownloadProgressMapping {
     }
 
     /// The durable status of a user's cancel intent. Only the coordinator's Cancel writes it.
-    static let userCancelIntentStatus: IOSModelDownloadLedger.Status = .cancelRequested
+    public static let userCancelIntentStatus: IOSModelDownloadLedger.Status = .cancelRequested
 
     /// The update one progress event makes, or nil when it changes nothing.
     /// - Parameters:
@@ -96,7 +104,7 @@ enum IOSModelDownloadProgressMapping {
     ///   - userCancelIntent: the user's Cancel of this model is under way. It owns the row
     ///     (Cancelling) and the ledger (`cancelRequested`, then `deleted`) until it finishes,
     ///     so no progress event may weaken it.
-    static func update(
+    public static func update(
         for phase: HuggingFaceDownloader.DownloadPhase,
         userCancelIntent: Bool
     ) -> Update? {
@@ -123,7 +131,7 @@ enum IOSModelDownloadProgressMapping {
 
     /// A run that is still current and that no Cancel owns reports how it ended as a
     /// failure, a `.cancelled` the coordinator never asked for included.
-    static func runEnd(runIsCurrent: Bool, userCancelIntent: Bool) -> RunEnd {
+    public static func runEnd(runIsCurrent: Bool, userCancelIntent: Bool) -> RunEnd {
         runIsCurrent && !userCancelIntent ? .reportFailure : .leaveToOwner
     }
 }

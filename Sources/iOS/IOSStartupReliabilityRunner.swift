@@ -3,6 +3,7 @@ import CryptoKit
 import Foundation
 import QwenVoiceCore
 import VocelloQwen3Core
+import VocelloiOSPolicies
 
 /// Physical-device-only characterization for Built-in Voice startup.
 ///

@@ -338,9 +338,31 @@ class VocelloiOSUITestCase: XCTestCase {
         launchProcess(additionalEnvironment: ["QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE": "1"])
     }
 
+    /// Launches the app in an isolated RF-59 upgrade profile without invoking
+    /// `acceptModelUpdatePromptAtLaunch` or `assertForegroundUnobstructed`, so
+    /// the test owns inspecting and answering the `"Update Voice Models?"` alert.
+    func launchAppForExplicitModelUpdatePrompt(
+        additionalEnvironment: [String: String] = [:],
+        additionalArguments: [String] = []
+    ) {
+        launchProcess(additionalEnvironment: additionalEnvironment, additionalArguments: additionalArguments)
+        let skip = element("onboarding_skip")
+        let studio = element(VocelloiOSTab.studio.identifier)
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(
+            VocelloUIWait.condition("visible onboarding, tab dock or model-update alert", timeout: 30) {
+                skip.exists || studio.exists || alert.exists
+            }
+        )
+        if skip.exists {
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: skip, timeout: 15))
+            XCTAssertTrue(VocelloUIWait.disappears(element("onboarding_cta"), timeout: 20))
+        }
+    }
+
     /// Launches the app process and waits for the foreground, without waiting for
     /// the Studio (a forced startup failure stops before it).
-    private func launchProcess(
+    func launchProcess(
         additionalEnvironment: [String: String] = [:],
         additionalArguments: [String] = []
     ) {
@@ -656,11 +678,35 @@ class VocelloiOSUITestCase: XCTestCase {
         XCTAssertFalse(element("iosAttributionLoadError").exists)
         XCTAssertTrue(VocelloUIWait.exists(element("iosAttributionRow_vocello"), timeout: 20))
         VocelloUIScreenshot.attach(app, named: "ios-settings-open-source-licenses")
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("iosSettings_openSourceBackButton"), timeout: 20))
+        assertModelAttributionRows()
+        let openSourceBack = element("iosSettings_openSourceBackButton")
+        XCTAssertTrue(revealSettingsElement(openSourceBack, swipingUp: false))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: openSourceBack, timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("screen_settings_about"), timeout: 20))
 
         openSettingsPage(for: "iosSettings_autoPlayToggle")
         XCTAssertTrue(revealSettingsElement(element("iosSettings_autoPlayToggle"), swipingUp: false))
+    }
+
+    /// RF-59: verify every shipped hybrid model artifact has an attribution row
+    /// under Open Source & Licenses and drills into its detail view cleanly.
+    /// Iterates in rendered order (`third_party_attributions.json`) so reveals
+    /// scroll strictly downward without reversing direction.
+    func assertModelAttributionRows() {
+        for artifactID in ["pro_clone-speed", "pro_custom-speed", "pro_design-speed"] {
+            let row = element("iosModelAttributionRow_\(artifactID)")
+            XCTAssertTrue(revealSettingsElement(row, swipingUp: true))
+            XCTAssertTrue(VocelloUIWait.exists(row, timeout: 20))
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: row, timeout: 20))
+            let detailBack = element("iosAttributionDetailBackButton")
+            XCTAssertTrue(VocelloUIWait.exists(detailBack, timeout: 20))
+            XCTAssertTrue(VocelloUIWait.exists(element("iosAttributionSourceLink"), timeout: 20))
+            if artifactID == "pro_custom-speed" {
+                VocelloUIScreenshot.attach(app, named: "ios-settings-model-attribution-\(artifactID)")
+            }
+            XCTAssertTrue(VocelloUIPrimaryAction.perform(on: detailBack, timeout: 20))
+            XCTAssertTrue(VocelloUIWait.exists(element("screen_openSourceLicenses"), timeout: 20))
+        }
     }
 
     /// Voice Models exposes each installed package with one non-color-dependent `Ready` status

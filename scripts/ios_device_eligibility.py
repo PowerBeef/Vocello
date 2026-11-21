@@ -65,9 +65,13 @@ def validate(root: Path = ROOT) -> dict[str, object]:
 
     project = _read(root / PROJECT)
     source_path = POLICY_SOURCE.as_posix()
-    if project.count(source_path) != 2:
+    compiled_in_ios_policies = (
+        project.count(source_path) == 1
+        and project.count("- target: VocelloiOSPolicies") == 3
+    )
+    if not compiled_in_ios_policies and project.count(source_path) != 2:
         raise EligibilityError(
-            "eligibility policy must compile in both host and generic-iOS logic-test targets"
+            "eligibility policy must compile in VocelloiOSPolicies (linked by VocelloiOS, host and generic-iOS logic tests)"
         )
 
     verifier = _read(root / RELEASE_VERIFIER)
@@ -97,9 +101,12 @@ def main() -> int:
     except (OSError, EligibilityError) as error:
         print(f"iOS device eligibility: FAIL\n{error}")
         return 1
+    required_capabilities = result["requiredCapabilities"]
+    assert isinstance(required_capabilities, list)
+    capability_labels = [str(item) for item in required_capabilities]
     print(
         "iOS device eligibility: PASS "
-        f"({', '.join(result['requiredCapabilities'])}; {result['minimumHardware']})"
+        f"({', '.join(capability_labels)}; {result['minimumHardware']})"
     )
     return 0
 

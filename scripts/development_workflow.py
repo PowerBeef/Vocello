@@ -266,6 +266,16 @@ def python_test_commands(selection: dict) -> list[list[str]]:
 CORE_TEST_SOURCES = ("Tests/VocelloCoreTests/", "Tests/VocelloiOSLogicTests/")
 
 
+def all_ios_logic_test_classes(root: Path = ROOT) -> list[str]:
+    classes: set[str] = set()
+    logic_dir = root / "Tests/VocelloiOSLogicTests"
+    if logic_dir.is_dir():
+        for path in sorted(logic_dir.rglob("*.swift")):
+            if path.is_file():
+                classes.update(TEST_CLASS_PATTERN.findall(path.read_text(encoding="utf-8")))
+    return sorted(classes)
+
+
 def changed_swift_test_classes(paths: list[str]) -> list[str]:
     classes: set[str] = set()
     for relative in paths:
@@ -303,7 +313,7 @@ def lint_commands(paths: list[str], *, scoped: bool = False) -> list[list[str]]:
             if _which(tool):
                 commands.append(["python3", "scripts/lint_baseline.py", tool])
     swift = [p for p in paths if p.endswith(".swift") and (ROOT / p).is_file()
-             and p.startswith(("Sources/", "Tests/"))]
+             and p.startswith(("Sources/", "Tests/", "Packages/VocelloQwen3Core/"))]
     if swift and _which("swiftlint"):
         commands.append(["swiftlint", "lint", "--quiet", "--strict", "--config", ".swiftlint.yml", *swift])
         pinned, installed = _pinned_version("swiftlint"), _installed_version(["swiftlint", "version"])
@@ -424,7 +434,6 @@ UI_BUNDLE_SOURCES = (
     "Tests/UIAutomationSupport/",
     "Tests/VocelloMacUITests/",
     "Tests/VocelloiOSUITests/",
-    "Tests/VocelloiOSCandidateUITests/",
 )
 
 
@@ -555,8 +564,9 @@ def _display(command: list[str]) -> str:
     return " ".join(shlex.quote(part) for part in command)
 
 
-def run_commands(commands: list[list[str]]) -> None:
+def run_commands(commands: list[list[str]], *, extra_env: dict[str, str] | None = None) -> None:
     started = time.monotonic()
+    env = {**os.environ, **extra_env} if extra_env else None
     for index, command in enumerate(commands, start=1):
         print(f"==> [dev {index}/{len(commands)}] {_display(command)}", flush=True)
         command_started = time.monotonic()
@@ -574,7 +584,7 @@ def run_commands(commands: list[list[str]]) -> None:
                     f"builds; missing from {browsers['cache']}: {', '.join(browsers['missing'])}. Install them "
                     f"with `{browsers['installCommand']}` ({browsers['installNote']}); the step was not run "
                     "and nothing was installed")
-        completed = subprocess.run(command, cwd=ROOT, check=False)
+        completed = subprocess.run(command, cwd=ROOT, env=env, check=False)
         elapsed = time.monotonic() - command_started
         print(f"==> [dev] completed in {elapsed:.1f}s (exit {completed.returncode})", flush=True)
         if completed.returncode != 0:
@@ -666,12 +676,16 @@ def main(argv: list[str] | None = None) -> int:
     py.add_argument("--all", action="store_true")
     py.add_argument("--lane", choices=("product", "research"), help="product = not research")
     py.add_argument("tests", nargs="*")
-    test = sub.add_parser("test", help="macOS XCTest bundles: changed classes, --only, or --all")
+    test = sub.add_parser("test", help="macOS XCTest bundles: changed classes, --only, --ios, or --all")
     test.add_argument("--only", help="comma-separated XCTestCase classes")
+    test.add_argument("--ios", action="store_true", help="run all VocelloiOSLogicTests classes on the macOS host")
     test.add_argument("--all", action="store_true")
     test.add_argument("--repeat", type=int, metavar="N",
-                      help="with --only: run the selection up to N times, stopping at the first failure")
-    sub.add_parser("ios", help="generic device-SDK compile (incremental)")
+                      help="with --only or --ios: run the selection up to N times, stopping at the first failure")
+    ios_parser = sub.add_parser("ios", help="generic device-SDK compile (incremental, --fast -Onone, or --ui bundles)")
+    ios_mode = ios_parser.add_mutually_exclusive_group()
+    ios_mode.add_argument("--fast", action="store_true", help="owned-only -Onone incremental compile in the fast dev arena")
+    ios_mode.add_argument("--ui", action="store_true", help="compile the iOS XCUITest bundles without executing them")
     sub.add_parser("build", help="dev-signed macOS app build (for running, not verification)")
     sub.add_parser("run", help="build and launch the macOS app")
     sub.add_parser("regen", help="regenerate derived artifacts and stale project inputs or membership")
@@ -750,15 +764,31 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"==> Python tests: {selection['mode']} ({selection['reason']})", flush=True)
                 run_commands(python_test_commands(selection))
         elif command == "test":
-            if args.repeat is not None and not args.only:
-                parser.error("test --repeat needs --only: repeat a focused selection, not the suite")
-            if args.only:
+            if args.ios and (args.only or args.all):
+                parser.error("test --ios cannot be combined with --only or --all")
+            if args.repeat is not None and not (args.only or args.ios):
+                parser.error("test --repeat needs --only or --ios: repeat a focused selection, not the suite")
+            if args.ios:
+                ios_classes = all_ios_logic_test_classes(ROOT)
+                if not ios_classes:
+                    raise WorkflowError("no XCTestCase classes found under Tests/VocelloiOSLogicTests/")
+                repeat = ["--repeat", str(args.repeat)] if args.repeat is not None else []
+                run_commands([["scripts/macos_test.sh", "core-test", "--only", ",".join(ios_classes), *repeat]])
+            elif args.only:
                 repeat = ["--repeat", str(args.repeat)] if args.repeat is not None else []
                 run_commands([["scripts/macos_test.sh", "core-test", "--only", args.only, *repeat]])
             else:
                 run_commands(swift_test_commands(changed_paths(), everything=args.all) or [["scripts/macos_test.sh", "test"]])
         elif command == "ios":
-            run_commands([["./scripts/build_foundation_targets.sh", "ios", "--incremental"]])
+            if args.ui:
+                run_commands([["./scripts/build_ui_test_bundles.sh", "ios"]])
+            elif args.fast:
+                run_commands(
+                    [["./scripts/build_foundation_targets.sh", "ios", "--incremental"]],
+                    extra_env={"QVOICE_FOUNDATION_SWIFT_OPTIMIZATION": "-Onone"},
+                )
+            else:
+                run_commands([["./scripts/build_foundation_targets.sh", "ios", "--incremental"]])
         elif command == "build":
             run_commands([["./scripts/build.sh", "build"]])
         elif command == "run":

@@ -2,7 +2,7 @@ import Foundation
 
 /// iOS outward-export policy. Generation, playback, internal History and
 /// enrollment never consult this policy. macOS/CLI do not compile this source.
-enum IOSExportProvenance: Equatable, Sendable {
+public enum IOSExportProvenance: Equatable, Sendable {
     case builtIn
     case generatedPremium
     case originalReference
@@ -11,7 +11,7 @@ enum IOSExportProvenance: Equatable, Sendable {
     case recoveryRecord
     case unknown
 
-    init(generationMode: String?) {
+    public init(generationMode: String?) {
         switch generationMode?.lowercased() {
         case "custom": self = .builtIn
         case "design", "clone": self = .generatedPremium
@@ -24,7 +24,7 @@ enum IOSExportProvenance: Equatable, Sendable {
     /// voice's audio decides (RF-13): Design and Clone publications embed their
     /// mode as Vocello provenance and stay locked; a recording carries none and
     /// stays free, as original references always are.
-    init(savedVoiceGeneratedSourceMode mode: String?, sidecarUnreadable: Bool, audioProvenanceMode: String?) {
+    public init(savedVoiceGeneratedSourceMode mode: String?, sidecarUnreadable: Bool, audioProvenanceMode: String?) {
         if sidecarUnreadable {
             self = audioProvenanceMode.map { IOSExportProvenance(generationMode: $0) } ?? .originalReference
         } else if let mode {
@@ -34,7 +34,7 @@ enum IOSExportProvenance: Equatable, Sendable {
         }
     }
 
-    var requiresUnlock: Bool {
+    public var requiresUnlock: Bool {
         switch self {
         case .builtIn, .originalReference, .recoveryRecord: false
         case .generatedPremium, .unknown: true
@@ -42,12 +42,12 @@ enum IOSExportProvenance: Equatable, Sendable {
     }
 }
 
-enum IOSExportAccessPolicy {
+public enum IOSExportAccessPolicy {
     /// Approved App Store Connect non-consumable identifier (RF-02).
     /// No runtime override, cached paid flag, or diagnostics entitlement bypass.
-    static let productID = "com.patricedery.vocello.design_clone_export"
+    public static let productID = "com.patricedery.vocello.design_clone_export"
 
-    static func permits(_ items: [IOSExportProvenance], unlocked: Bool) -> Bool {
+    public static func permits(_ items: [IOSExportProvenance], unlocked: Bool) -> Bool {
         !items.isEmpty && (unlocked || items.allSatisfy { !$0.requiresUnlock })
     }
 }

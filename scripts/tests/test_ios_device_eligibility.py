@@ -117,7 +117,7 @@ class IOSDeviceEligibilityTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
-        with self.assertRaisesRegex(module.EligibilityError, "both host"):
+        with self.assertRaisesRegex(module.EligibilityError, "VocelloiOSPolicies|both host"):
             module.validate(root)
 
         shutil.copy2(module.ROOT / module.PROJECT, project)

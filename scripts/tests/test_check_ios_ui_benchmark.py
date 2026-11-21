@@ -568,11 +568,15 @@ class CheckIOSUIBenchmarkTests(unittest.TestCase):
             ("processResourceUsage", "incomplete process resource deltas"),
             ("runEnvironment", "missing run environment"),
         ):
-            def app(rows, field=field):
-                self._current_rows[0]["summary"].pop(field)
             with self.subTest(field=field):
+                captured_engine_rows: list[dict] = []
+
                 def engine(rows):
-                    self._current_rows = rows
+                    captured_engine_rows[:] = rows
+
+                def app(rows, field=field):
+                    captured_engine_rows[0]["summary"].pop(field)
+
                 result = self.run_checker(
                     self.expected_order, mutate_rows=engine, mutate_app_rows=app
                 )

@@ -19,8 +19,8 @@ import Foundation
 /// side effect stays the coordinator's responsibility at the call site: several steps share the
 /// type `() -> Void`, and no token could stop a closure body from doing the wrong work.
 @MainActor
-enum IOSModelDownloadCancellationSequence {
-    enum PendingOutcome: Equatable {
+public enum IOSModelDownloadCancellationSequence {
+    public enum PendingOutcome: Equatable, Sendable {
         case deleted
         /// The `.cancelRequested` write failed: nothing was dequeued or removed, and the
         /// request was shown as still queued.
@@ -29,7 +29,7 @@ enum IOSModelDownloadCancellationSequence {
         case tombstonePersistenceFailed
     }
 
-    enum ActiveOutcome: Equatable {
+    public enum ActiveOutcome: Equatable, Sendable {
         case deleted
         /// The `.cancelRequested` write failed: the task was never cancelled or drained, and the
         /// transfer was shown as still running.
@@ -49,7 +49,7 @@ enum IOSModelDownloadCancellationSequence {
     ///   - persistTombstone: durable `.deleted`; `false` aborts before staging is touched.
     ///   - discardStaging: removes the staged files.
     ///   - publishDeleted: terminal `.deleted` snapshot.
-    static func cancelPending(
+    public static func cancelPending(
         persistIntent: () -> Bool,
         keepCancellable: () -> Void,
         dequeue: () -> Void,
@@ -80,7 +80,7 @@ enum IOSModelDownloadCancellationSequence {
     ///   - persistTombstone: durable `.deleted`; `false` aborts before staging is touched.
     ///   - removeStaging: removes the staging root.
     ///   - publishDeleted: terminal `.deleted` snapshot.
-    static func cancelActive(
+    public static func cancelActive(
         persistIntent: () -> Bool,
         keepCancellable: () -> Void,
         publishCancelling: () -> Void,
@@ -107,18 +107,18 @@ enum IOSModelDownloadCancellationSequence {
 /// The coordinator's one diagnostics heartbeat belongs to the transfer that started it (A5-04).
 /// Only a cancellation of that model stops it: cancelling a model still waiting in the queue
 /// never silences the heartbeat of the download in flight.
-struct IOSModelDownloadHeartbeatOwnership: Equatable, Sendable {
-    private(set) var modelID: String?
+public struct IOSModelDownloadHeartbeatOwnership: Equatable, Sendable {
+    public private(set) var modelID: String?
 
-    init() {}
+    public init() {}
 
     /// The heartbeat now follows this model's transfer.
-    mutating func claim(for modelID: String) {
+    public mutating func claim(for modelID: String) {
         self.modelID = modelID
     }
 
     /// Whether the heartbeat should stop for this model's cancellation: only when it owns it.
-    mutating func release(for modelID: String) -> Bool {
+    public mutating func release(for modelID: String) -> Bool {
         guard self.modelID == modelID else { return false }
         self.modelID = nil
         return true

@@ -114,8 +114,15 @@ def validate(root: Path = ROOT) -> dict[str, object]:
     if "try IOSStorageProtectionPolicy.apply(at: AppPaths.appSupportDir)" not in bootstrap:
         raise PolicyError("iOS bootstrap does not apply storage protection before opening stores")
     project = (root / PROJECT.relative_to(ROOT)).read_text(encoding="utf-8")
-    if project.count("Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift") != 2:
-        raise PolicyError("storage policy must compile in both host and generic-iOS logic-test targets")
+    source_path = "Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift"
+    compiled_in_ios_policies = (
+        project.count(source_path) == 1
+        and project.count("- target: VocelloiOSPolicies") == 3
+    )
+    if not compiled_in_ios_policies and project.count(source_path) != 2:
+        raise PolicyError(
+            "storage policy must compile in VocelloiOSPolicies (linked by VocelloiOS, host and generic-iOS logic tests)"
+        )
 
     return {
         "schemaVersion": 1,

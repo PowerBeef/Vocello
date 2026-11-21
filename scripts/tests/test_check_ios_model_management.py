@@ -596,6 +596,31 @@ class DuplicateByteAllowanceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "rangeLength"):
             MODULE.duplicate_byte_allowance(success, [record, success])
 
+    def test_queue_and_upgrade_scenarios_require_rf59_milestones(self):
+        self.assertIn("upgrade", MODULE.PASS_SCENARIOS)
+        self.assertEqual(
+            MODULE.missing_scenario_milestones([observation(milestone="queue-active")], "queue"),
+            ["queue-waiting"],
+        )
+        self.assertEqual(
+            MODULE.missing_scenario_milestones(
+                [observation(milestone=m) for m in MODULE.REQUIRED_QUEUE_MILESTONES],
+                "queue",
+            ),
+            [],
+        )
+        self.assertEqual(
+            MODULE.missing_scenario_milestones([observation(milestone="upgrade-later-paused")], "upgrade"),
+            ["upgrade-later-persisted", "upgrade-make-room-confirmed"],
+        )
+        self.assertEqual(
+            MODULE.missing_scenario_milestones(
+                [observation(milestone=m) for m in MODULE.REQUIRED_UPGRADE_MILESTONES],
+                "upgrade",
+            ),
+            [],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

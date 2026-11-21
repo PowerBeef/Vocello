@@ -479,12 +479,15 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: attribution, timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("screen_openSourceLicenses"), timeout: 20))
         XCTAssertTrue(VocelloUIWait.exists(element("iosAttributionRow_vocello"), timeout: 20))
+        assertModelAttributionRows()
         recorder.record(
             scenario: "external", controlID: "attribution-controls",
-            expected: "Bundled attributions open without a load error",
-            actual: "Vocello attribution row visible; no attribution error"
+            expected: "Bundled software and hybrid model attributions open and drill down without a load error",
+            actual: "Vocello row and all 3 hybrid model attribution rows opened cleanly; no attribution error"
         )
-        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: element("iosSettings_openSourceBackButton"), timeout: 20))
+        let openSourceBack = element("iosSettings_openSourceBackButton")
+        XCTAssertTrue(revealSettingsElement(openSourceBack, swipingUp: false))
+        XCTAssertTrue(VocelloUIPrimaryAction.perform(on: openSourceBack, timeout: 20))
 
         for identifier in ["iosSettings_privacyPolicyRow", "iosSettings_supportRow", "iosSettings_sourceCodeRow"] {
             verifyExternalHandoff(identifier: identifier, expectedApplication: nil)

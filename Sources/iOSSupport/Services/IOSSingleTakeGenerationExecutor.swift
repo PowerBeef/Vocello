@@ -6,15 +6,15 @@ import QwenVoiceCore
 /// The request remains the engine source of truth. This wrapper fails closed when
 /// the app has not minted the generation identity required to correlate frontend,
 /// middle-layer, engine, persistence, and diagnostics evidence.
-struct IOSSingleTakeGenerationPlan: Hashable, Sendable {
-    enum ValidationError: LocalizedError, Equatable {
+public struct IOSSingleTakeGenerationPlan: Hashable, Sendable {
+    public enum ValidationError: LocalizedError, Equatable {
         case missingGenerationID
         case emptyModelTier
         case emptyDisplayVoiceName
         case emptyModeLabel
         case emptyPersistenceCaller
 
-        var errorDescription: String? {
+        public var errorDescription: String? {
             switch self {
             case .missingGenerationID:
                 return "The generation request is missing its correlation identity."
@@ -30,17 +30,17 @@ struct IOSSingleTakeGenerationPlan: Hashable, Sendable {
         }
     }
 
-    let generationID: UUID
-    let request: GenerationRequest
-    let modelTier: String
-    let historyVoice: String?
-    let historyEmotion: String?
-    let displayVoiceName: String
-    let modeLabel: String
-    let waveformSeed: Int
-    let persistenceCaller: String
+    public let generationID: UUID
+    public let request: GenerationRequest
+    public let modelTier: String
+    public let historyVoice: String?
+    public let historyEmotion: String?
+    public let displayVoiceName: String
+    public let modeLabel: String
+    public let waveformSeed: Int
+    public let persistenceCaller: String
 
-    init(
+    public init(
         request: GenerationRequest,
         modelTier: String,
         historyVoice: String?,
@@ -76,7 +76,7 @@ struct IOSSingleTakeGenerationPlan: Hashable, Sendable {
 /// frontend ownership while allowing deterministic fakes to characterize the
 /// ordering and cancellation contract without loading models or launching UI.
 @MainActor
-protocol IOSSingleTakeGenerationExecutionHooks: AnyObject {
+public protocol IOSSingleTakeGenerationExecutionHooks: AnyObject {
     func generationSubmitted(_ plan: IOSSingleTakeGenerationPlan) async
     func generate(_ request: GenerationRequest) async throws -> GenerationResult
     func generationCompleted(
@@ -97,7 +97,7 @@ protocol IOSSingleTakeGenerationExecutionHooks: AnyObject {
 /// between those boundaries is identical across Built-in, Design, and Clone and
 /// therefore must not drift among three view implementations.
 @MainActor
-enum IOSSingleTakeGenerationExecutor {
+public enum IOSSingleTakeGenerationExecutor {
     /// `isCancellationRequested` reports a cancellation the attempt owner accepted
     /// before it cancelled this Swift task. The foreground-exit path (PA-15) calls
     /// the engine barrier first and cancels the task afterwards, so the take must
@@ -113,7 +113,7 @@ enum IOSSingleTakeGenerationExecutor {
     /// including one the engine or the store chose itself (memory pressure). The
     /// owner tells them apart: a Studio attempt nobody asked to stop closes
     /// through `StudioGenerationCoordinator.finishEngineCancellation` (U23).
-    static func run(
+    public static func run(
         plan: IOSSingleTakeGenerationPlan,
         hooks: any IOSSingleTakeGenerationExecutionHooks,
         isCancellationRequested: @MainActor () -> Bool = { false },

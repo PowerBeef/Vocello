@@ -4,8 +4,8 @@ import Foundation
 /// or after a failure, never while one is running or once the dependencies
 /// exist, and only the running pass may finish. `IOSStartupRunner` drives it;
 /// the startup screen's Retry begins the next pass.
-struct IOSStartupAttempt: Equatable {
-    enum Phase: Equatable {
+public struct IOSStartupAttempt: Equatable, Sendable {
+    public enum Phase: Equatable, Sendable {
         case idle
         case starting
         /// The last pass failed; the container shows its error with Retry.
@@ -13,12 +13,14 @@ struct IOSStartupAttempt: Equatable {
         case ready
     }
 
-    private(set) var phase: Phase = .idle
+    public private(set) var phase: Phase = .idle
 
-    var isStarting: Bool { phase == .starting }
+    public init() {}
+
+    public var isStarting: Bool { phase == .starting }
 
     /// Starts a pass when one may run; false leaves the state unchanged.
-    mutating func begin() -> Bool {
+    public mutating func begin() -> Bool {
         switch phase {
         case .idle, .failed:
             phase = .starting
@@ -29,7 +31,7 @@ struct IOSStartupAttempt: Equatable {
     }
 
     /// Ends the running pass: ready on success, failed (and retryable) otherwise.
-    mutating func finish(succeeded: Bool) {
+    public mutating func finish(succeeded: Bool) {
         guard phase == .starting else { return }
         phase = succeeded ? .ready : .failed
     }
@@ -41,23 +43,23 @@ struct IOSStartupAttempt: Equatable {
 /// Retry disabled. `IOSAppDependenciesContainer` supplies the iOS operation and
 /// republishes every change; tests supply fakes.
 @MainActor
-final class IOSStartupRunner<Dependencies> {
-    private(set) var attempt = IOSStartupAttempt()
-    private(set) var dependencies: Dependencies?
-    private(set) var error: (any Error)?
+public final class IOSStartupRunner<Dependencies> {
+    public private(set) var attempt = IOSStartupAttempt()
+    public private(set) var dependencies: Dependencies?
+    public private(set) var error: (any Error)?
     /// Called before every state change, for an observable owner.
-    var willChange: () -> Void = {}
+    public var willChange: () -> Void = {}
 
     private let operation: @MainActor () async throws -> Dependencies
 
-    init(operation: @escaping @MainActor () async throws -> Dependencies) {
+    public init(operation: @escaping @MainActor () async throws -> Dependencies) {
         self.operation = operation
     }
 
     /// Begins a pass when one may run and returns it, so a caller can await its
     /// end; nil while a pass runs or once startup has succeeded.
     @discardableResult
-    func start() -> Task<Void, Never>? {
+    public func start() -> Task<Void, Never>? {
         var next = attempt
         guard next.begin() else { return nil }
         willChange()
@@ -93,15 +95,17 @@ final class IOSStartupRunner<Dependencies> {
 /// onboarding cover and a cold-launch open is not lost while startup runs. One
 /// import cover shows at a time, so a later open replaces one still waiting,
 /// and each file is handed out once.
-struct IOSExternalImportQueue: Equatable {
-    private(set) var pending: URL?
+public struct IOSExternalImportQueue: Equatable, Sendable {
+    public private(set) var pending: URL?
 
-    mutating func enqueue(_ url: URL) {
+    public init() {}
+
+    public mutating func enqueue(_ url: URL) {
         pending = url
     }
 
     /// The waiting file, removed from the queue, when its import can be shown now.
-    mutating func take(onboardingIsPresented: Bool) -> URL? {
+    public mutating func take(onboardingIsPresented: Bool) -> URL? {
         guard !onboardingIsPresented, let url = pending else { return nil }
         pending = nil
         return url

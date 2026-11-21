@@ -246,7 +246,6 @@ targets:
       - path: Sources/iOSSupport/Models/Voice.swift
       - path: Sources/iOSSupport/ViewModels/SavedVoicesViewModel.swift
       - path: Sources/iOSSupport/Services/IOSAppLanguage.swift
-      - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
       - path: Sources/iOS/Studio/StudioGenerationCoordinator.swift
       - path: Sources/iOS/Studio/StudioGenerationItems.swift
       # CONV-22: long-form projects and the generation drafts are the iOS ones;
@@ -344,7 +343,7 @@ targets:
       # Bundle the contract beside the binary so the CLI resolves it via the
       # Bundle sweep in CLIRuntime.locateManifestURL — no longer dependent on
       # being run from the repo root. Uses the explicit resources buildPhase
-      # (same shape as the iOS target / XcodeGen 2.45.4 gotcha) to be safe for
+      # (same shape as the iOS target / XcodeGen gotcha) to be safe for
       # a non-app `tool` product.
       - path: Sources/Resources/qwenvoice_contract.json
         buildPhase: resources
@@ -547,6 +546,7 @@ targets:
       - path: Sources/iOSSupport/Services/StudioGenerationAttemptAuthority.swift
       - path: Sources/iOSSupport/Services/AppNotifications.swift
       - path: Sources/iOSSupport/Models/PendingVoiceCloningHandoff.swift
+      - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.qwenvoice.shared-policies
@@ -566,10 +566,49 @@ targets:
       - package: MLXSwift
         product: MLX
 
+  # Pure platform-neutral iOS policies (startup recovery, storage protection,
+  # device eligibility, download admission/cancellation/progress mapping,
+  # audio-session ledger, Studio draft persistence, leftover-audio analysis,
+  # and export access/purchase state). Compiled once for VocelloiOS,
+  # VocelloCoreTests and VocelloiOSLogicTests instead of 3x by path. Never
+  # linked by QwenVoice, VocelloDesktopCore, VocelloCLICore or VocelloCLI so
+  # macOS and CLI stay strictly free of iOS commerce/paywall code.
+  VocelloiOSPolicies:
+    type: framework.static
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - path: Sources/iOSSupport/Models/IOSStartupReliabilityRecord.swift
+      - path: Sources/iOSSupport/Services/IOSStartupRecovery.swift
+      - path: Sources/iOSSupport/Services/IOSModelDownloadCancellationSequence.swift
+      - path: Sources/iOSSupport/Services/IOSModelDownloadProgressMapping.swift
+      - path: Sources/iOSSupport/Services/IOSModelDownloadAdmission.swift
+      - path: Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift
+      - path: Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
+      - path: Sources/iOSSupport/Services/IOSExportAccessPolicy.swift
+      - path: Sources/iOSSupport/Services/IOSExportPurchaseState.swift
+      - path: Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift
+      - path: Sources/iOSSupport/Services/IOSStudioDraftPersistence.swift
+      - path: Sources/iOSSupport/Services/IOSLeftoverAudioAnalysis.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.qwenvoice.ios-policies
+        PRODUCT_NAME: VocelloiOSPolicies
+        PRODUCT_MODULE_NAME: VocelloiOSPolicies
+        SWIFT_VERSION: "6"
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
+        IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: QwenVoiceCore
+      - package: MLXAudio
+        product: VocelloQwen3Core
+      - package: MLXSwift
+        product: MLX
+
   VocelloiOS:
     type: application
     platform: iOS
-    # XcodeGen 2.45.4 gotcha (see the iOS section of .claude/rules/native.md + commit
+    # XcodeGen gotcha (see docs/reference/native-engineering.md + commit
     # 287c969): the bundled resources below MUST be listed under `sources:` with an
     # explicit `buildPhase: resources` override. Listing them under `resources:`
     # silently drops them from the VocelloiOS Resources phase, so iOS builds compile
@@ -590,6 +629,19 @@ targets:
           - Services/StudioGenerationAttemptAuthority.swift
           - Services/AppNotifications.swift
           - Models/PendingVoiceCloningHandoff.swift
+          - Services/IOSSingleTakeGenerationExecutor.swift
+          - Models/IOSStartupReliabilityRecord.swift
+          - Services/IOSStartupRecovery.swift
+          - Services/IOSModelDownloadCancellationSequence.swift
+          - Services/IOSModelDownloadProgressMapping.swift
+          - Services/IOSModelDownloadAdmission.swift
+          - Services/IOSStorageProtectionPolicy.swift
+          - Services/IOSDeviceEligibilityPolicy.swift
+          - Services/IOSExportAccessPolicy.swift
+          - Services/IOSExportPurchaseState.swift
+          - Services/IOSAudioSessionPolicy.swift
+          - Services/IOSStudioDraftPersistence.swift
+          - Services/IOSLeftoverAudioAnalysis.swift
       - path: Sources/SharedSupport
       - path: Sources/Resources/qwenvoice_contract.json
         buildPhase: resources
@@ -654,6 +706,7 @@ targets:
       - package: GRDB
       - target: QwenVoiceCore
       - target: VocelloSharedPolicies
+      - target: VocelloiOSPolicies
       - package: MLXAudio
         product: VocelloQwen3Core
       - package: MLXSwift
@@ -740,35 +793,18 @@ targets:
       - path: Sources/iOSSupport/Models/GenerationDrafts.swift
       - path: Sources/iOSSupport/Models/Voice.swift
       - path: Sources/Views/Voices/SavedVoiceSheetConfiguration.swift
-      - path: Sources/iOSSupport/Models/IOSStartupReliabilityRecord.swift
       - path: Sources/iOSSupport/Services/AppPaths.swift
+      - path: Sources/iOSSupport/Services/IOSAppDefaults.swift
       - path: Sources/iOSSupport/Services/IOSModelDeliverySupport.swift
       - path: Sources/iOSSupport/Services/IOSModelProgressPresentation.swift
       - path: Sources/iOSSupport/Services/IOSReferenceAudioImportPolicy.swift
-      - path: Sources/iOSSupport/Services/IOSStartupRecovery.swift
       - path: Sources/iOSSupport/Services/IOSPullableDiagnosticsMirror.swift
       - path: Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift
       - path: Sources/SharedSupport/Services/VoiceDesignBriefCatalog.swift
       - path: Sources/SharedSupport/Services/GenerationTextLimitPolicy.swift
       - path: Sources/SharedSupport/Services/WordTimingPlanner.swift
-      - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
-      - path: Sources/iOSSupport/Services/IOSModelDownloadCancellationSequence.swift
-      # RF-19 (E-02): downloader progress to the iPhone model row and ledger.
-      - path: Sources/iOSSupport/Services/IOSModelDownloadProgressMapping.swift
-      # RF-19 (E-01): the iPhone install and start claims taken before any await.
-      - path: Sources/iOSSupport/Services/IOSModelDownloadAdmission.swift
       - path: Sources/iOSSupport/Services/IOSModelUpdateAutoStartPolicy.swift
-      - path: Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift
-      - path: Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
-      - path: Sources/iOSSupport/Services/IOSExportAccessPolicy.swift
-      - path: Sources/iOSSupport/Services/IOSExportPurchaseState.swift
       - path: Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift
-      # PA-21: the one iOS audio-session owner's decision table.
-      - path: Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift
-      # PA-21: Studio drafts kept across launches (IOS-09).
-      - path: Sources/iOSSupport/Services/IOSStudioDraftPersistence.swift
-      # PA-30: which audio earlier iPhone History clears left may be offered and removed.
-      - path: Sources/iOSSupport/Services/IOSLeftoverAudioAnalysis.swift
       # PA-19: the orchestrators run under unit tests over a fake engine: the
       # shared engine store (with its diagnostics recorder), the History database
       # service, the iOS export gate and the iPhone model inventory manager (with
@@ -817,6 +853,7 @@ targets:
     dependencies:
       - target: QwenVoiceCore
       - target: VocelloSharedPolicies
+      - target: VocelloiOSPolicies
       # The CLI's tested files (PA-17's consent refusal, TEST-13's generate options, the
       # runtime wrappers) come from their module, imported @testable.
       - target: VocelloCLICore
@@ -837,7 +874,7 @@ targets:
   # host and no hidden app behavior. CI compiles it for generic/platform=iOS;
   # the same Foundation-level sources and assertions execute in VocelloCoreTests
   # on the macOS host.
-  # Xcode 26 cannot execute a tool-hosted, app-host-free XCTest bundle on a
+  # Xcode cannot execute a tool-hosted, app-host-free XCTest bundle on a
   # physical-device destination, so this target is intentionally compile-only.
   VocelloiOSLogicTests:
     type: bundle.unit-test
@@ -848,25 +885,14 @@ targets:
       - path: Tests/Fixtures/VocelloExports.storekit
         buildPhase: resources
       - path: Tests/VocelloiOSLogicTests
-      - path: Sources/iOSSupport/Models/IOSStartupReliabilityRecord.swift
       - path: Sources/iOSSupport/Services/AppPaths.swift
+      - path: Sources/iOSSupport/Services/IOSAppDefaults.swift
       - path: Sources/iOSSupport/Services/IOSModelDeliverySupport.swift
       - path: Sources/iOSSupport/Services/IOSModelProgressPresentation.swift
       - path: Sources/iOSSupport/Services/IOSReferenceAudioImportPolicy.swift
-      - path: Sources/iOSSupport/Services/IOSStartupRecovery.swift
       - path: Sources/iOSSupport/Services/IOSPullableDiagnosticsMirror.swift
       - path: Sources/SharedSupport/Services/ReferenceTranscriptionReviewState.swift
-      - path: Sources/iOSSupport/Services/IOSSingleTakeGenerationExecutor.swift
-      - path: Sources/iOSSupport/Services/IOSModelDownloadCancellationSequence.swift
-      # RF-19 (E-02): downloader progress to the iPhone model row and ledger.
-      - path: Sources/iOSSupport/Services/IOSModelDownloadProgressMapping.swift
-      # RF-19 (E-01): the iPhone install and start claims taken before any await.
-      - path: Sources/iOSSupport/Services/IOSModelDownloadAdmission.swift
       - path: Sources/iOSSupport/Services/IOSModelUpdateAutoStartPolicy.swift
-      - path: Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift
-      - path: Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift
-      - path: Sources/iOSSupport/Services/IOSExportAccessPolicy.swift
-      - path: Sources/iOSSupport/Services/IOSExportPurchaseState.swift
       - path: Sources/iOSSupport/Services/IOSSavedOutputsDestination.swift
       - path: Sources/SharedSupport/Services/VocelloPresentationText.swift
       - path: Sources/SharedSupport/Services/VocelloLocalization.swift
@@ -874,15 +900,10 @@ targets:
       - path: Sources/iOS/Commerce/IOSCommercePresentationText.swift
       - path: Sources/iOS/Commerce/IOSStoreKitClient.swift
       - path: Sources/iOSSupport/Services/IOSCommerceErrorDiagnostics.swift
-      # PA-21: the one iOS audio-session owner's decision table.
-      - path: Sources/iOSSupport/Services/IOSAudioSessionPolicy.swift
-      # PA-21: Studio drafts kept across launches (IOS-09).
-      - path: Sources/iOSSupport/Services/IOSStudioDraftPersistence.swift
-      # PA-30: which audio earlier iPhone History clears left may be offered and removed.
-      - path: Sources/iOSSupport/Services/IOSLeftoverAudioAnalysis.swift
     dependencies:
       - target: QwenVoiceCore
       - target: VocelloSharedPolicies
+      - target: VocelloiOSPolicies
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.patricedery.vocello.logic-tests

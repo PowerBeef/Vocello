@@ -1507,7 +1507,7 @@ PY
 # fixed-seed cohort is diagnostic-only and evaluates every predeclared take without retries.
 cmd_lang_bench() {
   require_team
-  note "lang-bench requires Built-in Voice (Speed) on device — install via Settings → Model Downloads if diagnostics fail"
+  note "lang-bench requires Built-in Voice (Speed) on device — install via Settings → Models & Files → Voice Models if diagnostics fail"
   local subset="full" label="" cohort=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -2200,7 +2200,7 @@ PY
 
 cmd_bench() {
   require_team
-  note "bench requires Built-in Voice (Speed) on device — confirm it in Settings → Model Downloads before generation"
+  note "bench requires Built-in Voice (Speed) on device — confirm it in Settings → Models & Files → Voice Models before generation"
   local spec="custom:speed:" label=""
   # parse: first non-flag arg = spec; --label RUN_ID; --memory-profile <profile>;
   # --voice-id <saved-voice-id> is mandatory for clone diagnostics.

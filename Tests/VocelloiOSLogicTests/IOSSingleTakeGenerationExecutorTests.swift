@@ -1,5 +1,6 @@
 import QwenVoiceCore
 import XCTest
+import VocelloSharedPolicies
 
 @MainActor
 final class IOSSingleTakeGenerationExecutorTests: XCTestCase {

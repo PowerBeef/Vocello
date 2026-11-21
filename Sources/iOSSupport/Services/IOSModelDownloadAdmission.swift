@@ -12,36 +12,36 @@ import Foundation
 /// is the coordinator's own state, which it passes in.
 ///
 /// Pure: the coordinator applies the decisions, and `IOSModelDownloadAdmissionTests` pins them.
-struct IOSModelDownloadAdmission: Equatable, Sendable {
-    let maxConcurrentModels: Int
+public struct IOSModelDownloadAdmission: Equatable, Sendable {
+    public let maxConcurrentModels: Int
     /// Models whose Install is preparing a request (catalog, delivery plan, free space, ledger)
     /// that has not joined the queue yet.
-    private(set) var preparingModelIDs: Set<String> = []
+    public private(set) var preparingModelIDs: Set<String> = []
     /// Models taken off the queue whose transfer is not recorded as running yet.
-    private(set) var startingModelIDs: Set<String> = []
+    public private(set) var startingModelIDs: Set<String> = []
 
-    init(maxConcurrentModels: Int) {
+    public init(maxConcurrentModels: Int) {
         self.maxConcurrentModels = max(1, maxConcurrentModels)
     }
 
     /// Install's duplicate guard, taken before its first await. `false` means the model already
     /// has a download, queued or running (`hasDownload`) or being prepared or started, so the
     /// request is ignored.
-    mutating func claimPreparation(of modelID: String, hasDownload: Bool) -> Bool {
+    public mutating func claimPreparation(of modelID: String, hasDownload: Bool) -> Bool {
         guard !hasDownload, !isClaimed(modelID) else { return false }
         preparingModelIDs.insert(modelID)
         return true
     }
 
     /// Ends a preparation claim: the request joined the queue, or preparing it failed.
-    mutating func releasePreparation(of modelID: String) {
+    public mutating func releasePreparation(of modelID: String) {
         preparingModelIDs.remove(modelID)
     }
 
     /// Claims the start slot for the model at the head of the queue, before the first await of
     /// its start. Starting and running transfers both count against `maxConcurrentModels`, so
     /// another start stays queued. `false` means there is no free slot.
-    mutating func claimStart(of modelID: String, runningCount: Int) -> Bool {
+    public mutating func claimStart(of modelID: String, runningCount: Int) -> Bool {
         guard runningCount + startingModelIDs.count < maxConcurrentModels,
               !startingModelIDs.contains(modelID) else { return false }
         startingModelIDs.insert(modelID)
@@ -49,12 +49,12 @@ struct IOSModelDownloadAdmission: Equatable, Sendable {
     }
 
     /// Ends a start claim: the transfer is recorded as running, or its start failed.
-    mutating func releaseStart(of modelID: String) {
+    public mutating func releaseStart(of modelID: String) {
         startingModelIDs.remove(modelID)
     }
 
     /// Whether the model is being prepared or started.
-    func isClaimed(_ modelID: String) -> Bool {
+    public func isClaimed(_ modelID: String) -> Bool {
         preparingModelIDs.contains(modelID) || startingModelIDs.contains(modelID)
     }
 }

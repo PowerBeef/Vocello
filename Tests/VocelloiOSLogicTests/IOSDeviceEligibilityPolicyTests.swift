@@ -1,4 +1,5 @@
 import XCTest
+import VocelloiOSPolicies
 
 final class IOSDeviceEligibilityPolicyTests: XCTestCase {
     func testRequiredCapabilitiesMatchTheAppStoreHardwareFloor() {

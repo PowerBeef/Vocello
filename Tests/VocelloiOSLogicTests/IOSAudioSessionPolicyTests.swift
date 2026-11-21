@@ -1,4 +1,5 @@
 import XCTest
+import VocelloiOSPolicies
 
 /// PA-21 / AUD-02: the one audio-session owner's decisions.
 final class IOSAudioSessionPolicyTests: XCTestCase {

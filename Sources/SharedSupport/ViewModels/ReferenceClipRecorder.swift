@@ -2,6 +2,9 @@ import AVFoundation
 import Foundation
 import Observation
 import QwenVoiceCore
+#if os(iOS)
+import VocelloiOSPolicies
+#endif
 
 /// Records a 10–20 s reference clip as a 24 kHz mono Int16 PCM WAV for Voice Cloning enrollment,
 /// exposing a live amplitude history that drives the level meters on both platforms (iOS

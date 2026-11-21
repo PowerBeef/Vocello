@@ -4,6 +4,7 @@ import SwiftUI
 import UIKit
 import QwenVoiceCore
 import VocelloSharedPolicies
+import VocelloiOSPolicies
 
 /// iOS app entry point.
 ///

@@ -2,6 +2,7 @@ import AVFoundation
 import Synchronization
 import QwenVoiceCore
 import OSLog
+import VocelloiOSPolicies
 
 /// The only code in the iOS app that changes `AVAudioSession` (PA-21, AUD-02).
 ///

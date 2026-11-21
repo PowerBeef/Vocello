@@ -1,6 +1,7 @@
 import AVFoundation
 import SwiftUI
 import QwenVoiceCore
+import VocelloiOSPolicies
 
 /// Full-screen Player sheet from design_references/Vocello iOS/player.jsx.
 /// Renders a mode-tinted waveform + scrubber, a karaoke transcript that

@@ -1,6 +1,9 @@
 import AVFoundation
 import Foundation
 import Observation
+#if os(iOS)
+import VocelloiOSPolicies
+#endif
 
 /// Tiny audio player for reviewing a just-recorded (or just-generated) reference clip inside the
 /// "Save this voice" sheet: play/pause + a 0…1 progress for the waveform playhead + the clip's

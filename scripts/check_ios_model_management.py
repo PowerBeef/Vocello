@@ -29,8 +29,17 @@ from lib import jsonio  # noqa: E402
 
 
 OBSERVATION_PREFIX = "VOCELLO_MODEL_OBSERVATION="
-PASS_SCENARIOS = {"acceptance", "queue", "recover", "soak"}
+PASS_SCENARIOS = {"acceptance", "queue", "upgrade", "recover", "soak"}
 REQUIRED_PROGRESS_MILESTONES = {"transfer-1", "transfer-25", "transfer-50", "transfer-75", "transfer-95"}
+REQUIRED_QUEUE_MILESTONES = {
+    "queue-active",
+    "queue-waiting",
+}
+REQUIRED_UPGRADE_MILESTONES = {
+    "upgrade-later-paused",
+    "upgrade-later-persisted",
+    "upgrade-make-room-confirmed",
+}
 
 
 # Duplicate wire bytes one file-level retry may meter: at most one 128 MiB range.
@@ -233,6 +242,19 @@ def missing_progress_milestones(
     return sorted(REQUIRED_PROGRESS_MILESTONES - captured)
 
 
+def missing_scenario_milestones(
+    observations: Iterable[dict[str, Any]],
+    scenario: str,
+) -> list[str]:
+    if scenario == "queue":
+        captured = {observation.get("milestone") for observation in observations}
+        return sorted(REQUIRED_QUEUE_MILESTONES - captured)
+    if scenario == "upgrade":
+        captured = {observation.get("milestone") for observation in observations}
+        return sorted(REQUIRED_UPGRADE_MILESTONES - captured)
+    return []
+
+
 def invalid_progress_milestone_ranges(
     observations: Iterable[dict[str, Any]],
     scenario: str,
@@ -269,7 +291,7 @@ def attachment_map(attachments: pathlib.Path) -> dict[str, pathlib.Path]:
             if name and exported:
                 path = attachments / exported
                 result[name] = path
-                # Xcode 26 decorates explicit XCTAttachment names during export with an
+                # Xcode decorates explicit XCTAttachment names during export with an
                 # occurrence counter and UUID. UI observations intentionally record the stable
                 # source name, so also expose that canonical key without weakening exact-name
                 # lookup for ordinary attachments.
@@ -814,7 +836,7 @@ def main() -> int:
     parser.add_argument("--xcodebuild-log", type=pathlib.Path)
     parser.add_argument("--attachments", type=pathlib.Path)
     parser.add_argument("--run-id", required=True)
-    parser.add_argument("--scenario", choices=["diagnose", "queue", "acceptance", "soak", "recover"])
+    parser.add_argument("--scenario", choices=["diagnose", "queue", "upgrade", "acceptance", "soak", "recover"])
     parser.add_argument("--partition-prior-traces", action="store_true")
     args = parser.parse_args()
 
@@ -889,6 +911,13 @@ def main() -> int:
             "missing-progress-milestones",
             "visual-evidence",
             "Missing required Custom progress observations: " + ", ".join(missing_milestones),
+        ))
+    missing_scenario = missing_scenario_milestones(observations, args.scenario)
+    if missing_scenario:
+        visual_findings.append(Finding(
+            "missing-scenario-milestones",
+            "visual-evidence",
+            f"Missing required {args.scenario} scenario observations: " + ", ".join(missing_scenario),
         ))
     invalid_milestones = invalid_progress_milestone_ranges(observations, args.scenario)
     if invalid_milestones:

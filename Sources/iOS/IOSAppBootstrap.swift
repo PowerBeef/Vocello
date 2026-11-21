@@ -4,6 +4,7 @@ import MLX
 import SwiftUI
 import UIKit
 import QwenVoiceCore
+import VocelloiOSPolicies
 
 /// Builds the app's dependencies (PA-21, AUD-01, IOS-06).
 ///
@@ -185,6 +186,15 @@ extension QVoiceiOSApp {
             rootDirectory: AppPaths.modelsDir,
             storeVersionSeed: modelAssetStoreSeed()
         )
+        // RF-59 internal-diagnostics isolated-root fixture seeding (no-op in
+        // distribution builds and whenever QVOICE_APP_SUPPORT_DIR is not an isolated child).
+        let seedResult = IOSModelUpdateAutoStartPolicy.seedRetiredModelsIfConfigured(
+            modelsDirectory: AppPaths.modelsDir,
+            allowedRetiredFolders: Set(registry.models.flatMap(\.retiredFolders))
+        )
+        if seedResult.shouldClearConsent {
+            IOSAppDefaults.modelUpdateConsentedArtifacts = []
+        }
         // RF-59: records which modes an earlier Vocello installed (a few small files, never model
         // weights) before the first statuses, so those modes read "Update Required"; then, off the
         // launch path, every retired Speed folder goes once any new model verifies.

@@ -1,4 +1,5 @@
 import StoreKit
+import VocelloiOSPolicies
 
 @MainActor
 enum IOSExportCommerce {

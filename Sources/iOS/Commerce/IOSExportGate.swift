@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import VocelloiOSPolicies
 // The gate's decision logic is Foundation-only so the macOS logic-test bundle
 // compiles and runs it (PA-19); the presentation below is iPhone UI.
 #if canImport(UIKit)

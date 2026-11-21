@@ -2,6 +2,7 @@ import Foundation
 import QwenVoiceCore
 import XCTest
 import VocelloSharedPolicies
+import VocelloiOSPolicies
 
 private actor CriticalMemoryReliefProbe {
     enum Action: Equatable {

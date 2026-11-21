@@ -2,6 +2,7 @@ import Foundation
 import GRDB
 import QwenVoiceCore
 import XCTest
+import VocelloiOSPolicies
 
 final class GenerationHistoryOutboxTests: XCTestCase {
     private final class CommitState: @unchecked Sendable {

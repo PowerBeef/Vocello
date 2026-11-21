@@ -1,5 +1,6 @@
 import QwenVoiceCore
 import XCTest
+import VocelloiOSPolicies
 
 /// RF-19 (E-02): a failed file's teardown is never recorded as a user's cancel. Recording it
 /// froze the row at Cancelling, kept the queue from advancing, and made the next launch

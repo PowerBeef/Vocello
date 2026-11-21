@@ -1,6 +1,7 @@
 import StoreKit
 import XCTest
 import QwenVoiceCore
+import VocelloiOSPolicies
 
 @MainActor
 final class IOSExportPurchaseTests: XCTestCase {

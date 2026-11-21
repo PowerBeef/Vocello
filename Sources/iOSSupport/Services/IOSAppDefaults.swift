@@ -53,10 +53,21 @@ public enum IOSAppDefaults {
         set { defaults.set(newValue, forKey: cellularModelDownloadsKey) }
     }
 
+    /// RF-59: per-root consent key so isolated internal-diagnostics upgrade roots
+    /// (`QVOICE_APP_SUPPORT_DIR`) never read or mutate the canonical profile's consent.
+    public static func resolvedModelUpdateConsentKey(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> String {
+        if let isolated = AppPaths.isolatedModelDeliverySupportRoot(environment: environment) {
+            return "\(modelUpdateConsentKey).isolated.\(isolated)"
+        }
+        return modelUpdateConsentKey
+    }
+
     /// RF-59: the model update asks once (Guideline 4.2.3(ii)) for these artifacts; after that a
     /// launch resumes it. Cleared once nothing is left to update, so a later set asks again.
     public static var modelUpdateConsentedArtifacts: [String] {
-        get { defaults.stringArray(forKey: modelUpdateConsentKey) ?? [] }
-        set { defaults.set(newValue, forKey: modelUpdateConsentKey) }
+        get { defaults.stringArray(forKey: resolvedModelUpdateConsentKey()) ?? [] }
+        set { defaults.set(newValue, forKey: resolvedModelUpdateConsentKey()) }
     }
 }

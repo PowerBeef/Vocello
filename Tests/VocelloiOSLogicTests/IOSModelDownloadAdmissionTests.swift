@@ -1,4 +1,5 @@
 import XCTest
+import VocelloiOSPolicies
 
 /// RF-19 (E-01): installs and starts claim their slot synchronously, before the awaited
 /// catalog and delivery plan (which hashes the 682 MB shared component), so two quick taps can

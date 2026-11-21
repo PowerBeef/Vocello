@@ -1,3 +1,4 @@
+import Foundation
 import QwenVoiceCore
 import XCTest
 
@@ -144,5 +145,234 @@ final class IOSModelUpdateAutoStartPolicyTests: XCTestCase {
         XCTAssertEqual(decide([candidate(failure: .space, paused: true)]), .none, "Later stopped it")
         XCTAssertEqual(decide([candidate(failure: .space)], lowDataMode: true), .none)
         XCTAssertEqual(decide([candidate(failure: .network)], consented: true), .none, "another failure waits for Retry")
+    }
+
+    func testSimulatedAvailableBytesRespectsRuntimeDebugGateAndValidatesInput() {
+        let systemBytes: Int64 = 50 * gigabyte
+        let overrideBytes: Int64 = 500_000_000
+
+        // Unset or gate off always returns the system value.
+        XCTAssertEqual(
+            Policy.resolvedAvailableBytes(systemAvailableBytes: systemBytes, environment: [:]),
+            systemBytes
+        )
+        XCTAssertEqual(
+            Policy.resolvedAvailableBytes(
+                systemAvailableBytes: systemBytes,
+                environment: [Policy.simulatedAvailableBytesKey: "\(overrideBytes)"]
+            ),
+            systemBytes,
+            "Without QWENVOICE_DEBUG=1 the override must remain inert"
+        )
+
+        // With internalDiagnosticsAvailable == false (distribution builds), override stays inert.
+        let armed = [
+            "QWENVOICE_DEBUG": "1",
+            Policy.simulatedAvailableBytesKey: " \(overrideBytes) ",
+        ]
+        XCTAssertEqual(
+            Policy.resolvedAvailableBytes(
+                systemAvailableBytes: systemBytes,
+                environment: armed,
+                internalDiagnosticsAvailable: false
+            ),
+            systemBytes
+        )
+
+        if RuntimeDebugGate.internalDiagnosticsAvailable {
+            XCTAssertEqual(
+                Policy.resolvedAvailableBytes(systemAvailableBytes: systemBytes, environment: armed),
+                overrideBytes
+            )
+            XCTAssertEqual(
+                decide(
+                    [candidate("pro_custom", bytes: 2 * gigabyte)],
+                    available: Policy.resolvedAvailableBytes(systemAvailableBytes: systemBytes, environment: armed)
+                ),
+                .ask(modelIDs: ["pro_custom"], totalBytes: 2 * gigabyte, makesRoomFirst: true)
+            )
+        } else {
+            XCTAssertEqual(
+                Policy.resolvedAvailableBytes(systemAvailableBytes: systemBytes, environment: armed),
+                systemBytes
+            )
+        }
+        for invalid in ["-1", "not-a-number", ""] {
+            XCTAssertEqual(
+                Policy.resolvedAvailableBytes(
+                    systemAvailableBytes: systemBytes,
+                    environment: ["QWENVOICE_DEBUG": "1", Policy.simulatedAvailableBytesKey: invalid]
+                ),
+                systemBytes,
+                "Invalid override \(invalid) must fall back to system free space"
+            )
+        }
+    }
+
+    func testSeedRetiredModelsRequiresIsolatedRootAndContractAllowlistAndIsIdempotent() throws {
+        let tempRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("IOSModelUpdateSeed-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: tempRoot) }
+
+        let allowed: Set<String> = [
+            "Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+            "Qwen3-TTS-12Hz-1.7B-Base-4bit",
+        ]
+
+        // Refuses without isolated QVOICE_APP_SUPPORT_DIR, without QWENVOICE_DEBUG,
+        // without internalDiagnosticsAvailable, or with malformed/absolute QVOICE_APP_SUPPORT_DIR.
+        for badSupport in [nil, "", ".", "..", "../escape", "a/b", "/tmp/canonical"] {
+            var env = [
+                "QWENVOICE_DEBUG": "1",
+                Policy.seedRetiredModelsKey: "reset:Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+            ]
+            if let badSupport {
+                env["QVOICE_APP_SUPPORT_DIR"] = badSupport
+            }
+            XCTAssertEqual(
+                Policy.seedRetiredModelsIfConfigured(
+                    modelsDirectory: tempRoot,
+                    allowedRetiredFolders: allowed,
+                    environment: env
+                ),
+                .none,
+                "Must refuse support root \(String(describing: badSupport))"
+            )
+        }
+        XCTAssertEqual(
+            Policy.seedRetiredModelsIfConfigured(
+                modelsDirectory: tempRoot,
+                allowedRetiredFolders: allowed,
+                environment: [
+                    "QVOICE_APP_SUPPORT_DIR": "upgrade-test",
+                    Policy.seedRetiredModelsKey: "Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+                ]
+            ),
+            .none
+        )
+        XCTAssertEqual(
+            Policy.seedRetiredModelsIfConfigured(
+                modelsDirectory: tempRoot,
+                allowedRetiredFolders: allowed,
+                environment: [
+                    "QWENVOICE_DEBUG": "1",
+                    "QVOICE_APP_SUPPORT_DIR": "upgrade-test",
+                    Policy.seedRetiredModelsKey: "Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+                ],
+                internalDiagnosticsAvailable: false
+            ),
+            .none
+        )
+
+        guard RuntimeDebugGate.internalDiagnosticsAvailable else { return }
+
+        // Rejects unknown and path-traversal entries while seeding allowed folders with a
+        // schema-valid ModelAssetIntegrityManifest recognized by ModelUpdateLedger.
+        let seeded = Policy.seedRetiredModelsIfConfigured(
+            modelsDirectory: tempRoot,
+            allowedRetiredFolders: allowed,
+            environment: [
+                "QWENVOICE_DEBUG": "1",
+                "QVOICE_APP_SUPPORT_DIR": "upgrade-test",
+                Policy.seedRetiredModelsKey: "../escape,unknown-folder,Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+            ]
+        )
+        XCTAssertEqual(
+            seeded,
+            Policy.SeedResult(didResetLedger: false, seededFolders: ["Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit"])
+        )
+        XCTAssertTrue(seeded.shouldClearConsent)
+        let manifestURL = tempRoot.appendingPathComponent(
+            "Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit/\(ModelAssetIntegrityManifest.filename)"
+        )
+        let decoded = try JSONDecoder().decode(ModelAssetIntegrityManifest.self, from: Data(contentsOf: manifestURL))
+        XCTAssertEqual(decoded.targetFolder, "Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit")
+        XCTAssertEqual(decoded.files.map(\.path), ["model.safetensors"])
+        XCTAssertTrue(
+            ModelUpdateLedger.holdsEarlierInstall("Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit", in: tempRoot),
+            "Seeded retired folder must satisfy real ModelUpdateLedger.holdsEarlierInstall"
+        )
+
+        // Once a model-update ledger exists, subsequent launches never re-seed,
+        // and `reset:` with only invalid folders must leave the existing ledger untouched.
+        let ledgerURL = tempRoot.appendingPathComponent(".qwenvoice-model-update.json")
+        try Data("{}".utf8).write(to: ledgerURL)
+        XCTAssertEqual(
+            Policy.seedRetiredModelsIfConfigured(
+                modelsDirectory: tempRoot,
+                allowedRetiredFolders: allowed,
+                environment: [
+                    "QWENVOICE_DEBUG": "1",
+                    "QVOICE_APP_SUPPORT_DIR": "upgrade-test",
+                    Policy.seedRetiredModelsKey: "reset:../escape,unknown-folder",
+                ]
+            ),
+            .none
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: ledgerURL.path), "Invalid reset must not delete ledger")
+
+        let secondPass = Policy.seedRetiredModelsIfConfigured(
+            modelsDirectory: tempRoot,
+            allowedRetiredFolders: allowed,
+            environment: [
+                "QWENVOICE_DEBUG": "1",
+                "QVOICE_APP_SUPPORT_DIR": "upgrade-test",
+                Policy.seedRetiredModelsKey: "Qwen3-TTS-12Hz-1.7B-Base-4bit",
+            ]
+        )
+        XCTAssertEqual(secondPass, .none)
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: tempRoot.appendingPathComponent("Qwen3-TTS-12Hz-1.7B-Base-4bit").path
+            )
+        )
+
+        // Explicit `reset:` on an ALREADY-EXISTING retired folder clears the ledger AND reports
+        // `shouldClearConsent == true` even when no new folder had to be written.
+        let resetExisting = Policy.seedRetiredModelsIfConfigured(
+            modelsDirectory: tempRoot,
+            allowedRetiredFolders: allowed,
+            environment: [
+                "QWENVOICE_DEBUG": "1",
+                "QVOICE_APP_SUPPORT_DIR": "upgrade-test",
+                Policy.seedRetiredModelsKey: "reset:Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+            ]
+        )
+        XCTAssertEqual(resetExisting, Policy.SeedResult(didResetLedger: true, seededFolders: []))
+        XCTAssertTrue(resetExisting.shouldClearConsent)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ledgerURL.path))
+    }
+
+    func testResolvedModelUpdateConsentKeyIsolatesFromCanonicalDefaults() {
+        let canonical = IOSAppDefaults.modelUpdateConsentKey
+        XCTAssertEqual(IOSAppDefaults.resolvedModelUpdateConsentKey(environment: [:]), canonical)
+        XCTAssertEqual(
+            IOSAppDefaults.resolvedModelUpdateConsentKey(environment: [
+                "QVOICE_APP_SUPPORT_DIR": "model-upgrade-acceptance",
+            ]),
+            canonical,
+            "Without QWENVOICE_DEBUG=1 the consent key must stay canonical"
+        )
+        for unsafeRoot in ["", ".", "..", "../escape", "a/b", "/tmp/canonical"] {
+            XCTAssertEqual(
+                IOSAppDefaults.resolvedModelUpdateConsentKey(environment: [
+                    "QWENVOICE_DEBUG": "1",
+                    "QVOICE_APP_SUPPORT_DIR": unsafeRoot,
+                ]),
+                canonical,
+                "Unsafe support root \(unsafeRoot) must not create an isolated consent key"
+            )
+        }
+        let isolatedKey = IOSAppDefaults.resolvedModelUpdateConsentKey(environment: [
+            "QWENVOICE_DEBUG": "1",
+            "QVOICE_APP_SUPPORT_DIR": "model-upgrade-acceptance",
+        ])
+        if RuntimeDebugGate.internalDiagnosticsAvailable {
+            XCTAssertEqual(isolatedKey, "\(canonical).isolated.model-upgrade-acceptance")
+            XCTAssertNotEqual(isolatedKey, canonical)
+        } else {
+            XCTAssertEqual(isolatedKey, canonical)
+        }
     }
 }

@@ -55,7 +55,7 @@ Usage:
   scripts/ui_test.sh ios perf [--label RUN_ID] [--no-publish]
   scripts/ui_test.sh ios delivery-cohort --text SCRIPT [--takes 20] [--label RUN_ID]
   scripts/ui_test.sh ios startup-parity --script-file UNTRACKED.txt
-  scripts/ui_test.sh ios model-download [--scenario diagnose|queue|acceptance|soak|recover] [--iterations 3] [--engine-profile legacy|chunked|chunked-multisession|chunked-bounded]
+  scripts/ui_test.sh ios model-download [--scenario diagnose|queue|upgrade|acceptance|soak|recover] [--iterations 3] [--engine-profile legacy|chunked|chunked-multisession|chunked-bounded]
   scripts/ui_test.sh ios control-audit [--scenario inventory|stateful|external|accessibility|generation|all] [--take-limit 5] [--resume RUN_ID]
   scripts/ui_test.sh ios enroll-clone-fixture
   scripts/ui_test.sh ios saved-voice-lifecycle
@@ -346,8 +346,8 @@ if [[ "$model_iterations" != 3 ]]; then
   [[ "$lane" == "model-download" ]] || die "--iterations is accepted only by the model-download lane"
 fi
 if [[ "$lane" == "model-download" ]]; then
-  [[ "$model_scenario" == "diagnose" || "$model_scenario" == "queue" || "$model_scenario" == "acceptance" || "$model_scenario" == "soak" || "$model_scenario" == "recover" ]] \
-    || die "--scenario must be diagnose, queue, acceptance, soak, or recover"
+  [[ "$model_scenario" == "diagnose" || "$model_scenario" == "queue" || "$model_scenario" == "upgrade" || "$model_scenario" == "acceptance" || "$model_scenario" == "soak" || "$model_scenario" == "recover" ]] \
+    || die "--scenario must be diagnose, queue, upgrade, acceptance, soak, or recover"
   [[ "$model_iterations" =~ ^[1-9][0-9]*$ ]] && (( model_iterations <= 20 )) \
     || die "--iterations must be an integer between 1 and 20"
   [[ "$model_scenario" == "soak" || "$model_iterations" == 3 ]] \
@@ -1092,6 +1092,10 @@ pull_ios_run_diagnostics() {
 
 pull_ios_model_download_diagnostics() {
   local device="$1" destination="$2"
+  local support_root="model-download-acceptance"
+  if [[ "${model_scenario:-}" == "upgrade" ]]; then
+    support_root="model-upgrade-acceptance"
+  fi
   local validation_status=0
   rm -rf "$destination"
   mkdir -p "$destination/trace/$run_id" "$destination/attempts/$run_id"
@@ -1100,7 +1104,7 @@ pull_ios_model_download_diagnostics() {
   for journal in trace attempts; do
     xcrun devicectl device copy from --device "$device" \
       --domain-type appDataContainer --domain-identifier "$BUNDLE_ID_IOS" \
-      --source "Library/Application Support/Q-Voice/model-download-acceptance/diagnostics/model-downloads/$journal/$run_id" \
+      --source "Library/Application Support/Q-Voice/$support_root/diagnostics/model-downloads/$journal/$run_id" \
       --destination "$destination/$journal/$run_id" --timeout 60 --quiet \
       >>"$out/model-download-diagnostics-pull.log" 2>&1 \
       || return 1
@@ -1278,7 +1282,7 @@ PY
   mkdir -p "$destination/forensics"
   xcrun devicectl device copy from --device "$device" \
     --domain-type appDataContainer --domain-identifier "$BUNDLE_ID_IOS" \
-    --source "Library/Application Support/Q-Voice/model-download-acceptance/downloads/ios_model_delivery_state.json" \
+    --source "Library/Application Support/Q-Voice/$support_root/downloads/ios_model_delivery_state.json" \
     --destination "$destination/forensics" --timeout 30 --quiet \
     >>"$out/model-download-diagnostics-pull.log" 2>&1 || true
   return "$validation_status"

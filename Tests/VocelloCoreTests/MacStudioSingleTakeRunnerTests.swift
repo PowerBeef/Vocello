@@ -1,6 +1,7 @@
 import Foundation
 import QwenVoiceCore
 import XCTest
+import VocelloSharedPolicies
 
 /// Records the VoiceOver announcements a coordinator posts.
 @MainActor

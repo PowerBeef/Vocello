@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import VocelloSharedPolicies
 
 /// The side effects of one macOS Studio take: the shared executor's hooks plus
 /// the dock card a completed take publishes. `MacStudioSingleTakeGenerationHooks`

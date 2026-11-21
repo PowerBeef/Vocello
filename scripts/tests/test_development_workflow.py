@@ -404,6 +404,36 @@ class PythonSelectionTests(unittest.TestCase):
         self.assertIn(["./scripts/check_project_inputs.sh", "--local"], plan["commands"])
         self.assertTrue((ROOT / audit).is_file())
 
+    def test_dev_ios_variants_and_test_ios_and_package_swiftlint(self) -> None:
+        # dev.sh lint includes Packages/VocelloQwen3Core/ Swift files.
+        pkg_swift = "Packages/VocelloQwen3Core/Sources/VocelloQwen3Core/Engine.swift"
+        self.assertTrue((ROOT / pkg_swift).is_file())
+        with mock.patch.object(MODULE, "_which", return_value=True), \
+                mock.patch.object(MODULE, "_pinned_version", return_value=None):
+            commands = MODULE.lint_commands([pkg_swift])
+        swiftlint_cmd = next(cmd for cmd in commands if cmd[0] == "swiftlint")
+        self.assertIn(pkg_swift, swiftlint_cmd)
+
+        # dev.sh ios --fast and --ui dispatch cleanly.
+        with mock.patch.object(MODULE, "run_commands") as run:
+            self.assertEqual(MODULE.main(["ios", "--fast"]), 0)
+            run.assert_called_once_with(
+                [["./scripts/build_foundation_targets.sh", "ios", "--incremental"]],
+                extra_env={"QVOICE_FOUNDATION_SWIFT_OPTIMIZATION": "-Onone"},
+            )
+        with mock.patch.object(MODULE, "run_commands") as run:
+            self.assertEqual(MODULE.main(["ios", "--ui"]), 0)
+            run.assert_called_once_with([["./scripts/build_ui_test_bundles.sh", "ios"]])
+
+        # dev.sh test --ios runs all VocelloiOSLogicTests classes via core-test --only.
+        ios_classes = MODULE.all_ios_logic_test_classes(ROOT)
+        self.assertIn("IOSModelUpdateAutoStartPolicyTests", ios_classes)
+        with mock.patch.object(MODULE, "run_commands") as run:
+            self.assertEqual(MODULE.main(["test", "--ios", "--repeat", "2"]), 0)
+            run.assert_called_once_with([
+                ["scripts/macos_test.sh", "core-test", "--only", ",".join(ios_classes), "--repeat", "2"]
+            ])
+
 
 class PrimaryPlanStatusTests(unittest.TestCase):
     ROADMAP = {

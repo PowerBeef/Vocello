@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import VocelloiOSPolicies
 
 // `IOSModelDeliverySnapshot` lives beside the pure progress mapping in
 // `Sources/iOSSupport/Services/IOSModelDownloadProgressMapping.swift` (RF-19).

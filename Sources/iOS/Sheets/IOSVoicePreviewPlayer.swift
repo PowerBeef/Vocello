@@ -3,6 +3,7 @@ import Observation
 import QwenVoiceCore
 import SwiftUI
 import OSLog
+import VocelloiOSPolicies
 
 /// Lightweight AVAudioPlayer wrapper that plays per-voice sample WAVs
 /// bundled at `Sources/Resources/voice-previews/{id}.wav`. Used by the

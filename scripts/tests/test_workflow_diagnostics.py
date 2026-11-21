@@ -404,6 +404,9 @@ class DoctorTests(unittest.TestCase):
             self.assertTrue(report["websiteBrowsers"]["available"])
             self.assertEqual(printed, ["Playwright browsers: chromium, chromium headless shell, webkit present "
                                        "(npm --prefix website run check)"])
+            self.assertIn("ios", report)
+            self.assertEqual(report["ios"]["platformSupport"]["status"], "unavailable")
+            self.assertEqual(report["ios"]["signing"]["reason"], "unavailable")
 
     def test_doctor_and_triage_route_without_workflow_execution(self):
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(WORKFLOW, "run_commands") as run:

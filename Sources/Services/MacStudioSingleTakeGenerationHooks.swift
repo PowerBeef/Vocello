@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import VocelloSharedPolicies
 
 /// macOS adapter for the shared `IOSSingleTakeGenerationExecutor`: the one
 /// short-form Studio owner of the frontend timeline, the live-preview

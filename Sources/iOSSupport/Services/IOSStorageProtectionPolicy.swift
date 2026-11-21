@@ -6,39 +6,63 @@ import Foundation
 /// after boot while preserving background URLSession delivery once the user has unlocked the
 /// device. Regenerable model, staging, cache, and diagnostic trees are excluded from backup;
 /// History, generated outputs, and saved voices remain eligible for backup.
-enum IOSStorageProtectionPolicy {
-    enum BackupDisposition: String, Equatable, Sendable {
+public enum IOSStorageProtectionPolicy {
+    public enum BackupDisposition: String, Equatable, Sendable {
         case inherited
         case included
         case excluded
     }
 
-    struct Entry: Equatable, Sendable {
-        let id: String
-        let relativePath: String
-        let pathPrefix: String?
-        let isDirectory: Bool
-        let backup: BackupDisposition
-        let recursive: Bool
+    public struct Entry: Equatable, Sendable {
+        public let id: String
+        public let relativePath: String
+        public let pathPrefix: String?
+        public let isDirectory: Bool
+        public let backup: BackupDisposition
+        public let recursive: Bool
+
+        public init(
+            id: String,
+            relativePath: String,
+            pathPrefix: String?,
+            isDirectory: Bool,
+            backup: BackupDisposition,
+            recursive: Bool
+        ) {
+            self.id = id
+            self.relativePath = relativePath
+            self.pathPrefix = pathPrefix
+            self.isDirectory = isDirectory
+            self.backup = backup
+            self.recursive = recursive
+        }
     }
 
     /// What one pass left unapplied (PA-21, IOS-06). A governed directory or the root that
     /// cannot be protected fails the pass; a single descendant file that cannot be updated
     /// is counted and retried on the next launch instead of stopping startup.
-    struct ApplyReport: Equatable, Sendable {
-        var descendantFailureCount = 0
+    public struct ApplyReport: Equatable, Sendable {
+        public var descendantFailureCount: Int
+
+        public init(descendantFailureCount: Int = 0) {
+            self.descendantFailureCount = descendantFailureCount
+        }
     }
 
     /// A read-only (`0444`) file was made writable for its metadata update and could not be
     /// made read-only again. Always fatal, even for a descendant: continuing would leave a
     /// digest-verified model component writable. Startup shows it with Retry.
-    struct ModeRestoreFailure: Error {
-        let underlying: any Error
+    public struct ModeRestoreFailure: Error {
+        public let underlying: any Error
+
+        public init(underlying: any Error) {
+            self.underlying = underlying
+        }
     }
 
-    static let protectionClass = FileProtectionType.completeUntilFirstUserAuthentication
+    public static let protectionClass = FileProtectionType.completeUntilFirstUserAuthentication
 
-    static let entries: [Entry] = [
+    public static let entries: [Entry] = [
         Entry(id: "application-support-root", relativePath: ".", pathPrefix: nil, isDirectory: true, backup: .inherited, recursive: false),
         Entry(id: "models", relativePath: "models", pathPrefix: nil, isDirectory: true, backup: .excluded, recursive: true),
         Entry(id: "downloads", relativePath: "downloads", pathPrefix: nil, isDirectory: true, backup: .excluded, recursive: true),
@@ -58,7 +82,7 @@ enum IOSStorageProtectionPolicy {
     /// Applies the policy to the governed tree. Bootstrap runs this off the main actor
     /// (IOS-06) before the engine and the background delivery coordinator exist.
     @discardableResult
-    static func apply(at root: URL, fileManager: FileManager = .default) throws -> ApplyReport {
+    public static func apply(at root: URL, fileManager: FileManager = .default) throws -> ApplyReport {
         try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
         var report = ApplyReport()
 
@@ -146,7 +170,7 @@ enum IOSStorageProtectionPolicy {
     /// delivery coordinator is created (bootstrap awaits the pass before building either). Hard-linked replicas share the same inode and therefore
     /// return to the same immutable mode together.
     @discardableResult
-    static func withMetadataWriteAccess<T>(
+    public static func withMetadataWriteAccess<T>(
         at url: URL,
         fileManager: FileManager = .default,
         operation: () throws -> T

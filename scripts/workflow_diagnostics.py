@@ -102,6 +102,50 @@ def playwright_browsers(root: Path = ROOT, environ: Mapping[str, str] | None = N
             "installNote": "a download: it needs the maintainer's word"}
 
 
+def _probe_json(command: list[str], *, timeout: int = 8) -> dict | None:
+    try:
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout, check=False)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for stream in (completed.stdout, completed.stderr):
+        text = stream.strip()
+        if not text:
+            continue
+        try:
+            payload = json.loads(text)
+            if isinstance(payload, dict):
+                return payload
+        except ValueError:
+            continue
+    return None
+
+
+def ios_tooling_status(root: Path = ROOT) -> dict:
+    """Read-only iOS platform component and Apple Development signing inventory.
+
+    Never downloads, installs, writes Keychain items, or probes a physical phone.
+    """
+    platform_script = root / "scripts/lib/ios_platform_preflight.py"
+    if platform_script.is_file() and shutil.which("xcodebuild"):
+        platform = _probe_json([sys.executable, os.fspath(platform_script), "check", "--json"])
+        if platform is None:
+            platform = {"status": "unavailable", "available": False}
+        else:
+            platform = {**platform, "available": platform.get("status") == "ready"}
+    else:
+        platform = {"status": "unavailable", "available": False}
+
+    signing_script = root / "scripts/lib/ios_signing_identity.py"
+    if signing_script.is_file() and shutil.which("security"):
+        signing = _probe_json([sys.executable, os.fspath(signing_script), "check", "--json"])
+        if signing is None:
+            signing = {"ready": False, "reason": "unavailable"}
+    else:
+        signing = {"ready": False, "reason": "unavailable"}
+
+    return {"platformSupport": platform, "signing": signing}
+
+
 def doctor(root: Path = ROOT) -> dict:
     """Inventory only: do not resolve packages, start a device, install, or write."""
     tools = {}
@@ -151,6 +195,7 @@ def doctor(root: Path = ROOT) -> dict:
             hooks_error = type(error).__name__
     plugin_root = root / ".agents/plugins/vocello"
     return {"schemaVersion": 1, "readOnly": True, "tools": tools, "xcode": xcode,
+            "ios": ios_tooling_status(root),
             "pythonModules": {name: entry["available"] for name, entry in python_module_inventory(manifest).items()},
             "pythonModuleDetails": python_module_inventory(manifest),
             "pythonSelection": {"executable": sys.executable, "override": os.environ.get("VOCELLO_PYTHON"),
@@ -414,6 +459,16 @@ def print_report(report: dict) -> None:
             print(f"{name}: {tool['version'] or ('present; version probe failed' if tool['available'] else 'missing')}{drift}")
         xcode_drift = f" (CI pin: {report['xcode']['pinnedVersion']}; differs)" if report["xcode"]["matchesPin"] is False else ""
         print(f"Xcode: {report['xcode']['version'] or 'not detected'}{xcode_drift}")
+        ios_info = report.get("ios") or {}
+        platform_info = ios_info.get("platformSupport") or {}
+        signing_info = ios_info.get("signing") or {}
+        platform_label = (
+            f"ready ({platform_info.get('sdk', {}).get('canonicalName') or 'iphoneos'})"
+            if platform_info.get("available")
+            else str(platform_info.get("status") or "unavailable")
+        )
+        signing_label = "ready" if signing_info.get("ready") else str(signing_info.get("reason") or "unavailable")
+        print(f"iOS platform support: {platform_label}; signing: {signing_label}")
         print(f"Selected Python: {report['pythonSelection']['executable']}")
         for name, entry in report["pythonModuleDetails"].items():
             detail = entry["version"] or ("present; version unknown" if entry["available"] else "missing")

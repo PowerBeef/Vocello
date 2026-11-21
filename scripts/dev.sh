@@ -40,9 +40,9 @@ usage: scripts/dev.sh <command>
   py [--all | --lane product|research | tests...]
                            Python tests via pytest (changed consumers by default)
   qc <args...>             QC v2 audio quality harness (scripts/qc.py) on the selected Python
-  test [--only A,B [--repeat N] | --all]
-                           macOS XCTest bundles (--repeat: until the first failure)
-  ios                      generic device-SDK compile (incremental)
+  test [--only A,B [--repeat N] | --ios [--repeat N] | --all]
+                           macOS XCTest bundles (--ios: all iOS logic tests on macOS host)
+  ios [--fast | --ui]      generic device-SDK compile (--fast: owned -Onone; --ui: iOS XCUITest bundles)
   build | run              dev-signed macOS app build / launch
   regen                    regenerate derived artifacts
   ci                       every gate push CI runs, serially

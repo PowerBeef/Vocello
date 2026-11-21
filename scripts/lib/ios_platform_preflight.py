@@ -137,7 +137,8 @@ def _ios_sdk(payload: Any) -> IOSSDK:
 
     def sort_key(item: dict[str, Any]) -> tuple[int, int, str]:
         version = _version_pair(str(item.get("platformVersion") or item.get("sdkVersion") or ""))
-        return (*(version or (-1, -1)), str(item.get("canonicalName") or ""))
+        major, minor = version or (-1, -1)
+        return (major, minor, str(item.get("canonicalName") or ""))
 
     item = max(candidates, key=sort_key)
     version = str(item.get("platformVersion") or item.get("sdkVersion") or "").strip()

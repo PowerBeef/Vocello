@@ -41,7 +41,7 @@ def runtime(
     version: str = "26.5.1",
     available: bool = True,
     identifier: str = "com.apple.CoreSimulator.SimRuntime.iOS-26-5",
-) -> dict[str, object]:
+) -> dict[str, list[dict[str, object]]]:
     item: dict[str, object] = {
         "identifier": identifier,
         "version": version,

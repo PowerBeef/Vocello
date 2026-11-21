@@ -1,4 +1,5 @@
 import XCTest
+import VocelloiOSPolicies
 
 @MainActor
 final class IOSModelDownloadCancellationSequenceTests: XCTestCase {

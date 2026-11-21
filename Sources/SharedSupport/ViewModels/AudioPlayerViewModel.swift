@@ -4,6 +4,9 @@ import Observation
 
 import QwenVoiceCore
 import VocelloSharedPolicies
+#if os(iOS)
+import VocelloiOSPolicies
+#endif
 
 typealias PlaybackGenerationResult = QwenVoiceCore.GenerationResult
 

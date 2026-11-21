@@ -88,7 +88,7 @@ class IOSStorageProtectionPolicyTests(unittest.TestCase):
         shutil.copy2(module.BOOTSTRAP, bootstrap)
         project = root / "project.yml"
         project.write_text(project.read_text(encoding="utf-8").replace("Sources/iOSSupport/Services/IOSStorageProtectionPolicy.swift", "removed.swift", 1), encoding="utf-8")
-        with self.assertRaisesRegex(module.PolicyError, "both host and generic-iOS"):
+        with self.assertRaisesRegex(module.PolicyError, "VocelloiOSPolicies|both host"):
             module.validate(root)
 
     def test_missing_immutable_model_reconciliation_is_rejected(self) -> None:

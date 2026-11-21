@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-20
+reviewed: 2026-11-21
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -18,7 +18,67 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 20, night: Antigravity harness Phases A, B & C complete on local `main` (resume here)
+### November 21: iOS dev/test/bench overhaul (Waves 1–4) & Pack A release blockers (`RB-01`..`RB-12`) landed locally (resume here)
+
+Six commits landed on local `main` ahead of `origin/main` (`4f273cb4`; **not yet pushed**), bringing
+iOS development, profiling, UI-perf testing, and policy modularization to parity with macOS and
+resolving all twelve sample-preserving Pack A Release Blockers (`RB-01`..`RB-12`) ahead of the
+physical-iPhone 3.1.0 calibration and qualification window (**Wave 5**). Packs B/C remain deferred
+post-3.1 behind `RF-57`.
+
+- **iOS Dev/Test/Bench Overhaul — Waves 1–4 (`c43f825f`, `4783d725`, `553d4e4a`, `deca64ee`,
+  `DW-03`/`DW-04`/`RF-59`, Waves 2–4 `Reviewed-by: vocello-swift-review`):**
+  - **Wave 1 (`c43f825f`):** aligned owned-only `-Onone` dev vs `-O` measured iOS build lanes,
+    enabled `SWIFT_TREAT_WARNINGS_AS_ERRORS: YES` on `VocelloiOSUITests` and
+    `VocelloiOSCandidateUITests`, and hardened CI parity.
+  - **Wave 2 (`4783d725`):** brought iOS profiling, `Metal System Trace` (`os_signpost`), app-layer
+    memory sampling, and benchmark history contracts to macOS parity.
+  - **Wave 3 (`553d4e4a`):** overhauled `VocelloiOSPerfUITests` to snapshot-free parity, wired
+    `ui_test.sh` hitch/stall gates and visual QA, and aligned iOS `ui-perf` lineage contracts.
+  - **Wave 4 (`deca64ee`):** extracted static framework `VocelloiOSPolicies` (linked only by
+    `VocelloiOS` and iOS/core test bundles, zero link on macOS/CLI), added hermetic RF-59 upgrade
+    and attribution XCUITests, burned iOS Python pyright findings to 0, and upgraded `scripts/dev.sh`
+    iOS ergonomics.
+- **Engine & Hybrid Delivery Pack A — Commit A1 (`1d8397f6`, `RF-35`/`RF-59`,
+  `Reviewed-by: vocello-swift-review`):** resolved `RB-01`..`RB-05` — MLX async readback safety,
+  deterministic `prewarmSlot` waiting (`prewarm_slot_wait_ms`), `MLXModelLoadCoordinator` load-state
+  consistency, `BG-01` background-transition generation guard + `inFlightPreparationDepth`, and
+  `IOSMemoryBudgetPolicy.minimumCloneCapableProcessLimitBytes()` (`4,779 MiB`).
+- **Engine & Hybrid Delivery Pack A — Commit A2 (`f269200d`, `RF-59`,
+  `Reviewed-by: vocello-swift-review`):** resolved `RB-06`..`RB-12` + `runQueueScenario` assertions —
+  - `RB-06`: relaunch `.queued` snapshot publication, synchronous coordinator state checks, and
+    `IOSModelDownloadLedger.isCurrentArtifactFailed(modelID:artifactVersion:)` so 3.0 → 3.1
+    superseded ledger entries never suppress the RF-59 Update prompt.
+  - `RB-07`: `SharedStorageBackgroundActivity` (`ProcessInfo.performExpiringActivity`),
+    `StorageBackgroundExpirationFlag` propagation across every `IOSBackgroundTime.hold` App Group
+    `flock(LOCK_EX)` site, dedicated non-cancellation `backgroundAssertionUnavailable`, and
+    expiration checks before post-tombstone reclamation.
+  - `RB-08`: pure `IOSBackgroundSessionCompletionCoordinator` in `VocelloiOSPolicies` plus
+    exact-once `logicalRequestID`-scoped `HuggingFaceDownloader` background task submission
+    flushing (closing Race A wake-before-restore, Race B `beginDownload`→`runDownload`/Model 1→2
+    handoffs, dead-task retries, and >6-file rollovers).
+  - `RB-09`: immediate unreferenced shared-blob reclamation on `releaseUpdatePins` (off-actor on
+    macOS, serialized via `pinReleaseTask` on iOS) + 24 h abandoned-pin fallback sweep.
+  - `RB-10`: `.preparing`/`.starting` cancellation targets, `admissionSettlementWaiters` teardown
+    sync before deletion, and pre-existing ledger tombstoning before discarding staging.
+  - `RB-11`: extracted `IOSAttributionManifest` into `VocelloiOSPolicies` and rendered hybrid
+    `additionalBases` and `builtFrom` provenance in `OpenSourceLicensesScreen`.
+  - `RB-12`: subtracted verified shared-component bytes from Make Room space estimates, added typed
+    `ModelUpdateFailureClassifiable` (`ENOSPC`/`EDQUOT`/Carbon `-34`), gated Make Room consent on
+    `afterMakingRoom == .startUpdate`, and added `runQueueScenario` RB-06/RB-10 XCUITest checks.
+- **Verification on `f269200d`:** `scripts/dev.sh lint` PASS (35 paths privacy scan, pyright 0 new,
+  strict SwiftLint 0 warnings/errors), 39/39 contract validators PASS, 44 Python tests PASS,
+  `./scripts/macos_test.sh test` PASS (`VocelloCoreTests` + `Qwen3RuntimeTests`), `scripts/dev.sh
+  ios` PASS (`VocelloiOS` + iOS executable scan + `VocelloiOSLogicTests`), `scripts/dev.sh ios --ui`
+  PASS (all 3 iOS XCUITest bundles), `scripts/dev.sh build` PASS (`Vocello.app`), and
+  `./scripts/build.sh cli --version` PASS (`vocello 3.1.0`).
+- **Next:** push these local `main` commits when explicitly requested, watch push CI on `xcode-27`,
+  and then execute **Wave 5** in a single announced physical-iPhone window (iPhone Mirroring quit,
+  `QVOICE_LEAD_ONLY=1`): 3× iOS `ui-perf` calibrations + threshold calibration, `model-management`
+  (queue/relaunch + upgrade Make Room), `profile --kind metal`, and the iOS 3.1.0 candidate
+  qualification/TestFlight tag (`v3.1.0-ios.4`).
+
+### November 20, night: Antigravity harness Phases A, B & C complete on local `main`
 
 Phases A, B and C of the Antigravity harness & engineering-velocity upgrade landed on local `main`
 (ahead of `origin/main` `670f7e77`; **not yet pushed**), closing five authorized backlog items

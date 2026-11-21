@@ -1459,13 +1459,13 @@ validate_macos_benchmark() {
     >"$out/telemetry-summary.txt" 2>&1
 }
 
-# What the lane's last line adds for a macOS benchmark that recorded a refused
+# What the lane's last line adds for a macOS or iOS benchmark that recorded a refused
 # take (audit T5): the benchmark gate's one-line account of how many takes the
 # mandatory audio check refused and which cells, and that the record is
 # exploratory. Empty for every other run.
 benchmark_refused_suffix() {
   local refused
-  [[ "$platform" == "macos" && "$lane" == "benchmark" && -f "$out/benchmark-gate.txt" ]] || return 0
+  [[ ( "$platform" == "macos" || "$platform" == "ios" ) && "$lane" == "benchmark" && -f "$out/benchmark-gate.txt" ]] || return 0
   refused="$(grep -m1 -E '^REFUSED [0-9]+ take\(s\): ' "$out/benchmark-gate.txt" 2>/dev/null || true)"
   [[ -z "$refused" ]] || printf ' · %s · exploratory record, never canonical' "$refused"
 }
@@ -1513,6 +1513,9 @@ print(matches[0])
 PY
   )" || return 1
   rm -rf "$diagnostics"
+  # Per-take harness phases the runner printed (matching macOS take-phases.jsonl).
+  grep -o 'VOCELLO_BENCH_TAKE_PHASES={.*}' "$out/xcodebuild.log" 2>/dev/null \
+    | sed 's/^VOCELLO_BENCH_TAKE_PHASES=//' >"$out/take-phases.jsonl" || true
   # Only what the gate reads (audit #21): the engine and app layers (rows and
   # sample sidecars) and the run's own directory, not the whole growing tree.
   "$ROOT_DIR/scripts/ios_device.sh" pull "$diagnostics" --subtree engine --subtree app \
@@ -1521,10 +1524,12 @@ PY
   if ! python3 "$ROOT_DIR/scripts/check_ios_ui_benchmark.py" "$diagnostics" \
       --run-id "$run_id" --modes "$modes" --lengths "$lengths" --warm "$warm" \
       --generation-map "$generation_map" \
+      --variant speed \
       --seed-policy "$seed_policy" \
       --allocation "$matrix_allocation" --matrix-version "$matrix_version" \
       --label "${label:-$run_id}" --evidence-manifest "$evidence" \
       --build-provenance "$out/last-build.json" \
+      --xcodebuild-log "$out/xcodebuild.log" \
       --crash-delta-passed \
       | tee "$out/benchmark-gate.txt"; then
     return 1

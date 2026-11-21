@@ -819,4 +819,114 @@ final class MemoryTelemetryV8Tests: XCTestCase {
             thermalState: "nominal"
         )
     }
+
+    @MainActor
+    func testAppGenerationTimelineVerboseCompletionAndCancellationWriteAppSamples() async throws {
+        let supportDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-app-timeline-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: supportDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: supportDir) }
+
+        let sink = GenerationTelemetryJSONLSink()
+        let writeRow: @Sendable (GenerationTelemetryRecord, URL, String) async -> Void = {
+            record, dir, subdirectory in
+            let folder = dir
+                .appendingPathComponent("diagnostics", isDirectory: true)
+                .appendingPathComponent(subdirectory, isDirectory: true)
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let url = folder.appendingPathComponent("generations.jsonl", isDirectory: false)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            guard var data = try? encoder.encode(record) else { return }
+            data.append(0x0A)
+            if FileManager.default.fileExists(atPath: url.path),
+               let handle = try? FileHandle(forWritingTo: url) {
+                defer { try? handle.close() }
+                _ = try? handle.seekToEnd()
+                try? handle.write(contentsOf: data)
+            } else {
+                try? data.write(to: url, options: .atomic)
+            }
+        }
+        let writeRaw: @Sendable ([TelemetrySample], String, URL, String) async -> Void = {
+            samples, generationID, dir, subdirectory in
+            await sink.persistRawSamples(
+                samples,
+                generationID: generationID,
+                appSupportDirectory: dir,
+                subdirectory: subdirectory
+            )
+        }
+        let timeline = AppGenerationTimeline(
+            appSupportDirectoryProvider: { supportDir },
+            telemetryEnabledProvider: { true },
+            telemetryModeProvider: { .verbose },
+            recordWriter: writeRow,
+            rawSamplesWriter: writeRaw
+        )
+
+        let completedID = UUID()
+        await timeline.recordSubmitted(id: completedID, mode: "custom")
+        await timeline.recordCompleted(
+            id: completedID,
+            mode: "custom",
+            usedStreaming: true,
+            finishReason: "completed",
+            summary: nil
+        )
+
+        let cancelledID = UUID()
+        await timeline.recordSubmitted(id: cancelledID, mode: "clone")
+        await timeline.recordFailed(id: cancelledID, finishReason: .cancelled)
+
+        let appDir = supportDir
+            .appendingPathComponent("diagnostics", isDirectory: true)
+            .appendingPathComponent("app", isDirectory: true)
+        let rowsText = try String(
+            contentsOf: appDir.appendingPathComponent("generations.jsonl"),
+            encoding: .utf8
+        )
+        let decoder = JSONDecoder()
+        let records = try rowsText.split(separator: "\n").map { line in
+            try decoder.decode(GenerationTelemetryRecord.self, from: Data(line.utf8))
+        }
+        XCTAssertEqual(records.count, 2)
+
+        let completedRow = try XCTUnwrap(records.first { $0.generationID == completedID.uuidString })
+        XCTAssertEqual(completedRow.layer, .app)
+        XCTAssertEqual(completedRow.finishReason, "completed")
+        XCTAssertNotNil(completedRow.summary)
+        XCTAssertNotNil(completedRow.memoryMetrics)
+
+        let cancelledRow = try XCTUnwrap(records.first { $0.generationID == cancelledID.uuidString })
+        XCTAssertEqual(cancelledRow.layer, .app)
+        XCTAssertEqual(cancelledRow.finishReason, "cancelled")
+        XCTAssertNotNil(cancelledRow.summary)
+        XCTAssertNotNil(cancelledRow.memoryMetrics)
+
+        for id in [completedID, cancelledID] {
+            let sidecarURL = appDir.appendingPathComponent("samples-\(id.uuidString).jsonl")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: sidecarURL.path))
+            let sidecarText = try String(contentsOf: sidecarURL, encoding: .utf8)
+            XCTAssertTrue(sidecarText.contains("app_submit"))
+            XCTAssertTrue(sidecarText.contains("app_terminal"))
+        }
+
+        let disabledDir = supportDir.appendingPathComponent("disabled", isDirectory: true)
+        let disabledTimeline = AppGenerationTimeline(
+            appSupportDirectoryProvider: { disabledDir },
+            telemetryEnabledProvider: { false },
+            telemetryModeProvider: { .verbose }
+        )
+        let ignoredID = UUID()
+        await disabledTimeline.recordSubmitted(id: ignoredID, mode: "custom")
+        await disabledTimeline.recordCompleted(
+            id: ignoredID,
+            mode: "custom",
+            usedStreaming: true,
+            finishReason: "completed",
+            summary: nil
+        )
+        XCTAssertFalse(FileManager.default.fileExists(atPath: disabledDir.path))
+    }
 }

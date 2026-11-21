@@ -8,8 +8,10 @@ import QwenVoiceCore
 ///
 /// `@MainActor` because every hook site already runs on the main actor
 /// (`AudioPlayerViewModel`, the generate coordinators), so recording a milestone is
-/// a synchronous dictionary write with no actor hop on the hot chunk path. The only
-/// off-main work is the final JSONL write, dispatched via `Task.detached`.
+/// a synchronous dictionary write with no actor hop on the hot chunk path.
+/// Submission, completion and failure `await` the app-layer `NativeTelemetrySampler`
+/// and `GenerationTelemetryJSONLSink.shared` so rows and raw sample sidecars are
+/// durable before callers publish or advance to the next take.
 ///
 /// Lives in `SharedSupport` so both the macOS and iOS app surfaces use it; the
 /// per-target `AppPaths` resolves the correct app-support directory in each build.
@@ -46,10 +48,62 @@ final class AppGenerationTimeline {
     /// Backstop against unbounded growth if a `completed` is ever missed.
     private static let maxTrackedGenerations = 16
 
-    private init() {}
+    private let appSupportDirectoryProvider: @Sendable () -> URL
+    private let telemetryEnabledProvider: @Sendable () -> Bool
+    private let telemetryModeProvider: @Sendable () -> NativeTelemetryMode
+    private let recordWriter: (@Sendable (GenerationTelemetryRecord, URL, String) async -> Void)?
+    private let rawSamplesWriter: (@Sendable ([TelemetrySample], String, URL, String) async -> Void)?
+
+    init(
+        appSupportDirectoryProvider: @escaping @Sendable () -> URL = { AppPaths.appSupportDir },
+        telemetryEnabledProvider: @escaping @Sendable () -> Bool = { TelemetryGate.appProcessIntendedEnabled },
+        telemetryModeProvider: @escaping @Sendable () -> NativeTelemetryMode = { TelemetryGate.appProcessIntendedMode },
+        recordWriter: (@Sendable (GenerationTelemetryRecord, URL, String) async -> Void)? = nil,
+        rawSamplesWriter: (@Sendable ([TelemetrySample], String, URL, String) async -> Void)? = nil
+    ) {
+        self.appSupportDirectoryProvider = appSupportDirectoryProvider
+        self.telemetryEnabledProvider = telemetryEnabledProvider
+        self.telemetryModeProvider = telemetryModeProvider
+        self.recordWriter = recordWriter
+        self.rawSamplesWriter = rawSamplesWriter
+    }
+
+    private func persistRecord(
+        _ record: GenerationTelemetryRecord,
+        appSupportDirectory: URL,
+        subdirectory: String
+    ) async {
+        if let recordWriter {
+            await recordWriter(record, appSupportDirectory, subdirectory)
+        } else {
+            await GenerationTelemetryJSONLSink.shared.write(
+                record: record,
+                appSupportDirectory: appSupportDirectory,
+                subdirectory: subdirectory
+            )
+        }
+    }
+
+    private func persistRawSamples(
+        _ samples: [TelemetrySample],
+        generationID: String,
+        appSupportDirectory: URL,
+        subdirectory: String
+    ) async {
+        if let rawSamplesWriter {
+            await rawSamplesWriter(samples, generationID, appSupportDirectory, subdirectory)
+        } else {
+            await GenerationTelemetryJSONLSink.shared.writeRawSamples(
+                samples,
+                generationID: generationID,
+                appSupportDirectory: appSupportDirectory,
+                subdirectory: subdirectory
+            )
+        }
+    }
 
     func recordSubmitted(id: UUID?, mode: String?) async {
-        guard TelemetryGate.appProcessIntendedEnabled else { return }
+        guard telemetryEnabledProvider() else { return }
         guard let key = id?.uuidString else { return }
         if marksByID.count >= Self.maxTrackedGenerations {
             let evictedSamplers = marksByID.values.compactMap(\.memorySampler)
@@ -61,7 +115,7 @@ final class AppGenerationTimeline {
                 _ = await sampler.stop(stageMarks: [])
             }
         }
-        let telemetryMode = TelemetryGate.appProcessIntendedMode
+        let telemetryMode = telemetryModeProvider()
         let memorySampler = Self.makeAppMemorySampler(mode: telemetryMode)
         let benchNotes = BenchRunContext.telemetryNotes()
         marksByID[key] = Marks(
@@ -87,7 +141,7 @@ final class AppGenerationTimeline {
         id: UUID?,
         finishReason: GenerationTerminalReason = .failed
     ) async {
-        guard TelemetryGate.appProcessIntendedEnabled else { return }
+        guard telemetryEnabledProvider() else { return }
         guard let key = id?.uuidString else { return }
         let now = clock.now
         let marks = marksByID.removeValue(forKey: key)
@@ -140,9 +194,9 @@ final class AppGenerationTimeline {
                 playbackStartSource: marks?.playbackHealth.startSource
             )
         )
-        await GenerationTelemetryJSONLSink.shared.write(
-            record: record,
-            appSupportDirectory: AppPaths.appSupportDir,
+        await persistRecord(
+            record,
+            appSupportDirectory: appSupportDirectoryProvider(),
             subdirectory: "app"
         )
     }
@@ -209,7 +263,7 @@ final class AppGenerationTimeline {
         finishReason: String?,
         summary _: TelemetrySummary?
     ) async {
-        guard TelemetryGate.appProcessIntendedEnabled else { return }
+        guard telemetryEnabledProvider() else { return }
         guard let key = id?.uuidString else { return }
         let now = clock.now
         let marks = marksByID.removeValue(forKey: key)
@@ -283,9 +337,9 @@ final class AppGenerationTimeline {
             mode: mode ?? marks?.mode,
             usedStreaming: usedStreaming,
             finishReason: finishReason,
-            // Memory belongs to the process that sampled it. On macOS this is the
-            // app-process sampler; iOS deliberately leaves this nil because its
-            // app and engine share the single engine-owned process sampler.
+            // Memory belongs to the process that sampled it. Both macOS and iOS
+            // capture the app-layer memory series across submit→playback→terminal
+            // so memory qualification merges engine + app into one process series.
             summary: appMemorySummary,
             timingsMS: timingsMS,
             counters: counters,
@@ -296,19 +350,18 @@ final class AppGenerationTimeline {
                 playbackStartSource: marks?.playbackHealth.startSource
             )
         )
-        let appSupportDirectory = AppPaths.appSupportDir
+        let appSupportDirectory = appSupportDirectoryProvider()
         // A completed result is a durability boundary. Await the append before
         // callers schedule the cross-layer merge or a benchmark starts another
         // cold session; this no longer depends on frontend-only UI-test markers.
-        await GenerationTelemetryJSONLSink.shared.write(
-            record: record,
+        await persistRecord(
+            record,
             appSupportDirectory: appSupportDirectory,
             subdirectory: "app"
         )
     }
 
     private static func makeAppMemorySampler(mode: NativeTelemetryMode) -> NativeTelemetrySampler? {
-        #if os(macOS)
         guard let sampleIntervalMS = mode.sampleIntervalMS(
             for: NativeMemoryPolicyResolver.deviceClass()
         ) else { return nil }
@@ -318,9 +371,6 @@ final class AppGenerationTimeline {
             processRole: .app,
             boundaryRequirements: TelemetryBoundaryRequirement.appGeneration
         )
-        #else
-        return nil
-        #endif
     }
 
     private func finishAppMemoryCapture(
@@ -331,10 +381,10 @@ final class AppGenerationTimeline {
         await sampler.captureBoundary("app_terminal")
         let result = await sampler.stop(stageMarks: [])
         if marks.telemetryMode.persistsRawSamples {
-            await GenerationTelemetryJSONLSink.shared.writeRawSamples(
+            await persistRawSamples(
                 result.samples,
                 generationID: generationID,
-                appSupportDirectory: AppPaths.appSupportDir,
+                appSupportDirectory: appSupportDirectoryProvider(),
                 subdirectory: "app"
             )
         }

@@ -481,6 +481,7 @@ def upgrade_language_memory_row(row: dict, diagnostics: Path, *, ios: bool) -> N
     )
     memory = memory_row(row["generationID"], sidecar, layer="engine", ios=ios)
     row["schemaVersion"] = 8
+    row["processIdentifier"] = memory["processIdentifier"]
     row["summary"] = memory["summary"]
     row["memoryMetrics"] = memory["memoryMetrics"]
     row["backendMetrics"] = {
@@ -488,6 +489,27 @@ def upgrade_language_memory_row(row: dict, diagnostics: Path, *, ios: bool) -> N
         "stages": [],
     }
     directory = diagnostics / "engine"
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / f"samples-{row['generationID']}.jsonl").write_text(
+        "".join(json.dumps(sample, sort_keys=True) + "\n" for sample in sidecar),
+        encoding="utf-8",
+    )
+
+
+def upgrade_ios_app_memory_row(row: dict, diagnostics: Path, *, process_id: int = 4242) -> None:
+    sidecar = memory_samples(
+        role="app",
+        boundaries=["app_submit", "app_terminal"],
+        ios=True,
+        footprint=3020,
+        uptime_offset=5_000_000,
+    )
+    memory = memory_row(row["generationID"], sidecar, layer="app", ios=True)
+    row["schemaVersion"] = 8
+    row["processIdentifier"] = process_id
+    row["summary"] = memory["summary"]
+    row["memoryMetrics"] = memory["memoryMetrics"]
+    directory = diagnostics / "app"
     directory.mkdir(parents=True, exist_ok=True)
     (directory / f"samples-{row['generationID']}.jsonl").write_text(
         "".join(json.dumps(sample, sort_keys=True) + "\n" for sample in sidecar),
@@ -1058,6 +1080,15 @@ class PublisherTests(unittest.TestCase):
             receipt.write_text(json.dumps(payload))
             with self.assertRaisesRegex(publisher.PublicationError, "unproven"):
                 publisher.validated_ios_app_optimization(receipt, executable)
+            payload["producer"] = "scripts/ios_device.sh build --optimized"
+            payload["optimization"] = "Onone"
+            receipt.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(publisher.PublicationError, "optimized"):
+                publisher.validated_ios_app_optimization(receipt, executable)
+            payload["optimization"] = "O"
+            receipt.write_text(json.dumps(payload))
+            with self.assertRaisesRegex(publisher.PublicationError, "unproven"):
+                publisher.validated_ios_app_optimization(receipt, executable, executed_sha256="0" * 64)
             payload["producer"] = "scripts/ios_device.sh build"
             receipt.write_text(json.dumps(payload))
             other = self.root / "other"
@@ -1095,14 +1126,22 @@ class PublisherTests(unittest.TestCase):
         app = ios_benchmark_app_row(
             generation_id, run_id=run_id, cell=cell
         )
-        with mock.patch.object(publisher, "load_app_rows", return_value=[app]):
-            selected = publisher.correlated_ios_app_rows(
-                diagnostics=self.root,
-                engine_rows=[engine],
-                takes=[take],
-                run_id=run_id,
-            )
-        self.assertEqual(selected, [app])
+        engine["processID"] = 4242
+        app_with_memory = {
+            **app,
+            "processID": 4242,
+            "summary": {"processID": 4242, "physFootprintPeakMB": 2400.0},
+            "memoryMetrics": {"peakPhysicalFootprintMB": 2400.0},
+        }
+        for candidate in (app, app_with_memory):
+            with mock.patch.object(publisher, "load_app_rows", return_value=[candidate]):
+                selected = publisher.correlated_ios_app_rows(
+                    diagnostics=self.root,
+                    engine_rows=[engine],
+                    takes=[take],
+                    run_id=run_id,
+                )
+            self.assertEqual(selected, [candidate])
 
         cases = {
             "missing": [],
@@ -1113,9 +1152,10 @@ class PublisherTests(unittest.TestCase):
             }],
             "failed": [{**app, "finishReason": "failed"}],
             "frontend-incomplete": [{**app, "frontendMetrics": {}}],
-            "app-memory-owner": [{
+            "app-pid-mismatch": [{
                 **app,
-                "summary": {"physFootprintPeakMB": 1.0},
+                "processID": 9999,
+                "summary": {"processID": 9999, "physFootprintPeakMB": 2400.0},
             }],
         }
         for name, rows in cases.items():
@@ -3977,6 +4017,7 @@ class PublisherTests(unittest.TestCase):
     def extract_intervals(
         self, *, dropped: int = 0, require_complete: bool = True,
         schemas: set[str] | None = None, require_cpu_samples: bool = True,
+        forbid_cpu_samples: bool | None = None,
         interval_schema: str = "os-signpost-interval",
     ) -> dict:
         trace = self.root / "profile-intervals.trace"
@@ -4024,6 +4065,7 @@ class PublisherTests(unittest.TestCase):
                 },
                 require_complete_intervals=require_complete,
                 require_cpu_samples=require_cpu_samples,
+                forbid_cpu_samples=forbid_cpu_samples,
             )
 
     def test_a_cpu_profile_reports_cycles_per_cpu_second_and_unresolved_rows(self) -> None:
@@ -4238,6 +4280,87 @@ class PublisherTests(unittest.TestCase):
         take = summary["intervalStatistics"]["takes"][0]
         self.assertEqual((take["loopIntervalCount"], take["expectedLoopIntervalCount"]), (107, 108))
         self.assertFalse(take["complete"])
+
+    def test_metal_trace_allows_ancillary_cpu_samples_and_requires_metal_toc_presence(self) -> None:
+        # Metal traces set require_cpu_samples=False and forbid_cpu_samples=False:
+        # ancillary CPU samples in a Metal System Trace never trip the witness error,
+        # and no partial CPU summary fields leak into the trace summary.
+        summary = self.extract_intervals(
+            schemas={"os-signpost", "os-signpost-interval", "time-profile", "metal-gpu-intervals"},
+            require_cpu_samples=False,
+            forbid_cpu_samples=False,
+        )
+        self.assertFalse({"cpuSampleCount", "cpuSampleSpanMS", "cpuSampleWeightMS", "cpuCycleWeight"} & set(summary))
+
+    def test_ios_profile_matrix_hash_separates_profile_kinds_and_supports_multi_take_sentinel(self) -> None:
+        sentinel = {
+            "runID": "ios-metal-profile-20261121-010000-abcdef12",
+            "status": "ok",
+            "mode": "custom",
+            "variant": "speed",
+            "seed": 19790615,
+            "takes": [
+                {"takeIndex": 1, "generationID": "gen-cold", "cell": "custom/speed/medium/cold#0", "mode": "custom", "variant": "speed"},
+                {"takeIndex": 2, "generationID": "gen-warm", "cell": "custom/speed/medium/warm#0", "mode": "custom", "variant": "speed"},
+            ],
+        }
+        takes = publisher._ios_sentinel_takes(sentinel)
+        self.assertEqual([t["generationID"] for t in takes], ["gen-cold", "gen-warm"])
+        cells = [t["cell"] for t in takes]
+        hashes = {
+            kind: publisher.engine_matrix_hash(cells, "verbose", True, 19790615, profile_kind=kind)
+            for kind in ("cpu", "memory", "metal", "witness")
+        }
+        self.assertEqual(len(set(hashes.values())), 4)
+
+    def test_expected_identity_supports_ios_platform(self) -> None:
+        output = self.root / "expected-ios-identity.json"
+        args = publisher.parse_args([
+            "expected-identity", "--platform", "ios",
+            "--modes", "custom", "--variants", "speed", "--lengths", "medium",
+            "--warm", "1", "--seed", "19790615", "--output", str(output),
+        ])
+        with mock.patch.object(publisher, "macos_host_identity", return_value={
+            "xcodeVersion": "27.2", "xcodeBuild": "18C1", "swiftVersion": "6.3",
+            "osVersion": "27.0", "osBuild": "27A1",
+        }):
+            publisher.expected_identity_command(args)
+        payload = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(payload["historyRecord"]["run"]["platform"], "ios")
+        self.assertEqual(payload["historyRecord"]["toolchain"]["optimization"], "-O")
+        self.assertTrue(payload["historyRecord"]["hardware"]["profileID"])
+
+    def test_language_sentinel_identity_accepts_schema_v2_and_v3(self) -> None:
+        planned = {"seed": 19790615, "samplingVariation": "expressive", "uiHint": "french"}
+        engine = {
+            "notes": {
+                "samplingSeed": "19790615",
+                "samplingVariation": "expressive",
+            }
+        }
+        base_sentinel = {
+            "seed": 19790615,
+            "samplingVariation": "expressive",
+            "requestedLanguageHint": "french",
+            "languageHintSource": "explicit",
+        }
+        for version in (2, 3):
+            with self.subTest(schemaVersion=version):
+                seed = publisher.validate_language_sampling_identity(
+                    cell_id="fr_explicit",
+                    planned_take=planned,
+                    sentinel={**base_sentinel, "schemaVersion": version},
+                    engine_row=engine,
+                )
+                self.assertEqual(seed, 19790615)
+        for bad_version in (1, 4, None):
+            with self.subTest(bad_version=bad_version), self.assertRaises(publisher.PublicationError):
+                publisher.validate_language_sampling_identity(
+                    cell_id="fr_explicit",
+                    planned_take=planned,
+                    sentinel={**base_sentinel, "schemaVersion": bad_version},
+                    engine_row=engine,
+                )
 
 
 if __name__ == "__main__":

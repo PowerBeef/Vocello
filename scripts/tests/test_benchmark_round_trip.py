@@ -45,6 +45,7 @@ from test_publish_benchmark_history import (  # noqa: E402
     qc_evidence,
     qc_recognitions,
     source_fixture,
+    upgrade_ios_app_memory_row,
     upgrade_language_memory_row,
 )
 
@@ -725,13 +726,14 @@ class PublisherRoundTripTests(unittest.TestCase):
         diagnostics = self.root / "diagnostics"
         sentinel = self.root / "device-diagnostics-done.json"
         sentinel.write_text(json.dumps({
-            "schemaVersion": 2, "runID": run_id, "generationID": generation_id, "status": "ok",
+            "schemaVersion": 3, "runID": run_id, "generationID": generation_id, "status": "ok",
             "mode": "custom", "variant": "speed", "startedAt": STARTED_AT, "finishedAt": FINISHED_AT,
             "wallSeconds": 5.0, "durationSeconds": 2.0, "deviceModel": "iPhone",
             "systemName": "iOS", "systemVersion": "26.5",
         }), encoding="utf-8")
         self.v8_engine_rows(diagnostics, run_id, [(generation_id, cell)], ios=True)
         app = ios_benchmark_app_row(generation_id, run_id=run_id, cell=cell)
+        upgrade_ios_app_memory_row(app, diagnostics)
         args = SimpleNamespace(
             sentinel=sentinel, run_id=run_id, diagnostics=diagnostics, artifact_dir=self.root,
             snapshot=self.root / "snapshot.json", crash_diagnostics=self.root / "crashes",
@@ -744,6 +746,7 @@ class PublisherRoundTripTests(unittest.TestCase):
         record, _size = publish_through_registry(manifest)
         self.assertEqual(record["run"]["platform"], "ios")
         self.assertEqual(record["run"]["runtimePolicy"], {"deviceClass": "iphone_pro", "deviceClassForced": False})
+        self.assertGreaterEqual(record["takes"][0]["metrics"]["peakPhysicalFootprintMB"], 3020.0)
 
 
     def test_macos_language_manifest_publishes(self) -> None:

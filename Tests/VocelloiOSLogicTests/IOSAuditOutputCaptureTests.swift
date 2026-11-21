@@ -84,4 +84,64 @@ final class IOSAuditOutputCaptureTests: XCTestCase {
             XCTAssertEqual(try Data(contentsOf: source), bytes)
         }
     }
+
+    func testSyncGenerationTelemetryMirrorsEngineAndAppRowsAndBothSampleSidecars() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let sourceRoot = root.appendingPathComponent("source", isDirectory: true)
+        let pullableRoot = root.appendingPathComponent("pullable", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let targetID = UUID().uuidString
+        let otherID = UUID().uuidString
+        for layer in ["engine", "app"] {
+            let layerDir = sourceRoot.appendingPathComponent(layer, isDirectory: true)
+            try FileManager.default.createDirectory(at: layerDir, withIntermediateDirectories: true)
+            let targetRow = "{\"generationID\":\"\(targetID)\",\"layer\":\"\(layer)\"}"
+            let otherRow = "{\"generationID\":\"\(otherID)\",\"layer\":\"\(layer)\"}"
+            try (targetRow + "\n" + otherRow + "\n").write(
+                to: layerDir.appendingPathComponent("generations.jsonl"),
+                atomically: true,
+                encoding: .utf8
+            )
+            let sampleContent = "{\"boundary\":\"\(layer)_submit\",\"tMS\":0}\n"
+            try sampleContent.write(
+                to: layerDir.appendingPathComponent("samples-\(targetID).jsonl"),
+                atomically: true,
+                encoding: .utf8
+            )
+        }
+
+        IOSPullableDiagnosticsMirror.syncGenerationTelemetry(
+            generationID: targetID,
+            from: sourceRoot,
+            into: pullableRoot
+        )
+        // Second call must be idempotent and must not duplicate rows.
+        IOSPullableDiagnosticsMirror.syncGenerationTelemetry(
+            generationID: targetID,
+            from: sourceRoot,
+            into: pullableRoot
+        )
+
+        for layer in ["engine", "app"] {
+            let rowsURL = pullableRoot
+                .appendingPathComponent(layer, isDirectory: true)
+                .appendingPathComponent("generations.jsonl")
+            let rowsText = try String(contentsOf: rowsURL, encoding: .utf8)
+            let lines = rowsText.split(separator: "\n")
+            XCTAssertEqual(lines.count, 1, "expected exactly one mirrored \(layer) row")
+            XCTAssertTrue(rowsText.contains(targetID))
+            XCTAssertFalse(rowsText.contains(otherID))
+
+            let sampleURL = pullableRoot
+                .appendingPathComponent(layer, isDirectory: true)
+                .appendingPathComponent("samples-\(targetID).jsonl")
+            XCTAssertTrue(
+                FileManager.default.fileExists(atPath: sampleURL.path),
+                "expected mirrored \(layer) raw samples sidecar"
+            )
+            let sampleText = try String(contentsOf: sampleURL, encoding: .utf8)
+            XCTAssertTrue(sampleText.contains("\(layer)_submit"))
+        }
+    }
 }

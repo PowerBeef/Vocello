@@ -119,6 +119,7 @@ case "${1:-} ${2:-} ${3:-} ${4:-}" in
   "devicectl device process resume"|"devicectl device process terminate") exit 0 ;;
 esac
 case "${1:-} ${2:-}" in
+  "xctrace list") cat "$QV_SANDBOX/xctrace-$3" ;;
   "xctrace record") exec "$QV_REAL_PYTHON" "$QV_SANDBOX/xctrace_record.py" "$@" ;;
   "xctrace export")
     output=""
@@ -216,12 +217,15 @@ def mac_profile(test: unittest.TestCase, *arguments: str, env: dict[str, str] | 
 
 
 def ios_profile(test: unittest.TestCase, *arguments: str, env: dict[str, str] | None = None,
-                tracer: str = "records", helpers: dict[str, str] | None = None
+                tracer: str = "records", listed: dict[str, list[str]] | None = None,
+                helpers: dict[str, str] | None = None
                 ) -> tuple[subprocess.CompletedProcess[str], LaneShell]:
     """The real iPhone cmd_profile over stand-ins for devicectl, xctrace and the phone."""
     shell = LaneShell(test, "ios_device.sh")
     shell.tool("xcrun", IOS_XCRUN)
     shell.tool("xctrace", "exit 0")
+    for listing, names in (listed or LISTED).items():
+        shell.file(f"xctrace-{listing}", "\n".join([f"== Standard {listing.title()} ==", *names]) + "\n")
     shell.file("xctrace_record.py", IOS_TRACER)
     shell.file("tracer", tracer)
     for relative in (RETENTION, PUBLISHER, SUMMARIZER, HISTORY):
@@ -507,7 +511,7 @@ class ProfileInstrumentTests(unittest.TestCase):
 
 class IOSProfileTests(unittest.TestCase):
     def test_history_publishes_before_retention_and_disk_is_checked_around_build_and_install(self) -> None:
-        completed, shell = ios_profile(self)
+        completed, shell = ios_profile(self, "--allow-dirty")
         self.assertEqual(completed.returncode, 0, completed.stderr)
         calls = shell.calls()
         preflights = [i for i, call in enumerate(calls) if call[:2] == [RETENTION, "preflight"]]
@@ -531,9 +535,14 @@ class IOSProfileTests(unittest.TestCase):
         self.assertEqual(completed.stdout.strip(), str(artifacts / "profile-summary.json"))
 
     def test_retention_policy_follows_keep_trace_and_kind(self) -> None:
-        for arguments, policy in ((("--keep-trace",), "keptExplicitly"), (("--kind", "memory"), "keptByDefault")):
+        for arguments, policy in (
+            (("--keep-trace",), "keptExplicitly"),
+            (("--kind", "memory"), "keptByDefault"),
+            (("--kind", "metal"), "keptByDefault"),
+            (("--kind", "witness"), "summaryOnly"),
+        ):
             with self.subTest(arguments=arguments):
-                completed, shell = ios_profile(self, *arguments)
+                completed, shell = ios_profile(self, "--allow-dirty", *arguments)
                 self.assertEqual(completed.returncode, 0, completed.stderr)
                 [published] = shell.calls_to(PUBLISHER, "ios-profile")
                 self.assertEqual(option(published, "--retention-policy"), policy)
@@ -541,7 +550,7 @@ class IOSProfileTests(unittest.TestCase):
                 self.assertEqual(option(finalize, "--policy"), policy)
 
     def test_a_failed_validation_marks_the_trace_and_terminates_the_exact_target(self) -> None:
-        completed, shell = ios_profile(self, helpers={PUBLISHER: fails_on("ios-profile")})
+        completed, shell = ios_profile(self, "--allow-dirty", helpers={PUBLISHER: fails_on("ios-profile")})
         self.assertEqual(completed.returncode, 1)
         [marked] = shell.calls_to(RETENTION, "mark-failure")
         self.assertEqual((option(marked, "--platform"), option(marked, "--phase")), ("ios", "evidence-validation"))
@@ -550,14 +559,14 @@ class IOSProfileTests(unittest.TestCase):
         self.assertEqual(len(shell.calls_to("xcrun", "devicectl", "device", "process", "terminate")), 1)
 
     def test_a_full_disk_after_build_and_install_stops_before_the_target_launches(self) -> None:
-        completed, shell = ios_profile(self, helpers={RETENTION: nth_preflight_fails(2)})
+        completed, shell = ios_profile(self, "--allow-dirty", helpers={RETENTION: nth_preflight_fails(2)})
         self.assertEqual(completed.returncode, 1)
         self.assertEqual(shell.calls_to("xcrun", "devicectl", "device", "process", "launch"), [])
         [marked] = shell.calls_to(RETENTION, "mark-failure")
         self.assertEqual((option(marked, "--platform"), option(marked, "--phase")), ("ios", "final-disk-preflight"))
 
     def test_a_failure_after_publication_does_not_mark_the_published_trace_failed(self) -> None:
-        completed, shell = ios_profile(self, helpers={RETENTION: fails_on("finalize-success")})
+        completed, shell = ios_profile(self, "--allow-dirty", helpers={RETENTION: fails_on("finalize-success")})
         self.assertEqual(completed.returncode, 1)
         self.assertEqual(len(shell.calls_to(HISTORY, "record")), 1)
         self.assertEqual(shell.calls_to(RETENTION, "mark-failure"), [])
@@ -565,7 +574,7 @@ class IOSProfileTests(unittest.TestCase):
         self.assertEqual(len(shell.calls_to("xcrun", "devicectl", "device", "process", "terminate")), 1)
 
     def test_the_target_resumes_only_after_xctrace_attached_to_its_exact_pid(self) -> None:
-        completed, shell = ios_profile(self)
+        completed, shell = ios_profile(self, "--allow-dirty")
         self.assertEqual(completed.returncode, 0, completed.stderr)
         [launch] = shell.calls_to("xcrun", "devicectl", "device", "process", "launch")
         self.assertIn("--start-stopped", launch)
@@ -575,6 +584,7 @@ class IOSProfileTests(unittest.TestCase):
         environment = json.loads(option(launch, "-e"))
         self.assertEqual(environment["QWENVOICE_NATIVE_TELEMETRY_MODE"], "verbose")
         self.assertEqual(environment["QVOICE_IOS_DEVICE_DIAGNOSTICS_SPEC"], "custom:speed:Profile device diagnostics.")
+        self.assertEqual(environment["QVOICE_IOS_DEVICE_DIAGNOSTICS_WARM_TAKES"], "3")
         [record] = shell.calls_to("xcrun", "xctrace", "record")
         self.assertEqual(option(record, "--device"), "fixture-udid")
         self.assertEqual(option(record, "--attach"), "4242")
@@ -592,13 +602,13 @@ class IOSProfileTests(unittest.TestCase):
         self.assertLessEqual({call[0] for call in shell.calls_to("sleep")}, {"0.1", "10", "3"})
         [published] = shell.calls_to(PUBLISHER, "ios-profile")
         self.assertEqual(option(published, "--target-pid"), "4242")
-        completed, shell = ios_profile(self, env={"QVOICE_IOS_PROFILE_PREDICTED_SECONDS": "4"})
+        completed, shell = ios_profile(self, "--allow-dirty", env={"QVOICE_IOS_PROFILE_PREDICTED_SECONDS": "4"})
         self.assertEqual(completed.returncode, 0, completed.stderr)
         resume = shell.index("xcrun", "devicectl", "device", "process", "resume")
         self.assertEqual([call[1] for call in shell.calls()[resume:] if call[0] == "sleep"][0], "4")
 
     def test_a_tracer_that_never_starts_stops_the_profile_before_the_target_resumes(self) -> None:
-        completed, shell = ios_profile(self, tracer="silent", env={"QVOICE_IOS_PROFILE_START_TIMEOUT": "1"})
+        completed, shell = ios_profile(self, "--allow-dirty", tracer="silent", env={"QVOICE_IOS_PROFILE_START_TIMEOUT": "1"})
         self.assertEqual(completed.returncode, 1)
         self.assertIn("xctrace did not report tracing startup within 1s", completed.stderr)
         self.assertEqual(shell.calls_to("xcrun", "devicectl", "device", "process", "resume"), [])
@@ -607,9 +617,12 @@ class IOSProfileTests(unittest.TestCase):
         self.assertEqual(option(marked, "--phase"), "trace-recording")
 
     def test_memory_profile_records_allocations_and_vm_tracker_beside_cpu_and_signposts(self) -> None:
-        completed, shell = ios_profile(self, "--kind", "memory", env={"QVOICE_IOS_MEMORY_PROFILE_DURATION": "45"})
+        completed, shell = ios_profile(self, "--allow-dirty", "--kind", "memory", env={"QVOICE_IOS_MEMORY_PROFILE_DURATION": "45"})
         self.assertEqual(completed.returncode, 0, completed.stderr)
         artifacts = only_profile(shell, "ios")
+        [launch] = shell.calls_to("xcrun", "devicectl", "device", "process", "launch")
+        environment = json.loads(option(launch, "-e"))
+        self.assertEqual(environment["QVOICE_IOS_DEVICE_DIAGNOSTICS_WARM_TAKES"], "0")
         [record] = shell.calls_to("xcrun", "xctrace", "record")
         self.assertEqual(record[4:10], ["--template", "Allocations", "--instrument", "CPU Profiler",
                                         "--instrument", "os_signpost"])
@@ -621,11 +634,55 @@ class IOSProfileTests(unittest.TestCase):
         self.assertEqual(shell.calls_to("xcrun", "xctrace", "export"),
                          [["xctrace", "export", "--input", str(trace), "--toc", "--output", str(toc)]])
 
-    def test_an_unknown_kind_is_refused_before_anything_runs(self) -> None:
-        completed, shell = ios_profile(self, "--kind", "witness")
+    def test_metal_and_witness_profiles_use_expected_instruments_takes_and_seed(self) -> None:
+        completed, shell = ios_profile(self, "--allow-dirty", "--kind", "metal", "--seed", "42")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        [launch] = shell.calls_to("xcrun", "devicectl", "device", "process", "launch")
+        env = json.loads(option(launch, "-e"))
+        self.assertEqual(env["QVOICE_IOS_DEVICE_DIAGNOSTICS_WARM_TAKES"], "1")
+        self.assertEqual(env["QVOICE_IOS_DEVICE_DIAGNOSTICS_SEED"], "42")
+        [record] = shell.calls_to("xcrun", "xctrace", "record")
+        self.assertEqual(record[4:8], ["--template", "Metal System Trace", "--instrument", "os_signpost"])
+        self.assertEqual(option(record, "--time-limit"), "120s")
+        [published] = shell.calls_to(PUBLISHER, "ios-profile")
+        self.assertEqual(option(published, "--profile-kind"), "metal")
+        self.assertEqual(option(published, "--template"), "Metal System Trace + os_signpost")
+
+        completed, shell = ios_profile(self, "--allow-dirty", "--kind", "witness")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        [launch] = shell.calls_to("xcrun", "devicectl", "device", "process", "launch")
+        env = json.loads(option(launch, "-e"))
+        self.assertEqual(env["QVOICE_IOS_DEVICE_DIAGNOSTICS_WARM_TAKES"], "3")
+        self.assertEqual(env["QVOICE_IOS_DEVICE_DIAGNOSTICS_SEED"], "19790615")
+        [record] = shell.calls_to("xcrun", "xctrace", "record")
+        self.assertEqual(record[4:6], ["--instrument", "os_signpost"])
+        [published] = shell.calls_to(PUBLISHER, "ios-profile")
+        self.assertEqual(option(published, "--profile-kind"), "witness")
+        self.assertEqual(option(published, "--template"), "os_signpost")
+
+    def test_missing_metal_template_and_unknown_kind_are_refused_before_build(self) -> None:
+        completed, shell = ios_profile(
+            self, "--allow-dirty", "--kind", "metal",
+            listed={"templates": ["Allocations"], "instruments": ["os_signpost"]},
+        )
         self.assertEqual(completed.returncode, 1)
-        self.assertIn("profile kind must be cpu or memory", completed.stderr)
+        self.assertIn("Metal System Trace", completed.stderr)
+        self.assertEqual(shell.calls_to("cmd_build"), [])
+
+        completed, shell = ios_profile(self, "--allow-dirty", "--kind", "bogon")
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("profile kind must be cpu, memory, metal or witness", completed.stderr)
         self.assertEqual(shell.calls(), [])
+
+    def test_main_dispatches_ios_profile_after_quiet_host_preflight(self) -> None:
+        shell = LaneShell(self, "ios_device.sh")
+        completed = shell.run(
+            "qv_stub require_quiet_host\nqv_stub cmd_profile\n"
+            "main profile --kind metal --allow-dirty\n"
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(shell.calls_to("require_quiet_host"), [["ios-profile"]])
+        self.assertLess(shell.index("require_quiet_host"), shell.index("cmd_profile"))
 
 
 class MemoryQualificationTests(unittest.TestCase):

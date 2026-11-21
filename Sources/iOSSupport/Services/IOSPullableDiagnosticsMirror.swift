@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import QwenVoiceCore
 
 /// Copies App-Group `diagnostics/<layer>/generations.jsonl` into the app's own
@@ -8,6 +9,10 @@ import QwenVoiceCore
 /// bench/gate lanes read telemetry from the Caches mirror (see
 /// `scripts/ios_device.sh pull` and `IOSDeviceDiagnosticsRunner`).
 enum IOSPullableDiagnosticsMirror {
+    private static let logger = Logger(
+        subsystem: "com.patricedery.vocello",
+        category: "pullable-diagnostics-mirror"
+    )
     /// App-Group diagnostics dir where the in-process engine writes JSONL rows.
     private static var appGroupDiagnosticsRoot: URL {
         AppPaths.appSupportDir.appendingPathComponent("diagnostics", isDirectory: true)
@@ -45,7 +50,8 @@ enum IOSPullableDiagnosticsMirror {
             } catch {
                 // The host requires the exact WAV digest; missing capture fails
                 // qualification without misreporting successful synthesis.
-                print("[IOSPullableDiagnosticsMirror] audit output capture failed")
+                let summary = DiagnosticPrivacy.summary(of: error).description
+                logger.error("audit output capture failed: \(summary, privacy: .public)")
             }
         }
         let generationID = generationID.uuidString
@@ -155,25 +161,29 @@ enum IOSPullableDiagnosticsMirror {
                     try Data(payload.utf8).write(to: destination, options: .atomic)
                 }
             } catch {
-                print("[IOSPullableDiagnosticsMirror] could not export \(layer) row: \(DiagnosticPrivacy.summary(of: error))")
+                let summary = DiagnosticPrivacy.summary(of: error).description
+                logger.error("could not export \(layer, privacy: .public) row: \(summary, privacy: .public)")
             }
         }
 
         let sampleName = "samples-\(generationID).jsonl"
-        let sampleSource = sourceRoot.appendingPathComponent("engine", isDirectory: true)
-            .appendingPathComponent(sampleName, isDirectory: false)
-        guard fileManager.fileExists(atPath: sampleSource.path) else { return }
-        let sampleDestination = pullableRoot.appendingPathComponent("engine", isDirectory: true)
-            .appendingPathComponent(sampleName, isDirectory: false)
-        do {
-            try fileManager.createDirectory(
-                at: sampleDestination.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            try? fileManager.removeItem(at: sampleDestination)
-            try fileManager.copyItem(at: sampleSource, to: sampleDestination)
-        } catch {
-            print("[IOSPullableDiagnosticsMirror] could not export verbose samples: \(DiagnosticPrivacy.summary(of: error))")
+        for sampleLayer in ["engine", "app"] {
+            let sampleSource = sourceRoot.appendingPathComponent(sampleLayer, isDirectory: true)
+                .appendingPathComponent(sampleName, isDirectory: false)
+            guard fileManager.fileExists(atPath: sampleSource.path) else { continue }
+            let sampleDestination = pullableRoot.appendingPathComponent(sampleLayer, isDirectory: true)
+                .appendingPathComponent(sampleName, isDirectory: false)
+            do {
+                try fileManager.createDirectory(
+                    at: sampleDestination.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                try? fileManager.removeItem(at: sampleDestination)
+                try fileManager.copyItem(at: sampleSource, to: sampleDestination)
+            } catch {
+                let summary = DiagnosticPrivacy.summary(of: error).description
+                logger.error("could not export \(sampleLayer, privacy: .public) verbose samples: \(summary, privacy: .public)")
+            }
         }
     }
 
@@ -195,7 +205,8 @@ enum IOSPullableDiagnosticsMirror {
                 }
                 try fileManager.copyItem(at: from, to: to)
             } catch {
-                print("[IOSPullableDiagnosticsMirror] could not mirror \(layer) telemetry: \(DiagnosticPrivacy.summary(of: error))")
+                let summary = DiagnosticPrivacy.summary(of: error).description
+                logger.error("could not mirror \(layer, privacy: .public) telemetry: \(summary, privacy: .public)")
             }
         }
     }
@@ -223,7 +234,8 @@ enum IOSPullableDiagnosticsMirror {
             try? fileManager.removeItem(at: destination)
             try fileManager.copyItem(at: source, to: destination)
         } catch {
-            print("[IOSPullableDiagnosticsMirror] could not export startup evidence: \(DiagnosticPrivacy.summary(of: error))")
+            let summary = DiagnosticPrivacy.summary(of: error).description
+            logger.error("could not export startup evidence: \(summary, privacy: .public)")
         }
     }
 

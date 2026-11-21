@@ -3782,10 +3782,16 @@ def validate_record(
         require_digest(
             evidence.get("sampleSidecarsDigest"), "evidence.sampleSidecarsDigest", allow_na=False
         )
-        expected_sidecars = len(takes)
+        expected_sidecars = {len(takes)}
         if kind == "ui-generation" and run["platform"] == "macos":
-            expected_sidecars *= 2
-        if evidence.get("sampleSidecarCount") != expected_sidecars:
+            expected_sidecars = {2 * len(takes)}
+        elif run["platform"] == "ios" and kind in {
+            "ui-generation", "engine-generation", "memory-qualification", "instrument-profile",
+        }:
+            # Historical iOS records (before app-layer memory capture) carry 1 sidecar per take
+            # (engine only); new records with app-layer sampling carry 2 per take (engine + app).
+            expected_sidecars = {len(takes), 2 * len(takes)}
+        if evidence.get("sampleSidecarCount") not in expected_sidecars:
             raise HistoryError("selected memory-sidecar count does not match the benchmark takes")
         qualified_with_warnings = any(
             take.get("memoryStatus") == "qualifiedWithWarnings" for take in takes

@@ -274,15 +274,16 @@ class RefusedTakeLaneTests(unittest.TestCase):
         self.assertIn("validation=1", completed.stdout)
         self.assertEqual(shell.calls_to(SUMMARIZER), [])
 
-    def test_only_the_macos_benchmark_names_refused_takes(self) -> None:
+    def test_only_benchmarks_name_refused_takes(self) -> None:
         shell = UIFunctionShell(self)
         out = shell.path / "run"
         out.mkdir()
         (out / "benchmark-gate.txt").write_text(f"{REFUSED_LINE}\nPASS\n", encoding="utf-8")
         for platform, lane, expected in (
             ("macos", "benchmark", f" · {REFUSED_LINE} · exploratory record, never canonical"),
-            ("ios", "benchmark", ""),
+            ("ios", "benchmark", f" · {REFUSED_LINE} · exploratory record, never canonical"),
             ("macos", "perf", ""),
+            ("ios", "perf", ""),
             ("macos", "smoke", ""),
         ):
             with self.subTest(platform=platform, lane=lane):

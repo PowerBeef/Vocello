@@ -110,9 +110,10 @@ MACOS_ENGINE_LANE = (
     "Sources/QwenVoiceCore/BenchMatrixSpec.swift",
     *GENERATION_TELEMETRY,
 )
-# Headless iPhone lanes: the device lane script, the in-app runner and the publisher.
+# Headless iPhone lanes: the device lane script, its quiet-host preflight, the in-app runner and the publisher.
 IOS_ENGINE_LANE = (
     "scripts/ios_device.sh",
+    "scripts/lib/host_preflight.sh",
     "scripts/publish_benchmark_history.py",
     "Sources/iOS/IOSDeviceDiagnosticsRunner.swift",
     "Sources/QwenVoiceCore/BenchMatrixSpec.swift",
@@ -244,7 +245,11 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # 500 ms, and every sample times its own capture. The versions below that
     # name it moved for it; the others were already moved in the same batch.
     ("ui-generation", "macos"): 2,
-    ("ui-generation", "ios"): 2,
+    # 3 (2026-11-21, DW-04 iOS overhaul): iOS UI benchmark now captures and
+    # qualifies both engine and app-layer memory series in one process series
+    # (matching macOS), validates process ownership and take identity across
+    # layers, and supports recorded-exploratory-v1 refused takes.
+    ("ui-generation", "ios"): 3,
     # Also 2 for audit #39: delivery takes publish the remaining
     # expectation-bound paired features and their per-take adherence flags as a
     # diagnostic count; the cell verdict, not each take's flags, warns. And for
@@ -329,7 +334,12 @@ LINEAGE_MEASUREMENT_VERSIONS: dict[tuple[str, str], int] = {
     # app to the time limit, and a CPU trace reports the take's cycles per
     # rusage CPU-second. The recording first probes that sentinel at the take's
     # predicted end, then every 3 s, instead of every 3 s from the resume.
-    ("instrument-profile", "ios"): 2,
+    # 3 (2026-11-21, DW-04 iOS overhaul): the iPhone profile lane builds -O
+    # wholemodule on a clean tree and quiet host, adds Metal System Trace and
+    # os_signpost-only witness kinds, runs multi-take sequences (1c+3w cpu/witness,
+    # 1c+1w metal, 1c memory), and hashes profileKind into inputs.matrixHash so
+    # kinds never collide in lineage.
+    ("instrument-profile", "ios"): 3,
 }
 
 # (scheme, extra root targets) whose project.yml subset each lane builds;

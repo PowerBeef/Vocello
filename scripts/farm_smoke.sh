@@ -72,6 +72,8 @@ reseal_staged_runner() {
 package() {
   local team products log commit dirty=false fingerprint status=0
   team="$(derive_team)" || fail "no Apple Development team found; set QWENVOICE_DEVELOPMENT_TEAM"
+  python3 "$ROOT_DIR/scripts/lib/ios_signing_identity.py" check --team "$team" >/dev/null \
+    || fail "no usable Apple Development signing identity for team $team"
   command -v xcodebuild >/dev/null 2>&1 || fail "xcodebuild not found"
   require_ios_xcode_platform || fail "the selected Xcode cannot build for iPhone"
   require_build_free_space device-build || fail "not enough free space for an iPhone build"

@@ -96,6 +96,7 @@ from lib import jsonio  # noqa: E402
 TRIM_SEVERITY = {"softTrim": 1, "hardTrim": 2, "fullUnload": 3}
 UINT64_MAX = (1 << 64) - 1
 LANGUAGE_SENTINEL_SCHEMA = 2
+LANGUAGE_SENTINEL_SCHEMAS = (2, 3)
 LANGUAGE_OUTPUT_SCHEMA = 3
 LANGUAGE_OUTPUT_ALGORITHM = "language-output-verifier-v3"
 ASR_EVIDENCE_SCHEMA = 2
@@ -302,17 +303,20 @@ IOS_BUILD_PROVENANCE = ROOT / "build/cache/xcode/ios-device/last-build.json"
 def validated_ios_app_optimization(
     provenance: Path | None = None,
     executable: Path | None = None,
+    *,
+    executed_sha256: str | None = None,
 ) -> str:
     """Optimization of the installed iOS app, bound to the build receipt and its bytes.
 
-    `scripts/ios_device.sh build` writes the receipt with the app executable's
-    digest; publication refuses a label the receipt cannot prove (missing
-    receipt, failed build, other platform, or a binary rebuilt since).
+    `scripts/ios_device.sh build --optimized` writes the receipt with the app executable's
+    digest; publication refuses an unoptimized build or a label the receipt cannot prove
+    (missing receipt, failed build, other platform, rebuilt binary, or executedSHA256 mismatch).
     """
     try:
         receipt = load_build_provenance(
             provenance or IOS_BUILD_PROVENANCE,
             platform="ios",
+            executed_sha256=executed_sha256,
             producer_prefix="scripts/ios_device.sh build",
         )
     except ProvenanceError as error:
@@ -322,7 +326,12 @@ def validated_ios_app_optimization(
         raise PublicationError(
             "iOS build receipt describes a different executable than the installed app"
         )
-    return str(receipt["optimization"])
+    optimization = str(receipt["optimization"])
+    if optimization != "-O":
+        raise PublicationError(
+            f"iOS benchmark publication requires an optimized (-O) build, not {optimization!r}"
+        )
+    return optimization
 
 
 def canonical_engine_matrix_scope(result_takes: list[dict[str, Any]]) -> str:
@@ -637,6 +646,18 @@ def validate_language_app_row(
         raise PublicationError(f"language cell {cell_id} app telemetry identity is invalid")
 
 
+def _row_process_id(row: dict[str, Any]) -> int | None:
+    """Return the positive process identifier recorded on a telemetry row or its summary."""
+    for candidate in (
+        row.get("processIdentifier"),
+        row.get("processID"),
+        _as_dict(row.get("summary")).get("processID"),
+    ):
+        if isinstance(candidate, int) and not isinstance(candidate, bool) and candidate > 0:
+            return candidate
+    return None
+
+
 def correlated_ios_app_rows(
     *,
     diagnostics: Path,
@@ -646,9 +667,10 @@ def correlated_ios_app_rows(
 ) -> list[dict[str, Any]]:
     """Select one completed app row for each ordered iOS engine generation.
 
-    iOS uses one process, so the engine sampler remains the sole owner of process
-    memory and its sidecar. The app row is nevertheless mandatory frontend
-    lifecycle evidence and is bound into the selected-evidence digest.
+    iOS runs the app and engine in one process; verbose telemetry captures
+    process memory on both layers across their respective windows (merged by
+    `qualify_memory_rows`), while frontend lifecycle timing stays owned by the
+    app row and bound into the selected-evidence digest.
     """
     ordered_engine = list(engine_rows)
     ordered_takes = list(takes)
@@ -698,9 +720,11 @@ def correlated_ios_app_rows(
             raise PublicationError(
                 f"iOS generation {generation_id} app telemetry identity/completion is invalid"
             )
-        if app.get("summary") not in (None, {}) or app.get("memoryMetrics") not in (None, {}):
+        engine_pid = _row_process_id(engine)
+        app_pid = _row_process_id(app)
+        if engine_pid is not None and app_pid is not None and engine_pid != app_pid:
             raise PublicationError(
-                f"iOS generation {generation_id} app row must not own process-memory evidence"
+                f"iOS generation {generation_id} app PID {app_pid} differs from engine PID {engine_pid}"
             )
         selected.append(app)
     return selected
@@ -1932,8 +1956,8 @@ def expected_identity_command(args: argparse.Namespace) -> Path:
     gate builds, and the matrix hash of the exact bench it will run; plus the
     source commit, which seeding must keep clean. Models, corpus and evidence
     versions are only known once the takes exist."""
-    if args.platform != "macos":
-        raise PublicationError("expected-identity describes the macOS gate bench only")
+    if args.platform not in {"macos", "ios"}:
+        raise PublicationError("expected-identity supports macos and ios only")
     if args.warm < 0:
         raise PublicationError("--warm must be a non-negative whole number")
     split = lambda value: [item for item in value.split(",") if item]  # noqa: E731
@@ -1942,19 +1966,25 @@ def expected_identity_command(args: argparse.Namespace) -> Path:
         raise PublicationError("the bench matrix is empty")
     host = macos_host_identity()
     source = history_git_state()
+    if args.platform == "macos":
+        hardware = {
+            "profileID": verify_canonical_hardware("macos")["profileID"],
+            **{key: host[key] for key in HOST_IDENTITY_HARDWARE_KEYS},
+        }
+    else:
+        hardware = {
+            "profileID": str(canonical_hardware_profile("ios")["id"]),
+        }
     payload = {
         "schemaVersion": 1,
         "purpose": "gate-bench-preflight",
         "historyRecord": {
             "run": {
                 "kind": "engine-generation",
-                "platform": "macos",
+                "platform": args.platform,
                 "matrixScope": canonical_engine_matrix_scope([{"cell": cell} for cell in cells]),
             },
-            "hardware": {
-                "profileID": verify_canonical_hardware("macos")["profileID"],
-                **{key: host[key] for key in HOST_IDENTITY_HARDWARE_KEYS},
-            },
+            "hardware": hardware,
             "toolchain": {
                 "optimization": "-O",
                 **{key: host[key] for key in HOST_IDENTITY_TOOLCHAIN_KEYS},
@@ -2043,6 +2073,8 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
             rows=selected,
             diagnostics=args.diagnostics,
             platform=args.platform,
+            app_rows=selected_app if args.platform == "ios" else None,
+            require_app_layer=(args.platform == "ios"),
         )
     except MemoryEvidenceError as error:
         raise PublicationError(str(error)) from error
@@ -2111,7 +2143,10 @@ def engine_command(args: argparse.Namespace, *, kind: str = "engine-generation",
             )
         optimization = validated_macos_cli_optimization(executed_sha256=executed)
     else:
-        optimization = validated_ios_app_optimization()
+        executed_ios = results.get("executableSHA256")
+        optimization = validated_ios_app_optimization(
+            executed_sha256=executed_ios if isinstance(executed_ios, str) and executed_ios else None,
+        )
     # The OS and toolchain that measured this run, from its own pre-run snapshot,
     # so the baseline identity never comes from tools installed later.
     host = snapshot_host_identity(args.snapshot) if args.platform == "macos" else {}
@@ -2179,6 +2214,74 @@ def engine_ttfc_definition(platform: str, takes: list[dict[str, Any]]) -> str | 
     }[platform]
 
 
+def _ios_sentinel_takes(sentinel: dict[str, Any]) -> list[dict[str, Any]]:
+    """Normalize either a single-take or multi-take iOS device-diagnostics sentinel."""
+    raw_takes = sentinel.get("takes")
+    if isinstance(raw_takes, list) and raw_takes:
+        normalized: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
+        for index, raw in enumerate(raw_takes, start=1):
+            if not isinstance(raw, dict):
+                raise PublicationError("iOS sentinel take entry must be a JSON object")
+            take_index = raw.get("takeIndex", index)
+            if isinstance(take_index, bool) or take_index != index:
+                raise PublicationError("iOS sentinel take indices must be contiguous and one-based")
+            generation_id = raw.get("generationID")
+            mode = raw.get("mode") or sentinel.get("mode")
+            variant = raw.get("variant") or sentinel.get("variant", "speed")
+            if (
+                not isinstance(generation_id, str) or not generation_id
+                or generation_id.lower() in seen_ids
+                or not isinstance(mode, str) or not mode
+                or not isinstance(variant, str) or not variant
+            ):
+                raise PublicationError("iOS sentinel take lacks unique generation, mode or variant identity")
+            seen_ids.add(generation_id.lower())
+            cell = raw.get("cell")
+            if not isinstance(cell, str) or not cell:
+                cell = f"{mode}/{variant}/device"
+            normalized.append({
+                "takeIndex": index,
+                "generationID": generation_id,
+                "cell": cell,
+                "mode": mode,
+                "modelID": raw.get("modelID") or sentinel.get("modelID"),
+                "variant": variant,
+                "warmState": raw.get("warmState"),
+                "length": raw.get("length") or "not-applicable",
+                "wallSeconds": raw.get("wallSeconds"),
+                "audioSeconds": raw.get("durationSeconds"),
+                "fixtureDigest": raw.get("fixtureDigest") or sentinel.get("fixtureDigest"),
+            })
+        return normalized
+
+    generation_id = sentinel.get("generationID")
+    mode = sentinel.get("mode")
+    variant = sentinel.get("variant", "speed")
+    if (
+        not isinstance(generation_id, str) or not generation_id
+        or not isinstance(mode, str) or not mode
+        or not isinstance(variant, str) or not variant
+    ):
+        raise PublicationError("iOS sentinel has no generation ID")
+    cell = sentinel.get("cell")
+    if not isinstance(cell, str) or not cell:
+        cell = f"{mode}/{variant}/device"
+    return [{
+        "takeIndex": 1,
+        "generationID": generation_id,
+        "cell": cell,
+        "mode": mode,
+        "modelID": sentinel.get("modelID"),
+        "variant": variant,
+        "warmState": None,
+        "length": sentinel.get("length") or "not-applicable",
+        "wallSeconds": sentinel.get("wallSeconds"),
+        "audioSeconds": sentinel.get("durationSeconds"),
+        "fixtureDigest": sentinel.get("fixtureDigest"),
+    }]
+
+
 def ios_engine_command(
     args: argparse.Namespace,
     *,
@@ -2188,58 +2291,79 @@ def ios_engine_command(
     sentinel = load_json(args.sentinel)
     if sentinel.get("runID") != args.run_id or sentinel.get("status") != "ok":
         raise PublicationError("iOS sentinel does not describe this successful run")
-    generation_id = sentinel.get("generationID")
-    if not isinstance(generation_id, str) or not generation_id:
-        raise PublicationError("iOS sentinel has no generation ID")
-    rows = rows_by_generation(load_engine_rows(args.diagnostics), [generation_id])
-    row = rows[0]
-    successful_row(row)
-    mode = str(sentinel.get("mode"))
-    model_id = str(row.get("modelID", sentinel.get("modelID", "not-applicable")))
-    variant = str(sentinel.get("variant", "speed"))
-    take_source = {
-        "generationID": generation_id,
-        "cell": f"{mode}/{variant}/device",
-        "mode": mode,
-        "modelID": model_id,
-        "variant": variant,
-        "warmState": str(row.get("warmState", "unknown")),
-        "length": "not-applicable",
-        "wallSeconds": sentinel.get("wallSeconds"),
-        "audioSeconds": sentinel.get("durationSeconds"),
-    }
+    sentinel_takes = _ios_sentinel_takes(sentinel)
+    generation_ids = [item["generationID"] for item in sentinel_takes]
+    rows = rows_by_generation(load_engine_rows(args.diagnostics), generation_ids)
+    for row in rows:
+        successful_row(row)
+
+    take_sources: list[dict[str, Any]] = []
+    fixture_digests: dict[str, str] = {}
+    for item, row in zip(sentinel_takes, rows, strict=True):
+        mode = str(item["mode"])
+        model_id = str(row.get("modelID", item.get("modelID") or "not-applicable"))
+        variant = str(item.get("variant") or "speed")
+        warm_state = str(item.get("warmState") or row.get("warmState", "unknown"))
+        take_sources.append({
+            "generationID": item["generationID"],
+            "cell": item["cell"],
+            "mode": mode,
+            "modelID": model_id,
+            "variant": variant,
+            "warmState": warm_state,
+            "length": str(item.get("length") or "not-applicable"),
+            "wallSeconds": item.get("wallSeconds"),
+            "audioSeconds": item.get("audioSeconds"),
+        })
+        fixture_digest = item.get("fixtureDigest")
+        if isinstance(fixture_digest, str) and fixture_digest:
+            fixture_digests[mode] = fixture_digest
+
     selected_app = correlated_ios_app_rows(
         diagnostics=args.diagnostics,
         engine_rows=rows,
-        takes=[take_source],
+        takes=take_sources,
         run_id=args.run_id,
     )
-    take = engine_take(1, take_source, row, None, run_id=args.run_id)
-    take["layers"] = ["engine", "app"]
+    takes = [
+        {**engine_take(index, take_source, row, None, run_id=args.run_id), "layers": ["engine", "app"]}
+        for index, (take_source, row) in enumerate(zip(take_sources, rows, strict=True), start=1)
+    ]
     try:
         qualified_memory, memory_run = qualify_memory_rows(
             rows=rows,
             diagnostics=args.diagnostics,
             platform="ios",
+            app_rows=selected_app,
+            require_app_layer=True,
         )
     except MemoryEvidenceError as error:
         raise PublicationError(str(error)) from error
-    apply_memory_qualification([take], qualified_memory)
+    apply_memory_qualification(takes, qualified_memory)
     if kind == "instrument-profile":
-        label_instrumented_takes([take], trace)
-    fixture_digest = sentinel.get("fixtureDigest")
+        label_instrumented_takes(takes, trace)
     require_fixture_cross_check(
-        [take],
-        {mode: fixture_digest} if isinstance(fixture_digest, str) else {},
+        takes,
+        fixture_digests,
         source="iOS sentinel",
     )
+    inputs: dict[str, Any] = {"corpusHash": prompt_corpus_digest(rows)}
+    if kind == "instrument-profile":
+        inputs["matrixHash"] = engine_matrix_hash(
+            [take["cell"] for take in takes],
+            "verbose",
+            True,
+            sentinel.get("seed"),
+            profile_kind=getattr(args, "profile_kind", "cpu"),
+        )
+    executed_sha = sentinel.get("executableSHA256")
     manifest = record_shell(
         kind=kind, platform="ios", run_id=args.run_id,
         label=args.label or args.run_id,
         started_at=str(sentinel.get("startedAt")), finished_at=str(sentinel.get("finishedAt")),
         matrix_scope="instrumented" if kind == "instrument-profile" else "focused",
         artifact_dir=args.artifact_dir, snapshot=args.snapshot,
-        takes=[take], raw_digest=digest_bytes(canonical_bytes({
+        takes=takes, raw_digest=digest_bytes(canonical_bytes({
             "telemetry": rows,
             "appTelemetry": selected_app,
             "sampleSidecars": memory_run["digestPayload"],
@@ -2247,19 +2371,21 @@ def ios_engine_command(
         telemetry_schema=max(
             int(candidate.get("schemaVersion", 0)) for candidate in [*rows, *selected_app]
         ),
-        qc_algorithm=int((row.get("audioQC") or {}).get("algorithmVersion", 1)),
-        inputs={"corpusHash": prompt_corpus_digest(rows)},
+        qc_algorithm=max(int((row.get("audioQC") or {}).get("algorithmVersion", 1)) for row in rows),
+        inputs=inputs,
         trace=trace,
         hardware=hardware_context(rows),
         hardware_evidence=[sentinel],
-        models=exact_models("ios", [take]),
+        models=exact_models("ios", takes),
         crash_delta=crash_delta_from_snapshot(
             args.snapshot, expected_scope="ios", diagnostics=args.diagnostics
             if getattr(args, "crash_diagnostics", None) is None else args.crash_diagnostics
         ),
         executable_paths={"Vocello": "build/cache/xcode/ios-device/Build/Products/Release-iphoneos/Vocello.app/Vocello"},
-        optimization=validated_ios_app_optimization(),
-        classification=engine_record_classification(kind, "ios", [take], rows),
+        optimization=validated_ios_app_optimization(
+            executed_sha256=executed_sha if isinstance(executed_sha, str) and executed_sha else None,
+        ),
+        classification=engine_record_classification(kind, "ios", takes, rows),
         memory_evidence=compact_memory_evidence(memory_run),
         runtime_policy=runtime_policy_provenance(rows),
         engine_rows=rows,
@@ -2477,8 +2603,8 @@ def validate_language_sampling_identity(
     sentinel: dict[str, Any],
     engine_row: dict[str, Any],
 ) -> int:
-    if sentinel.get("schemaVersion") != LANGUAGE_SENTINEL_SCHEMA:
-        raise PublicationError(f"language cell {cell_id} lacks sentinel schema v2 evidence")
+    if sentinel.get("schemaVersion") not in LANGUAGE_SENTINEL_SCHEMAS:
+        raise PublicationError(f"language cell {cell_id} lacks sentinel schema v2/v3 evidence")
     seed = uint64_value(planned_take.get("seed"))
     notes = _as_dict(engine_row.get("notes"))
     if seed is None or uint64_value(sentinel.get("seed")) != seed:
@@ -4144,10 +4270,12 @@ def extract_trace_data_summary(
     take_expectations: dict[tuple[str, int, str], dict[str, Any]] | None = None,
     require_complete_intervals: bool = False,
     require_cpu_samples: bool = True,
+    forbid_cpu_samples: bool | None = None,
 ) -> dict[str, Any]:
-    """`require_cpu_samples` is False only for the os_signpost-only witness
-    profile (audit #50), which records no sampler: its summary then carries no
-    CPU fields at all rather than zeros.
+    """`require_cpu_samples` is False for profile kinds that do not require a
+    CPU sampler (`witness` and `metal`); `forbid_cpu_samples` defaults to
+    `not require_cpu_samples` (witness) and is explicitly False for `metal` so
+    ancillary CPU samples in a Metal System Trace never trip the witness guard.
 
     The CPU sampler table is CPU Profiler's cpu-profile (cycle weights) or Time
     Profiler's time-profile (sampled-time weights, the Mac lane since
@@ -4157,7 +4285,7 @@ def extract_trace_data_summary(
         schema for schema in schemas
         if re.fullmatch(r"[A-Za-z0-9._-]+", schema)
         and any(token in schema.lower() for token in (
-            "cpu-profile", "time-profile", "signpost", "allocation", "vm", "energy", "gpu", "wakeup",
+            "cpu-profile", "time-profile", "signpost", "allocation", "vm", "energy", "gpu", "metal", "wakeup",
         ))
     })
     if not relevant:
@@ -4227,12 +4355,14 @@ def extract_trace_data_summary(
     captured_rows = sum(rows_by_schema.values())
     if captured_rows == 0:
         raise PublicationError("xctrace exported no performance data rows")
+    if forbid_cpu_samples is None:
+        forbid_cpu_samples = not require_cpu_samples
     if require_cpu_samples:
         if not ({"cpu-profile", "time-profile"} & set(relevant)):
             raise PublicationError("trace lacks an exportable CPU Profiler or Time Profiler table")
         if not cpu_sample_times_ns:
             raise PublicationError("CPU profile trace contains no target-process samples")
-    elif cpu_sample_times_ns:
+    elif forbid_cpu_samples and cpu_sample_times_ns:
         raise PublicationError("a witness profile records no CPU sampler, but its trace has CPU samples")
     correlation_fields_verified = correlated_signposts > 0
     if signpost_events == 0 or not correlation_fields_verified:
@@ -4257,10 +4387,10 @@ def extract_trace_data_summary(
         summary["cpuSampleSpanMS"] = round(
             (max(cpu_sample_times_ns) - min(cpu_sample_times_ns)) / 1_000_000.0, 6
         ) if len(cpu_sample_times_ns) >= 2 else 0.0
-    if cpu_weights_ns:
-        summary["cpuSampleWeightMS"] = round(sum(cpu_weights_ns) / 1_000_000.0, 6)
-    if cpu_cycle_weights:
-        summary["cpuCycleWeight"] = int(sum(cpu_cycle_weights))
+        if cpu_weights_ns:
+            summary["cpuSampleWeightMS"] = round(sum(cpu_weights_ns) / 1_000_000.0, 6)
+        if cpu_cycle_weights:
+            summary["cpuCycleWeight"] = int(sum(cpu_cycle_weights))
     if take_expectations is None:
         return summary
     if set(take_expectations) != expected_correlations:
@@ -4611,6 +4741,11 @@ def trace_evidence(
             raise PublicationError("memory profile lacks the VM Tracker Regions Map detail")
         if require_disabled_vm_auto_snapshot:
             require_vm_tracker_auto_snapshot_disabled(args.trace)
+    elif profile_kind == "metal":
+        has_metal_track = any("metal" in name or "gpu" in name for name in track_details)
+        has_metal_schema = any("metal" in token.lower() or "gpu" in token.lower() for token in schemas)
+        if not has_metal_track and not has_metal_schema:
+            raise PublicationError("metal profile lacks Metal System Trace tracks or schemas")
     extracted = extract_trace_data_summary(
         args.trace,
         schemas,
@@ -4620,6 +4755,7 @@ def trace_evidence(
         take_expectations=take_expectations,
         require_complete_intervals=require_complete_intervals,
         require_cpu_samples=profile_kind not in {"witness", "metal"},
+        forbid_cpu_samples=profile_kind == "witness",
     )
     if profile_kind == "witness" and "signpostSummaryVersion" not in extracted:
         raise PublicationError("a witness profile publishes per-take signpost interval statistics")
@@ -4681,17 +4817,19 @@ def trace_evidence(
 def _profile_correlations(args: argparse.Namespace, *, ios: bool) -> set[tuple[str, int, str]]:
     if ios:
         sentinel = load_json(args.sentinel)
-        generation_id = sentinel.get("generationID")
-        mode = sentinel.get("mode")
-        variant = sentinel.get("variant", "speed")
-        if (
-            sentinel.get("runID") != args.run_id
-            or not isinstance(generation_id, str) or not generation_id
-            or not isinstance(mode, str) or not mode
-            or not isinstance(variant, str) or not variant
-        ):
+        if sentinel.get("runID") != args.run_id:
             raise PublicationError("iOS profile sentinel lacks exact signpost identity")
-        return {(generation_id, 1, f"{mode}/{variant}/device")}
+        try:
+            takes = _ios_sentinel_takes(sentinel)
+        except PublicationError as error:
+            raise PublicationError("iOS profile sentinel lacks exact signpost identity") from error
+        expected_ios = {
+            (str(take["generationID"]), int(take["takeIndex"]), str(take["cell"]))
+            for take in takes
+        }
+        if len(expected_ios) != len(takes):
+            raise PublicationError("iOS profile correlations are not unique")
+        return expected_ios
 
     results = load_json(args.results)
     takes = results.get("takes")
@@ -4987,7 +5125,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     ios_profile.add_argument("--duration", type=float, required=True)
     ios_profile.add_argument("--target-process", required=True)
     ios_profile.add_argument("--target-pid", type=int)
-    ios_profile.add_argument("--profile-kind", choices=("cpu", "memory"), default="cpu")
+    ios_profile.add_argument("--profile-kind", choices=("cpu", "memory", "metal", "witness"), default="cpu")
     ios_profile.add_argument(
         "--retention-policy", choices=TRACE_RETENTION_POLICIES,
         default="summaryOnly",
@@ -5008,9 +5146,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
     expected = subparsers.add_parser(
         "expected-identity",
-        help="write the baseline identity a macOS gate bench will have, before building or running it",
+        help="write the baseline identity a gate bench will have, before building or running it",
     )
-    expected.add_argument("--platform", choices=("macos",), required=True)
+    expected.add_argument("--platform", choices=("macos", "ios"), required=True)
     expected.add_argument("--modes", required=True, help="comma list, as passed to vocello bench")
     expected.add_argument("--variants", required=True, help="comma list, as passed to vocello bench")
     expected.add_argument("--lengths", required=True, help="comma list, as passed to vocello bench")

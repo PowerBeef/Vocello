@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 from pathlib import Path
@@ -137,13 +138,29 @@ def upgrade_rows_to_v8(
         }
         if mode in {"design", "clone"}:
             row["modelRuntimeIdentity"]["fixtureDigest"] = "d" * 64
+        row["processIdentifier"] = 4242
         row["notes"]["promptDigest"] = "c" * 64
         (diagnostics / "engine" / f"samples-{row['generationID']}.jsonl").write_text(
             "".join(json.dumps(item) + "\n" for item in sidecar), encoding="utf-8"
         )
     for row in app_rows:
+        gid = row.get("generationID") or "fixture-0"
+        suffix = int(str(gid).rsplit("-", 1)[-1]) if str(gid).rsplit("-", 1)[-1].isdigit() else 0
+        app_sidecar = memory_samples(
+            role="app",
+            boundaries=["app_submit", "app_terminal"],
+            ios=True,
+            footprint=3000 + suffix,
+        )
+        app_memory = memory_row(gid, app_sidecar, layer="app", ios=True)
         row["schemaVersion"] = 8
+        row["processIdentifier"] = 4242
+        row["summary"] = app_memory["summary"]
+        row["memoryMetrics"] = app_memory["memoryMetrics"]
         row["frontendMetrics"] = v7_frontend()
+        (diagnostics / "app" / f"samples-{gid}.jsonl").write_text(
+            "".join(json.dumps(item) + "\n" for item in app_sidecar), encoding="utf-8"
+        )
 
 
 class CheckIOSUIBenchmarkTests(unittest.TestCase):
@@ -711,6 +728,116 @@ class StartupWindowMetricsTests(unittest.TestCase):
         self.assertEqual(metrics["excludedStartupMS"], 1_100.0)
         # The request wall (and so RTF) is exactly the terminal mark minus them.
         self.assertAlmostEqual(metrics["requestWallSeconds"], (3_000 - 1_100) / 1_000)
+
+
+class IOSRefusedAndOwnershipParityTests(unittest.TestCase):
+    """Wave 2 macOS parity: refused takes, process ownership, take identity and variant checks."""
+
+    def _marker_line(self, take_index: int, cell: str) -> str:
+        payload = json.dumps({"cell": cell, "schemaVersion": 1, "takeIndex": take_index}, sort_keys=True)
+        return "VOCELLO_BENCH_TAKE_REFUSED=" + base64.b64encode(payload.encode("utf-8")).decode("ascii")
+
+    def test_single_refused_take_publishes_exploratory_manifest(self) -> None:
+        cells = [("custom", "medium", "cold"), ("custom", "short", "warm"), ("custom", "medium", "warm")]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            diagnostics = root / "diag"
+            (diagnostics / "engine").mkdir(parents=True)
+            (diagnostics / "app").mkdir(parents=True)
+            rows = [make_row(index, *cell) for index, cell in enumerate(cells, start=1)]
+            # Take 2 is refused by Fast QC.
+            rows[1]["finishReason"] = "failed"
+            rows[1]["audioQC"] = {"verdict": "fail", "flags": ["excess_trailing_silence"]}
+            rows[1]["notes"]["nativeRuntimeFailureCode"] = "audio.quality_rejected"
+            rows[1]["notes"]["audioQCFlags"] = "excess_trailing_silence"
+            rows[1]["outputMetrics"] = {"readableWAV": False, "atomicallyPublished": False}
+            completed_rows = [rows[0], rows[2]]
+            app_rows = [
+                {"generationID": row["generationID"], "finishReason": "completed", "notes": {"benchRunID": RUN_ID}}
+                for row in completed_rows
+            ]
+            upgrade_rows_to_v8(completed_rows, app_rows, diagnostics)
+            rows[1]["schemaVersion"] = 8
+            rows[1]["processIdentifier"] = 4242
+            (diagnostics / "engine" / "generations.jsonl").write_text(
+                "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8"
+            )
+            (diagnostics / "app" / "generations.jsonl").write_text(
+                "".join(json.dumps(r) + "\n" for r in app_rows), encoding="utf-8"
+            )
+            gen_map = root / "map.json"
+            gen_map.write_text(json.dumps({
+                "schemaVersion": 1,
+                "runID": RUN_ID,
+                "takes": [
+                    {"takeIndex": 1, "cell": "custom/medium/cold#0", "generationID": "fixture-1"},
+                    {"takeIndex": 2, "cell": "custom/short/warm#0", "refused": True},
+                    {"takeIndex": 3, "cell": "custom/medium/warm#0", "generationID": "fixture-3"},
+                ],
+            }), encoding="utf-8")
+            xcode_log = root / "xcodebuild.log"
+            xcode_log.write_text(self._marker_line(2, "custom/short/warm#0") + "\n", encoding="utf-8")
+            evidence = root / "evidence.json"
+            provenance = write_provenance_fixture(root)
+            completed = subprocess.run([
+                sys.executable, str(CHECK), str(diagnostics),
+                "--run-id", RUN_ID, "--modes", "custom", "--lengths", "short,medium", "--warm", "1",
+                "--generation-map", str(gen_map),
+                "--xcodebuild-log", str(xcode_log),
+                "--variant", "speed",
+                "--evidence-manifest", str(evidence),
+                "--build-provenance", str(provenance),
+                "--crash-delta-passed",
+            ], capture_output=True, text=True, check=False)
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            manifest = json.loads(evidence.read_text(encoding="utf-8"))
+            record = manifest["historyRecord"]
+            self.assertEqual(record["run"]["classification"], "exploratory")
+            self.assertIn("takes.refused(1/3)", record["run"]["warnings"])
+            self.assertEqual(record["evidence"]["refusedTakeRule"], "recorded-exploratory-v1")
+            self.assertEqual(len(record["evidence"]["refusedCells"]), 1)
+            self.assertEqual(len(record["takes"]), 2)
+
+    def test_mismatched_app_pid_and_take_identity_fail(self) -> None:
+        cells = [("custom", "medium", "cold"), ("custom", "short", "warm")]
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            diagnostics = root / "diag"
+            (diagnostics / "engine").mkdir(parents=True)
+            (diagnostics / "app").mkdir(parents=True)
+            rows = [make_row(index, *cell) for index, cell in enumerate(cells, start=1)]
+            app_rows = [
+                {"generationID": row["generationID"], "finishReason": "completed", "notes": {"benchRunID": RUN_ID}}
+                for row in rows
+            ]
+            upgrade_rows_to_v8(rows, app_rows, diagnostics)
+            app_rows[0]["processIdentifier"] = 9999
+            rows[1]["notes"]["benchCell"] = "custom/short/warm#0"
+            app_rows[1]["notes"]["benchCell"] = "custom/medium/cold#0"
+            (diagnostics / "engine" / "generations.jsonl").write_text(
+                "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8"
+            )
+            (diagnostics / "app" / "generations.jsonl").write_text(
+                "".join(json.dumps(r) + "\n" for r in app_rows), encoding="utf-8"
+            )
+            gen_map = root / "map.json"
+            gen_map.write_text(json.dumps({
+                "schemaVersion": 1,
+                "runID": RUN_ID,
+                "takes": [
+                    {"takeIndex": 1, "cell": "custom/medium/cold#0", "generationID": "fixture-1"},
+                    {"takeIndex": 2, "cell": "custom/short/warm#0", "generationID": "fixture-2"},
+                ],
+            }), encoding="utf-8")
+            completed = subprocess.run([
+                sys.executable, str(CHECK), str(diagnostics),
+                "--run-id", RUN_ID, "--modes", "custom", "--lengths", "short", "--warm", "1",
+                "--generation-map", str(gen_map), "--variant", "quality",
+            ], capture_output=True, text=True, check=False)
+            self.assertEqual(completed.returncode, 1)
+            self.assertIn("app PID 9999 != engine PID 4242", completed.stdout)
+            self.assertIn("names benchCell='custom/medium/cold#0'", completed.stdout)
+            self.assertIn("variant 'speed' != expected 'quality'", completed.stdout)
 
 
 if __name__ == "__main__":

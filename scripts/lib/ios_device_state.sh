@@ -19,22 +19,23 @@ probe_device_state() {
 }
 
 probe_device_state_json() {
-  local dev="${1:-}" core_json line verdict detail
+  local dev="${1:-}" core_json
   core_json="$(python3 "$DEVICE_STATE_PROBE_PY" probe ${dev:+--device "$dev"})"
-  line="$(probe_device_state "$dev")"
-  verdict="${line%%|*}"
-  detail="${line#*|}"
-  DEVICE_STATE_CORE="$core_json" DEVICE_STATE_VERDICT="$verdict" \
-  DEVICE_STATE_DETAIL="$detail" python3 <<'PY'
+  DEVICE_STATE_CORE="$core_json" python3 <<'PY'
 import json, os
 core = json.loads(os.environ["DEVICE_STATE_CORE"])
-verdict = os.environ["DEVICE_STATE_VERDICT"]
+reachable = bool(core.get("reachable"))
+verdict = "READY" if reachable else "DEVICE_UNREACHABLE"
+detail = (
+    "paired physical iPhone is reachable" if reachable
+    else "resume the connection, then unlock and trust the paired iPhone"
+)
 print(json.dumps({
     "verdict": verdict,
-    "detail": os.environ["DEVICE_STATE_DETAIL"],
+    "detail": detail,
     "confidence": "high",
     "advice": (
-        "safe to run physical-device operations" if verdict == "READY"
+        "safe to run physical-device operations" if reachable
         else "resume the connection, then unlock and trust the paired iPhone"
     ),
     "probeVersion": 4,

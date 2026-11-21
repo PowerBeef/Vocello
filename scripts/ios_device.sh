@@ -126,6 +126,17 @@ validate_dsym_identity() {
     || die "dSYM UUID mismatch for $binary (binary=${binary_uuids:-none}, dsym=${dsym_uuids:-none})"
 }
 
+redact_device_id() {
+  local raw="${1:-}"
+  if [[ "${#raw}" -gt 8 ]]; then
+    printf 'iPhone(…%s)' "${raw: -4}"
+  elif [[ -n "$raw" ]]; then
+    printf 'iPhone(configured)'
+  else
+    printf 'iPhone(none)'
+  fi
+}
+
 # Canonical history/telemetry cell for every one-take physical-device diagnostic.
 # The publisher reconstructs this same identity from the successful sentinel.
 
@@ -211,10 +222,10 @@ print(json.dumps({"verdict": os.environ["VERDICT"], "detail": os.environ["DETAIL
   fi
 
   if (( as_json && json_v2 )); then
-    probe_device_state_json "$dev"
-    local line verdict
-    line="$(probe_device_state "$dev")"
-    verdict="${line%%|*}"
+    local payload verdict
+    payload="$(probe_device_state_json "$dev")"
+    printf '%s\n' "$payload"
+    verdict="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("verdict",""))' <<<"$payload")"
     exit "$(device_state_exit_code "$verdict")"
   fi
 
@@ -343,7 +354,9 @@ if len(cands) == 1:
 else:
     for d in cands:
         props = d.get("deviceProperties") or {}
-        sys.stderr.write(f"  {d.get('identifier')}  {props.get('name','?')}\n")
+        raw_id = str(d.get("identifier") or "")
+        redacted = f"…{raw_id[-4:]}" if len(raw_id) > 8 else "configured"
+        sys.stderr.write(f"  {redacted}  {props.get('name','?')}\n")
     sys.exit(4)
 PY
 )" || {
@@ -467,7 +480,7 @@ cmd_build() {
     optimization_label="O"
     compilation_mode="wholemodule"
   fi
-  note "building $SCHEME ($CONFIG, $swift_optimization $compilation_mode) for $dev (team $team)"
+  note "building $SCHEME ($CONFIG, $swift_optimization $compilation_mode) for $(redact_device_id "$dev") (team $team)"
   mkdir -p "$DERIVED"
   local log="$DERIVED/device-build.log"
 
@@ -513,7 +526,11 @@ cmd_build() {
     )
     set +e
     "${command[@]}" 2>&1 | tee "$log"
-    local st=${PIPESTATUS[0]}; set -e; return $st
+    local st=${PIPESTATUS[0]}; set -e
+    if [[ -n "${QVOICE_IOS_BUILD_LOG_MIRROR:-}" ]]; then
+      cp "$log" "$QVOICE_IOS_BUILD_LOG_MIRROR" 2>/dev/null || true
+    fi
+    return $st
   }
 
   if _run_device_build "$mode"; then
@@ -556,7 +573,7 @@ cmd_build() {
 cmd_install() {
   [[ -d "$APP_PATH" ]] || die "no built app at $APP_PATH (run: $0 build)"
   local dev; dev="$(resolve_device)"
-  note "installing on $dev"
+  note "installing on $(redact_device_id "$dev")"
   xcrun devicectl device install app --device "$dev" "$APP_PATH"
 }
 
@@ -2211,9 +2228,10 @@ cmd_bench() {
   local artifacts="$QVOICE_ARTIFACTS_IOS/engine-bench/$run_id"
   mkdir -p "$artifacts"
 
-  cmd_build --optimized
+  QVOICE_IOS_BUILD_LOG_MIRROR="$artifacts/device-build.log" cmd_build --optimized
   cmd_install
   capture_benchmark_source "$artifacts"
+  snapshot_device_process_exit_baseline "$artifacts/system-crashes-before"
   export QVOICE_LAUNCH_RUN_ID="$run_id"
   export QVOICE_MAC_BENCH_RUN_ID="$run_id"
   export QVOICE_MAC_BENCH_TAKE_INDEX=1
@@ -2238,50 +2256,18 @@ cmd_bench() {
   local dest="$QVOICE_ARTIFACTS_DIAGNOSTICS/ios/device-diagnostics"
   rm -rf "$dest"
   note "waiting for device-diagnostics sentinel (runID=$run_id, timeout=${timeout}s)…"
-  local waited=0 sentinel="" exited=0
-  while (( waited < timeout )); do
-    if (( exited == 0 )); then
-      sleep 10; waited=$((waited + 10))
-    fi
-    # Sentinel-only probe: the measured take must not share the device with a
-    # full container copy every ten seconds. The whole tree is pulled once below.
-    probe_device_sentinel "$run_id" "$dest" "$dev" || true
-    sentinel="$(find "$dest" -name device-diagnostics-done.json -path "*/${run_id}/*" 2>/dev/null | head -1)"
-    if [[ -n "$sentinel" && -f "$sentinel" ]]; then
-      note "sentinel found after ${waited}s"
-      rm -rf "$dest"
-      cmd_pull "$dest" >/dev/null 2>&1 || die "sentinel appeared but diagnostics could not be pulled"
-      sentinel="$(find "$dest" -name device-diagnostics-done.json -path "*/${run_id}/*" 2>/dev/null | head -1)"
-      break
-    fi
-    if (( exited == 1 )); then
-      cmd_pull "$dest" >/dev/null 2>&1 || true
-      die "bench process $target_pid exited at ${waited}s without writing its sentinel (jetsam or crash; check '$0 crashes'); partial diagnostics in $dest"
-    fi
-    if device_process_exited "$dev" "$target_pid" "$waited"; then
-      # One more probe first: a sentinel written just before exit still wins.
-      exited=1
-      continue
-    fi
-    # Interference probe: abort fast instead of polling to the full timeout.
-    # Competing UI ownership or a disconnected device dooms the run immediately.
-    local state verdict
-    state="$(probe_device_state 2>/dev/null || true)"
-    verdict="${state%%|*}"
-    case "$verdict" in
-      DEVICE_UNREACHABLE)
-        die "run doomed at ${waited}s — $verdict: $(device_state_advice "$verdict") (${state#*|})"
-        ;;
-      *) ;;
-    esac
-    note "…still generating (${waited}s)"
-  done
-
+  local sentinel="" wait_status=0
+  sentinel="$({ wait_device_diagnostics_sentinel "$run_id" "$timeout" "$dest" "$dev" "$target_pid"; })" \
+    || wait_status=$?
+  if (( wait_status == 27 )); then
+    die "bench process $target_pid exited without writing its sentinel ($(describe_device_process_exit "$artifacts" "$artifacts/system-crashes-before")); partial diagnostics in $dest"
+  fi
   local diagnostic_hint="$0 console \"$spec\""
   if [[ "$spec" == clone:* ]]; then
     diagnostic_hint+=" --voice-id \"$QVOICE_IOS_DEVICE_DIAGNOSTICS_CLONE_VOICE_ID\""
   fi
-  [[ -n "$sentinel" && -f "$sentinel" ]] || die "no sentinel after ${timeout}s — device diagnostics did not write. Device state: $(probe_device_state 2>/dev/null || echo unknown). Diagnose live with: $diagnostic_hint"
+  (( wait_status == 0 )) && [[ -n "$sentinel" && -f "$sentinel" ]] \
+    || die "no sentinel after ${timeout}s — device diagnostics did not write. Device state: $(probe_device_state 2>/dev/null || echo unknown). Diagnose live with: $diagnostic_hint"
 
   # The summarizer reads <dir>/engine/generations.jsonl: this run's, beside its sentinel.
   local diag; diag="$(run_diagnostics_dir "$dest" "$sentinel")"
@@ -2326,8 +2312,17 @@ PY
 }
 
 cmd_crashes() {
-  local test_mode=0
-  [[ "${1:-}" == "--test" ]] && test_mode=1
+  local test_mode=0 fail_on_crash=0 app_baseline="" system_baseline="" artifacts_dir=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --test) test_mode=1; shift ;;
+      --fail-on-crash) fail_on_crash=1; shift ;;
+      --app-baseline) app_baseline="${2:-}"; shift 2 ;;
+      --system-baseline) system_baseline="${2:-}"; shift 2 ;;
+      --artifacts) artifacts_dir="${2:-}"; shift 2 ;;
+      *) die "unknown crashes flag: $1 (try [--test] [--fail-on-crash])" ;;
+    esac
+  done
   local dev; dev="$(resolve_device)"
 
   if [[ $test_mode -eq 1 ]]; then
@@ -2347,31 +2342,61 @@ cmd_crashes() {
   rm -rf "$dest"
   cmd_pull "$dest" >/dev/null || die "could not pull diagnostics (run device diagnostics first, or use --test)"
   local crash_dir; crash_dir="$(find "$dest" -type d -name crashes 2>/dev/null | head -1)"
+  local new_app_crashes=0
+  if [[ -n "$crash_dir" ]]; then
+    local f base_crash_dir=""
+    [[ -z "$app_baseline" ]] || base_crash_dir="$(find "$app_baseline" -type d -name crashes 2>/dev/null | head -1 || true)"
+    while IFS= read -r f; do
+      [[ -n "$f" ]] || continue
+      if [[ -z "$base_crash_dir" || ! -e "$base_crash_dir/$(basename "$f")" ]]; then
+        new_app_crashes=$((new_app_crashes + 1))
+      fi
+    done < <(find "$crash_dir" -maxdepth 1 -type f 2>/dev/null | sort)
+  fi
+
+  local system_crash_class="no-report"
+  if [[ -n "$system_baseline" && -d "$system_baseline" ]]; then
+    local sys_out="${artifacts_dir:-$dest}"
+    if ! system_crash_class="$(classify_device_process_exit "$sys_out" "$system_baseline" 2>/dev/null)"; then
+      if (( fail_on_crash )); then
+        die "could not evaluate systemCrashLogs delta against $system_baseline"
+      fi
+      system_crash_class="unclassified"
+    fi
+  fi
+
   if [[ -z "$crash_dir" ]] || [[ -z "$(find "$crash_dir" -maxdepth 1 -type f 2>/dev/null | head -1)" ]]; then
     note "no crash payloads in the pulled diagnostics — nothing to symbolicate."
-    return 0
-  fi
+  else
+    note "── crash payloads ($crash_dir) ──"
+    find "$crash_dir" -maxdepth 1 -type f | sort
 
-  note "── crash payloads ($crash_dir) ──"
-  find "$crash_dir" -maxdepth 1 -type f | sort
-
-  local dsym="$QVOICE_SYMBOLS_IOS/Vocello.app.dSYM"
-  if [[ ! -d "$dsym" ]]; then
-    warn "no preserved dSYM at $dsym — run '$0 build' to enable symbolication."
-    return 0
-  fi
-
-  note "── symbolication (optional xcsym when on PATH; otherwise Xcode Organizer) ──"
-  local f
-  for f in "$crash_dir"/*; do
-    [[ -f "$f" ]] || continue
-    if command -v xcsym >/dev/null 2>&1; then
-      xcsym crash "$f" --dsym "$dsym" 2>&1 || warn "xcsym failed on $(basename "$f")"
+    local dsym="$QVOICE_SYMBOLS_IOS/Vocello.app.dSYM"
+    if [[ ! -d "$dsym" ]]; then
+      warn "no preserved dSYM at $dsym — run '$0 build' to enable symbolication."
     else
-      warn "xcsym not on PATH — use Xcode Organizer, or consult the axiom:axiom-tools skill before installing xcsym:"
-      warn "  xcsym crash \"$f\" --dsym \"$dsym\""
+      note "── symbolication (optional xcsym when on PATH; otherwise Xcode Organizer) ──"
+      local f
+      for f in "$crash_dir"/*; do
+        [[ -f "$f" ]] || continue
+        if command -v xcsym >/dev/null 2>&1; then
+          xcsym crash "$f" --dsym "$dsym" 2>&1 || warn "xcsym failed on $(basename "$f")"
+        else
+          warn "xcsym not on PATH — use Xcode Organizer, or consult the axiom:axiom-tools skill before installing xcsym:"
+          warn "  xcsym crash \"$f\" --dsym \"$dsym\""
+        fi
+      done
     fi
-  done
+  fi
+
+  if (( fail_on_crash )); then
+    if (( new_app_crashes > 0 )); then
+      die "crash delta failed: $new_app_crashes new app crash payload(s) in $crash_dir"
+    fi
+    if [[ "$system_crash_class" != "no-report" ]]; then
+      die "crash delta failed: systemCrashLogs delta classified as '$system_crash_class'"
+    fi
+  fi
 }
 
 # debug [spec]: build+install the get-task-allow build, then an attached console launch
@@ -2427,22 +2452,59 @@ cmd_logs() {
 
 # profile_instrument_args KIND
 # Sets PROFILE_INSTRUMENT_ARGS, the xctrace record instrument arguments of a
-# profile KIND (cpu|memory), and PROFILE_CAPTURE_INSTRUMENTS, the capture label
-# publication checks. Every kind records CPU Profiler and os_signpost. As on
-# macOS (d52340a0), a memory profile adds Allocations and VM Tracker through
-# Apple's Allocations template, never as standalone instruments: those take
-# stop-the-world automatic VM snapshots that blind the in-process sampler (414 ms
-# lateness profiled against 5.7-48 ms unprofiled), and the template carries both
-# tracks with automatic snapshots disabled (audit #51).
+# profile KIND (cpu|memory|metal|witness), and PROFILE_CAPTURE_INSTRUMENTS, the
+# capture label publication checks. CPU/memory record CPU Profiler + os_signpost;
+# memory adds Allocations + VM Tracker through Apple's Allocations template
+# (automatic VM snapshots disabled, audit #51); metal records Metal System Trace
+# + os_signpost (DW-04); witness records os_signpost alone (audit #50).
 profile_instrument_args() {
   local kind="$1" cpu_instrument="CPU Profiler"
-  PROFILE_INSTRUMENT_ARGS=(--instrument "$cpu_instrument")
-  PROFILE_CAPTURE_INSTRUMENTS="$cpu_instrument + os_signpost"
-  if [[ "$kind" == "memory" ]]; then
-    PROFILE_INSTRUMENT_ARGS=(--template "Allocations" --instrument "$cpu_instrument")
-    PROFILE_CAPTURE_INSTRUMENTS="$cpu_instrument + Allocations + VM Tracker + os_signpost"
-  fi
+  case "$kind" in
+    memory)
+      PROFILE_INSTRUMENT_ARGS=(--template "Allocations" --instrument "$cpu_instrument")
+      PROFILE_CAPTURE_INSTRUMENTS="$cpu_instrument + Allocations + VM Tracker + os_signpost"
+      ;;
+    metal)
+      PROFILE_INSTRUMENT_ARGS=(--template "Metal System Trace")
+      PROFILE_CAPTURE_INSTRUMENTS="Metal System Trace + os_signpost"
+      ;;
+    witness)
+      PROFILE_INSTRUMENT_ARGS=()
+      PROFILE_CAPTURE_INSTRUMENTS="os_signpost"
+      ;;
+    *)
+      PROFILE_INSTRUMENT_ARGS=(--instrument "$cpu_instrument")
+      PROFILE_CAPTURE_INSTRUMENTS="$cpu_instrument + os_signpost"
+      ;;
+  esac
   PROFILE_INSTRUMENT_ARGS+=(--instrument os_signpost)
+}
+
+# require_ios_profile_instruments
+# Refuses, before any build or launch, a profile whose PROFILE_INSTRUMENT_ARGS
+# name a template or instrument this Xcode's xctrace does not list.
+require_ios_profile_instruments() {
+  local templates instruments flag name i=0
+  templates="$(xcrun xctrace list templates 2>/dev/null)" \
+    || die "xctrace could not list its templates; check the selected Xcode (xcode-select -p)"
+  instruments="$(xcrun xctrace list instruments 2>/dev/null)" \
+    || die "xctrace could not list its instruments; check the selected Xcode (xcode-select -p)"
+  while (( i < ${#PROFILE_INSTRUMENT_ARGS[@]} )); do
+    flag="${PROFILE_INSTRUMENT_ARGS[i]}"
+    name="${PROFILE_INSTRUMENT_ARGS[i + 1]:-}"
+    case "$flag" in
+      --template)
+        grep -Fxq -- "$name" <<<"$templates" \
+          || die "profile needs the Instruments template '$name', which 'xcrun xctrace list templates' does not list"
+        ;;
+      --instrument)
+        grep -Fxq -- "$name" <<<"$instruments" \
+          || die "profile needs the Instruments instrument '$name', which 'xcrun xctrace list instruments' does not list"
+        ;;
+      *) die "unexpected xctrace record argument: $flag" ;;
+    esac
+    i=$((i + 2))
+  done
 }
 
 # record_until_take_ends XCTRACE_PID RUN_ID DEST DEVICE TRACE PREDICTED
@@ -2479,33 +2541,39 @@ record_until_take_ends() {
   return "$tracer_status"
 }
 
-# profile [--kind cpu|memory] [spec]: record an Instruments/xctrace trace while device diagnostics runs one
-# generation on-device (burns-in safe — headless, screen dark). The lane always records
-# CPU Profiler and os_signpost in one trace; memory profiles also record Allocations and
-# VM Tracker through Apple's Allocations template, whose VM Tracker takes no automatic
-# snapshots (audit #51; publication checks the captured setting). The recording stops
-# once the take's sentinel appears, not at the time limit (audit #52), and the first
-# sentinel probe waits for the take's predicted end, QVOICE_IOS_PROFILE_PREDICTED_SECONDS
-# after the target resumes (default 10, provisional until a measured lane tunes it).
-# QVOICE_IOS_PROFILE_DURATION caps the capture window (seconds, default 90),
-# and QVOICE_IOS_MEMORY_PROFILE_DURATION may override it for memory captures. The engine
-# emits OSSignpost intervals under
-# com.qwenvoice.engine / com.patricedery.vocello. Produces
-# build/artifacts/ios/profiles/<run-id>/<run-id>.trace + the in-app telemetry summary for the same run.
+# profile [--kind cpu|memory|metal|witness] [--keep-trace] [--allow-dirty] [--voice-id ID] [--seed N] [spec]:
+# record an Instruments/xctrace trace while device diagnostics runs on-device (burns-in safe —
+# headless, screen dark). Mirrors macOS `macos_test.sh profile`: clean tree required unless
+# --allow-dirty, quiet Mac host required, multi-take defaults (1c+3w for cpu/witness, 1c+1w for
+# metal, 1c for memory), keptByDefault retention for memory and metal traces, and per-kind
+# matrixHash separation.
 cmd_profile() {
   local kind="cpu"
   local spec=""
-  local keep_trace=0
+  local keep_trace=0 allow_dirty=0
+  local profile_seed=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --kind) kind="${2:-}"; shift 2 ;;
       --kind=*) kind="${1#*=}"; shift ;;
       --keep-trace) keep_trace=1; shift ;;
-      -*) die "unknown profile flag: $1 (try --kind cpu|memory [--keep-trace])" ;;
+      --allow-dirty) allow_dirty=1; shift ;;
+      --voice-id) export QVOICE_IOS_DEVICE_DIAGNOSTICS_CLONE_VOICE_ID="${2:-}"; shift 2 ;;
+      --voice-id=*) export QVOICE_IOS_DEVICE_DIAGNOSTICS_CLONE_VOICE_ID="${1#*=}"; shift ;;
+      --seed) profile_seed="${2:-}"; shift 2 ;;
+      --seed=*) profile_seed="${1#*=}"; shift ;;
+      -*) die "unknown profile flag: $1 (try --kind cpu|memory|metal|witness [--keep-trace] [--allow-dirty] [--voice-id ID] [--seed N])" ;;
       *) [[ -z "$spec" ]] || die "profile accepts one generation spec"; spec="$1"; shift ;;
     esac
   done
-  case "$kind" in cpu|memory) ;; *) die "profile kind must be cpu or memory" ;; esac
+  case "$kind" in cpu|memory|metal|witness) ;; *) die "profile kind must be cpu, memory, metal or witness" ;; esac
+  if (( allow_dirty == 0 )) \
+    && [[ -n "$(git -C "$ROOT_DIR" status --porcelain=v1 --untracked-files=all 2>/dev/null)" ]]; then
+    die "profile needs a clean tree; commit first, or pass --allow-dirty for an exploratory profile"
+  fi
+  if [[ -n "$profile_seed" && ! "$profile_seed" =~ ^[0-9]+$ ]]; then
+    die "--seed must be an unsigned integer"
+  fi
   spec="${spec:-custom:speed:Profile device diagnostics.}"
   [[ "$spec" == *:* ]] || spec="custom:speed:$spec"
   python3 "$ROOT_DIR/scripts/lib/profile_trace_retention.py" preflight \
@@ -2517,39 +2585,55 @@ cmd_profile() {
   local -a instrument_args=("${PROFILE_INSTRUMENT_ARGS[@]}")
   local capture_instruments="$PROFILE_CAPTURE_INSTRUMENTS"
   local duration="${QVOICE_IOS_PROFILE_DURATION:-90}"
-  [[ "$kind" != "memory" ]] || duration="${QVOICE_IOS_MEMORY_PROFILE_DURATION:-$duration}"
+  [[ "$kind" != "memory" ]] || duration="${QVOICE_IOS_MEMORY_PROFILE_DURATION:-180}"
+  [[ "$kind" != "metal" ]] || duration="${QVOICE_IOS_METAL_PROFILE_DURATION:-120}"
+  local default_warm_takes=3
+  if [[ "$kind" == "memory" ]]; then
+    default_warm_takes=0
+  elif [[ "$kind" == "metal" ]]; then
+    default_warm_takes=1
+  fi
+  local warm_takes="${QVOICE_IOS_DEVICE_DIAGNOSTICS_WARM_TAKES:-$default_warm_takes}"
+  if [[ -z "$profile_seed" && "$kind" == "witness" ]]; then
+    profile_seed="19790615"
+  fi
   local tracer_start_timeout="${QVOICE_IOS_PROFILE_START_TIMEOUT:-30}"
   local predicted_take="${QVOICE_IOS_PROFILE_PREDICTED_SECONDS:-10}"
-  [[ "$duration" =~ ^[1-9][0-9]*$ ]] || die "QVOICE_IOS_PROFILE_DURATION must be a positive whole number of seconds"
+  [[ "$duration" =~ ^[1-9][0-9]*$ ]] || die "the selected iOS profile duration must be a positive whole number of seconds"
   [[ "$tracer_start_timeout" =~ ^[1-9][0-9]*$ ]] \
     || die "QVOICE_IOS_PROFILE_START_TIMEOUT must be a positive whole number of seconds"
   [[ "$predicted_take" =~ ^[0-9]+$ ]] \
     || die "QVOICE_IOS_PROFILE_PREDICTED_SECONDS must be a whole number of seconds"
+  [[ "$warm_takes" =~ ^[0-8]$ ]] \
+    || die "QVOICE_IOS_DEVICE_DIAGNOSTICS_WARM_TAKES must be a whole number from 0 to 8"
   local dev; dev="$(resolve_device)"
   command -v xctrace >/dev/null 2>&1 \
     || die "xctrace not found — install Xcode and use Instruments for native profiling"
+  require_ios_profile_instruments
   local xctrace_dev
   xctrace_dev="$(resolve_xctrace_device "$dev")"
 
-  # Profiling evidence must describe the current checkout, not merely whatever
-  # compatible app happens to remain in the persistent device cache.
-  cmd_build --optimized
-  cmd_install >/dev/null
   local run_id
   run_id="ios-${kind}-profile-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
   local artifacts="$QVOICE_ARTIFACTS_IOS/profiles/$run_id"
+  mkdir -p "$artifacts"
+
+  # Profiling evidence must describe the current checkout, not merely whatever
+  # compatible app happens to remain in the persistent device cache.
+  QVOICE_IOS_BUILD_LOG_MIRROR="$artifacts/device-build.log" cmd_build --optimized
+  cmd_install >/dev/null
   local trace="$artifacts/$run_id.trace"
   local toc="$artifacts/trace-toc.xml"
   local profile_summary="$artifacts/profile-summary.json"
   local history_record="$ROOT_DIR/benchmarks/runs/instrument-profile/$run_id.json"
   local retention_policy="summaryOnly"
   (( keep_trace == 0 )) || retention_policy="keptExplicitly"
-  # xctrace cannot export a memory profile's allocation and VM tables, so its
-  # trace is the only memory evidence and is kept by default (audit #69).
-  [[ "$kind" != "memory" || "$retention_policy" != "summaryOnly" ]] || retention_policy="keptByDefault"
+  # xctrace cannot export a memory profile's allocation/VM tables or a Metal
+  # System Trace's GPU shader tables, so both keep raw traces by default.
+  [[ ( "$kind" != "memory" && "$kind" != "metal" ) || "$retention_policy" != "summaryOnly" ]] \
+    || retention_policy="keptByDefault"
   local launch_json="$artifacts/launch.json"
   local dest="$artifacts/device-diagnostics"
-  mkdir -p "$artifacts"
   capture_benchmark_source "$artifacts"
 
   local target_pid="" xctrace_pid="" cleanup_command=""
@@ -2564,19 +2648,33 @@ cmd_profile() {
   trap profile_failure_cleanup EXIT
 
   local profile_label="instrument-${kind}-profile"
-  note "profile: kind=$kind, instruments='$capture_instruments', ${duration}s, device=$dev (exact suspended PID)"
+  note "profile: kind=$kind, instruments='$capture_instruments', takes=1c+${warm_takes}w, ${duration}s, device=$(redact_device_id "$dev") (exact suspended PID)"
   local env_json
   export QVOICE_MAC_BENCH_RUN_ID="$run_id"
   export QVOICE_MAC_BENCH_TAKE_INDEX=1
   QVOICE_MAC_BENCH_CELL="$(device_benchmark_cell "$spec")"
   export QVOICE_MAC_BENCH_CELL
   local previous_telemetry_mode="${QWENVOICE_NATIVE_TELEMETRY_MODE:-}"
+  local previous_warm_takes="${QVOICE_IOS_DEVICE_DIAGNOSTICS_WARM_TAKES:-}"
+  local previous_seed="${QVOICE_IOS_DEVICE_DIAGNOSTICS_SEED:-}"
   export QWENVOICE_NATIVE_TELEMETRY_MODE=verbose
+  export QVOICE_IOS_DEVICE_DIAGNOSTICS_WARM_TAKES="$warm_takes"
+  [[ -z "$profile_seed" ]] || export QVOICE_IOS_DEVICE_DIAGNOSTICS_SEED="$profile_seed"
   env_json="$(device_diagnostics_env_json "$spec" "$run_id")"
   if [[ -n "$previous_telemetry_mode" ]]; then
     export QWENVOICE_NATIVE_TELEMETRY_MODE="$previous_telemetry_mode"
   else
     unset QWENVOICE_NATIVE_TELEMETRY_MODE
+  fi
+  if [[ -n "$previous_warm_takes" ]]; then
+    export QVOICE_IOS_DEVICE_DIAGNOSTICS_WARM_TAKES="$previous_warm_takes"
+  else
+    unset QVOICE_IOS_DEVICE_DIAGNOSTICS_WARM_TAKES
+  fi
+  if [[ -n "$previous_seed" ]]; then
+    export QVOICE_IOS_DEVICE_DIAGNOSTICS_SEED="$previous_seed"
+  else
+    unset QVOICE_IOS_DEVICE_DIAGNOSTICS_SEED
   fi
   unset QVOICE_MAC_BENCH_RUN_ID QVOICE_MAC_BENCH_TAKE_INDEX QVOICE_MAC_BENCH_CELL
   PROFILE_TRACE_PHASE="final-disk-preflight"
@@ -3086,8 +3184,24 @@ cmd_preflight() {
   [[ $# -eq 0 ]] || die "preflight accepts no arguments"
   note "on-device preflight"
 
+  if require_ios_xcode_platform >/dev/null 2>&1; then
+    printf '  xcode-ios-platform: OK\n' >&2
+  else
+    warn "  xcode-ios-platform: ✗ selected Xcode lacks matching iOS platform support"; rc=1
+  fi
+
+  local mirroring_json mirroring_running="false"
+  if mirroring_json="$(python3 "$ROOT_DIR/scripts/lib/iphone_mirroring.py" status --json 2>/dev/null)"; then
+    mirroring_running="$(python3 -c 'import json,sys; print("true" if json.load(sys.stdin).get("mirroringRunning") else "false")' <<<"$mirroring_json" 2>/dev/null || echo false)"
+  fi
+  if [[ "$mirroring_running" == "true" ]]; then
+    warn "  iphone-mirroring: ✗ running (quit iPhone Mirroring before running iPhone lanes)"; rc=1
+  else
+    printf '  iphone-mirroring: OK (not running)\n' >&2
+  fi
+
   local dev; dev="$(resolve_device 2>/dev/null)" || dev=""
-  if [[ -z "$dev" ]]; then warn "  device: ✗ none resolved"; rc=1; else printf '  device: %s\n' "$dev" >&2; fi
+  if [[ -z "$dev" ]]; then warn "  device: ✗ none resolved"; rc=1; else printf '  device: %s\n' "$(redact_device_id "$dev")" >&2; fi
 
   if [[ -n "$dev" ]]; then
     local tmp; tmp="$(mktemp)"
@@ -3142,16 +3256,17 @@ PY
 # Fail when ColdGeneration was skipped because the Speed model is missing on device.
 _gate_generation_check() {
   local gate_dir="$1"
-  # The gate must not launch an older app already present on the phone. Rebuild,
-  # install the exact APP_PATH, then snapshot that same local binary identity before
-  # the diagnostic generation starts.
-  cmd_build --optimized
-  cmd_install >/dev/null
   local run_id
   run_id="ios-gate-bench-$(date -u +%Y%m%d-%H%M%S)-$(benchmark_nonce)"
   local artifacts="$gate_dir/engine-benchmark"
   mkdir -p "$artifacts"
+  # The gate must not launch an older app already present on the phone. Rebuild,
+  # install the exact APP_PATH, then snapshot that same local binary identity before
+  # the diagnostic generation starts.
+  QVOICE_IOS_BUILD_LOG_MIRROR="$artifacts/device-build.log" cmd_build --optimized
+  cmd_install >/dev/null
   capture_benchmark_source "$artifacts"
+  snapshot_device_process_exit_baseline "$gate_dir/system-crashes-before"
   export QVOICE_LAUNCH_RUN_ID="$run_id"
   export QVOICE_MAC_BENCH_RUN_ID="$run_id"
   export QVOICE_MAC_BENCH_TAKE_INDEX=1
@@ -3174,41 +3289,17 @@ _gate_generation_check() {
   local timeout="${QVOICE_IOS_BENCH_TIMEOUT:-300}"
   local dest="$artifacts/device-diagnostics"
   rm -rf "$dest"
-  local waited=0 sentinel="" exited=0
-  while (( waited < timeout )); do
-    if (( exited == 0 )); then
-      sleep 10; waited=$((waited + 10))
-    fi
-    # Sentinel-only probe (audit #56): the take must not share the phone with a
-    # full container copy every ten seconds. The whole tree is pulled once below.
-    probe_device_sentinel "$run_id" "$dest" "$dev" || true
-    sentinel="$(find "$dest" -name device-diagnostics-done.json -path "*/${run_id}/*" 2>/dev/null | head -1)"
-    [[ -n "$sentinel" && -f "$sentinel" ]] && break
-    if (( exited == 1 )); then
-      ( cmd_pull "$dest" ) >/dev/null 2>&1 || true
-      echo "gate generation process $target_pid exited at ${waited}s without writing its sentinel (jetsam or crash)"
-      return 1
-    fi
-    if device_process_exited "$dev" "$target_pid" "$waited"; then
-      # One more probe first: a sentinel written just before exit still wins.
-      exited=1
-      continue
-    fi
-    # Abort as soon as the device becomes unreachable (cmd_bench's poll policy).
-    local state verdict
-    state="$(probe_device_state 2>/dev/null || true)"
-    verdict="${state%%|*}"
-    case "$verdict" in
-      DEVICE_UNREACHABLE)
-        echo "aborted at ${waited}s — $verdict: $(device_state_advice "$verdict")"
-        return 1
-        ;;
-      *) ;;
-    esac
-  done
-  [[ -n "$sentinel" && -f "$sentinel" ]] || { echo "no device-diagnostics sentinel after ${timeout}s (device state: $(probe_device_state 2>/dev/null || echo unknown))"; return 1; }
-  ( cmd_pull "$dest" ) >/dev/null 2>&1 \
-    || { echo "the gate sentinel appeared but the diagnostics tree could not be pulled"; return 1; }
+  local sentinel="" wait_status=0
+  sentinel="$({ wait_device_diagnostics_sentinel "$run_id" "$timeout" "$dest" "$dev" "$target_pid"; })" \
+    || wait_status=$?
+  if (( wait_status == 27 )); then
+    echo "gate generation process $target_pid exited without writing its sentinel ($(describe_device_process_exit "$artifacts" "$gate_dir/system-crashes-before"))"
+    return 1
+  fi
+  if (( wait_status != 0 )) || [[ -z "$sentinel" || ! -f "$sentinel" ]]; then
+    echo "no device-diagnostics sentinel after ${timeout}s (device state: $(probe_device_state 2>/dev/null || echo unknown))"
+    return 1
+  fi
   cp "$sentinel" "$gate_dir/generation-sentinel.json" 2>/dev/null || true
   python3 - "$sentinel" <<'PY' || { report_clone_consent_advice "$sentinel" failureCode; return 1; }
 import json, sys
@@ -3259,7 +3350,14 @@ cmd_gate() {
     echo "generation: FAIL" | tee -a "$verdict"; return 1
   fi
   note "iOS device gate: crashes"
-  required_step_run "$step_ledger" crash-delta cmd_crashes \
+  local -a crash_args=(--fail-on-crash --artifacts "$gate_dir")
+  if [[ -d "$gate_dir/engine-benchmark/crash-before" ]]; then
+    crash_args+=(--app-baseline "$gate_dir/engine-benchmark/crash-before")
+  fi
+  if [[ -d "$gate_dir/system-crashes-before" ]]; then
+    crash_args+=(--system-baseline "$gate_dir/system-crashes-before")
+  fi
+  required_step_run "$step_ledger" crash-delta cmd_crashes "${crash_args[@]}" \
     >"$gate_dir/crashes.log" 2>&1 \
     || { echo "crashes: FAIL" | tee -a "$verdict"; return 1; }
   echo "crashes: PASS" | tee -a "$verdict"
@@ -3327,7 +3425,10 @@ main() {
     crashes) cmd_crashes "$@" ;;
     debug)   cmd_debug "$@" ;;
     logs)    cmd_logs "$@" ;;
-    profile) cmd_profile "$@" ;;
+    profile)
+      require_quiet_host ios-profile || die "iOS profile needs a quiet Mac host"
+      cmd_profile "$@"
+      ;;
     memory)
       require_build_free_space memory-qualification || die "iOS memory qualification storage preflight failed"
       require_quiet_host ios-memory || die "iOS memory qualification needs a quiet Mac host"

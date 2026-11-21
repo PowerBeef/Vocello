@@ -1105,9 +1105,9 @@ def _process_identifier(row: dict[str, Any] | None) -> int | None:
 
 
 def _one_process_series(
-    engine: LayerEvidence, app: LayerEvidence
+    engine: LayerEvidence, app: LayerEvidence, *, platform: str = "macos"
 ) -> tuple[dict[str, float | int], list[float], list[float | None]]:
-    """One memory series for the one process both macOS layers sampled (contract v2).
+    """One memory series for the one process both layers sampled (contract v2).
 
     Since 2026-09-15 the engine runs inside the app process, so the app-layer
     and engine-layer samplers are two readers of one process: every value is
@@ -1142,8 +1142,9 @@ def _one_process_series(
         not math.isclose(value, reference, rel_tol=0.01, abs_tol=1.0) for value in recommended
     ):
         # A device-wide recommendation: both readers must report the same one.
+        platform_label = "macOS" if platform == "macos" else "iOS"
         raise MemoryEvidenceError(
-            "macOS app/engine Metal recommended working-set limits disagree"
+            f"{platform_label} app/engine Metal recommended working-set limits disagree"
         )
     peak_index = max(range(len(footprint)), key=footprint.__getitem__)
     metrics: dict[str, float | int] = {
@@ -1164,6 +1165,37 @@ def _one_process_series(
         "memoryTimeToPeakMS": (uptimes[peak_index] - uptimes[0]) / 1_000_000,
         "samplerMaximumUnobservedGapMS": _maximum_gap_ms(uptimes),
     }
+    if platform == "ios":
+        headroom = [float(sample["headroomMB"]) for sample in samples]
+        total_ram = [float(sample["totalDeviceRAMMB"]) for sample in samples]
+        implied_limits = [used + left for used, left in zip(footprint, headroom, strict=True)]
+        remaining = [
+            float(sample[LIMIT_REMAINING_SAMPLE_KEY])
+            if isinstance(sample.get(LIMIT_REMAINING_SAMPLE_KEY), (int, float))
+            and not isinstance(sample.get(LIMIT_REMAINING_SAMPLE_KEY), bool)
+            and math.isfinite(float(sample[LIMIT_REMAINING_SAMPLE_KEY]))
+            and float(sample[LIMIT_REMAINING_SAMPLE_KEY]) >= 0
+            else available
+            for sample, available in zip(samples, headroom, strict=True)
+        ]
+        budget = [used + left for used, left in zip(footprint, remaining, strict=True)]
+        utilization = [used / total if total > 0 else 0.0 for used, total in zip(footprint, budget, strict=True)]
+        metrics.update({
+            "headroomStartMB": headroom[0],
+            "headroomEndMB": headroom[-1],
+            "minimumHeadroomMB": min(headroom),
+            "peakProcessBudgetUtilization": max(utilization),
+            "impliedProcessLimitMB": min(implied_limits),
+            "totalDeviceRAMMB": min(total_ram),
+        })
+        same_call = [
+            abs(float(sample[LIMIT_REMAINING_SAMPLE_KEY]) - available)
+            for sample, available in zip(samples, headroom, strict=True)
+            if isinstance(sample.get(LIMIT_REMAINING_SAMPLE_KEY), (int, float))
+            and not isinstance(sample.get(LIMIT_REMAINING_SAMPLE_KEY), bool)
+        ]
+        if same_call:
+            metrics["processLimitRemainingDriftMB"] = max(same_call)
     kernel = (
         [layer.kernel_peaks[index] for _, layer, index in series] if engine.kernel_peaks else []
     )
@@ -1232,14 +1264,15 @@ def qualify_take_memory(
     metrics = dict(engine.metrics)
     kernel = list(engine.kernel_peaks)
     graphics = list(engine.graphics)
-    if platform == "macos" and require_app_layer:
+    if require_app_layer:
+        platform_label = "macOS" if platform == "macos" else "iOS"
         if not isinstance(app_row, dict) or app_row.get("generationID") != generation_id:
-            raise MemoryEvidenceError(f"generation {generation_id}: missing matching macOS app row")
+            raise MemoryEvidenceError(f"generation {generation_id}: missing matching {platform_label} app row")
         engine_pid = _process_identifier(row)
         app_pid = _process_identifier(app_row)
         if engine_pid is None or app_pid is None:
             raise MemoryEvidenceError(
-                f"generation {generation_id}: macOS memory evidence needs both layers' "
+                f"generation {generation_id}: {platform_label} memory evidence needs both layers' "
                 "process identifier"
             )
         if engine_pid != app_pid:
@@ -1264,7 +1297,7 @@ def qualify_take_memory(
                 f"generation {generation_id}: the app and engine layers sampled different "
                 "kernel ledgers"
             )
-        metrics, kernel, graphics = _one_process_series(engine, app)
+        metrics, kernel, graphics = _one_process_series(engine, app, platform=platform)
         # Layer-level capture health stays per layer; the peaks come only from
         # the one process series above.
         metrics.update({
@@ -1310,7 +1343,7 @@ def qualify_take_memory(
     trim_count = events.trim_count
     maximum_trim = events.maximum_trim
     policy_cache_clear_count = events.policy_cache_clear_count
-    if platform == "macos" and require_app_layer and app_row is not None:
+    if require_app_layer and app_row is not None:
         app_events = _memory_warnings_and_failures(app_row)
         pressure_warnings.extend(app_events.warnings)
         pressure_failures.extend(app_events.failures)

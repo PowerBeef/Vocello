@@ -1,6 +1,7 @@
 import AVFoundation
 import CryptoKit
 import Foundation
+import OSLog
 import QwenVoiceCore
 import Speech
 import UIKit
@@ -46,6 +47,10 @@ import VocelloQwen3Core
 /// calls `exit()`; the app stays up so the script can pull the diagnostics container.
 @MainActor
 enum IOSDeviceDiagnosticsRunner {
+    private static let logger = Logger(
+        subsystem: "com.patricedery.vocello",
+        category: "device-diagnostics"
+    )
     private static let environmentKey = "QVOICE_IOS_DEVICE_DIAGNOSTICS_SPEC"
     /// PA-17: the store refuses clone generation and enrollment until the phone's
     /// visible Settings consent is recorded; every headless lane names that one
@@ -77,6 +82,7 @@ enum IOSDeviceDiagnosticsRunner {
     private static let cloneVoiceIDEnvKey = "QVOICE_IOS_DEVICE_DIAGNOSTICS_CLONE_VOICE_ID"
     private static let seedEnvKey = "QVOICE_IOS_DEVICE_DIAGNOSTICS_SEED"
     private static let variationEnvKey = "QVOICE_IOS_DEVICE_DIAGNOSTICS_VARIATION"
+    private static let warmTakesEnvKey = "QVOICE_IOS_DEVICE_DIAGNOSTICS_WARM_TAKES"
     private static let customSpeakerEnvKey = "QVOICE_IOS_DEVICE_DIAGNOSTICS_CUSTOM_SPEAKER"
     private static let designInstructionEnvKey = "QVOICE_IOS_DEVICE_DIAGNOSTICS_DESIGN_INSTRUCTION"
     private static let designDeliveryEnvKey =
@@ -138,7 +144,7 @@ enum IOSDeviceDiagnosticsRunner {
         // crash and the `scripts/ios_device.sh crashes --test` flow can symbolicate it
         // against the preserved build dSYM. This code is absent from ordinary builds.
         if ProcessInfo.processInfo.environment["QVOICE_IOS_DEVICE_DIAGNOSTICS_CRASH_TEST"] == "1" {
-            print("[device-diagnostics] deliberate crash requested for the capture/symbolication lane")
+            logger.notice("deliberate crash requested for the capture/symbolication lane")
             fatalError("QVOICE_IOS_DEVICE_DIAGNOSTICS_CRASH_TEST: deliberate diagnostics crash")
         }
         if trimmedEnvironmentValue(cloneConditioningAcceptanceEnvironmentKey) == "1" {
@@ -338,7 +344,7 @@ enum IOSDeviceDiagnosticsRunner {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? encoder.encode(record) else {
-            print("[enroll-voice] could not encode completion evidence")
+            logger.error("enroll-voice could not encode completion evidence")
             return
         }
         let fileName = "enroll-voice-done.json"
@@ -606,9 +612,12 @@ enum IOSDeviceDiagnosticsRunner {
         let runID = safeRunID(from: ProcessInfo.processInfo.environment[runIDKey]) ?? "device-diagnostics"
         let generationID = UUID()
         let startedAt = Date()
-        print(
-            "[device-diagnostics] start mode=\(spec.mode.rawValue) variant=\(spec.variant.rawValue) "
-            + "runID=\(runID) lang=\(uiLanguageHint ?? "auto") chars=\(spec.text.count)"
+        let modeLabel = spec.mode.rawValue
+        let variantLabel = spec.variant.rawValue
+        let langLabel = uiLanguageHint ?? "auto"
+        let charCount = spec.text.count
+        logger.info(
+            "start mode=\(modeLabel, privacy: .public) variant=\(variantLabel, privacy: .public) runID=\(runID, privacy: .public) lang=\(langLabel, privacy: .public) chars=\(charCount)"
         )
 
         // Device/bundle fields read here (MainActor) — UIDevice is MainActor-isolated,
@@ -624,16 +633,23 @@ enum IOSDeviceDiagnosticsRunner {
             uiLanguageHint: uiLanguageHint,
             requestedLanguageHint: uiLanguageHint ?? Qwen3SupportedLanguage.auto.rawValue,
             languageHintSource: languageHintSource(for: uiLanguageHint),
+            executableSHA256: executableSHA256(),
             deviceModel: device.model,
             systemName: device.systemName,
             systemVersion: device.systemVersion,
             bundleVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
             buildVersion: Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as? String
         )
+        var activeGenerationID = generationID
         var appTimelineSubmitted = false
         var diagnosticRequest: GenerationRequest?
 
         do {
+            guard spec.variant == .speed else {
+                throw DiagnosticsError(
+                    "iOS supports only the speed variant (got '\(spec.variant.rawValue)')"
+                )
+            }
             guard let model = ModelDescriptor.model(for: spec.mode) else {
                 throw DiagnosticsError("no model in the contract for mode \(spec.mode.rawValue)")
             }
@@ -644,122 +660,250 @@ enum IOSDeviceDiagnosticsRunner {
             if case .custom(let speakerID, _) = payload {
                 record.customSpeakerID = speakerID
             }
-            record.fixtureDigest = try fixtureDigest(for: payload)
+            let resolvedFixtureDigest = try fixtureDigest(for: payload)
+            record.fixtureDigest = resolvedFixtureDigest
             let seed = try diagnosticsSeed()
             try validateDiagnosticsVariation()
+            let warmTakes = try diagnosticsWarmTakes()
             record.seed = seed
             record.samplingVariation = Qwen3SamplingVariation.expressive.rawValue
             let loadedModelID = engine.loadState.currentModelID
             record.preGenerationModelID = loadedModelID
             record.preGenerationWarmState = loadedModelID == model.id ? "warm" : "cold"
 
-            // Do not explicitly load or prime here. `engine.generate` enters the native
-            // per-generation telemetry session before model load, prewarm, and clone
-            // conditioning. Preloading from this runner would hide the cold model-loading
-            // peak and clone preparation from the benchmark's clock and sampler.
-
-            let outputPath = makeOutputPath(runID: runID, model: model)
-            let request = GenerationRequest(
-                mode: spec.mode,
-                modelID: model.id,
-                text: spec.text,
-                outputPath: outputPath,
-                shouldStream: true,
-                streamingInterval: GenerationSemantics.appStreamingInterval,
-                languageHint: uiLanguageHint,
-                payload: payload,
-                generationID: generationID,
-                seed: seed,
-                captureCodecTrace: ProcessInfo.processInfo.environment[
-                    voiceReliabilityCodecTraceEnvironmentKey
-                ] == "1"
-            )
-            diagnosticRequest = request
             guard let capabilities = model.qwen3Capabilities else {
                 throw DiagnosticsError("model \(model.id) has no declared Qwen3 prompt capabilities")
             }
-            let prompt = GenerationSemantics.qwen3PromptAssembly(
-                for: request,
-                capabilities: capabilities
-            )
-            record.resolvedLanguageHint = prompt.language
-            // One definition with the engine row's note (`promptAssemblyDigest`).
-            guard let promptDigest = GenerationSemantics.promptAssemblyDigest(prompt) else {
-                throw DiagnosticsError("the resolved prompt assembly could not be digested")
-            }
-            record.resolvedPromptAssemblyDigest = promptDigest
-            record.promptDigestScope = spec.mode == .clone
-                ? "request_without_resolved_clone_transcript"
-                : "resolved"
 
-            print("[device-diagnostics] generating… resolvedLanguage=\(record.resolvedLanguageHint ?? "?")")
-            // Headless diagnostics still execute in the production app process. Record the real
-            // submit/completion lifecycle so iOS benchmark evidence proves both app and engine
-            // ownership. Do not synthesize player milestones: this lane never schedules playback.
-            await AppGenerationTimeline.shared.recordSubmitted(
-                id: generationID,
-                mode: spec.mode.rawValue
-            )
-            appTimelineSubmitted = true
-            let started = ContinuousClock.now
-            let result = try await engine.generate(request)
-            await AppGenerationTimeline.shared.recordCompleted(
-                id: generationID,
-                mode: spec.mode.rawValue,
-                usedStreaming: true,
-                finishReason: result.finishReason?.rawValue,
-                summary: result.telemetrySummary
-            )
-            appTimelineSubmitted = false
-            let wall = started.elapsedSeconds
-            // Standard real-time factor: wall ÷ audio, lower is faster.
-            let rtf = result.durationSeconds > 0 ? wall / result.durationSeconds : 0
+            if let warmTakes {
+                // Multi-take profile sequence (1 cold + N warm in one process, mirroring macOS
+                // `vocello bench` profiles). BenchRunContext stamps each take's exact index and
+                // cell so os_signpost intervals correlate per take.
+                defer { BenchRunContext.clearCurrentTakeFile() }
+                let lengthLabel = diagnosticsLengthBucket(characters: spec.text.count)
+                let totalTakes = 1 + warmTakes
+                var takeRecords: [SentinelTakeRecord] = []
+                takeRecords.reserveCapacity(totalTakes)
+                var lastResult: GenerationResult?
+                var lastWall = 0.0
+                var lastRTF = 0.0
 
-            record.status = "ok"
-            record.durationSeconds = result.durationSeconds
-            record.wallSeconds = wall
-            record.realtimeFactor = rtf
-            record.finishReason = result.finishReason?.rawValue
-            record.requestReceipt = RequestReceiptObservation(
-                stringFlags: result.diagnosticStringFlags
-            )
-            unsafe print(String(
-                format: "[device-diagnostics] ✓ %.2fs audio · rtf=%.2f (wall/audio) · finish=%@",
-                result.durationSeconds, rtf, result.finishReason?.rawValue ?? "?"
-            ))
+                for takeIndex in 1...totalTakes {
+                    let takeGenerationID = takeIndex == 1 ? generationID : UUID()
+                    activeGenerationID = takeGenerationID
+                    let actualWarmState = engine.loadState.currentModelID == model.id ? "warm" : "cold"
+                    let cell = takeIndex == 1
+                        ? "\(spec.mode.rawValue)/\(spec.variant.rawValue)/\(lengthLabel)/cold#0"
+                        : "\(spec.mode.rawValue)/\(spec.variant.rawValue)/\(lengthLabel)/warm#\(takeIndex - 2)"
+                    try BenchRunContext.writeCurrentTakeFile(
+                        takeIndex: takeIndex,
+                        cell: cell,
+                        intendedWarmState: actualWarmState
+                    )
 
-            if shouldVerifyOutput,
-               let resolvedHint = record.resolvedLanguageHint,
-               let expectedLanguage = resolvedLanguageHint(for: resolvedHint) {
-                let verification = await GenerationOutputVerifier.verify(
-                    audioURL: URL(fileURLWithPath: result.audioPath),
-                    expectedScript: spec.text,
-                    expectedLanguage: expectedLanguage
+                    let outputPath = makeOutputPath(
+                        runID: "\(runID)-take-\(takeIndex)",
+                        model: model
+                    )
+                    let request = GenerationRequest(
+                        mode: spec.mode,
+                        modelID: model.id,
+                        text: spec.text,
+                        outputPath: outputPath,
+                        shouldStream: true,
+                        streamingInterval: GenerationSemantics.appStreamingInterval,
+                        languageHint: uiLanguageHint,
+                        payload: payload,
+                        generationID: takeGenerationID,
+                        seed: seed,
+                        captureCodecTrace: false
+                    )
+                    diagnosticRequest = request
+                    if takeIndex == 1 {
+                        let prompt = GenerationSemantics.qwen3PromptAssembly(
+                            for: request,
+                            capabilities: capabilities
+                        )
+                        record.resolvedLanguageHint = prompt.language
+                        guard let promptDigest = GenerationSemantics.promptAssemblyDigest(prompt) else {
+                            throw DiagnosticsError("the resolved prompt assembly could not be digested")
+                        }
+                        record.resolvedPromptAssemblyDigest = promptDigest
+                        record.promptDigestScope = spec.mode == .clone
+                            ? "request_without_resolved_clone_transcript"
+                            : "resolved"
+                    }
+
+                    logger.info(
+                        "profile take \(takeIndex)/\(totalTakes) cell=\(cell, privacy: .public)"
+                    )
+                    await AppGenerationTimeline.shared.recordSubmitted(
+                        id: takeGenerationID,
+                        mode: spec.mode.rawValue
+                    )
+                    appTimelineSubmitted = true
+                    let started = ContinuousClock.now
+                    let result = try await engine.generate(request)
+                    await AppGenerationTimeline.shared.recordCompleted(
+                        id: takeGenerationID,
+                        mode: spec.mode.rawValue,
+                        usedStreaming: true,
+                        finishReason: result.finishReason?.rawValue,
+                        summary: result.telemetrySummary
+                    )
+                    appTimelineSubmitted = false
+                    IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
+                        generationID: takeGenerationID
+                    )
+                    let wall = started.elapsedSeconds
+                    let rtf = result.durationSeconds > 0 ? wall / result.durationSeconds : 0
+                    lastResult = result
+                    lastWall = wall
+                    lastRTF = rtf
+                    takeRecords.append(
+                        SentinelTakeRecord(
+                            takeIndex: takeIndex,
+                            generationID: takeGenerationID.uuidString,
+                            cell: cell,
+                            mode: spec.mode.rawValue,
+                            variant: spec.variant.rawValue,
+                            modelID: model.id,
+                            warmState: actualWarmState,
+                            length: lengthLabel,
+                            durationSeconds: result.durationSeconds,
+                            wallSeconds: wall,
+                            realtimeFactor: rtf,
+                            finishReason: result.finishReason?.rawValue,
+                            fixtureDigest: resolvedFixtureDigest
+                        )
+                    )
+                    let finishLabel = result.finishReason?.rawValue ?? "?"
+                    logger.info(
+                        "profile take \(takeIndex)/\(totalTakes) done audio=\(result.durationSeconds, format: .fixed(precision: 2))s rtf=\(rtf, format: .fixed(precision: 2)) finish=\(finishLabel, privacy: .public)"
+                    )
+                }
+
+                record.status = "ok"
+                record.takes = takeRecords
+                if let lastResult {
+                    record.durationSeconds = lastResult.durationSeconds
+                    record.wallSeconds = lastWall
+                    record.realtimeFactor = lastRTF
+                    record.finishReason = lastResult.finishReason?.rawValue
+                    record.requestReceipt = RequestReceiptObservation(
+                        stringFlags: lastResult.diagnosticStringFlags
+                    )
+                    let audioURL = URL(fileURLWithPath: lastResult.audioPath)
+                    try mirrorOutputToPullableDiagnostics(audioURL, runID: runID)
+                    record.outputEvidence = try makeOutputEvidence(for: audioURL)
+                }
+            } else {
+                // Do not explicitly load or prime here. `engine.generate` enters the native
+                // per-generation telemetry session before model load, prewarm, and clone
+                // conditioning. Preloading from this runner would hide the cold model-loading
+                // peak and clone preparation from the benchmark's clock and sampler.
+
+                let outputPath = makeOutputPath(runID: runID, model: model)
+                let request = GenerationRequest(
+                    mode: spec.mode,
+                    modelID: model.id,
+                    text: spec.text,
+                    outputPath: outputPath,
+                    shouldStream: true,
+                    streamingInterval: GenerationSemantics.appStreamingInterval,
+                    languageHint: uiLanguageHint,
+                    payload: payload,
+                    generationID: generationID,
+                    seed: seed,
+                    captureCodecTrace: ProcessInfo.processInfo.environment[
+                        voiceReliabilityCodecTraceEnvironmentKey
+                    ] == "1"
                 )
-                record.outputVerification = verification
-                // The rate `pass` reads (WER v2, or CER for Chinese, Japanese and Korean).
-                let gatedRateLabel = verification.accuracyMetric == .characterErrorRate ? "cer" : "wer"
-                let gatedRate = verification.accuracyValue.map { unsafe String(format: "%.2f", $0) } ?? "unavailable"
-                print(
-                    unsafe "[device-diagnostics] output verify pass=\(verification.pass) "
-                    + "lang=\(verification.languagePass) \(gatedRateLabel)=\(gatedRate) "
-                    + "score=\(String(format: "%.2f", verification.languageMatchScore))"
+                diagnosticRequest = request
+                let prompt = GenerationSemantics.qwen3PromptAssembly(
+                    for: request,
+                    capabilities: capabilities
                 )
-            }
+                record.resolvedLanguageHint = prompt.language
+                // One definition with the engine row's note (`promptAssemblyDigest`).
+                guard let promptDigest = GenerationSemantics.promptAssemblyDigest(prompt) else {
+                    throw DiagnosticsError("the resolved prompt assembly could not be digested")
+                }
+                record.resolvedPromptAssemblyDigest = promptDigest
+                record.promptDigestScope = spec.mode == .clone
+                    ? "request_without_resolved_clone_transcript"
+                    : "resolved"
 
-            let audioURL = URL(fileURLWithPath: result.audioPath)
-            let outputEvidence = try makeOutputEvidence(for: audioURL)
-            try mirrorOutputToPullableDiagnostics(audioURL, runID: runID)
-            record.outputEvidence = outputEvidence
-            if let verification = record.outputVerification {
-                record.languageASRGate = verification.languageASRGateResult(
-                    evidenceDigest: outputEvidence.sha256
+                let resolvedHintLabel = record.resolvedLanguageHint ?? "?"
+                logger.info("generating resolvedLanguage=\(resolvedHintLabel, privacy: .public)")
+                // Headless diagnostics still execute in the production app process. Record the real
+                // submit/completion lifecycle so iOS benchmark evidence proves both app and engine
+                // ownership. Do not synthesize player milestones: this lane never schedules playback.
+                await AppGenerationTimeline.shared.recordSubmitted(
+                    id: generationID,
+                    mode: spec.mode.rawValue
                 )
+                appTimelineSubmitted = true
+                let started = ContinuousClock.now
+                let result = try await engine.generate(request)
+                await AppGenerationTimeline.shared.recordCompleted(
+                    id: generationID,
+                    mode: spec.mode.rawValue,
+                    usedStreaming: true,
+                    finishReason: result.finishReason?.rawValue,
+                    summary: result.telemetrySummary
+                )
+                appTimelineSubmitted = false
+                let wall = started.elapsedSeconds
+                // Standard real-time factor: wall ÷ audio, lower is faster.
+                let rtf = result.durationSeconds > 0 ? wall / result.durationSeconds : 0
+
+                record.status = "ok"
+                record.durationSeconds = result.durationSeconds
+                record.wallSeconds = wall
+                record.realtimeFactor = rtf
+                record.finishReason = result.finishReason?.rawValue
+                record.requestReceipt = RequestReceiptObservation(
+                    stringFlags: result.diagnosticStringFlags
+                )
+                let finishLabel = result.finishReason?.rawValue ?? "?"
+                logger.info(
+                    "completed audio=\(result.durationSeconds, format: .fixed(precision: 2))s rtf=\(rtf, format: .fixed(precision: 2)) finish=\(finishLabel, privacy: .public)"
+                )
+
+                if shouldVerifyOutput,
+                   let resolvedHint = record.resolvedLanguageHint,
+                   let expectedLanguage = resolvedLanguageHint(for: resolvedHint) {
+                    let verification = await GenerationOutputVerifier.verify(
+                        audioURL: URL(fileURLWithPath: result.audioPath),
+                        expectedScript: spec.text,
+                        expectedLanguage: expectedLanguage
+                    )
+                    record.outputVerification = verification
+                    // The rate `pass` reads (WER v2, or CER for Chinese, Japanese and Korean).
+                    let gatedRateLabel = verification.accuracyMetric == .characterErrorRate ? "cer" : "wer"
+                    let gatedRate = verification.accuracyValue.map {
+                        $0.formatted(.number.precision(.fractionLength(2)))
+                    } ?? "unavailable"
+                    logger.info(
+                        "output verify pass=\(verification.pass) lang=\(verification.languagePass) \(gatedRateLabel, privacy: .public)=\(gatedRate, privacy: .public) score=\(verification.languageMatchScore, format: .fixed(precision: 2))"
+                    )
+                }
+
+                let audioURL = URL(fileURLWithPath: result.audioPath)
+                let outputEvidence = try makeOutputEvidence(for: audioURL)
+                try mirrorOutputToPullableDiagnostics(audioURL, runID: runID)
+                record.outputEvidence = outputEvidence
+                if let verification = record.outputVerification {
+                    record.languageASRGate = verification.languageASRGateResult(
+                        evidenceDigest: outputEvidence.sha256
+                    )
+                }
             }
         } catch is CancellationError {
             if appTimelineSubmitted {
                 await AppGenerationTimeline.shared.recordFailed(
-                    id: generationID,
+                    id: activeGenerationID,
                     finishReason: .cancelled
                 )
             }
@@ -767,17 +911,17 @@ enum IOSDeviceDiagnosticsRunner {
             record.error = "cancelled"
             let evidence = await terminalFailureEvidence(
                 request: diagnosticRequest,
-                generationID: generationID,
+                generationID: activeGenerationID,
                 runID: runID,
                 script: spec.text,
                 fallbackFailureCode: "cancelled",
                 engine: engine
             )
             record.apply(evidence)
-            print("[device-diagnostics] ✗ cancelled")
+            logger.error("cancelled runID=\(runID, privacy: .public)")
         } catch {
             if appTimelineSubmitted {
-                await AppGenerationTimeline.shared.recordFailed(id: generationID)
+                await AppGenerationTimeline.shared.recordFailed(id: activeGenerationID)
             }
             record.status = "error"
             // The pullable sentinel keeps the typed summary, not error text (AUD-08).
@@ -789,7 +933,7 @@ enum IOSDeviceDiagnosticsRunner {
             let metadata = GenerationFailureDiagnosticLogger.errorMetadata(for: error)
             let evidence = await terminalFailureEvidence(
                 request: diagnosticRequest,
-                generationID: generationID,
+                generationID: activeGenerationID,
                 runID: runID,
                 script: spec.text,
                 // PA-17: a clone cell refused because the phone's visible Settings
@@ -800,7 +944,8 @@ enum IOSDeviceDiagnosticsRunner {
                 engine: engine
             )
             record.apply(evidence)
-            print("[device-diagnostics] ✗ \(record.error ?? "error")")
+            let errorSummary = record.error ?? "error"
+            logger.error("failed runID=\(runID, privacy: .public) error=\(errorSummary, privacy: .public)")
         }
 
         record.finishedAt = ISO8601DateFormatter().string(from: Date())
@@ -1067,7 +1212,7 @@ enum IOSDeviceDiagnosticsRunner {
             var takeResults: [CloneConditioningAcceptanceTakeResult] = []
             let seed: UInt64 = 19_790_615
 
-            print("[clone-conditioning] start runID=\(runID) takes=2")
+            logger.info("clone-conditioning start runID=\(runID, privacy: .public) takes=2")
             for plan in plans {
                 failedTakeIndex = plan.takeIndex
                 let actualWarmState = engine.loadState.currentModelID == model.id ? "warm" : "cold"
@@ -1202,10 +1347,21 @@ enum IOSDeviceDiagnosticsRunner {
                     )
                     completedTakeCount = takeResults.count
                     failedTakeIndex = nil
-                    print(
-                        "[clone-conditioning] take \(plan.takeIndex)/2 "
-                        + "\(plan.expectedConditioningMode) PASS"
+                    let conditioningMode = plan.expectedConditioningMode
+                    logger.info(
+                        "clone-conditioning take \(plan.takeIndex)/2 \(conditioningMode, privacy: .public) PASS"
                     )
+                } catch is CancellationError {
+                    if appTimelineSubmitted {
+                        await AppGenerationTimeline.shared.recordFailed(
+                            id: generationID,
+                            finishReason: .cancelled
+                        )
+                    }
+                    IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
+                        generationID: generationID
+                    )
+                    throw CancellationError()
                 } catch {
                     if error is VoiceCloningConsentRequiredError {
                         failureCode = .cloneConsentNotRecorded
@@ -1213,6 +1369,9 @@ enum IOSDeviceDiagnosticsRunner {
                     if appTimelineSubmitted {
                         await AppGenerationTimeline.shared.recordFailed(id: generationID)
                     }
+                    IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
+                        generationID: generationID
+                    )
                     throw error
                 }
             }
@@ -1247,7 +1406,7 @@ enum IOSDeviceDiagnosticsRunner {
             )
             failureCode = .resultWriteFailed
             try writeCloneConditioningResult(terminal, runID: runID)
-            print("[clone-conditioning] PASS runID=\(runID)")
+            logger.info("clone-conditioning PASS runID=\(runID, privacy: .public)")
         } catch {
             try? FileManager.default.removeItem(at: scratchDirectory)
             let failure = CloneConditioningAcceptanceFailure(
@@ -1259,9 +1418,9 @@ enum IOSDeviceDiagnosticsRunner {
                 failedTakeIndex: failedTakeIndex
             )
             try? writeCloneConditioningFailure(failure, runID: runID)
-            print(
-                "[clone-conditioning] FAIL code=\(failureCode.rawValue) "
-                + "completed=\(completedTakeCount)/2"
+            let code = failureCode.rawValue
+            logger.error(
+                "clone-conditioning FAIL code=\(code, privacy: .public) completed=\(completedTakeCount)/2"
             )
         }
     }
@@ -1309,7 +1468,8 @@ enum IOSDeviceDiagnosticsRunner {
             var fixtureDigests: [String: String] = [:]
             defer { BenchRunContext.clearCurrentTakeFile() }
 
-            print("[device-memory] start runID=\(plan.runID) takes=\(plan.takes.count)")
+            let planRunID = plan.runID
+            logger.info("device-memory start runID=\(planRunID, privacy: .public) takes=\(plan.takes.count)")
             for plannedTake in plan.takes {
                 activeTake = plannedTake
                 failureCode = .modeUnavailable
@@ -1438,10 +1598,21 @@ enum IOSDeviceDiagnosticsRunner {
                     )
                     completedTakeCount = takeResults.count
                     activeTake = nil
-                    print(
-                        "[device-memory] take \(plannedTake.takeIndex)/9 "
-                        + "\(plannedTake.cell) \(actualWarmState) PASS"
+                    let cell = plannedTake.cell
+                    logger.info(
+                        "device-memory take \(plannedTake.takeIndex)/9 \(cell, privacy: .public) \(actualWarmState, privacy: .public) PASS"
                     )
+                } catch is CancellationError {
+                    if appTimelineSubmitted {
+                        await AppGenerationTimeline.shared.recordFailed(
+                            id: generationID,
+                            finishReason: .cancelled
+                        )
+                    }
+                    IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
+                        generationID: generationID
+                    )
+                    throw CancellationError()
                 } catch {
                     if error is VoiceCloningConsentRequiredError {
                         failureCode = .cloneConsentNotRecorded
@@ -1449,6 +1620,9 @@ enum IOSDeviceDiagnosticsRunner {
                     if appTimelineSubmitted {
                         await AppGenerationTimeline.shared.recordFailed(id: generationID)
                     }
+                    IOSPullableDiagnosticsMirror.syncGenerationTelemetryIfEnabled(
+                        generationID: generationID
+                    )
                     throw error
                 }
             }
@@ -1473,6 +1647,7 @@ enum IOSDeviceDiagnosticsRunner {
                 telemetryMode: "verbose",
                 seed: plan.seed,
                 streaming: true,
+                executableSHA256: executableSHA256(),
                 fixtureDigests: fixtureDigests,
                 memoryQualification: MemoryQualificationDeclaration(
                     policyID: plan.policyID,
@@ -1486,11 +1661,12 @@ enum IOSDeviceDiagnosticsRunner {
             )
             failureCode = .resultWriteFailed
             try writeMemoryQualificationSentinel(terminal, runID: plan.runID)
-            print("[device-memory] PASS runID=\(plan.runID)")
+            logger.info("device-memory PASS runID=\(planRunID, privacy: .public)")
         } catch {
             // Preserve already-written per-generation telemetry and outputs. The
             // allowlisted marker lets the host terminate promptly, while absence of
             // the PASS sentinel keeps history publication fail-closed.
+            let code = failureCode.rawValue
             if let environmentRunID {
                 let failure = IOSMemoryQualificationFailureStatus(
                     runID: environmentRunID,
@@ -1503,15 +1679,13 @@ enum IOSDeviceDiagnosticsRunner {
                 do {
                     try writeMemoryQualificationFailureMarker(failure, runID: environmentRunID)
                 } catch {
-                    print(
-                        "[device-memory] failure marker unavailable "
-                        + "code=\(failureCode.rawValue)"
+                    logger.error(
+                        "device-memory failure marker unavailable code=\(code, privacy: .public)"
                     )
                 }
             }
-            print(
-                "[device-memory] FAIL code=\(failureCode.rawValue) "
-                + "completed=\(completedTakeCount)/9"
+            logger.error(
+                "device-memory FAIL code=\(code, privacy: .public) completed=\(completedTakeCount)/9"
             )
         }
     }
@@ -1599,6 +1773,25 @@ enum IOSDeviceDiagnosticsRunner {
         guard Qwen3SamplingVariation(rawValue: raw.lowercased()) == .expressive else {
             throw DiagnosticsError("\(variationEnvKey) must be expressive (RF-58)")
         }
+    }
+
+    private static func diagnosticsWarmTakes() throws -> Int? {
+        guard let raw = trimmedEnvironmentValue(warmTakesEnvKey) else { return nil }
+        guard let count = Int(raw), (0...8).contains(count) else {
+            throw DiagnosticsError("\(warmTakesEnvKey) must be a whole number from 0 to 8")
+        }
+        return count
+    }
+
+    private static func diagnosticsLengthBucket(characters: Int) -> String {
+        if characters < 70 { return "short" }
+        if characters >= 140 { return "long" }
+        return "medium"
+    }
+
+    private static func executableSHA256() -> String? {
+        guard let url = Bundle.main.executableURL else { return nil }
+        return try? sha256File(at: url)
     }
 
     private static func languageHintSource(for requestedHint: String?) -> String {
@@ -1713,7 +1906,7 @@ enum IOSDeviceDiagnosticsRunner {
         guard let summary = row.summary,
               let coverage = summary.captureCoverage,
               coverage.totalSampleCount == summary.sampleCount,
-              coverage.memoryCoverageRatio >= 0.95,
+              coverage.memoryCoverageRatio >= 1.0,
               coverage.processResourceCaptureSucceeded,
               let boundaries = summary.boundaryCoverage,
               boundaries.missingBoundaryNames.isEmpty,
@@ -2116,7 +2309,7 @@ enum IOSDeviceDiagnosticsRunner {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? encoder.encode(record) else {
-            print("[speech-assets] could not encode completion evidence")
+            logger.error("speech-assets could not encode completion evidence")
             return
         }
         let fileName = "speech-assets-done.json"
@@ -2470,25 +2663,6 @@ enum IOSDeviceDiagnosticsRunner {
         }
     }
 
-    private static func sha256File(at url: URL) throws -> String {
-        guard let stream = InputStream(url: url) else {
-            throw DiagnosticsError("reference file is unreadable")
-        }
-        stream.open()
-        defer { stream.close() }
-        var hasher = SHA256()
-        var buffer = [UInt8](repeating: 0, count: 64 * 1024)
-        while stream.hasBytesAvailable {
-            let count = unsafe stream.read(&buffer, maxLength: buffer.count)
-            if count < 0 {
-                throw stream.streamError ?? DiagnosticsError("reference file read failed")
-            }
-            if count == 0 { break }
-            hasher.update(data: Data(buffer[..<count]))
-        }
-        return hasher.finalize().map { unsafe String(format: "%02x", $0) }.joined()
-    }
-
     private static func sha256Text(_ value: String) -> String {
         SHA256.hash(data: Data(value.utf8))
             .map { unsafe String(format: "%02x", $0) }
@@ -2515,6 +2689,25 @@ enum IOSDeviceDiagnosticsRunner {
         writeData(data, to: pullableURL, label: "voice reliability transcription (pullable)")
     }
     #endif
+
+    private static func sha256File(at url: URL) throws -> String {
+        guard let stream = InputStream(url: url) else {
+            throw DiagnosticsError("file is unreadable")
+        }
+        stream.open()
+        defer { stream.close() }
+        var hasher = SHA256()
+        var buffer = [UInt8](repeating: 0, count: 64 * 1024)
+        while stream.hasBytesAvailable {
+            let count = unsafe stream.read(&buffer, maxLength: buffer.count)
+            if count < 0 {
+                throw stream.streamError ?? DiagnosticsError("file read failed")
+            }
+            if count == 0 { break }
+            hasher.update(data: Data(buffer[..<count]))
+        }
+        return hasher.finalize().map { unsafe String(format: "%02x", $0) }.joined()
+    }
 
     private static func writeSentinel(_ record: SentinelRecord, runID: String) {
         let encoder = JSONEncoder()
@@ -2553,9 +2746,11 @@ enum IOSDeviceDiagnosticsRunner {
             try FileManager.default.createDirectory(
                 at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try data.write(to: url, options: .atomic)
-            print("[device-diagnostics] \(label) → \(url.path)")
+            let fileName = url.lastPathComponent
+            logger.info("wrote \(label, privacy: .public) file=\(fileName, privacy: .public)")
         } catch {
-            print("[device-diagnostics] could not write \(label): \(DiagnosticPrivacy.summary(of: error))")
+            let summary = DiagnosticPrivacy.summary(of: error).description
+            logger.error("could not write \(label, privacy: .public): \(summary, privacy: .public)")
         }
     }
 
@@ -2623,6 +2818,7 @@ enum IOSDeviceDiagnosticsRunner {
         let telemetryMode: String
         let seed: UInt64
         let streaming: Bool
+        let executableSHA256: String?
         let fixtureDigests: [String: String]
         let memoryQualification: MemoryQualificationDeclaration
         let takes: [MemoryQualificationTakeResult]
@@ -2777,6 +2973,22 @@ enum IOSDeviceDiagnosticsRunner {
         var vocelloLegacyReady: Bool?
     }
 
+    private struct SentinelTakeRecord: Codable {
+        let takeIndex: Int
+        let generationID: String
+        let cell: String
+        let mode: String
+        let variant: String
+        let modelID: String
+        let warmState: String
+        let length: String
+        let durationSeconds: Double
+        let wallSeconds: Double
+        let realtimeFactor: Double
+        let finishReason: String?
+        let fixtureDigest: String?
+    }
+
     private struct SentinelRecord: Codable {
         // `var` (not `let`) for the defaulted fields: a `let` with an initial value is
         // skipped by Codable decode (warning) and, for the device fields, a default
@@ -2806,6 +3018,8 @@ enum IOSDeviceDiagnosticsRunner {
         var modelName: String?
         var customSpeakerID: String?
         var fixtureDigest: String?
+        var executableSHA256: String?
+        var takes: [SentinelTakeRecord]?
         var outputEvidence: OutputEvidence?
         var durationSeconds: Double?
         var wallSeconds: Double?

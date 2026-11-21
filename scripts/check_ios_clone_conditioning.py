@@ -268,7 +268,7 @@ def validate(args: argparse.Namespace) -> dict[str, Any]:
         diagnostics=args.diagnostics,
         platform="ios",
         app_rows=app_rows,
-        require_app_layer=False,
+        require_app_layer=True,
     )
     source = source_from_snapshot(args.snapshot)
     if source.get("fingerprintsMatch") is not True:

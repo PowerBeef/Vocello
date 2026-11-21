@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import XCTest
 
@@ -49,10 +50,14 @@ final class VocelloiOSBenchmarkUITests: VocelloiOSUITestCase {
 
         var previousTake: VocelloUIBenchMatrix.Take?
         var preparedMode: VocelloUIBenchMatrix.Mode?
+        var previousTakeRefused = false
         var completedCount = 0
+        var refusedCount = 0
         var generationMap: [[String: Any]] = []
 
         for (offset, take) in takes.enumerated() {
+            let takeNumber = offset + 1
+            let phases = VocelloIOSBenchTakePhases(takeIndex: takeNumber, cell: take.cellID)
             // BenchForceColdPolicy consumes its flag once. A mode's cold take
             // and warm grid therefore remain in one process; only a mode
             // boundary starts a new process. Clone starts warm by definition.
@@ -60,6 +65,8 @@ final class VocelloiOSBenchmarkUITests: VocelloiOSUITestCase {
                 || previousTake?.mode != take.mode
 
             if requiresNewSession {
+                phases.relaunched = true
+                previousTakeRefused = false
                 var environment = [
                     "QVOICE_MAC_BENCH_RUN_ID": runID,
                     "QVOICE_IOS_BENCH_LABEL": label,
@@ -88,12 +95,40 @@ final class VocelloiOSBenchmarkUITests: VocelloiOSUITestCase {
                 prepare(mode: take.mode)
                 preparedMode = take.mode
             }
+            phases.mark("sessionReadyMS")
 
-            let takeNumber = offset + 1
             print("[ios-xcui-benchmark] begin \(takeNumber)/\(takes.count) \(take.cellID)")
             XCTContext.runActivity(named: "Take \(takeNumber): \(take.cellID)") { _ in
                 replaceScript(with: take.text)
-                let generationID = generateAndWaitForCompletedPlayer(timeout: timeout(for: take))
+                phases.mark("scriptReadyMS")
+                let generationID = generateAndWaitForCompletedPlayer(
+                    timeout: timeout(for: take),
+                    startingFromNotice: previousTakeRefused,
+                    failTestOnVisibleError: false
+                )
+                phases.mark("terminalSeenMS")
+
+                if generationID.isEmpty {
+                    // A take refused by Fast QC ends on the retryable error notice. Record its
+                    // marker and continue the matrix; scripts/check_ios_ui_benchmark.py verifies
+                    // the engine row proved `audio.quality_rejected` and enforces --max-refused-takes.
+                    phases.refused = true
+                    refusedCount += 1
+                    previousTakeRefused = true
+                    VocelloUIScreenshot.attach(
+                        app,
+                        named: "ios-benchmark-\(takeNumber)-\(sanitized(take.cellID))-refused"
+                    )
+                    Self.emitRefusedTake(takeIndex: takeNumber, cell: take.cellID)
+                    generationMap.append([
+                        "takeIndex": takeNumber,
+                        "cell": take.cellID,
+                        "refused": true,
+                    ])
+                    return
+                }
+
+                previousTakeRefused = false
                 generationMap.append([
                     "takeIndex": takeNumber,
                     "cell": take.cellID,
@@ -108,7 +143,10 @@ final class VocelloiOSBenchmarkUITests: VocelloiOSUITestCase {
                 }
 
                 dismissCompletedPlayerAndAssertGenerateReady()
+                phases.mark("settledMS")
             }
+            phases.mark("endMS")
+            phases.emit()
             print("[ios-xcui-benchmark] complete \(takeNumber)/\(takes.count) \(take.cellID)")
             completedCount += 1
             previousTake = take
@@ -125,11 +163,67 @@ final class VocelloiOSBenchmarkUITests: VocelloiOSUITestCase {
         mapAttachment.name = "ios-benchmark-generation-map.json"
         mapAttachment.lifetime = .keepAlways
         add(mapAttachment)
-        print("VOCELLO-BENCH-UI-MANIFEST ran=\(completedCount) runID=\(runID) skippedClone=false")
+        print("VOCELLO-BENCH-UI-MANIFEST ran=\(completedCount) refused=\(refusedCount) runID=\(runID) skippedClone=false")
+    }
+
+    /// One line per take that ended on its retryable error, for `scripts/check_ios_ui_benchmark.py`
+    /// (matching macOS `VOCELLO_BENCH_TAKE_REFUSED`, audit T5).
+    private static func emitRefusedTake(takeIndex: Int, cell: String) {
+        let payload: [String: Any] = ["schemaVersion": 1, "takeIndex": takeIndex, "cell": cell]
+        guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]) else {
+            return
+        }
+        print("VOCELLO_BENCH_TAKE_REFUSED=\(data.base64EncodedString())")
+        unsafe fflush(stdout)
     }
 
     private func sanitized(_ value: String) -> String {
         value.replacingOccurrences(of: "/", with: "-")
             .replacingOccurrences(of: "#", with: "-")
+    }
+}
+
+/// Per-take harness phases mirroring macOS `VocelloBenchTakePhases`: monotonic
+/// millisecond offsets printed as `VOCELLO_BENCH_TAKE_PHASES=` JSON lines that
+/// `scripts/ui_test.sh` retains in `take-phases.jsonl`.
+@MainActor
+private final class VocelloIOSBenchTakePhases {
+    private let clock = ContinuousClock()
+    private let start: ContinuousClock.Instant
+    private let startEpochMS: Int64
+    private let takeIndex: Int
+    private let cell: String
+    private var offsetsMS: [String: Int] = [:]
+    var relaunched = false
+    var refused = false
+
+    init(takeIndex: Int, cell: String) {
+        start = clock.now
+        startEpochMS = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+        self.takeIndex = takeIndex
+        self.cell = cell
+    }
+
+    func mark(_ phase: String) {
+        offsetsMS[phase] = Int((start.duration(to: clock.now) / .milliseconds(1)).rounded())
+    }
+
+    func emit() {
+        var payload: [String: Any] = [
+            "takeIndex": takeIndex,
+            "cell": cell,
+            "relaunched": relaunched,
+            "startEpochMS": startEpochMS,
+        ]
+        for (phase, offset) in offsetsMS {
+            payload[phase] = offset
+        }
+        if refused {
+            payload["refused"] = true
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
+              let line = String(data: data, encoding: .utf8) else { return }
+        print("VOCELLO_BENCH_TAKE_PHASES=\(line)")
+        unsafe fflush(stdout)
     }
 }

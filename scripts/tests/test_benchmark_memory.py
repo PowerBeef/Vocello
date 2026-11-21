@@ -1121,6 +1121,39 @@ class MemoryEvidenceTests(unittest.TestCase):
                 platform="macos", require_app_layer=True,
             )
 
+    def test_ios_app_layer_memory_qualification_merges_and_validates_pid(self) -> None:
+        generation_id = "generation-ios-app-layer"
+        engine_samples = samples(
+            role="engine", boundaries=ENGINE_BOUNDARIES, ios=True, footprint=2500
+        )
+        app_samples = samples(
+            role="app", boundaries=["app_submit", "app_terminal"], ios=True, footprint=2650,
+            uptime_offset=5_000_000,
+        )
+        engine = row(generation_id, engine_samples, layer="engine", ios=True)
+        app = row(generation_id, app_samples, layer="app", ios=True)
+        self.write_sidecar("engine", generation_id, engine_samples)
+        self.write_sidecar("app", generation_id, app_samples)
+        qualified, _ = qualify_memory_rows(
+            rows=[engine], app_rows=[app], diagnostics=self.root,
+            platform="ios", require_app_layer=True,
+        )
+        self.assertEqual(len(qualified), 1)
+        self.assertGreaterEqual(qualified[0].metrics["peakPhysicalFootprintMB"], 2650.0)
+        # Missing app row fails when require_app_layer=True on iOS.
+        with self.assertRaisesRegex(MemoryEvidenceError, "missing matching iOS app row"):
+            qualify_memory_rows(
+                rows=[engine], app_rows=[], diagnostics=self.root,
+                platform="ios", require_app_layer=True,
+            )
+        # Mismatched PID fails.
+        app["processIdentifier"] = 99999
+        with self.assertRaisesRegex(MemoryEvidenceError, "differ; one process"):
+            qualify_memory_rows(
+                rows=[engine], app_rows=[app], diagnostics=self.root,
+                platform="ios", require_app_layer=True,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -44,8 +44,8 @@ One engine core (`QwenVoiceCore` / `MLXTTSEngine`) is hosted three ways:
 | **iOS app** | Engine runs **in-process** (`MLXTTSEngine` via `NativeRuntimeFactory`) | `Sources/iOS/TTSEngineStore.swift` | `VocelloiOS` |
 | **CLI** | Engine runs **in-process** | `VocelloCLI` (`CLIRuntime`) | `vocello` binary |
 
-Platforms: macOS 26+, iOS 26+, Apple Silicon (`arm64`), Swift 6; CI pins Xcode 26.6 / Swift 6.3.3
-and local Xcode 27 also builds (roadmap CONV-21). Minimum
+Platforms: macOS 26+, iOS 26+, Apple Silicon (`arm64`), Swift 6; CI pins Xcode 27.2 / Swift 6.4.2
+on GitHub's GA `xcode-27` runner (matching the local development Mac since 2026-11-20, DW-04). Minimum
 hardware support is an Apple Silicon Mac with 8 GB or iPhone 15 Pro or newer; canonical benchmark
 hardware is separately defined as Mac mini M6 16 GB (since 2026-09-22; the retired Mac mini M2
 8 GB records stay history) and iPhone 17 Pro.

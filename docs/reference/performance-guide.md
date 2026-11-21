@@ -11,8 +11,8 @@ sourceOfTruth:
 # Swift and Metal performance guide
 
 > **Living document.** When this guide disagrees with the code, the code wins: fix this file.
-> Language mode Swift 6 (`SWIFT_VERSION: "6"` in `project.yml`); CI's compiler is Swift 6.3.3 with
-> Xcode 26.6 (`config/toolchain.json`). The MLX pins are
+> Language mode Swift 6 (`SWIFT_VERSION: "6"` in `project.yml`); CI's compiler is Swift 6.4.2 with
+> Xcode 27.2 (`config/toolchain.json`). The MLX pins are
 > [`mlx-guide.md` §9.1](mlx-guide.md#91-current-pins)'s.
 
 This guide owns Swift-layer and Metal performance practice. Other facts have one owner each:

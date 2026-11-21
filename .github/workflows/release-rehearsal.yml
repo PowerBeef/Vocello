@@ -65,7 +65,7 @@ concurrency:
 jobs:
   macos-package:
     name: Rehearse macOS package (ad-hoc, not notarized)
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 150
     outputs:
       tag: ${{ steps.bind.outputs.tag }}
@@ -182,7 +182,7 @@ jobs:
   sparkle-feed:
     name: Rehearse the Sparkle signatures (ephemeral key)
     needs: macos-package
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 20
     permissions:
       contents: read
@@ -264,7 +264,7 @@ jobs:
   evidence:
     name: Rehearse the release evidence (not published)
     needs: [macos-package, sparkle-feed]
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 30
     permissions:
       contents: read
@@ -365,7 +365,7 @@ jobs:
 
   ios-release-prerequisites:
     name: Rehearse iOS archive prerequisites
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 40
     steps:
       - name: Checkout

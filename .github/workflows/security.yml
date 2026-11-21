@@ -2,7 +2,7 @@ name: Security
 
 # Weekly and on-demand security analysis, and the exact-tag run release.yml
 # calls before it authorizes a candidate. Not per push: Swift CodeQL rebuilds
-# the whole graph and takes about an hour on a macos-26 runner, which is not a
+# the whole graph and takes about an hour on an xcode-27 runner, which is not a
 # useful signal on every trunk commit. `Security required` remains the stable
 # aggregate name.
 on:
@@ -55,7 +55,7 @@ jobs:
             runner: ubuntu-24.04
           - language: swift
             build-mode: manual
-            runner: macos-26
+            runner: xcode-27
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     permissions:
@@ -97,7 +97,7 @@ jobs:
         if: matrix.language == 'swift'
         run: |
           # CodeQL's tracing shell currently runs through Rosetta on the ARM
-          # macos-26 image. Keep the owned-Swift rebuild inside that shell so
+          # xcode-27 image. Keep the owned-Swift rebuild inside that shell so
           # the extractor sees it, while reusing native Metal/dependency outputs
           # and emitting only arm64 products through ARCHS=arm64. Neither
           # command stages public output.

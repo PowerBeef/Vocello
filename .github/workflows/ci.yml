@@ -245,7 +245,7 @@ jobs:
     # runs this job for the bundle compile alone: the deterministic steps below
     # and the TSan job have nothing of it to prove.
     if: github.event_name != 'pull_request' && (needs.changes.outputs.swift == 'true' || needs.changes.outputs.macos_ui == 'true')
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -394,7 +394,7 @@ jobs:
     name: macOS ThreadSanitizer subset
     needs: changes
     if: github.event_name != 'pull_request' && needs.changes.outputs.swift == 'true'
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -494,7 +494,7 @@ jobs:
     name: iOS compile check (device SDK)
     needs: changes
     if: github.event_name != 'pull_request' && needs.changes.outputs.ios == 'true'
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 30
     steps:
       - name: Checkout

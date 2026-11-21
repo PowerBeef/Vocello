@@ -246,7 +246,7 @@ jobs:
     name: Build + sign + notarize + DMG
     needs: [release-trigger, source-authority]
     if: ${{ needs.release-trigger.outputs.ios_candidate == 'false' && (github.event_name == 'push' || inputs.package_macos) }}
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 150
     # Signing secrets belong to the tag-restricted `release` environment; a job
     # that references it before it exists runs with repository secrets.
@@ -263,7 +263,7 @@ jobs:
       # Applied to every step in this job. Each step starts a fresh
       # process and would otherwise not see env vars set on a previous
       # step. release.sh and verify_packaged_dmg.sh each invoke
-      # verify_release_bundle.sh internally. The macos-26 runner must
+      # verify_release_bundle.sh internally. The xcode-27 runner must
       # execute the packaged-app startup smoke on both the staged app
       # and the app copied back out of the notarized DMG.
       QWENVOICE_SIGNING_MODE: developer-id
@@ -607,7 +607,7 @@ jobs:
   sparkle-feed:
     name: Sign the DMG and appcast for Sparkle
     needs: [source-authority, package]
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 20
     environment: release
     permissions:
@@ -690,7 +690,7 @@ jobs:
   draft-release:
     name: Evidence + attestation + draft Release
     needs: [source-authority, package, sparkle-feed]
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 30
     permissions:
       contents: write
@@ -966,7 +966,7 @@ jobs:
     # uploads it as a workflow artifact.
     name: iOS compile-safety
     needs: source-authority
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -1040,7 +1040,7 @@ jobs:
     name: iOS archive + App Store export
     needs: [release-trigger, source-authority]
     if: ${{ (github.event_name == 'workflow_dispatch' && inputs.archive_ios) || (github.event_name == 'push' && needs.release-trigger.outputs.ios_candidate == 'true') }}
-    runs-on: macos-26
+    runs-on: xcode-27
     # A backstop above the sum of the steps' own limits (175 minutes); each step stops itself.
     timeout-minutes: 180
     environment: release

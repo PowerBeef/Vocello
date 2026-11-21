@@ -35,10 +35,10 @@ cd Vocello
 ### 1. Xcode and its components
 
 - An Apple Silicon Mac on macOS 26 or newer with **full Xcode**; the Command Line Tools alone cannot
-  build any product. CI pins the version in `config/toolchain.json` (`native.xcode`). A newer local
-  Xcode (27) builds the project, but it accepts some code the pinned CI Xcode rejects, so push CI stays
-  the judge; the report-only `xcode-preview.yml` shows the differences daily, and moving CI to Xcode
-  27 is part of roadmap item DW-04.
+  build any product. CI pins `Xcode 27.2` / `Swift 6.4.2` in `config/toolchain.json` (`native.xcode`,
+  `native.swift`) on GitHub's GA `xcode-27` runner image (DW-04 cutover on 2026-11-20). If a newer
+  local Xcode point release is installed than the pin, push CI stays the judge and the daily
+  report-only `xcode-preview.yml` shows differences against newer Xcode 27.x releases on the runner.
 - Select it and finish its first launch:
 
   ```sh
@@ -414,9 +414,9 @@ tests; a test that outgrows its lane moves, it does not slow every push. `pytest
 | `changes` | ubuntu | always | seconds |
 | `contracts` | ubuntu | always | about 1 min: the action-pin check (`supply_chain_contract.py`) first, then the complete deterministic contract gate (`check_project_inputs.sh --python none`: product contracts, invariants, privacy scan, work authority, benchmark history), then the shellcheck, ruff, SwiftLint and Pyright gates, each failing on findings absent from `config/lint-baseline/` (`scripts/lint_baseline.py`) |
 | `python` | ubuntu | Python paths, contracts, workflow files | 3 to 4 min: product and tooling tests; research tests when routed |
-| `macos-tests` | macos-26 | never on a pull request; Swift compile inputs, build configs, the lane's own scripts and the `scripts/` modules their Python imports; also macOS XCUITest sources (`macos_ui`), which run only the bundle compile | cached DerivedData; macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s), then `build_ui_test_bundles.sh macos --gate` compiles the macOS XCUITest bundle in the same arena (build only) |
-| `macos-tsan` | macos-26 | never on a pull request; the `swift` lane only (never `macos_ui`) | cached `macos-tsan` DerivedData; `scripts/macos_test.sh tsan`, the deterministic core bundles under ThreadSanitizer, blocking since 2026-09-14 (`config/tsan-policy.json`); 5 to 11 min on a second runner |
-| `ios-compile` | macos-26 | never on a pull request; iOS compile inputs | cached DerivedData; `build_foundation_targets.sh ios --incremental` at `-Onone` (`QVOICE_FOUNDATION_SWIFT_OPTIMIZATION`), then `build_ui_test_bundles.sh ios --gate` compiles the iOS XCUITest bundle unsigned in the same arena (build only) |
+| `macos-tests` | xcode-27 | never on a pull request; Swift compile inputs, build configs, the lane's own scripts and the `scripts/` modules their Python imports; also macOS XCUITest sources (`macos_ui`), which run only the bundle compile | cached DerivedData; macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s), then `build_ui_test_bundles.sh macos --gate` compiles the macOS XCUITest bundle in the same arena (build only) |
+| `macos-tsan` | xcode-27 | never on a pull request; the `swift` lane only (never `macos_ui`) | cached `macos-tsan` DerivedData; `scripts/macos_test.sh tsan`, the deterministic core bundles under ThreadSanitizer, blocking since 2026-09-14 (`config/tsan-policy.json`); 5 to 11 min on a second runner |
+| `ios-compile` | xcode-27 | never on a pull request; iOS compile inputs | cached DerivedData; `build_foundation_targets.sh ios --incremental` at `-Onone` (`QVOICE_FOUNDATION_SWIFT_OPTIMIZATION`), then `build_ui_test_bundles.sh ios --gate` compiles the iOS XCUITest bundle unsigned in the same arena (build only) |
 | `website` | ubuntu | `website/` | about 1 min |
 | `dependency-submission` | ubuntu | push only (skipped on dispatch and pull requests) | seconds: `scripts/swift_dependency_snapshot.py` submitted to the GitHub dependency graph; needed by `CI required`, which it fails only when the snapshot cannot be generated: a failed or stalled POST (bounded at two minutes) is a warning annotation (BKL-58) |
 | `CI required` | ubuntu | always | the branch-protection context; skipped lanes count as passed |
@@ -646,12 +646,12 @@ For any multi-file feature, runtime optimization or debt wave, run one determini
 then inspect it offline via `axiom_xcprof_analyze` / `axiom_xcprof_compare` or
 `.agents/workflows/qc_experiment_synthesizer.py`.
 
-**Xcode 27 / Swift 6.4 cutover checklist:** `xcode-preview.yml` (report-only on `xcode-27`) is
-green across consecutive runs as of 2026-11-20. Keep `config/toolchain.json` pinned to Xcode 26.6
-until GitHub promotes a GA `macos-27` / Xcode 27 runner image and the maintainer authorizes the
-cutover; at cutover, bump `config/toolchain.json`, verify `ci.yml` + `release-rehearsal.yml` +
-`supply_chain_contract.py`, and evaluate Swift 6.4 warnings-as-errors across `MLXAudioTTS` once
-upstream `mlx-swift` adds `MLXArray: Sendable`.
+**Xcode 27 / Swift 6.4 pin (`DW-04`):** on 2026-11-20 CI, nightly, release rehearsal, release,
+promote-release and CodeQL cut over to GitHub's GA `xcode-27` runner image (`Xcode 27.2` build
+`27B52`, `Swift 6.4.2` in `config/toolchain.json`), eliminating local-vs-CI compiler skew.
+`xcode-preview.yml` stays report-only to preview newer Xcode 27.x point releases ahead of the pin;
+evaluating Swift 6.4 warnings-as-errors on `MLXAudioTTS` still waits on upstream `mlx-swift` adding
+`MLXArray: Sendable`.
 
 Safeguards remain directly callable without hook activation:
 

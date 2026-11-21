@@ -26,7 +26,7 @@ concurrency:
 jobs:
   tsan:
     name: Core TSan subset
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 60
     steps:
       - name: Checkout
@@ -78,7 +78,7 @@ jobs:
 
   foundation-cold:
     name: Cold foundation compile (macOS + iOS)
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 60
     steps:
       - name: Checkout
@@ -115,7 +115,7 @@ jobs:
     # Report-only (audit P1-14): line coverage of the deterministic suites and which newer
     # build settings the pinned Xcode defines. It files no issue; coverage is never a verdict.
     name: Coverage and build-setting probe (report-only)
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 60
     steps:
       - name: Checkout
@@ -151,7 +151,7 @@ jobs:
     # under Xcode 26.5 (scripts/macos_test.sh), so a failure here may be the runner, not
     # the code. It files no issue.
     name: Shipped-configuration test run (report-only)
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 60
     steps:
       - name: Checkout
@@ -185,7 +185,7 @@ jobs:
     # is skipped and named in the summary.
     # It files no issue; no count is a verdict.
     name: Migrate-mode strictness warnings (report-only)
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 60
     steps:
       - name: Checkout
@@ -236,7 +236,7 @@ jobs:
     # with the index store kept and scans all three schemes, so code only one product uses
     # is not reported. It files no issue; no finding is a verdict.
     name: Dead code (Periphery, report-only)
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 60
     steps:
       - name: Checkout

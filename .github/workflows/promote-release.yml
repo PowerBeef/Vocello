@@ -32,7 +32,7 @@ concurrency:
 jobs:
   promote-macos:
     name: Validate quality evidence + publish draft
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 15
     environment: release
     permissions:

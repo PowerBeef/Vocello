@@ -50,18 +50,24 @@ product-binary regressions.
     `BKL-79`) to fail closed when any planned/installed file lacks a valid 64-hex SHA-256 or
     disagrees between `files` and `installedFiles`, with zero-request/zero-staging tests.
   - Eliminated XCUITest accessibility snapshot walks in `test05DeliveryMenu()` (`81b0dbf8`, `BKL-77`)
-    using window-anchored coordinate clicks + keyboard and exposed `actionHitchTimeMSPerS` /
-    `queryHitchTimeMSPerS` in `check_macos_ui_perf.py` (awaits a 3-run Mac perf calibration window).
-- **Phase C — Metal profiling, `VocelloSharedPolicies` modularization & playbook (`2aea00c9`,
-  `91f5eae6`):** added `macos_test.sh profile --kind metal` (`Metal System Trace` + `os_signpost`)
-  across trace retention and benchmark history contracts; extracted pure multiplatform static
-  framework `VocelloSharedPolicies` (`91f5eae6`, `Reviewed-by: vocello-swift-review`) compiling 7
-  runtime/Studio/ownership/retry policy files once instead of 4–5x across 5 targets (macOS, iOS,
-  CLI and all 3 UI test bundles verified green); verified `xcode-preview.yml` 4-for-4 green on
-  Nov 17–20 (`config/toolchain.json` stays pinned to Xcode 26.6 pending GA `macos-27` cutover);
-  documented the Repeatable Innovation Playbook in `docs/reference/development-workflow.md`.
-- **Next:** push local `main` when explicitly requested, observe CI, schedule a 3-run Mac perf
-  window to recalibrate & enforce `BKL-77`, and resume iOS 3.1.0 candidate work (`RF-12`/`RF-15`/
+    using window-anchored coordinate clicks + keyboard, exposed `actionHitchTimeMSPerS` /
+    `queryHitchTimeMSPerS`, bumped `("ui-perf", "macos")` lineage to v3 (`e073bbb8`), ran 3 clean
+    canonical calibrations (`8f412666`, `8b059da3`, `b6cfbcce`: `[59.446, 55.426, 53.901]` ms/s,
+    median `55.426` vs `84.168`), recalibrated `config/ui-perf-thresholds.json` (`72.5 ms/s`,
+    `130 ms`), added `delivery-menu` to `enforce`, and closed **`BKL-77`** (`4974d4e9`).
+- **Phase C — Metal profiling, `VocelloSharedPolicies` modularization, Xcode 27.2 CI cutover &
+  playbook (`2aea00c9`, `91f5eae6`):** added `macos_test.sh profile --kind metal` (`Metal System
+  Trace` + `os_signpost`) across trace retention and benchmark history contracts; extracted pure
+  multiplatform static framework `VocelloSharedPolicies` (`91f5eae6`, `Reviewed-by:
+  vocello-swift-review`) compiling 7 runtime/Studio/ownership/retry policy files once instead of
+  4–5x across 5 targets (macOS, iOS, CLI and all 3 UI test bundles verified green; push CI
+  `44853701944` green); cut over `config/toolchain.json` (`Xcode 27.2` / `Swift 6.4.2`) and all 6
+  macOS GitHub workflows (`ci.yml`, `nightly.yml`, `promote-release.yml`, `release-rehearsal.yml`,
+  `release.yml`, `security.yml`) from `macos-26` to GA `xcode-27` (`DW-04`, matching local
+  `Xcode 27.2` build `27B52`); documented the Repeatable Innovation Playbook in
+  `docs/reference/development-workflow.md`.
+- **Next:** push the `BKL-77` calibration + `DW-04` Xcode 27.2 cutover commits when requested,
+  observe the first `xcode-27` push CI run, and resume iOS 3.1.0 candidate work (`RF-12`/`RF-15`/
   `RF-35`–`RF-42`) in the next iPhone window.
 
 ### November 20: Antigravity harness takeover

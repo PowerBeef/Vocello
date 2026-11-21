@@ -1,12 +1,10 @@
 name: Xcode preview
 
-# Report-only (workflow audit P3-1): the deterministic suites on GitHub's `xcode-27`
-# preview image (macOS 27, Xcode 27), the toolchain the App Store candidate is built with
-# on the maintainer's Mac. Push CI stays gated on the Xcode in config/toolchain.json
-# until the maintainer moves it; this run shows where the two toolchains disagree before
-# a push meets the difference. Its own concurrency group keeps a queued preview runner
-# (GitHub warns of preview capacity limits) from holding up the nightly. It blocks
-# nothing and files no issue.
+# Report-only (workflow audit P3-1): the deterministic suites on the newest
+# Xcode 27 point release installed on GitHub's GA `xcode-27` image (macOS 27).
+# Push CI pins Xcode 27.2 in config/toolchain.json; this run shows any
+# difference when a newer Xcode 27.x release arrives on the runner before the
+# pin moves. It blocks nothing and files no issue.
 on:
   schedule:
     - cron: '30 5 * * *'

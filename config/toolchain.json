@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "native": {
     "xcode": {
-      "version": "26.6",
+      "version": "27.2",
       "versionCommand": [
         "xcodebuild",
         "-version"
       ]
     },
     "swift": {
-      "version": "6.3.3",
+      "version": "6.4.2",
       "versionCommand": [
         "swift",
         "--version"

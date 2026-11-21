@@ -28,7 +28,7 @@
 #   scripts/macos_test.sh crashes [--test]          # collect + xcsym-symbolicate .ips (app)
 #   scripts/macos_test.sh debug                     # LLDB attach guidance (app PID)
 #   scripts/macos_test.sh logs                      # retained os_log → build/artifacts/macos/logs/<run>.log
-#   scripts/macos_test.sh profile [--kind cpu|memory|witness] [--keep-trace] [--allow-dirty] [spec]
+#   scripts/macos_test.sh profile [--kind cpu|memory|metal|witness] [--keep-trace] [--allow-dirty] [spec]
 #                                                    # exact-PID xctrace vocello bench
 #   scripts/macos_test.sh memory [--label ID]        # retained-memory qualification sequence
 #   scripts/macos_test.sh gate                      # inputs → build_foundation → test → crashes
@@ -474,6 +474,10 @@ profile_instrument_args() {
       PROFILE_INSTRUMENT_ARGS=(--template "Allocations" --instrument "$cpu_instrument")
       PROFILE_CAPTURE_INSTRUMENTS="$cpu_instrument + Allocations + VM Tracker + os_signpost"
       ;;
+    metal)
+      PROFILE_INSTRUMENT_ARGS=(--template "Metal System Trace")
+      PROFILE_CAPTURE_INSTRUMENTS="Metal System Trace + os_signpost"
+      ;;
     witness)
       PROFILE_INSTRUMENT_ARGS=()
       PROFILE_CAPTURE_INSTRUMENTS="os_signpost"
@@ -545,11 +549,11 @@ cmd_profile() {
       --kind=*) kind="${1#*=}"; shift ;;
       --keep-trace) keep_trace=1; shift ;;
       --allow-dirty) allow_dirty=1; shift ;;
-      -*) die "unknown profile flag: $1 (try --kind cpu|memory|witness [--keep-trace] [--allow-dirty])" ;;
+      -*) die "unknown profile flag: $1 (try --kind cpu|memory|metal|witness [--keep-trace] [--allow-dirty])" ;;
       *) [[ -z "$spec" ]] || die "profile accepts one generation spec"; spec="$1"; shift ;;
     esac
   done
-  case "$kind" in cpu|memory|witness) ;; *) die "profile kind must be cpu, memory or witness" ;; esac
+  case "$kind" in cpu|memory|metal|witness) ;; *) die "profile kind must be cpu, memory, metal or witness" ;; esac
   # A profile is a timing witness only on committed source (audit #99): five of
   # the first six profile records came from dirty trees.
   if (( allow_dirty == 0 )) \
@@ -573,6 +577,7 @@ cmd_profile() {
   local -a profile_seed_args=()
   [[ "$kind" != "witness" ]] || profile_seed_args=(--seed "$GATE_BENCH_SEED")
   [[ "$kind" != "memory" ]] || duration="${QVOICE_MAC_MEMORY_PROFILE_DURATION:-180}"
+  [[ "$kind" != "metal" ]] || duration="${QVOICE_MAC_METAL_PROFILE_DURATION:-120}"
   if [[ "$kind" == "memory" ]]; then
     # Retention has its own multi-take lane. The Instruments memory lane focuses
     # on one cold long take: this captures model-load and sustained-generation
@@ -581,6 +586,12 @@ cmd_profile() {
     # discounting profiler-induced sampler gaps.
     profile_length="long"
     profile_warm="0"
+  elif [[ "$kind" == "metal" ]]; then
+    # Metal System Trace captures MLX GPU command buffers and shader kernels
+    # for Instruments / axiom_xcprof analysis (DW-04); 1 cold + 1 warm medium
+    # take keeps raw trace size bounded.
+    profile_length="medium"
+    profile_warm="1"
   fi
   local tracer_start_timeout="${QVOICE_MAC_PROFILE_START_TIMEOUT:-30}"
   local default_profile_grace_timeout=30
@@ -621,9 +632,10 @@ cmd_profile() {
   local history_record="$ROOT_DIR/benchmarks/runs/instrument-profile/$run_id.json"
   local retention_policy="summaryOnly"
   (( keep_trace == 0 )) || retention_policy="keptExplicitly"
-  # xctrace cannot export a memory profile's allocation and VM tables, so its
-  # trace is the only memory evidence and is kept by default (audit #69).
-  [[ "$kind" != "memory" || "$retention_policy" != "summaryOnly" ]] || retention_policy="keptByDefault"
+  # xctrace cannot export a memory profile's allocation/VM tables or a Metal
+  # System Trace's GPU shader tables, so both keep raw traces by default.
+  [[ ( "$kind" != "memory" && "$kind" != "metal" ) || "$retention_policy" != "summaryOnly" ]] \
+    || retention_policy="keptByDefault"
   local target_pid_file="$artifacts/target.pid"
   mkdir -p "$runtime"
   ln -s "$(debug_models_dir)" "$runtime/models"

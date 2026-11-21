@@ -4429,8 +4429,8 @@ def write_trace_summary_artifact(
     if retention_policy not in TRACE_RETENTION_POLICIES:
         raise PublicationError(f"unsupported trace retention policy: {retention_policy!r}")
     profile_kind = getattr(args, "profile_kind", "cpu")
-    if retention_policy == "keptByDefault" and profile_kind != "memory":
-        raise PublicationError("only a memory profile keeps its raw trace by default")
+    if retention_policy == "keptByDefault" and profile_kind not in {"memory", "metal"}:
+        raise PublicationError("only memory or metal profiles keep their raw trace by default")
     raw_trace_retained = retention_policy in RETAINED_TRACE_POLICIES
     template = Path(args.template).name
     capture_settings = {
@@ -4619,7 +4619,7 @@ def trace_evidence(
         expected_correlations=expected_correlations,
         take_expectations=take_expectations,
         require_complete_intervals=require_complete_intervals,
-        require_cpu_samples=profile_kind != "witness",
+        require_cpu_samples=profile_kind not in {"witness", "metal"},
     )
     if profile_kind == "witness" and "signpostSummaryVersion" not in extracted:
         raise PublicationError("a witness profile publishes per-take signpost interval statistics")
@@ -4966,8 +4966,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     profile.add_argument("--duration", type=float, required=True)
     profile.add_argument("--target-process", required=True)
     profile.add_argument("--target-pid", type=int)
-    # witness: os_signpost alone, the low-perturbation timing witness (audit #50).
-    profile.add_argument("--profile-kind", choices=("cpu", "memory", "witness"), default="cpu")
+    # witness: os_signpost alone (audit #50); metal: Metal System Trace + os_signpost (DW-04).
+    profile.add_argument("--profile-kind", choices=("cpu", "memory", "metal", "witness"), default="cpu")
     profile.add_argument(
         "--retention-policy", choices=TRACE_RETENTION_POLICIES,
         default="summaryOnly",

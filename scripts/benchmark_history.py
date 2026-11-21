@@ -486,8 +486,11 @@ V2_ONLY_TRACE_KEYS = set(TRACE_RETENTION_KEYS)
 # no CPU fields. From schema v2 on the schema therefore leaves the CPU summary
 # fields optional and the executable validator requires them of every other
 # profile kind; frozen schema-v1 keeps them required.
-TRACE_PROFILE_KINDS = {"cpu", "memory", "witness"}
+TRACE_PROFILE_KINDS = {"cpu", "memory", "metal", "witness"}
 WITNESS_TRACE_TEMPLATE = "os_signpost"
+METAL_TRACE_TEMPLATE = "Metal System Trace"
+DEFAULT_KEPT_TRACE_KINDS = frozenset({"memory", "metal"})
+NO_CPU_SAMPLER_PROFILE_KINDS = frozenset({"witness", "metal"})
 CPU_TRACE_SUMMARY_KEYS = frozenset({"cpuSampleCount", "cpuSampleSpanMS"})
 CPU_SAMPLER_TRACE_SUMMARY_KEYS = CPU_TRACE_SUMMARY_KEYS | {
     "cpuCycleWeight", "cpuSampleWeightMS", "cpuPlausibility",
@@ -2937,8 +2940,8 @@ def validate_trace_retention(record: dict[str, Any], trace: dict[str, Any]) -> N
         raise HistoryError("trace captureSettings is missing: " + ", ".join(missing))
     if capture_settings["profileKind"] not in TRACE_PROFILE_KINDS:
         raise HistoryError("trace captureSettings.profileKind is unsupported")
-    if retention_policy == "keptByDefault" and capture_settings["profileKind"] != "memory":
-        raise HistoryError("only a memory profile keeps its raw trace by default")
+    if retention_policy == "keptByDefault" and capture_settings["profileKind"] not in DEFAULT_KEPT_TRACE_KINDS:
+        raise HistoryError("only memory or metal profiles keep their raw trace by default")
     if capture_settings["template"] != trace.get("template"):
         raise HistoryError("trace captureSettings.template does not match trace.template")
     if capture_settings["targetProcess"] != summary.get("targetProcess"):
@@ -2955,8 +2958,13 @@ def validate_trace_retention(record: dict[str, Any], trace: dict[str, Any]) -> N
     ):
         raise HistoryError("trace capture duration does not match validated trace evidence")
     memory_profile = "allocations" in str(trace.get("template", "")).lower()
+    metal_profile = (
+        trace.get("template") == METAL_TRACE_TEMPLATE
+        or "metal" in str(trace.get("template", "")).lower()
+    )
     expected_kind = (
         "memory" if memory_profile
+        else "metal" if metal_profile
         else "witness" if trace.get("template") == WITNESS_TRACE_TEMPLATE
         else "cpu"
     )
@@ -2979,13 +2987,13 @@ def validate_trace_summary(record: dict[str, Any]) -> None:
         raise HistoryError("instrument-profile requires a structured trace summary")
     reject_unknown_keys(summary, TRACE_SUMMARY_KEYS, "evidence.trace.summary")
     capture_settings = trace.get("captureSettings")
-    witness = (
-        isinstance(capture_settings, dict) and capture_settings.get("profileKind") == "witness"
-    )
+    profile_kind = capture_settings.get("profileKind") if isinstance(capture_settings, dict) else None
+    witness = profile_kind == "witness"
+    no_cpu_sampler = profile_kind in NO_CPU_SAMPLER_PROFILE_KINDS
     required = SCHEMA_REQUIRED_KEYS["traceSummary"]
-    if witness:
+    if no_cpu_sampler:
         required = required - CPU_TRACE_SUMMARY_KEYS
-        if CPU_SAMPLER_TRACE_SUMMARY_KEYS.intersection(summary):
+        if witness and CPU_SAMPLER_TRACE_SUMMARY_KEYS.intersection(summary):
             raise HistoryError("a witness trace summary carries CPU sampler evidence")
     if missing := sorted(required - set(summary)):
         raise HistoryError(f"trace summary is missing: {', '.join(missing)}")
@@ -3000,7 +3008,7 @@ def validate_trace_summary(record: dict[str, Any]) -> None:
         "capturedDataRowCount", "processCount", "schemaCount",
         "signpostEventCount", "signpostSchemaCount", "tableCount",
     }
-    if not witness:
+    if not no_cpu_sampler:
         count_fields.add("cpuSampleCount")
     if any(
         not isinstance(summary[name], int) or isinstance(summary[name], bool) or summary[name] <= 0
@@ -3137,7 +3145,7 @@ def validate_trace_summary(record: dict[str, Any]) -> None:
         raise HistoryError("trace summary row counts do not match CPU/signpost totals")
     if sum(rows.values()) != summary["capturedDataRowCount"]:
         raise HistoryError("trace summary captured-row total is inconsistent")
-    if not witness:
+    if not no_cpu_sampler:
         if not isinstance(summary["cpuSampleSpanMS"], (int, float)) or summary["cpuSampleSpanMS"] <= 0:
             raise HistoryError("trace summary CPU sample span is empty")
         weight = summary.get("cpuCycleWeight", summary.get("cpuSampleWeightMS"))

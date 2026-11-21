@@ -25,7 +25,7 @@ SUMMARIZER = "scripts/summarize_generation_telemetry.py"
 HISTORY = "scripts/benchmark_history.py"
 
 LISTED = {
-    "templates": ["Allocations", "CPU Profiler", "Time Profiler"],
+    "templates": ["Allocations", "CPU Profiler", "Metal System Trace", "Time Profiler"],
     "instruments": ["Allocations", "CPU Profiler", "Time Profiler", "VM Tracker", "os_signpost"],
 }
 
@@ -392,8 +392,18 @@ class MacProfileTests(unittest.TestCase):
     def test_an_unknown_kind_is_refused_before_anything_runs(self) -> None:
         completed, shell = mac_profile(self, "--allow-dirty", "--kind", "gpu")
         self.assertEqual(completed.returncode, 1)
-        self.assertIn("profile kind must be cpu, memory or witness", completed.stderr)
+        self.assertIn("profile kind must be cpu, memory, metal or witness", completed.stderr)
         self.assertEqual(shell.calls(), [])
+
+    def test_metal_profile_records_metal_system_trace_and_keeps_raw_trace_by_default(self) -> None:
+        completed, shell = mac_profile(self, "--allow-dirty", "--kind", "metal")
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        [record] = shell.calls_to("xcrun", "xctrace", "record")
+        self.assertEqual(record[2:6], ["--template", "Metal System Trace", "--instrument", "os_signpost"])
+        [publish] = shell.calls_to(PUBLISHER, "profile")
+        self.assertEqual(option(publish, "--profile-kind"), "metal")
+        self.assertEqual(option(publish, "--retention-policy"), "keptByDefault")
+        self.assertEqual(option(publish, "--template"), "Metal System Trace + os_signpost")
 
     def test_memory_profile_records_allocations_and_vm_tracker_beside_cpu_and_signposts(self) -> None:
         completed, shell = mac_profile(self, "--allow-dirty", "--kind", "memory")
@@ -456,6 +466,11 @@ class ProfileInstrumentTests(unittest.TestCase):
             ("macos_test.sh", "memory"): (
                 memory("Time Profiler"), "Time Profiler + Allocations + VM Tracker + os_signpost",
             ),
+            # Metal System Trace captures MLX GPU kernels + signposts (DW-04).
+            ("macos_test.sh", "metal"): (
+                ["--template", "Metal System Trace", "--instrument", "os_signpost"],
+                "Metal System Trace + os_signpost",
+            ),
             # The witness records signposts alone, no sampler (audit #50).
             ("macos_test.sh", "witness"): (["--instrument", "os_signpost"], "os_signpost"),
             ("ios_device.sh", "cpu"): (cpu("CPU Profiler"), "CPU Profiler + os_signpost"),
@@ -477,10 +492,15 @@ class ProfileInstrumentTests(unittest.TestCase):
             shell.tool("xcrun", '[[ "$1 $2" == "xctrace list" ]] || exit 64\ncat "$QV_SANDBOX/xctrace-$3"')
             return shell.run(f"profile_instrument_args {quote(kind)}\nrequire_profile_instruments\n").returncode
 
-        for kind in ("cpu", "memory", "witness"):
+        for kind in ("cpu", "memory", "metal", "witness"):
             with self.subTest(kind=kind):
                 self.assertEqual(preflight(kind), 0)
-        for kind, missing in (("cpu", "Time Profiler"), ("memory", "Allocations"), ("witness", "os_signpost")):
+        for kind, missing in (
+            ("cpu", "Time Profiler"),
+            ("memory", "Allocations"),
+            ("metal", "Metal System Trace"),
+            ("witness", "os_signpost"),
+        ):
             with self.subTest(kind=kind, missing=missing):
                 self.assertNotEqual(preflight(kind, drop=missing), 0)
 

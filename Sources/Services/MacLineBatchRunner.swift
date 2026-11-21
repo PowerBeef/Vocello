@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import QwenVoiceCore
+import VocelloSharedPolicies
 
 /// The macOS line batch: one ordinary Studio take per line, looped over the
 /// shared `IOSSingleTakeGenerationExecutor` with `MacStudioSingleTakeGenerationHooks`

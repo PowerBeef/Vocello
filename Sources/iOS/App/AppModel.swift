@@ -3,6 +3,7 @@ import Foundation
 import Observation
 import SwiftUI
 import QwenVoiceCore
+import VocelloSharedPolicies
 
 struct IOSDeleteModelSheetPresentation: Identifiable {
     let id = UUID()

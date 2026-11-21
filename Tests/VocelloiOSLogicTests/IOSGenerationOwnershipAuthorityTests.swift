@@ -1,4 +1,5 @@
 import XCTest
+import VocelloSharedPolicies
 
 final class IOSGenerationOwnershipAuthorityTests: XCTestCase {
     /// (a) Both admission checks in `generate` refuse while a generation owns the scope, while the

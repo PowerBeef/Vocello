@@ -1,5 +1,6 @@
 import SwiftUI
 import QwenVoiceCore
+import VocelloSharedPolicies
 
 /// Top-level Voices tab entry point. Reads/writes `AppModel` state
 /// directly so the screen doesn't need binding plumbing from

@@ -55,7 +55,7 @@ macOS release is **Vocello 3.0.0**, the Mac app with the signed `vocello` CLI pa
 app is a **public TestFlight beta** until its 3.0 App Store release.
 
 > For repo conventions,
-> build commands, engine invariants, and release process, read [`CLAUDE.md`](../CLAUDE.md).
+> build commands, engine invariants, and release process, read [`AGENTS.md`](../AGENTS.md).
 > This document provides the deeper architecture narrative.
 
 ---
@@ -63,7 +63,7 @@ app is a **public TestFlight beta** until its 3.0 App Store release.
 ## 1. Module & target dependency graph
 
 The Xcode project is generated from [`project.yml`](../project.yml) (XcodeGen
-2.46.0). There are 12 targets split into **frameworks** and **apps/CLI/tests**; since
+2.46.0). There are 13 targets split into **frameworks** and **apps/CLI/tests**; since
 2026-09-15 no target is macOS-only except the app, the CLI, the CLI's `VocelloCLICore` framework
 (2026-10-19), the CLI's share of the app, `VocelloDesktopCore` (2026-10-21), and their test bundles.
 
@@ -80,6 +80,7 @@ graph TD
 
     QwenVoiceCore["QwenVoiceCore<br/>(engine core · iOS+macOS)"]:::fw
     QwenVoiceBackendCore["QwenVoiceBackendCore<br/>(provenance + policy vocabulary · iOS+macOS)"]:::fw
+    VocelloSharedPolicies["VocelloSharedPolicies<br/>(runtime/Studio policies · iOS+macOS)"]:::fw
     VocelloCLICore["VocelloCLICore<br/>(CLI runtime + parsing · macOS)"]:::macfw
     VocelloDesktopCore["VocelloDesktopCore<br/>(the app's store, History, settings · macOS)"]:::macfw
     VocelloCoreTests["VocelloCoreTests<br/>(macOS unit tests)"]:::app
@@ -90,9 +91,11 @@ graph TD
     SwiftHuggingFace["SwiftHuggingFace"]:::spm
 
     QwenVoice --> QwenVoiceCore
+    QwenVoice --> VocelloSharedPolicies
     QwenVoice --> GRDB
 
     VocelloiOS --> QwenVoiceCore
+    VocelloiOS --> VocelloSharedPolicies
     VocelloiOS --> GRDB
 
     VocelloCLI --> VocelloCLICore
@@ -100,11 +103,14 @@ graph TD
     VocelloCLICore --> VocelloDesktopCore
     VocelloCLICore --> QwenVoiceCore
     VocelloDesktopCore --> QwenVoiceCore
+    VocelloDesktopCore --> VocelloSharedPolicies
     VocelloDesktopCore --> GRDB
 
     VocelloCoreTests --> QwenVoiceCore
+    VocelloCoreTests --> VocelloSharedPolicies
     VocelloCoreTests -.->|"@testable import"| VocelloCLICore
 
+    VocelloSharedPolicies --> QwenVoiceCore
     QwenVoiceCore --> QwenVoiceBackendCore
 
     QwenVoiceCore --> MLXAudio
@@ -129,6 +135,7 @@ for the exact link graph.)
 | `VocelloDesktopCore` | framework.static | macOS | `VocelloDesktopCore` | `com.qwenvoice.desktop.core` | The Mac app logic the CLI shares (RF-26, RF-27): app files compiled by path (the engine store and Mac memory budget, History records and migrations, model-variant resolution) plus `Sources/DesktopShared` (also compiled by the app; it holds the engine-host lease the app and the CLI both write, and the one admission rule both apply). `DesktopEngineHost` hosts the engine as `MacEngineBootstrap` does and runs long-form projects through the apps' `IOSLongFormProjectRunner` (compiled by path) headless; read-only History, app settings (CFPreferences), model selection and inventory. |
 | `QwenVoiceCore` | framework.static | iOS + macOS | `QwenVoiceCore` | `com.qwenvoice.core` | **Engine core**: `TTSEngine` protocol, `MLXTTSEngine`, generation semantics, runtime, memory policy, telemetry. |
 | `QwenVoiceBackendCore` | framework.static | iOS + macOS | `QwenVoiceBackendCore` | `com.qwenvoice.backend-core` | Backend provenance, generation defaults and policy vocabulary, finish reason, and the minimal synthesis abstraction. MLX loading, synthesis, and codecs live in `QwenVoiceCore` and the owned Qwen3 runtime. |
+| `VocelloSharedPolicies` | framework.static | iOS + macOS | `VocelloSharedPolicies` | `com.qwenvoice.shared-policies` | Pure platform-neutral runtime-release, generation-ownership, Studio attempt-authority, foreground-exit, retry-policy, handoff and notification types compiled once instead of 4-5x by path across `QwenVoice`, `VocelloiOS`, `VocelloDesktopCore`, `VocelloCoreTests` and `VocelloiOSLogicTests` (P2-3 / DW-03). |
 | `VocelloCoreTests` | bundle.unit-test | macOS | `VocelloCoreTests` | `com.qwenvoice.core.tests` | Core semantics, typed telemetry compatibility, atomic/readable output contracts, the host-runnable iOS policy assertions from `Tests/VocelloiOSLogicTests`, which this target also compiles, and the shared orchestrators compiled by path (engine store over a fake engine, Studio coordinator, History database service, export gate, iPhone model inventory, long-form coordinator and runner). |
 | `VocelloiOSLogicTests` | bundle.unit-test | iOS | `VocelloiOSLogicTests` | `com.patricedery.vocello.logic-tests` | Duplicate standalone, app-host-free platform policy compile for catalog/ledger, memory, cancellation, storage gating, and privacy-safe diagnostics. Ordinary CI compiles this bundle for the physical-device SDK. Xcode 26 does not support executing a tool-hosted app-free bundle on a physical-device destination, so this target is compile-only; its shared assertions execute in `VocelloCoreTests`. |
 | `VocelloMacUITests` | bundle.ui-testing | macOS | `VocelloMacUITests` | `com.qwenvoice.app.uitests` | Explicit native-app smoke and benchmark XCUITest lanes. |

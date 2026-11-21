@@ -2,8 +2,7 @@ import Foundation
 import Observation
 import QwenVoiceCore
 
-@MainActor
-enum RuntimeReleaseAction: nonisolated Equatable {
+public enum RuntimeReleaseAction: Equatable, Sendable {
     case none
     case deferred(reason: String)
     case execute(reason: String, wasDeferred: Bool)
@@ -12,21 +11,18 @@ enum RuntimeReleaseAction: nonisolated Equatable {
 /// Severity signaled alongside a cache-relief request. `warning` may be
 /// deferred while a generation is active; `critical` must run immediately
 /// because the generation itself may be the source of the pressure.
-@MainActor
-enum MemoryPressureSeverity: nonisolated Equatable {
+public enum MemoryPressureSeverity: Equatable, Sendable {
     case warning
     case critical
 }
 
-@MainActor
-enum MemoryPressureReliefAction: nonisolated Equatable {
+public enum MemoryPressureReliefAction: Equatable, Sendable {
     case none
     case deferred(reason: String)
     case execute(reason: String, cancelActiveGeneration: Bool)
 }
 
-@MainActor
-enum CriticalMemoryReliefOutcome: nonisolated Equatable {
+public enum CriticalMemoryReliefOutcome: Equatable, Sendable {
     case completed
     case cancellationFailed
     case alreadyInFlight
@@ -38,11 +34,11 @@ enum CriticalMemoryReliefOutcome: nonisolated Equatable {
 /// proven, which keeps a full unload from racing live MLX compute and keeps UI
 /// admission closed until that unload has completed.
 @MainActor
-enum CriticalMemoryReliefExecutor {
-    static func execute(
-        cancel: @concurrent (GenerationCancellationReason) async throws -> Void,
-        applyRelief: @concurrent () async -> Void,
-        releaseOwnership: @concurrent () async -> Void
+public enum CriticalMemoryReliefExecutor {
+    public static func execute(
+        cancel: (GenerationCancellationReason) async throws -> Void,
+        applyRelief: () async -> Void,
+        releaseOwnership: () async -> Void
     ) async -> CriticalMemoryReliefOutcome {
         do {
             try await cancel(.memoryPressure)
@@ -61,9 +57,9 @@ enum CriticalMemoryReliefExecutor {
 /// cleared exactly once, after that record. `@MainActor` for the same reason as
 /// `CriticalMemoryReliefExecutor`: `TTSEngineStore` passes MainActor-bound closures.
 @MainActor
-enum CriticalMemoryFullUnloadSequence {
-    static func execute(
-        unload: @concurrent () async -> Void,
+public enum CriticalMemoryFullUnloadSequence {
+    public static func execute(
+        unload: () async -> Void,
         recordUnloadCompleted: () -> Void,
         clearGenerationActivity: () -> Void
     ) async {
@@ -75,12 +71,14 @@ enum CriticalMemoryFullUnloadSequence {
 
 @MainActor
 @Observable
-final class RuntimeReleaseCoordinator {
-    private(set) var pendingReason: String?
-    private(set) var pendingCacheReliefReason: String?
-    private(set) var isReleaseInFlight = false
+public final class RuntimeReleaseCoordinator {
+    public private(set) var pendingReason: String?
+    public private(set) var pendingCacheReliefReason: String?
+    public private(set) var isReleaseInFlight = false
 
-    func requestRelease(reason: String, hasActiveGeneration: Bool) -> RuntimeReleaseAction {
+    public init() {}
+
+    public func requestRelease(reason: String, hasActiveGeneration: Bool) -> RuntimeReleaseAction {
         if hasActiveGeneration || isReleaseInFlight {
             pendingReason = reason
             return .deferred(reason: reason)
@@ -90,7 +88,7 @@ final class RuntimeReleaseCoordinator {
         return .execute(reason: reason, wasDeferred: false)
     }
 
-    func executeDeferredReleaseIfReady(hasActiveGeneration: Bool) -> RuntimeReleaseAction {
+    public func executeDeferredReleaseIfReady(hasActiveGeneration: Bool) -> RuntimeReleaseAction {
         guard !hasActiveGeneration, !isReleaseInFlight, let pendingReason else {
             return .none
         }
@@ -100,7 +98,7 @@ final class RuntimeReleaseCoordinator {
         return .execute(reason: pendingReason, wasDeferred: true)
     }
 
-    func completeRelease(hasActiveGeneration: Bool) -> RuntimeReleaseAction {
+    public func completeRelease(hasActiveGeneration: Bool) -> RuntimeReleaseAction {
         isReleaseInFlight = false
         return executeDeferredReleaseIfReady(hasActiveGeneration: hasActiveGeneration)
     }
@@ -109,13 +107,13 @@ final class RuntimeReleaseCoordinator {
     /// (the app returned to the foreground before the generation terminated).
     /// A release already in flight, or one pending for another reason, is kept.
     @discardableResult
-    func cancelPendingRelease(reason: String) -> Bool {
+    public func cancelPendingRelease(reason: String) -> Bool {
         guard pendingReason == reason else { return false }
         pendingReason = nil
         return true
     }
 
-    func requestCacheRelief(
+    public func requestCacheRelief(
         reason: String,
         severity: MemoryPressureSeverity = .warning,
         hasActiveGeneration: Bool
@@ -140,7 +138,7 @@ final class RuntimeReleaseCoordinator {
         }
     }
 
-    func executeDeferredCacheReliefIfReady(
+    public func executeDeferredCacheReliefIfReady(
         hasActiveGeneration: Bool
     ) -> MemoryPressureReliefAction {
         guard !hasActiveGeneration, let pendingCacheReliefReason else {

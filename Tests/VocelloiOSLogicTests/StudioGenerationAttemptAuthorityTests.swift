@@ -1,4 +1,5 @@
 import XCTest
+import VocelloSharedPolicies
 
 final class StudioGenerationAttemptAuthorityTests: XCTestCase {
     private let first = StudioGenerationAttemptToken(

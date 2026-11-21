@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import OSLog
 import QwenVoiceCore
+import VocelloSharedPolicies
 
 extension Notification.Name {
     static let ttsEngineMemoryContextDidChange = Notification.Name("TTSEngineStoreMemoryContextDidChange")

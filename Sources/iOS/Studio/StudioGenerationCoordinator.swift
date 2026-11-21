@@ -2,6 +2,7 @@ import Accessibility
 import Foundation
 import Observation
 import QwenVoiceCore
+import VocelloSharedPolicies
 
 /// Per-mode generation lifecycle state. Lifted out of the three legacy
 /// per-mode views (`IOSCustomVoiceView`, `IOSVoiceDesignView`,

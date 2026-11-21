@@ -7,7 +7,7 @@ import QwenVoiceCore
 /// once the scene reaches `.background`. The maintainer decision (2026-09-22)
 /// is to cancel through the typed barrier, keep finished long-form segments and
 /// tell the user on return.
-enum IOSBackgroundGenerationWork: Equatable, Sendable {
+public enum IOSBackgroundGenerationWork: Equatable, Sendable {
     /// No Studio attempt is running.
     case idle
     /// A short-form take is running; cancelling discards it (it never reaches History).
@@ -22,7 +22,7 @@ enum IOSBackgroundGenerationWork: Equatable, Sendable {
 }
 
 /// What the user is told on return after the foreground exit stopped Studio work.
-enum IOSBackgroundInterruption: Equatable, Sendable {
+public enum IOSBackgroundInterruption: Equatable, Sendable {
     case singleTakeDiscarded
     case longFormStopped
 }
@@ -31,29 +31,43 @@ enum IOSBackgroundInterruption: Equatable, Sendable {
 /// request finite background time, cancel through the typed barrier with the
 /// shutdown reason, and request the runtime release only after that barrier
 /// has returned (see `IOSForegroundExitState`).
-struct IOSBackgroundTransitionPlan: Equatable, Sendable {
+public struct IOSBackgroundTransitionPlan: Equatable, Sendable {
     /// Ask the system for background time so the barrier and release can
     /// finish before suspension. Ended when the release completes or expires.
-    let requestsBackgroundTime: Bool
+    public let requestsBackgroundTime: Bool
     /// Studio work to cancel through its coordinator, with the notice to show on return.
-    let studioInterruption: IOSBackgroundInterruption?
+    public let studioInterruption: IOSBackgroundInterruption?
     /// Engine work that no Studio attempt owns still has to stop before suspension.
-    let cancelsUnownedEngineGeneration: Bool
+    public let cancelsUnownedEngineGeneration: Bool
     /// Typed reason for every cancellation this transition issues.
-    let cancellationReason: GenerationCancellationReason
+    public let cancellationReason: GenerationCancellationReason
     /// Reason of the runtime release requested after the cancellation.
-    let releaseReason: String
+    public let releaseReason: String
+
+    public init(
+        requestsBackgroundTime: Bool,
+        studioInterruption: IOSBackgroundInterruption?,
+        cancelsUnownedEngineGeneration: Bool,
+        cancellationReason: GenerationCancellationReason,
+        releaseReason: String
+    ) {
+        self.requestsBackgroundTime = requestsBackgroundTime
+        self.studioInterruption = studioInterruption
+        self.cancelsUnownedEngineGeneration = cancelsUnownedEngineGeneration
+        self.cancellationReason = cancellationReason
+        self.releaseReason = releaseReason
+    }
 }
 
 /// Pure decisions behind the iOS foreground-exit handling. The app-only scene
 /// handler (`QVoiceiOSApp`) and `AppModel` apply them; tests pin them here.
-enum IOSBackgroundGenerationPolicy {
+public enum IOSBackgroundGenerationPolicy {
     /// Runtime-release reason owned by the foreground exit.
-    static let releaseReason = "background"
+    public static let releaseReason = "background"
     /// Leaving the foreground is a shutdown of in-flight work, not a user cancel.
-    static let cancellationReason: GenerationCancellationReason = .shutdown
+    public static let cancellationReason: GenerationCancellationReason = .shutdown
 
-    static func backgroundPlan(
+    public static func backgroundPlan(
         hasActiveGeneration: Bool,
         studioWork: IOSBackgroundGenerationWork
     ) -> IOSBackgroundTransitionPlan {
@@ -83,13 +97,13 @@ enum IOSBackgroundGenerationPolicy {
 /// handler. A non-user reason (the foreground exit's `.shutdown`) therefore
 /// goes through the engine barrier first; the Swift task is cancelled once the
 /// barrier returns, which still stops work that had not reached the engine.
-enum IOSStudioCancellationOrder: Equatable, Sendable {
+public enum IOSStudioCancellationOrder: Equatable, Sendable {
     /// User Stop: cancel the Swift task immediately, then await the barrier.
     case taskThenBarrier
     /// Typed non-user reason: await the barrier, then cancel the Swift task.
     case barrierThenTask
 
-    static func forReason(_ reason: GenerationCancellationReason) -> IOSStudioCancellationOrder {
+    public static func forReason(_ reason: GenerationCancellationReason) -> IOSStudioCancellationOrder {
         reason == .user ? .taskThenBarrier : .barrierThenTask
     }
 }
@@ -101,14 +115,16 @@ enum IOSStudioCancellationOrder: Equatable, Sendable {
 /// is still in the background, and the grant ends only when no exit is still
 /// waiting on its barrier and no release is running, queued or pending for the
 /// foreground exit, so an earlier release can never end a newer grant.
-struct IOSForegroundExitState: Equatable, Sendable {
-    private(set) var epoch: UInt64 = 0
-    private(set) var isBackgrounded = false
+public struct IOSForegroundExitState: Equatable, Sendable {
+    public private(set) var epoch: UInt64 = 0
+    public private(set) var isBackgrounded = false
     /// The current exit's barrier has not returned, so its release is not requested yet.
-    private(set) var awaitsBarrier = false
+    public private(set) var awaitsBarrier = false
+
+    public init() {}
 
     /// Starts an exit and returns its epoch.
-    mutating func enterBackground() -> UInt64 {
+    public mutating func enterBackground() -> UInt64 {
         epoch &+= 1
         isBackgrounded = true
         awaitsBarrier = true
@@ -117,21 +133,21 @@ struct IOSForegroundExitState: Equatable, Sendable {
 
     /// The exit's cancellation barrier returned. `true` when the release must be
     /// requested now; `false` when the user came back (or a newer exit began).
-    mutating func barrierReturned(for exitEpoch: UInt64) -> Bool {
+    public mutating func barrierReturned(for exitEpoch: UInt64) -> Bool {
         guard isBackgrounded, exitEpoch == epoch else { return false }
         awaitsBarrier = false
         return true
     }
 
     /// The scene is active again; any in-flight exit is superseded.
-    mutating func returnToForeground() {
+    public mutating func returnToForeground() {
         epoch &+= 1
         isBackgrounded = false
         awaitsBarrier = false
     }
 
     /// A runtime release finished. `true` when the background-time grant may end.
-    func endsBackgroundTime(
+    public func endsBackgroundTime(
         followUpReleaseExecutes: Bool,
         pendingReleaseReason: String?
     ) -> Bool {
@@ -151,26 +167,28 @@ struct IOSForegroundExitState: Equatable, Sendable {
 /// long-form acceptance awaited by the cancellation barrier, finishes first. The
 /// database resumes as soon as the scene is active again, and the app then
 /// reconciles History so a write the suspension deferred commits.
-struct IOSHistoryDatabaseSuspensionState: Equatable, Sendable {
-    enum Transition: Equatable, Sendable {
+public struct IOSHistoryDatabaseSuspensionState: Equatable, Sendable {
+    public enum Transition: Equatable, Sendable {
         case suspend
         case resume
     }
 
-    private(set) var isSuspended = false
+    public private(set) var isSuspended = false
+
+    public init() {}
 
     /// The scene left the foreground; `holdsBackgroundTime` is whether a grant is running.
-    mutating func enterBackground(holdsBackgroundTime: Bool) -> Transition? {
+    public mutating func enterBackground(holdsBackgroundTime: Bool) -> Transition? {
         holdsBackgroundTime ? nil : suspend()
     }
 
     /// The background-time grant ended. Suspends only while still backgrounded.
-    mutating func backgroundTimeEnded(isBackgrounded: Bool) -> Transition? {
+    public mutating func backgroundTimeEnded(isBackgrounded: Bool) -> Transition? {
         isBackgrounded ? suspend() : nil
     }
 
     /// The scene is active again.
-    mutating func returnToForeground() -> Transition? {
+    public mutating func returnToForeground() -> Transition? {
         guard isSuspended else { return nil }
         isSuspended = false
         return .resume
@@ -188,11 +206,13 @@ struct IOSHistoryDatabaseSuspensionState: Equatable, Sendable {
 ///
 /// `update` returns the value to assign to `UIApplication.isIdleTimerDisabled`,
 /// or `nil` when it must be left alone.
-struct IOSGenerationScreenAwakeHold: Equatable, Sendable {
+public struct IOSGenerationScreenAwakeHold: Equatable, Sendable {
     /// True only while this hold is the one that disabled the idle timer.
-    private(set) var ownsIdleTimerHold = false
+    public private(set) var ownsIdleTimerHold = false
 
-    mutating func update(isGenerating: Bool, idleTimerDisabled: Bool) -> Bool? {
+    public init() {}
+
+    public mutating func update(isGenerating: Bool, idleTimerDisabled: Bool) -> Bool? {
         if isGenerating {
             guard !idleTimerDisabled else { return nil }
             ownsIdleTimerHold = true
@@ -207,22 +227,24 @@ struct IOSGenerationScreenAwakeHold: Equatable, Sendable {
 /// Per-coordinator notice state: recorded when the foreground exit stops an
 /// attempt, shown only once the user is back, cleared on dismissal, a new
 /// attempt or a failed cancellation (which surfaces its own error).
-struct IOSBackgroundInterruptionNoticeState: Equatable, Sendable {
-    private(set) var pending: IOSBackgroundInterruption?
-    private(set) var presented: IOSBackgroundInterruption?
+public struct IOSBackgroundInterruptionNoticeState: Equatable, Sendable {
+    public private(set) var pending: IOSBackgroundInterruption?
+    public private(set) var presented: IOSBackgroundInterruption?
 
-    mutating func record(_ interruption: IOSBackgroundInterruption) {
+    public init() {}
+
+    public mutating func record(_ interruption: IOSBackgroundInterruption) {
         pending = interruption
         presented = nil
     }
 
-    mutating func presentOnReturn() {
+    public mutating func presentOnReturn() {
         guard let pending else { return }
         presented = pending
         self.pending = nil
     }
 
-    mutating func clear() {
+    public mutating func clear() {
         pending = nil
         presented = nil
     }

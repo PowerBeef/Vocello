@@ -1,6 +1,7 @@
 import AVFoundation
 import QwenVoiceCore
 import XCTest
+import VocelloSharedPolicies
 
 /// The player's live preview driven as the app drives it, on a fake audio graph (RF-61, audit
 /// findings A2, A3 and T9): streamed chunks arrive as notifications, the node "plays" them, the

@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import QwenVoiceCore
 import OSLog
+import VocelloSharedPolicies
 
 /// The engine's own Auto resolution, so the chip names the language the take
 /// is sent with (U02). The recognizer reads the whole script (up to the

@@ -2,6 +2,7 @@ import Foundation
 
 import QwenVoiceCore
 import OSLog
+import VocelloSharedPolicies
 
 typealias PersistenceGenerationResult = QwenVoiceCore.GenerationResult
 

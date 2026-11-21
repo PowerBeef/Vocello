@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 @testable import QwenVoiceCore
 import VocelloQwen3Core
+import VocelloSharedPolicies
 
 /// PA-15 / DA-09 (E7-03): the foreground exit's `.shutdown` must reach the
 /// engine's terminal cancellation summary. These tests drive a real

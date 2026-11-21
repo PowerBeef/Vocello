@@ -2,6 +2,7 @@ import Foundation
 import QwenVoiceCore
 import UniformTypeIdentifiers
 import XCTest
+import VocelloSharedPolicies
 
 final class IOSReferenceTranscriptionReviewStateTests: XCTestCase {
     func testSupportedImportTypesShareOnePolicy() throws {

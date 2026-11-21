@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import QwenVoiceCore
 import XCTest
+import VocelloSharedPolicies
 
 /// PA-15: leaving the foreground cancels generation safely. The app-only scene
 /// handler and `AppModel` apply these decisions; the physical-device proof that

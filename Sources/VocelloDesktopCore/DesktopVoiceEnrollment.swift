@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import VocelloSharedPolicies
 
 /// RF-28: saving a clone voice as the Mac app's voice sheet saves one
 /// (`MacSavedVoiceSheet`), for `voices enroll`, `voices replace` and `voices

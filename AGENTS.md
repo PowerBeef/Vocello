@@ -45,15 +45,17 @@ and re-render in one call. `docs/ARCHITECTURE.md` traces ownership and lifecycle
   UI-test bundle; strict memory safety, NonisolatedNonsendingByDefault, InferIsolatedConformances and
   MemberImportVisibility on): `QwenVoice` (macOS app `Vocello.app`), `VocelloiOS` (module
   `QVoiceiOS`), `VocelloCLI` (`vocello`); static frameworks `QwenVoiceCore` (product engine),
-  `QwenVoiceBackendCore` (provenance/policy vocabulary), `VocelloDesktopCore` (the Mac app's UI-free
+  `QwenVoiceBackendCore` (provenance/policy vocabulary), `VocelloSharedPolicies` (pure multiplatform
+  runtime/Studio/ownership/retry policies compiled once for both apps, desktop core and unit tests),
+  `VocelloDesktopCore` (the Mac app's UI-free
   History, settings, engine store, long-form and line-batch logic, compiled by path for the CLI) and
   `VocelloCLICore` (the CLI's runtime and parsing, which the tests import instead of compiling by
   path); `VocelloCoreTests` (macOS host for core and iOS-logic tests), compile-only
-  `VocelloiOSLogicTests`, and three XCUITest bundles. The macOS app compiles about 20 `Sources/iOS`
-  and `Sources/iOSSupport` files by path; that shared code, not a shared data folder, is the "shared
-  store".
-- **Layering:** `QwenVoiceBackendCore` ← `QwenVoiceCore` ← {apps, `VocelloDesktopCore` ←
-  `VocelloCLICore` ← CLI}. Platform differences live only in the bootstraps (`MacEngineBootstrap`,
+  `VocelloiOSLogicTests`, and three XCUITest bundles. The macOS app compiles the remaining shared
+  `Sources/iOS` and `Sources/iOSSupport` files by path; that shared code, not a shared data folder,
+  is the "shared store".
+- **Layering:** `QwenVoiceBackendCore` ← `QwenVoiceCore` ← `VocelloSharedPolicies` ← {apps,
+  `VocelloDesktopCore` ← `VocelloCLICore` ← CLI}. Platform differences live only in the bootstraps (`MacEngineBootstrap`,
   `IOSAppBootstrap`, `CLIRuntime`), which all call `NativeRuntimeFactory.make`. Never reintroduce a
   separate engine process.
 - **Generation flow:** view → coordinator (`StudioGenerationCoordinator`, attempt tokens) →

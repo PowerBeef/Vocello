@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import VocelloSharedPolicies
 
 /// iOS adapter of `IOSLongFormPlatformHooks`: every member calls exactly what
 /// `IOSLongFormProject.swift` called inline before the seam, so the iOS

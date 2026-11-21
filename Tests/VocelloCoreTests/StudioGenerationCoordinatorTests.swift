@@ -1,6 +1,7 @@
 import Foundation
 import QwenVoiceCore
 import XCTest
+import VocelloSharedPolicies
 
 private struct CoordinatorFixtureBarrierFailure: LocalizedError {
     var errorDescription: String? { "fixture barrier failure" }

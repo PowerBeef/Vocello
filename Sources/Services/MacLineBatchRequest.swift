@@ -1,5 +1,6 @@
 import Foundation
 import QwenVoiceCore
+import VocelloSharedPolicies
 
 /// A text file dropped on the batch sheet (A8). The extension is compared
 /// without regard to case, the text is decoded in the encoding the file

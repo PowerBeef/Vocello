@@ -3,6 +3,7 @@ import Foundation
 import Observation
 
 import QwenVoiceCore
+import VocelloSharedPolicies
 
 typealias PlaybackGenerationResult = QwenVoiceCore.GenerationResult
 

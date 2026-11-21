@@ -3,6 +3,7 @@ import QwenVoiceCore
 import SwiftUI
 import UniformTypeIdentifiers
 import OSLog
+import VocelloSharedPolicies
 
 /// Session state of the reference the screen holds beside the draft: which
 /// saved voice has been hydrated from disk, a transcript that could not be

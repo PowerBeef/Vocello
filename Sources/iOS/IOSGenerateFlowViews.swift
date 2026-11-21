@@ -1,5 +1,6 @@
 import SwiftUI
 import QwenVoiceCore
+import VocelloSharedPolicies
 
 struct IOSGenerateContainerView: View {
     @Environment(AppModel.self) private var appModel

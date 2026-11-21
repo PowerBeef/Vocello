@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 @testable import QwenVoiceCore
+import VocelloSharedPolicies
 import XCTest
 import os
 

@@ -3,6 +3,7 @@ import AVFoundation
 import Foundation
 import Observation
 import QwenVoiceCore
+import VocelloSharedPolicies
 
 /// iOS long-form v4: scripts above the single-take limit run as a planned
 /// project of ordinary sequential streaming takes — the same shipping design

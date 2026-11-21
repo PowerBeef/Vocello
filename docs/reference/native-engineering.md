@@ -253,9 +253,11 @@ physical-device or macOS XCUITest lane at a coherent checkpoint.
   querying a tab while a bottom panel or keyboard covers the dock (the hittability query can end the
   runner before cleanup; close the panel first).
 - Testing pure order or state logic owned by an app-only `@MainActor` iOS type in place: extract it
-  into a value type under `Sources/iOSSupport/Services`, list the file under both `VocelloCoreTests`
-  and `VocelloiOSLogicTests` in `project.yml`, and add it to the matching `promotionRouting` class in
-  `config/quality-promotion-contract.json`. The orchestrators themselves are the exception: the engine
+  into a value type under `Sources/iOSSupport/Services`, either adding it to `VocelloSharedPolicies`
+  (preferred for pure platform-neutral policies shared across apps and tests) or listing the file
+  under both `VocelloCoreTests` and `VocelloiOSLogicTests` in `project.yml`, and add it to the
+  matching `promotionRouting` class in `config/quality-promotion-contract.json`. The orchestrators
+  themselves are the exception: the engine
   store, the Studio coordinator, the History `DatabaseService`, the export gate's decision logic, the
   iPhone model inventory and the long-form coordinator and runner are compiled by path into
   `VocelloCoreTests` only and driven there over fakes; extend those suites instead of extracting their

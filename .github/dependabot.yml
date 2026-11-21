@@ -1,5 +1,7 @@
 version: 2
 updates:
+  # Action SHAs are pinned in lockstep with config/toolchain.json (supply_chain_contract.py);
+  # keep version-update PRs disabled so Dependabot does not open unmergeable solo bumps.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -8,7 +10,7 @@ updates:
       time: "09:00"
       timezone: "America/Toronto"
     labels: ["dependencies", "ci"]
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     groups:
       github-actions:
         patterns: ["*"]
@@ -31,6 +33,8 @@ updates:
         patterns: ["*"]
 
   # The independently governed Qwen runtime is the repository's SwiftPM package root.
+  # Exact Swift pins move only in lockstep with project.yml/COMPATIBILITY.json and benchmark review
+  # (monitored weekly by .github/workflows/swift-dependency-watch.yml), so keep automated PRs off.
   - package-ecosystem: "swift"
     directory: "/Packages/VocelloQwen3Core"
     schedule:
@@ -39,7 +43,7 @@ updates:
       time: "10:00"
       timezone: "America/Toronto"
     labels: ["dependencies", "backend"]
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 0
     groups:
       mlx-runtime:
         patterns: ["mlx-*"]

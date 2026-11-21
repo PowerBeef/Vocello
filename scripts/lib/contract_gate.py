@@ -148,7 +148,7 @@ VALIDATORS: tuple[Validator, ...] = (
         "README.md", "benchmarks/hardware-profiles.json", "website/PRODUCT.md", "website/index.html",
         "website/public/", "website/src/",
         # README product imagery must exist.
-        "docs/screenshots/", "docs/readme/", "docs/readme_banner_vocello.png")),
+        "docs/screenshots/", "docs/readme/")),
     _reads(PYTHON, "scripts/attribution_manifest.py", "rebuild", "--check", inputs=ATTRIBUTION),
     _reads(PYTHON, "scripts/attribution_manifest.py", "validate", inputs=ATTRIBUTION),
 

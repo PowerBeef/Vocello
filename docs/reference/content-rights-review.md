@@ -1,8 +1,8 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-10
-summary: The maintainer's recorded privacy, region and content-rights decisions for the 3.0 App Store submission, with the evidence behind them for model artifacts, built-in voice previews, marketing audio, product artwork and the App Store Connect declarations.
+reviewed: 2026-11-21
+summary: The maintainer's recorded privacy, region and content-rights decisions for the 3.1 App Store submission, with the evidence behind them for model artifacts, built-in voice previews, marketing audio, product artwork and the App Store Connect declarations.
 sourceOfTruth:
   - config/third-party-attribution-policy.json
   - Sources/Resources/qwenvoice_production_model_catalog.json
@@ -18,7 +18,7 @@ not become a qualified legal conclusion merely because it is recorded here.
 
 Apple's [upload requirements](https://developer.apple.com/news/upcoming-requirements/) were rechecked
 September 6: iOS uploads require Xcode 26 or later and the iOS 26 SDK or later. CI's pinned
-Xcode 26.6 (`config/toolchain.json`) and the local Xcode 27.1 both clear that minimum;
+Xcode 27.2 (`config/toolchain.json`) and the matching local Xcode 27.2 both clear that minimum;
 signed-candidate verification is still separate. Apple's
 [privacy definition](https://developer.apple.com/app-store/app-privacy-details/) still requires
 consideration of third-party partner collection. No disclosure decision is inferred from local
@@ -64,7 +64,7 @@ code, an SDK, an account, analytics, or a non-Apple purchase path.
 
 ### ASR-09: model downloads are verified for North America only
 
-3.0 is available in 148 territories outside the EU (since 2026-10-27), but download verification
+3.1 is available in 148 territories outside the EU (since 2026-10-27), but download verification
 covers North America only, where App Review runs.
 - **Existing evidence:** the North America proof of 2026-09-01 (full digests of the three largest
   iOS files) is the evidence class.
@@ -102,8 +102,8 @@ candidate's state, and no inventoried path changed between `a60dd204` and build 
 | 5 | Launch logo | 3 | `f8e963075a0a` | `Sources/Assets.xcassets/VocelloLaunchLogo.imageset/*.png` |
 | 6 | Launch background | 3 | `fcb8bc9835ee` | `Sources/Assets.xcassets/VocelloLaunchBackground.imageset/*.png` |
 | 7 | Website social preview | 1 | `125eba9aa004` | `website/public/assets/social_preview.png` |
-| 8 | README banner | 1 | `9f202800a5fd` | `docs/readme_banner_vocello.png` |
-| 9 | Website app screenshots | 20 | `cd5489e7d394` | `website/public/assets/screens/*.png`, `*.avif` |
+| 8 | README banner | 0 (retired) | `9f202800a5fd` (at `a60dd204`) | Retired `docs/readme_banner_vocello.png` (replaced by generated `docs/readme/hero.svg`) |
+| 9 | Website app screenshots | 14 (20 at `a60dd204`) | `368430a47505` (`cd5489e7d394` at `a60dd204`) | `website/public/assets/screens/*.png`, `*.avif` (refreshed for 3.1 in `f5ba3251`; 6 unused triplets removed 2026-11-21) |
 | 10 | Website voice samples | 4 | `d7eefde05e19` | `website/public/assets/voice-samples/*.wav` |
 | 11 | In-app voice previews | 9 | `dccd9303c7fc` | `Sources/Resources/voice-previews/*.wav` |
 
@@ -132,7 +132,7 @@ below), so a "pending" in this table is history, not open work.
 
 | Surface | Source-proven evidence | Current decision | Qualified reviewer and closure evidence |
 | --- | --- | --- | --- |
-| Six downloadable model artifacts | Every production fork and base artifact is bound to an immutable revision and model-card digest. The exact fork and base revisions declare Apache-2.0. The forks identify their base lineage and the quantized tensor modification. Vocello bundles the Apache-2.0 text and offline model attribution. | **Conditional source support; qualified redistribution decision pending.** Apache-2.0 grants broad reproduction, derivative, and distribution rights subject to its conditions, but the repository cannot adjudicate whether the app's license-delivery mechanism, NOTICE handling, trademark references, and every distribution territory fully satisfy them. | Open-source/IP counsel records a signed decision covering Apache-2.0 section 4 delivery and modification notices, absence or handling of upstream NOTICE material, Qwen/Hugging Face names and marks, the public quantized forks, and commercial App Store redistribution. Attach a dated decision reference without credentials or private correspondence. |
+| Three downloadable hybrid model artifacts (`RF-59`; six in 3.0) | Every production fork and base artifact is bound to an immutable revision and model-card digest. The exact fork and base revisions declare Apache-2.0. The forks identify their base lineage and the quantized tensor modification (`docs/reference/hybrid-model.md` §7). Vocello bundles the Apache-2.0 text and offline model attribution. | **Conditional source support; qualified redistribution decision pending.** Apache-2.0 grants broad reproduction, derivative, and distribution rights subject to its conditions, but the repository cannot adjudicate whether the app's license-delivery mechanism, NOTICE handling, trademark references, and every distribution territory fully satisfy them. | Open-source/IP counsel records a signed decision covering Apache-2.0 section 4 delivery and modification notices, absence or handling of upstream NOTICE material, Qwen/Hugging Face names and marks, the public quantized forks, and commercial App Store redistribution. Attach a dated decision reference without credentials or private correspondence. |
 | AudioSeal watermark code and weights (3.0 candidate) | `MLXAudioMark` ports Meta's MIT-licensed AudioSeal generator, and every model package downloads its fp16 weights (`marking/audioseal_wm16_generator_fp16.safetensors`, digest pinned in the catalog). Meta's copyright and MIT notice are in `Packages/VocelloQwen3Core/NOTICES.md` and therefore in the bundled attribution manifest. The port's reference is the `audioseal` 0.2.0 Python package (GitHub `facebookresearch/audioseal` commit `a0ce2564ff2b`, which sets that version) with weights from `facebook/audioseal` `generator_base.pth`, whose content (SHA-256 `7a845b5fbe93…`) is identical at every Hugging Face revision; reconstructed on 2026-09-24 from public metadata and recorded in `ORIGINS.md` (the `cc2700db` hash cited before 2026-09-24 was the UTMOSv2 pin). The fp16 conversion is shape-consistent with that checkpoint but not byte-reproduced. | **Attribution present; upstream revision identified from metadata.** | Optional stronger proof: reproduce the fp16 conversion from `generator_base.pth` and match the catalog digest (needs the maintainer's consent to download the checkpoint). Counsel confirms the MIT notice delivery for the redistributed weights with the other model artifacts. |
 | Built-in voice previews and speaker presentation | The nine bundled WAVs are locally generated by Vocello from documented neutral scripts and built-in Qwen speakers. The official model card names and describes those speakers. | **Qualified output/personality-rights decision pending.** Reproducibility and model licensing do not themselves prove rights to commercially distribute voice output or use speaker identities/names in product presentation. | IP/publicity-rights counsel reviews the official Qwen terms and obtains written vendor clarification if needed. Record whether audio, speaker names, and personality presentation are permitted in each intended territory; otherwise replace the previews/presentation with independently cleared voices. |
 | Marketing audio other than cloning | `website/src/data/samples.js` identifies the mode, displayed speaker, delivery, script, and tracked audio asset. | **Creator provenance and output-rights decision pending.** The repository does not contain a signed script-ownership attestation, generation receipt, or qualified conclusion for using Qwen outputs in advertising. | The maintainer signs the factual asset attestation below for every clip; counsel then approves the relevant model/output terms and marketing use. Replace any clip lacking both records. |
@@ -225,7 +225,7 @@ the signing owner authorizes candidate operations separately. Record only saniti
 scope and evidence digest in the repository; private correspondence stays untracked. A missing
 response keeps its item (ASR-04, ASR-11) blocked, not implicitly approved.
 
-ASR-09 verifies North America only for 3.0 (see the 2026-10-12 decisions above). Run its
+ASR-09 verifies North America only for 3.x (see the 2026-10-12 decisions above). Run its
 full-artifact host proof only near submission: its freshness window is **24 hours**. Do not purchase
 hosts, send vendor or legal inquiries, edit account fields or accept agreements without separate
 authority.

@@ -56,7 +56,7 @@ runs:
         echo "$HOME/.qwenvoice-pinned-tools/bin" >> "$GITHUB_PATH"
         export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
         if [[ "$INSTALL_METAL" == "true" ]] && ! xcrun metal --version >/dev/null 2>&1; then
-          # Xcode 26 ships Metal as an optional component and fresh runner
+          # Xcode 27 ships Metal as an optional component and fresh runner
           # images do not consistently include it; MLX compiles Metal sources.
           xcodebuild -downloadComponent metalToolchain
         fi

@@ -80,7 +80,7 @@ jobs:
       - name: Prepare Swift CodeQL build inputs
         if: matrix.language == 'swift'
         run: |
-          # Prebuild the full graph natively so Xcode 26's optional Metal
+          # Prebuild the full graph natively so Xcode 27's optional Metal
           # compiler materializes and validates MLX shader outputs in managed
           # CI scratch before CodeQL's translated tracing shell starts. The
           # traced command below reuses that scratch graph and invalidates only

@@ -28,9 +28,9 @@
         "floor_8gb_mac",
         "iphone_pro"
       ],
-      "floorMS": 1000,
-      "status": "provisional",
-      "calibrationRunID": null
+      "floorMS": 500.0,
+      "status": "calibrated",
+      "calibrationRunID": "ios-memory-qualification-20261121-182637-c2b75046"
     }
   },
   "retainedMemoryV2": {
@@ -53,12 +53,12 @@
         }
       },
       "ios": {
-        "status": "uncalibrated",
-        "calibrationRunID": null,
+        "status": "calibrated",
+        "calibrationRunID": "ios-memory-qualification-20261121-182637-c2b75046",
         "growthLimitMBByMode": {
-          "custom": null,
-          "design": null,
-          "clone": null
+          "custom": 16.0,
+          "design": 16.0,
+          "clone": 16.0
         }
       }
     }

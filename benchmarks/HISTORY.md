@@ -1194,6 +1194,12 @@ their harness files differ from the baseline's.
 | 2026-11-03 | [`ios-memory-qualification-20261103-184038-a1004c76`](runs/memory-qualification/ios-memory-qualification-20261103-184038-a1004c76.json) | focused | focused | passed | qualified | 9 | 0.57 | `a60dd2040b2b` | `b5ba83b875ad` | baseline | ios-memory-qualification-20261103-184038-a1004c76 |
 | 2026-11-11 | [`ios-memory-qualification-20261111-170450-503cb136`](runs/memory-qualification/ios-memory-qualification-20261111-170450-503cb136.json) | focused | focused | passed | qualified | 9 | 0.52 | `3119a74506f8` | `b5ba83b875ad` | vs ios-memory-qualification-20261103-184038-a1004c76: RTF -7.2% (within noise), TTFC -5.6% (faster), RAM -5.9% (within noise), harness changed | ios-memory-qualification-20261111-170450-503cb136 |
 
+## memory-qualification / ios / iphone-17-pro / config `bb6149770133`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-21 | [`ios-memory-qualification-20261121-182637-c2b75046`](runs/memory-qualification/ios-memory-qualification-20261121-182637-c2b75046.json) | focused | focused | passed | qualified | 9 | 0.52 | `05e4386cee42` | `bb6149770133` | baseline | ios-memory-qualification-20261121-182637-c2b75046 |
+
 ## memory-qualification / ios / iphone-17-pro / config `dcec19b63f13`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
@@ -1467,6 +1473,12 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-20 | [`ios-xcui-benchmark-20260720-174441-16fc128c`](runs/ui-generation/ios-xcui-benchmark-20260720-174441-16fc128c.json) | canonical | canonical | passedWithWarnings | qualified-with-warnings | 29 | ~0.57 | `610125b7423e` | `ef1fb93b4162` | baseline | post-phase0-ios-matrix-20260720 |
+
+## ui-generation / ios / iphone-17-pro / config `f0dfffae2886`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-21 | [`ios-xcui-benchmark-20261121-180730-f1e8631c`](runs/ui-generation/ios-xcui-benchmark-20261121-180730-f1e8631c.json) | canonical | exploratory | passed | qualified | 29 | 0.55 | `05e4386cee42` dirty | `excluded` | baseline | ios-xcui-benchmark-20261121-180730-f1e8631c |
 
 ## ui-generation / ios / iphone-17-pro / config `f50250bbe161`
 

@@ -6724,6 +6724,27 @@
       "evidence": [
         "commit:1251fcc4"
       ]
+    },
+    {
+      "id": "BKL-77",
+      "plan": "post-3-0-backlog-2026-10",
+      "title": "The Mac perf lane's click scenarios mostly measure XCUITest's accessibility snapshots",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "The delivery-menu and sidebar-navigation readings separate the app's frame cost from the harness's: either the checker reports hitch time outside the phases in which XCUITest queries or snapshots the app, or the scenarios drive the app without a snapshot inside the measured window; the ceilings are recalibrated on the separated number.",
+      "sourceOfTruth": [
+        "Tests/VocelloMacUITests/VocelloMacPerfUITests.swift",
+        "scripts/check_macos_ui_perf.py",
+        "config/ui-perf-thresholds.json"
+      ],
+      "updated": "2026-11-20",
+      "notes": "2026-11-16 investigation showed 79% of busy main-thread time in delivery-menu (and 64% in sidebar-navigation) was XCTAutomationSupport accessibility snapshots rather than AppKit/SwiftUI. 2026-11-20 (81b0dbf8, lineage v3 e073bbb8): switched test05DeliveryMenu to window-anchored coordinate clicks + keyboard, exposed actionHitchTimeMSPerS/queryHitchTimeMSPerS in check_macos_ui_perf.py, and ran 3 clean canonical calibrations ([59.446, 55.426, 53.901] ms/s, median 55.426 vs 84.168; maxGap median 65.49 vs 100.0 ms). Recalibrated config/ui-perf-thresholds.json (72.5 ms/s, 130 ms) and added delivery-menu to enforce.",
+      "evidence": [
+        "commit:81b0dbf8",
+        "benchmark:macos-xcui-perf-20261121-021029-38fc6c5f",
+        "benchmark:macos-xcui-perf-20261121-022535-5f431af8",
+        "benchmark:macos-xcui-perf-20261121-023945-eb6a564b"
+      ]
     }
   ]
 }

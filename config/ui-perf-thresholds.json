@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "basis": "Derived with spread-v1 from 3 counted ui-perf runs on mac-mini-m6-16gb (macos-xcui-perf-20261115-234925-dae0f970, macos-xcui-perf-20261116-000214-b26d443d, macos-xcui-perf-20261116-001436-4d575c18) by check_*_ui_perf.py --derive-thresholds. Per scenario with a ceiling: max(1.3 x median, median + 3 x (max - min)); hitch rounded up to 0.5 ms/s (floor 5), gap to 10 ms (floor 40). Warn-only. Exception: delivery-menu keeps the 2026-09-27 ceilings (see enforceDescription).",
+  "basis": "Derived with spread-v1 from 3 counted ui-perf runs on mac-mini-m6-16gb (macos-xcui-perf-20261121-021029-38fc6c5f, macos-xcui-perf-20261121-022535-5f431af8, macos-xcui-perf-20261121-023945-eb6a564b) by check_*_ui_perf.py --derive-thresholds. Per scenario with a ceiling: max(1.3 x median, median + 3 x (max - min)); hitch rounded up to 0.5 ms/s (floor 5), gap to 10 ms (floor 40). Warn-only.",
   "calibrationProfile": "mac-mini-m6-16gb",
   "calibrationRefreshIntervalMS": 16.67,
   "calibrationRuns": [
-    "macos-xcui-perf-20261115-234925-dae0f970",
-    "macos-xcui-perf-20261116-000214-b26d443d",
-    "macos-xcui-perf-20261116-001436-4d575c18"
+    "macos-xcui-perf-20261121-021029-38fc6c5f",
+    "macos-xcui-perf-20261121-022535-5f431af8",
+    "macos-xcui-perf-20261121-023945-eb6a564b"
   ],
   "derivationRule": "spread-v1",
   "warnOnly": true,
@@ -20,49 +20,50 @@
   "enforce": [
     "idle-baseline",
     "sidebar-navigation",
+    "delivery-menu",
     "settings-scroll",
     "composer-typing",
     "history-filter",
     "history-filter-paged"
   ],
-  "enforceDescription": "warnOnly is the default posture: a hitch or max-gap ceiling breach is a warning code. A scenario named in enforce fails the run instead (exit 1, report status failed, no evidence manifest) when it breaches either ceiling on the calibration profile and refresh interval; it must have both ceilings in this contract. Enforced since 2026-11-15 (RF-61, audit T1): four of the five confirmatory scenarios and both History filters, whose stall was the regression this lane could not fail on. delivery-menu is not enforced and keeps the ceiling of the 2026-09-27 calibration (89 ms/s, 150 ms) instead of the 109.5 ms/s these runs derive: it reads 82 to 86 ms/s against 67 to 70 in September for a cause that is still open, and a looser ceiling would hide that. history-scroll, window-resize and sidebar-navigation-warms carry ceilings that only warn. A run that is uncalibrated (another profile or refresh interval, or calibrationStale) enforces nothing.",
+  "enforceDescription": "warnOnly is the default posture: a hitch or max-gap ceiling breach is a warning code. A scenario named in enforce fails the run instead (exit 1, report status failed, no evidence manifest) when it breaches either ceiling on the calibration profile and refresh interval; it must have both ceilings in this contract. Enforced since 2026-11-15 (RF-61, audit T1) for idle-baseline, sidebar-navigation, settings-scroll, composer-typing and both History filters, and since 2026-11-20 (BKL-77) for all five confirmatory scenarios including delivery-menu after test05DeliveryMenu switched to window-anchored coordinate clicks + keyboard (lineage measurement version 3, median 55.426 ms/s vs 84.168 ms/s under accessibility snapshots; ceiling 72.5 ms/s, 130 ms). history-scroll, window-resize and sidebar-navigation-warms carry ceilings that only warn. A run that is uncalibrated (another profile or refresh interval, or calibrationStale) enforces nothing.",
   "hitchCeilingMSPerS": {
     "idle-baseline": 5.0,
-    "sidebar-navigation": 69.0,
-    "delivery-menu": 89.0,
-    "settings-scroll": 11.0,
-    "composer-typing": 14.5,
-    "history-filter": 98.0,
-    "history-filter-paged": 124.0,
-    "history-scroll": 91.0,
-    "window-resize": 29.0,
-    "sidebar-navigation-warms": 73.0
+    "sidebar-navigation": 64.5,
+    "delivery-menu": 72.5,
+    "settings-scroll": 14.5,
+    "composer-typing": 16.0,
+    "history-filter": 130.0,
+    "history-filter-paged": 102.5,
+    "history-scroll": 69.0,
+    "window-resize": 26.0,
+    "sidebar-navigation-warms": 83.0
   },
   "maxGapCeilingMS": {
     "idle-baseline": 40.0,
     "sidebar-navigation": 160.0,
-    "delivery-menu": 150.0,
+    "delivery-menu": 130.0,
     "settings-scroll": 40.0,
     "composer-typing": 110.0,
-    "history-filter": 130.0,
-    "history-filter-paged": 110.0,
+    "history-filter": 100.0,
+    "history-filter-paged": 130.0,
     "history-scroll": 110.0,
-    "window-resize": 120.0,
-    "sidebar-navigation-warms": 160.0
+    "window-resize": 100.0,
+    "sidebar-navigation-warms": 150.0
   },
   "footprintGrowthCeilingMB": 250.0,
   "derivationInputs": {
     "idle-baseline": {
       "hitchTimeMSPerS": {
         "values": [
-          1.377,
-          0.002,
-          0.002
+          0.0,
+          1.635,
+          0.0
         ],
-        "median": 0.002,
-        "range": 1.375,
-        "relativeRange": 687.5,
-        "multiplier": 2063.5,
+        "median": 0.0,
+        "range": 1.635,
+        "relativeRange": null,
+        "multiplier": null,
         "ceiling": 5.0
       },
       "maxGapMS": {
@@ -81,25 +82,25 @@
     "sidebar-navigation": {
       "hitchTimeMSPerS": {
         "values": [
-          52.856,
-          53.137,
-          51.709
+          50.363,
+          48.95,
+          49.532
         ],
-        "median": 52.856,
-        "range": 1.428,
-        "relativeRange": 0.027,
+        "median": 49.532,
+        "range": 1.413,
+        "relativeRange": 0.0285,
         "multiplier": 1.3,
-        "ceiling": 69.0
+        "ceiling": 64.5
       },
       "maxGapMS": {
         "values": [
-          118.8,
-          116.96,
-          118.71
+          117.03,
+          116.9,
+          119.27
         ],
-        "median": 118.71,
-        "range": 1.84,
-        "relativeRange": 0.0155,
+        "median": 117.03,
+        "range": 2.37,
+        "relativeRange": 0.0203,
         "multiplier": 1.3,
         "ceiling": 160.0
       }
@@ -107,51 +108,51 @@
     "delivery-menu": {
       "hitchTimeMSPerS": {
         "values": [
-          85.752,
-          81.965,
-          84.168
+          59.446,
+          55.426,
+          53.901
         ],
-        "median": 84.168,
-        "range": 3.787,
-        "relativeRange": 0.045,
-        "multiplier": 1.3,
-        "ceiling": 109.5
+        "median": 55.426,
+        "range": 5.545,
+        "relativeRange": 0.1,
+        "multiplier": 1.3001,
+        "ceiling": 72.5
       },
       "maxGapMS": {
         "values": [
-          83.33,
-          100.0,
-          100.0
+          81.96,
+          61.72,
+          65.49
         ],
-        "median": 100.0,
-        "range": 16.67,
-        "relativeRange": 0.1667,
-        "multiplier": 1.5001,
-        "ceiling": 160.0
+        "median": 65.49,
+        "range": 20.24,
+        "relativeRange": 0.3091,
+        "multiplier": 1.9272,
+        "ceiling": 130.0
       }
     },
     "settings-scroll": {
       "hitchTimeMSPerS": {
         "values": [
-          0.003,
-          2.826,
-          2.351
+          3.99,
+          2.485,
+          0.002
         ],
-        "median": 2.351,
-        "range": 2.823,
-        "relativeRange": 1.2008,
-        "multiplier": 4.6023,
-        "ceiling": 11.0
+        "median": 2.485,
+        "range": 3.988,
+        "relativeRange": 1.6048,
+        "multiplier": 5.8145,
+        "ceiling": 14.5
       },
       "maxGapMS": {
         "values": [
-          16.67,
-          16.67,
-          16.67
+          16.74,
+          16.72,
+          16.68
         ],
-        "median": 16.67,
-        "range": 0.0,
-        "relativeRange": 0.0,
+        "median": 16.72,
+        "range": 0.06,
+        "relativeRange": 0.0036,
         "multiplier": 1.3,
         "ceiling": 40.0
       }
@@ -159,157 +160,157 @@
     "composer-typing": {
       "hitchTimeMSPerS": {
         "values": [
-          8.405,
-          6.181,
-          7.578
+          9.141,
+          7.684,
+          6.47
         ],
-        "median": 7.578,
-        "range": 2.224,
-        "relativeRange": 0.2935,
-        "multiplier": 1.8804,
-        "ceiling": 14.5
+        "median": 7.684,
+        "range": 2.671,
+        "relativeRange": 0.3476,
+        "multiplier": 2.0428,
+        "ceiling": 16.0
       },
       "maxGapMS": {
         "values": [
-          58.45,
-          48.56,
-          62.57
+          66.67,
+          58.11,
+          49.52
         ],
-        "median": 58.45,
-        "range": 14.01,
-        "relativeRange": 0.2397,
-        "multiplier": 1.7191,
+        "median": 58.11,
+        "range": 17.15,
+        "relativeRange": 0.2951,
+        "multiplier": 1.8854,
         "ceiling": 110.0
       }
     },
     "history-filter": {
       "hitchTimeMSPerS": {
         "values": [
-          79.932,
-          71.534,
-          71.141
+          65.471,
+          82.325,
+          79.375
         ],
-        "median": 71.534,
-        "range": 8.791,
-        "relativeRange": 0.1229,
-        "multiplier": 1.3687,
-        "ceiling": 98.0
+        "median": 79.375,
+        "range": 16.854,
+        "relativeRange": 0.2123,
+        "multiplier": 1.637,
+        "ceiling": 130.0
       },
       "maxGapMS": {
         "values": [
-          86.06,
-          85.55,
-          72.11
+          70.19,
+          78.64,
+          73.81
         ],
-        "median": 85.55,
-        "range": 13.95,
-        "relativeRange": 0.1631,
-        "multiplier": 1.4892,
-        "ceiling": 130.0
+        "median": 73.81,
+        "range": 8.45,
+        "relativeRange": 0.1145,
+        "multiplier": 1.3434,
+        "ceiling": 100.0
       }
     },
     "history-filter-paged": {
       "hitchTimeMSPerS": {
         "values": [
-          70.943,
-          84.19,
-          83.955
+          71.895,
+          80.795,
+          75.575
         ],
-        "median": 83.955,
-        "range": 13.247,
-        "relativeRange": 0.1578,
-        "multiplier": 1.4734,
-        "ceiling": 124.0
+        "median": 75.575,
+        "range": 8.9,
+        "relativeRange": 0.1178,
+        "multiplier": 1.3533,
+        "ceiling": 102.5
       },
       "maxGapMS": {
         "values": [
-          80.31,
-          76.6,
-          81.56
+          87.81,
+          73.43,
+          80.81
         ],
-        "median": 80.31,
-        "range": 4.96,
-        "relativeRange": 0.0618,
-        "multiplier": 1.3,
-        "ceiling": 110.0
+        "median": 80.81,
+        "range": 14.38,
+        "relativeRange": 0.1779,
+        "multiplier": 1.5338,
+        "ceiling": 130.0
       }
     },
     "history-scroll": {
       "hitchTimeMSPerS": {
         "values": [
-          34.3,
-          52.356,
-          36.435
+          47.85,
+          43.52,
+          39.489
         ],
-        "median": 36.435,
-        "range": 18.056,
-        "relativeRange": 0.4956,
-        "multiplier": 2.4867,
-        "ceiling": 91.0
+        "median": 43.52,
+        "range": 8.361,
+        "relativeRange": 0.1921,
+        "multiplier": 1.5764,
+        "ceiling": 69.0
       },
       "maxGapMS": {
         "values": [
-          80.26,
-          80.94,
-          81.38
+          76.99,
+          75.91,
+          66.93
         ],
-        "median": 80.94,
-        "range": 1.12,
-        "relativeRange": 0.0138,
-        "multiplier": 1.3,
+        "median": 75.91,
+        "range": 10.06,
+        "relativeRange": 0.1325,
+        "multiplier": 1.3976,
         "ceiling": 110.0
       }
     },
     "window-resize": {
       "hitchTimeMSPerS": {
         "values": [
-          22.803,
-          20.572,
-          22.261
+          19.328,
+          19.334,
+          17.13
         ],
-        "median": 22.261,
-        "range": 2.231,
-        "relativeRange": 0.1002,
-        "multiplier": 1.3007,
-        "ceiling": 29.0
+        "median": 19.328,
+        "range": 2.204,
+        "relativeRange": 0.114,
+        "multiplier": 1.3421,
+        "ceiling": 26.0
       },
       "maxGapMS": {
         "values": [
-          84.44,
-          83.23,
-          74.11
+          73.29,
+          72.16,
+          64.28
         ],
-        "median": 83.23,
-        "range": 10.33,
-        "relativeRange": 0.1241,
-        "multiplier": 1.3723,
-        "ceiling": 120.0
+        "median": 72.16,
+        "range": 9.01,
+        "relativeRange": 0.1249,
+        "multiplier": 1.3746,
+        "ceiling": 100.0
       }
     },
     "sidebar-navigation-warms": {
       "hitchTimeMSPerS": {
         "values": [
-          55.971,
-          55.179,
-          58.658
+          57.733,
+          51.06,
+          59.41
         ],
-        "median": 55.971,
-        "range": 3.479,
-        "relativeRange": 0.0622,
-        "multiplier": 1.3,
-        "ceiling": 73.0
+        "median": 57.733,
+        "range": 8.35,
+        "relativeRange": 0.1446,
+        "multiplier": 1.4339,
+        "ceiling": 83.0
       },
       "maxGapMS": {
         "values": [
-          122.61,
-          109.21,
-          117.36
+          108.18,
+          119.15,
+          108.11
         ],
-        "median": 117.36,
-        "range": 13.4,
-        "relativeRange": 0.1142,
-        "multiplier": 1.3425,
-        "ceiling": 160.0
+        "median": 108.18,
+        "range": 11.04,
+        "relativeRange": 0.1021,
+        "multiplier": 1.3062,
+        "ceiling": 150.0
       }
     }
   }

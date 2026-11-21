@@ -29,7 +29,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | `ios-generation-startup-reliability-2026-08` | parked | backend-and-platform | 4/6 (67%) |
 | `ios-settings-2026-08` | parked | ios | 3/5 (60%) |
 | `macos-ui-fidelity-2026-09` | parked | backend-and-platform | 7/8 (88%) |
-| `post-3-0-backlog-2026-10` | parked | release-qa | 54/91 (59%) |
+| `post-3-0-backlog-2026-10` | parked | release-qa | 55/91 (60%) |
 | `project-audit-2026-09` | parked | backend-and-platform | 25/32 (78%) |
 | `project-audit-2026-10` | parked | backend-and-platform | 9/14 (64%) |
 | `qc-v2-2026-10` | parked | backend-mlx | 5/8 (62%) |
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (79)
+### Mac, remotely (78)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -63,7 +63,6 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `BKL-57` (parked) Every iPhone candidate waits on Swift CodeQL and a website npm audit
 - `BKL-61` (parked) pip installs on the signing runners have no hashes
 - `BKL-76` (parked) Notes from the 3.1 release review of the command line, the MCP server and the player
-- `BKL-77` (parked) The Mac perf lane's click scenarios mostly measure XCUITest's accessibility snapshots
 - `BKL-78` (parked) The tracker still shows two resolved issues open and has no review line
 - `BKL-80` (parked) A pass over try? in the engine, model-management and History paths
 - `BKL-81` (parked) Split GenerationOutputAdapter and HuggingFaceDownloader by concern
@@ -779,7 +778,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `BKL-68` | parked | The Cancel download dialog may show no Keep Download button on the iPhone | — |
 | `BKL-69` | parked | The iPhone frame-health lane's player scenarios open whatever take is newest in History | — |
 | `BKL-76` | parked | Notes from the 3.1 release review of the command line, the MCP server and the player | — |
-| `BKL-77` | parked | The Mac perf lane's click scenarios mostly measure XCUITest's accessibility snapshots | — |
 | `BKL-78` | parked | The tracker still shows two resolved issues open and has no review line | — |
 | `BKL-80` | parked | A pass over try? in the engine, model-management and History paths | — |
 | `BKL-81` | parked | Split GenerationOutputAdapter and HuggingFaceDownloader by concern | — |
@@ -895,10 +893,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`BKL-76`** (parked) — Notes from the 3.1 release review of the command line, the MCP server and the player.
   gate: Each note is fixed with a test or declined with its reason: an opt-in flag for the MCP history and saved-voice transcript tools (a maintainer decision); the forced exit uses _exit; models install reports success when a cancel lands after the swap; a text-mode take that finished exits 0 on a late signal; an interrupted bench sweep records cancelled cells as cancelled; models remove takes the staging lock; the live preview's audio engine stops at the hand-off to the file.
-  unparkWhen: The 3.1 iOS submission is done and the maintainer picks the next plan.
-
-- **`BKL-77`** (parked) — The Mac perf lane's click scenarios mostly measure XCUITest's accessibility snapshots.
-  gate: The delivery-menu and sidebar-navigation readings separate the app's frame cost from the harness's: either the checker reports hitch time outside the phases in which XCUITest queries or snapshots the app, or the scenarios drive the app without a snapshot inside the measured window; the ceilings are recalibrated on the separated number.
   unparkWhen: The 3.1 iOS submission is done and the maintainer picks the next plan.
 
 - **`BKL-78`** (parked) — The tracker still shows two resolved issues open and has no review line.

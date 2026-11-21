@@ -827,20 +827,20 @@ class ThresholdsContractTests(unittest.TestCase):
             # RF-61: the History filter over 700 rows, uncalibrated like history-filter.
             "history-filter-paged",
         })
-        # RF-61 (calibration of 2026-11-15): ceilings also cover the History scenarios, the window
-        # resize and navigation with warms; four confirmatory scenarios and both History filters
-        # fail a run. The delivery menu is confirmatory and deliberately not enforced.
+        # BKL-77 (calibration of 2026-11-20, lineage v3): delivery-menu switched to
+        # window-anchored coordinate clicks + keyboard, dropping from 84.168 to 55.426 ms/s
+        # median, so all five confirmatory scenarios and both History filters are enforced.
         self.assertEqual(set(contract["hitchCeilingMSPerS"]), set(contract["confirmatoryScenarios"]) | {
             "history-filter", "history-filter-paged", "history-scroll", "window-resize",
             "sidebar-navigation-warms",
         })
         self.assertEqual(contract["enforce"], [
-            "idle-baseline", "sidebar-navigation", "settings-scroll", "composer-typing",
-            "history-filter", "history-filter-paged",
+            "idle-baseline", "sidebar-navigation", "delivery-menu", "settings-scroll",
+            "composer-typing", "history-filter", "history-filter-paged",
         ])
         self.assertEqual(
             (contract["hitchCeilingMSPerS"]["delivery-menu"], contract["maxGapCeilingMS"]["delivery-menu"]),
-            (89.0, 150.0), "the September ceiling stays until the menu's slowdown is explained",
+            (72.5, 130.0), "lineage-v3 snapshot-free delivery-menu ceiling is enforced",
         )
         self.assertIn("enforce", contract["enforceDescription"])
         self.assertIs(contract["warnOnly"], True)

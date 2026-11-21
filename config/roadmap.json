@@ -2482,25 +2482,6 @@
       "notes": "Parked 2026-11-15 from the static audits of the 3.1 release diff (three read-only reviews: app, command line, security and privacy); none is a release blocker. The MCP server lets a connected agent read History text and saved-voice transcripts with no flag, while delete_voice and install_model need one. The forced exit calls exit() with engine threads running: 38 double Ctrl-C runs on the M6 all exited 130 with no crash report and one reached the forced path, so the teardown race is unobserved. The other notes were confirmed by reading only. The same review's two fixes shipped in 3.1: an output-device change under a paused or underrun-held live preview, and a filtered History page landing over a newer filter. 2026-11-16: the forced exit calls _exit (a8784430). Open: the MCP opt-in flag (a maintainer decision) and the five other notes."
     },
     {
-      "id": "BKL-77",
-      "plan": "post-3-0-backlog-2026-10",
-      "title": "The Mac perf lane's click scenarios mostly measure XCUITest's accessibility snapshots",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "The delivery-menu and sidebar-navigation readings separate the app's frame cost from the harness's: either the checker reports hitch time outside the phases in which XCUITest queries or snapshots the app, or the scenarios drive the app without a snapshot inside the measured window; the ceilings are recalibrated on the separated number.",
-      "sourceOfTruth": [
-        "Tests/VocelloMacUITests/VocelloMacPerfUITests.swift",
-        "scripts/check_macos_ui_perf.py",
-        "config/ui-perf-thresholds.json"
-      ],
-      "needs": [
-        "mac"
-      ],
-      "updated": "2026-11-20",
-      "unparkWhen": "The 3.1 iOS submission is done and the maintainer picks the next plan.",
-      "notes": "Parked 2026-11-16 from the delivery-menu investigation (maintainer request). A sampler on the app during an unpublished perf run showed 79% of the busy main-thread time in delivery-menu, and 64% in sidebar-navigation, inside XCTAutomationSupport's accessibility snapshots; AppKit's menu code is 12% and SwiftUI plus Vocello's code under 2% in the menu scenario. Each snapshot also makes AppKit open every menu-bar menu for inspection. The delivery menu's rise from 67 to 70 ms/s (September 27, macOS 27.0, Xcode 27.0) to 81 to 86 (since November 14, 27.2.1, 27.2) is therefore harness cost, not a slower menu; its ceiling stays warn-only. Window resize rose separately inside the week of November 14 (34 to 50 to 61 ms per action) and was not looked into. 2026-11-20 (81b0dbf8): eliminated XCUITest snapshot walks in test05DeliveryMenu via window-anchored coordinates + keyboard and exposed actionHitchTimeMSPerS/queryHitchTimeMSPerS in check_macos_ui_perf.py; awaits a 3-run Mac perf window to recalibrate and enforce."
-    },
-    {
       "id": "BKL-78",
       "plan": "post-3-0-backlog-2026-10",
       "title": "The tracker still shows two resolved issues open and has no review line",

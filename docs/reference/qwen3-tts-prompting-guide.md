@@ -408,7 +408,7 @@ The script is not just content. It is the only prosodic-timing control the model
 `OFFICIAL`. Qwen3-TTS does not parse SSML, does not accept pause markers, and does not accept
 inline tags. Timing comes from punctuation.
 
-`MEASURED-HERE`, folded in from [`../qwen_tone.md`](../qwen_tone.md) (2026-06-11), whose
+`MEASURED-HERE`, folded in from the retired `docs/qwen_tone.md` (2026-06-11), whose
 punctuation mapping is its most durable content:
 
 | Cue | Effect |
@@ -886,8 +886,9 @@ improves instruction adherence here is `UNVERIFIED`.
 `OFFICIAL` and `UNVERIFIED`. Qwen trained and evaluated in bf16, recommends fp32 where bf16 is
 unavailable, and never evaluated a quantized checkpoint. A collaborator says the code predictor is
 "extremely sensitive to precision" (QwenLM#43); the context is half-precision assertion failures on
-CUDA, not a quality comparison of quantized weights (corrected 2026-11-11). Vocello ships 4-bit
-(Speed) and 8-bit (Quality) quantizations that quantize every code-predictor projection and head
+CUDA, not a quality comparison of quantized weights (corrected 2026-11-11). Vocello ships the
+`attn` hybrid quantization (RF-55/RF-59: 4-bit group 64 base with 8-bit `text_embedding` and 8-bit
+talker `self_attn` projections), which keeps every code-predictor projection and head at 4 bits
 (research §1, finding 8, and research §7). No upstream evaluation of instruction adherence under
 quantization exists. Instruction following is generally the first capability to degrade under
 quantization, so this is a real open question (§10.7) rather than a settled one.
@@ -931,8 +932,9 @@ both tiers.
 
 The prompt strings, the system turn, the clone instruction path and the decode budget are not
 suspects when delivery sounds off. Vocello's input still differs from the reference in the streamed
-text layout, the ICL join and padding, the Custom fallback (D6) and the diction sentence; the
-parity ledger tracks each.
+long-form text layout, the ICL join and edge trim/fade (A-12 removed the earlier 0.5 s ICL padding;
+G-07 trims silent edges and fades over 10 ms), the Custom fallback (D6) and the diction sentence;
+the parity ledger tracks each.
 
 ### 8.2 The one defect the audit found
 
@@ -1092,7 +1094,7 @@ each is actually worth.
 | High-arousal instructions trigger literal laughter or breath sounds | **`OFFICIAL` acknowledgement.** Qwen confirms emotive instructs can add laughter (QwenLM#16) and that non-verbal sounds come out only implicitly (QwenLM#9). The `no laughing` remedy is Qwen's suggestion, still unmeasured. |
 
 `MEASURED-HERE`. Two further corrections, both **applied 2026-08-02**:
-[`qwen3-tts-guide.md`](qwen3-tts-guide.md) and [`../qwen_tone.md`](../qwen_tone.md) each stated the
+[`qwen3-tts-guide.md`](qwen3-tts-guide.md) and the retired `docs/qwen_tone.md` each stated the
 preset grid with the wrong intensity-tier count, contradicting the guide's own §6 table and the
 then-shipped code. The correct figure at the time was **10 presets × 2 intensity tiers**; the
 roster has since been cut to 8 presets (2026-08-03) and the user-facing intensity control retired
@@ -1100,7 +1102,7 @@ roster has since been cut to 8 presets (2026-08-03) and the user-facing intensit
 `happy` and `angry`, `strong` for the rest) — see §4.3. The current counts come from
 [`EmotionPreset.swift`](../../Sources/QwenVoiceCore/EmotionPreset.swift).
 
-`MEASURED-HERE`. [`../qwen_tone.md`](../qwen_tone.md) additionally attributes "negative constraints
+`MEASURED-HERE`. The retired `docs/qwen_tone.md` additionally attributed "negative constraints
 work and are officially endorsed" and "the official instruction-writing principle" to upstream
 without a link. The first overstates the source: Qwen suggests one negative form (QwenLM#16), but
 nothing measures it (table above). The second is real — it is Alibaba's
@@ -1268,6 +1270,6 @@ Community, quality varies:
 - [`qwen3-tts-guide.md`](qwen3-tts-guide.md) — model family, architecture, speaker roster, generation semantics, failure catalogue and parity ledger
 - [`mimi-codec-guide.md`](mimi-codec-guide.md) — the 12 Hz speech tokenizer: clone-reference encoding and decode
 - [`2026-10-17-qwen3-tts-model-research.md`](../audits/2026-10-17-qwen3-tts-model-research.md) — the sourced research behind this rewrite
-- [`../qwen_tone.md`](../qwen_tone.md) — the earlier app-facing tone guide this document supersedes for provenance questions
+- The retired `docs/qwen_tone.md` — the earlier app-facing tone guide superseded by this document
 - [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) — how to run the matrix the §10 experiments need
 - [`../ARCHITECTURE.md`](../ARCHITECTURE.md) §4 — engine core and generation semantics

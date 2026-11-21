@@ -801,7 +801,7 @@ updated for RF-18. The upstream readings in the clone, loop and number rows were
   a take made before RF-21.
 - **Clone references.** The gaps in §8.2 and §8.3. "Use audio only" on a saved voice with a
   transcript no longer conditions on that transcript (G-02, fixed 2026-11-11, RF-51).
-- **No human listening for 3.0.** Machine screens catch gross failures only; subtle defects ship as a
+- **No human listening for 3.x.** Machine screens catch gross failures only; subtle defects ship as a
   documented limitation ([v3.0.0 release notes](../releases/v3.0.0.md)).
 
 ### 11.3 Model limits Qwen states
@@ -843,7 +843,7 @@ Every verified place Vocello's runtime departs from Qwen's reference implementat
 | — | Talker RoPE; decoder output | `rotate_half`; `clamp(-1, 1)` | same | matches | — |
 | — | Token cap | 8,192 in the config; 2,048 in evaluation | 2,048 | deliberate (= evaluation) | — |
 | — | Codec precision | bf16 in the README setup; the file is fp32 | fp32 | deliberate (an f16 codec opened streamed clone takes with a burst; withdrawn 2026-09-14) | — |
-| — | Weights | bf16 | 4-bit or 8-bit affine, group 64, 8-bit text embedding | deliberate; never evaluated upstream; in the 2026-11-11 pre-screen 8-bit clones match the reference speaker better than 4-bit ones by 0.025 (§2.3) | — |
+| — | Weights | bf16 | `attn` hybrid (RF-55/RF-59): 4-bit affine, group 64 base with 8-bit `text_embedding` and 8-bit talker `self_attn.{q,k,v,o}_proj` (113 per-layer 8-bit entries; §2.2–§2.3) | deliberate; never evaluated upstream; in the 2026-11-11 pre-screen 8-bit clones match the reference speaker better than 4-bit ones by 0.025 (§2.3) | — |
 
 **A-02, measured on 2026-11-11** ([review §4.1](../audits/2026-11-11-qwen3-tts-quality-report-review.md#41-the-encoders-rotary-convention-a-02)).
 The finding stays open, and its effect is no longer unmeasured:

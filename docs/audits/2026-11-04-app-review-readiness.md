@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: release-qa
 reviewed: 2026-11-04
 summary: Read-only assessment, on 2026-11-04, of how ready Vocello for iPhone 3.0 (build 29, v3.0.0-ios.8) is for App Review, using an external November 2026 App Review rules report as the reference and checking its claims against Apple's live guideline text and the repository. Verdict, gaps ranked by risk, tracked blockers and tiered recommendations; it changes no code, roadmap item or App Store Connect field. On 2026-11-04, at the maintainer's request, the doc drift in section 6 was fixed, the review-notes safeguards paragraph was entered in App Store Connect and read back, and the wording check in section 8 was done.

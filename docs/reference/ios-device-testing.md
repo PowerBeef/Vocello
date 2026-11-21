@@ -38,7 +38,7 @@ results must not block preserving and sharing development work.
 
 These shared sources and assertions cover catalog and delivery-ledger validation, memory policy,
 cancellation semantics, app-support path gating, and privacy-safe diagnostics. Xcode
-26 (the pinned CI toolchain) reports tool-hosted testing as unavailable for physical-device destinations, so the repository
+27.2 (the pinned CI and local toolchain, DW-04) reports tool-hosted testing as unavailable for physical-device destinations, so the repository
 does not expose a device execution command for this target. Physical runtime assurance remains in
 the existing headless diagnostics and genuine XCUITest lanes; no Simulator substitute is used.
 
@@ -49,12 +49,12 @@ host after joining workers. `require_quiet_host` rejects excessive load, memory 
 native-lock holder or validated active-worker leases. Unknown ownership blocks measurement; if
 tracking is unavailable declare `QVOICE_LEAD_ONLY=1` only after joining workers.
 `QVOICE_ALLOW_BUSY_HOST=1` preserves explicitly exploratory classification. No new large download,
-release or external write is implied. The Claude Code skills `vocello-ios-validation` and
+release or external write is implied. The Antigravity workspace skills `vocello-ios-validation` and
 `vocello-device-diagnostics` call the scripts; `vocello-xcresult-triage` reads finished artifacts.
 
 ### Host toolchain prerequisite
 
-`-destination 'generic/platform=iOS'` does not launch or execute a Simulator. Current Xcode toolchains (26.6 in CI, 27 locally) still
+`-destination 'generic/platform=iOS'` does not launch or execute a Simulator. The pinned Xcode 27.2 toolchain (in both CI and local development, DW-04) still
 require the selected Xcode installation to expose usable iOS Platform Support and a compatible iOS
 runtime component before that physical-device SDK destination becomes eligible. An `iphoneos`
 entry in `xcodebuild -showsdks` is not sufficient proof. Repository build routes run this read-only
@@ -145,7 +145,8 @@ exact model-status assertions do not depend on the phone's language. They read t
 Language choice from the Settings root row's value, open the genuine picker only to change it,
 temporarily select System Default, and restore the original choice during session cleanup. They never write global `AppleLanguages` preferences.
 The Settings `localization` walk explicitly overrides the process language for French-Default
-(including translated title and variation-value assertions), in addition to Default, AX-L,
+(including translated title and localized Settings-row assertions; the earlier take-variation control
+was retired in RF-58), in addition to Default, AX-L,
 AX-XXXL and pseudo-AX-XXXL. Keep each layout's full-visibility assertions and retained captures;
 neither a default-language pass nor a compile substitutes for bilingual device acceptance.
 
@@ -238,7 +239,8 @@ AX-XXXL, and pseudo-AX-XXXL, then runs the complete system audit without a force
 clipping audit can pass an ellipsized label whose accessibility name is complete. Inspect the
 retained screenshots as well; automatic PASS alone does not establish untruncated visual reflow.
 
-The stateful lane registers observed original toggle/variation values before mutation and awaits
+The stateful lane registers observed original toggle/setting values (the earlier take-variation
+control was retired in RF-58) before mutation and awaits
 its session cleanup through XCTest teardown, including after assertion aborts. Failed or skipped
 restoration remains failure; never replace an unknown original value with a default. The inventory
 and simple saved-voice enrollment journeys still need equivalent preservation of Studio selections,
@@ -507,7 +509,7 @@ scenario. What XCUITest cannot drive stays the maintainer's, by hand:
 | RF-35 cellular download (switch off waits, switch on completes) | Maintainer: Wi-Fi off is a system setting |
 | RF-35 navigation row and Wi-Fi reinstall, the ~30-take machine screen | XCUITest (`first-launch`, `navigation`, `modes`) |
 | Purchase rows | XCUITest; the purchase confirmation sheet is the maintainer's |
-| ASR-06 file protection and backup proof | [privacy-storage.md](privacy-storage.md), "Device proof on the signed candidate": the maintainer makes the backups, locks and restarts the phone; Claude reads the backup manifest and drives the app through XCUITest |
+| ASR-06 file protection and backup proof | [privacy-storage.md](privacy-storage.md), "Device proof on the signed candidate": the maintainer makes the backups, locks and restarts the phone; Antigravity reads the backup manifest and drives the app through XCUITest |
 | TestFlight installs | Maintainer, in the TestFlight app |
 | Removing a model before a reinstall row, in-app settings, reproductions | XCUITest: an existing lane's scenario or a new one |
 
@@ -515,7 +517,7 @@ The iOS `ui-preflight` refuses a lane while iPhone Mirroring is open, because XC
 even while CoreDevice reports the phone unlocked; `scripts/ios_device.sh mirroring stop` quits it, and
 the maintainer then unlocks the phone, which Mirroring keeps locked.
 
-After every XCUITest lane, Claude reviews `<run>/screenshots/` (readable names, `index.json` with the
+After every XCUITest lane, Antigravity reviews `<run>/screenshots/` (readable names, `index.json` with the
 test, time and failure flag), report-only: each failure frame and each named state the row asserts,
 for clipping, overlap, a wrong state, untranslated text or an unexpected dialog.
 
@@ -674,7 +676,7 @@ and publishes a platform-`ios` `ui-perf` record — the macOS UI-7 twin
    and confirm required runs are `explicitly-pinned`. Retire pins only after explicit closure.
 4. **Frozen source:** record run IDs, source/build/device/plan identities, outcomes, remaining
    rows and the validated next command in the existing untracked run checkpoints. Do not edit
-   the roadmap, this guide, `CLAUDE.md`, or any tracked file between shards.
+   the roadmap, this guide, `AGENTS.md`, or any tracked file between shards.
 5. **Deliberate source checkpoint:** incorporate collected results into `config/roadmap.json`
    and the current narrative. A changed full-tree identity requires new acceptance identity;
    previous results remain history, never merged current-source PASS.
@@ -747,7 +749,8 @@ selection. Modern installation and legacy readiness are separate verdicts; the c
 benchmark history and performs no generation.
 
 `lang-bench` declares an immutable one-based run plan before generation and passes an explicit
-UInt64 seed plus sampling variation to every take. Its schema-v2 sentinel is published last and
+UInt64 seed to every take (using the shipping reference sampling; the earlier user-facing variation
+control was retired in RF-58). Its schema-v2 sentinel is published last and
 binds the resolved language, prompt-assembly digest, exact output-WAV digest/metadata, generation
 telemetry identity, and structured three-pass on-device Speech evidence. The collector retains only
 those plan-selected rows and files. Corpus v2 requires at least 15 normalized words for alphabetic

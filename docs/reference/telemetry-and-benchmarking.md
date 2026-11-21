@@ -86,7 +86,7 @@ the summarizer's `xRT` column.
    paired physical iPhone (see [`testing-runbook.md`](testing-runbook.md) and
    [`ios-device-testing.md`](ios-device-testing.md)).
 2. **Runtime-gated, never compiled out.** There is one shippable config; dev and release run
-   identical code (see root `CLAUDE.md`). Telemetry is switched on at runtime by `TelemetryGate`
+   identical code (see root `AGENTS.md`). Telemetry is switched on at runtime by `TelemetryGate`
    ([§2](#telemetry-gate)), not by `#if DEBUG`. When the gate is off, every probe is a no-op and
    nothing is written.
 3. **Correlated by `generationID`.** The app mints a `UUID` per generation and threads it down;
@@ -138,7 +138,7 @@ UI heartbeat        —                       yes                    yes
 | **CLI** | `./build/vocello bench` | In-process `MLXTTSEngine` | Deterministic RTF/decode/memory matrix; release QA step 3 |
 | **macOS UI** | App (in-process engine) | In-process engine | Submit-to-first-chunk, playback scheduling and delayed-heartbeat evidence; UI smoke tests |
 | **macOS UI benchmark** | `scripts/ui_test.sh macos benchmark` | In-process engine | Full UI matrix through the real app; merged app + engine telemetry |
-| **macOS profile** | `scripts/macos_test.sh profile --kind cpu|memory|witness` | In-process via CLI inside exact-PID trace | CPU/signpost, allocation/VM validation, or the signpost-only timing witness |
+| **macOS profile** | `scripts/macos_test.sh profile --kind cpu\|memory\|metal\|witness` | In-process via CLI inside exact-PID trace | CPU/signpost, allocation/VM validation, Metal GPU command-buffer/shader trace (`Metal System Trace + os_signpost`), or the signpost-only timing witness |
 | **iOS device** | `scripts/ios_device.sh bench` | In-process | iPhone tier, Jetsam, on-device RTF (headless diagnostics, single take) |
 | **iOS UI benchmark** | `scripts/ui_test.sh ios benchmark` | In-process | Full UI matrix through XCUITest on the paired physical iPhone; telemetry gated per take |
 | **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Twelve scripted SwiftUI scenarios with the in-app frame probe; ceilings that warn unless the contract enforces the scenario; canonical-hardware runs publish `ui-perf` registry records; lane contract in [`macos-testing.md`](macos-testing.md) (history: [the 2026-08 macOS UI audit](../audits/2026-08-04-macos-ui-refresh.md)) |
@@ -203,7 +203,7 @@ scripts/macos_test.sh models ensure
 
 This installs (or symlinks into debug context):
 
-- `pro_custom_speed`, `pro_design_speed`, `pro_clone_speed` (~6.0 GB one-time if none installed)
+- `pro_custom_speed`, `pro_design_speed`, `pro_clone_speed` (~6.7 GB catalog total / ~5.34 GB on disk with shared-component deduplication, one-time if none installed)
 - Clone voice `A_warm_elderly_woman`, enrolled from a 10–20 second, transcript-backed Voice
   Design reference with a distinctive mature feminine alto. `models ensure` replaces the retired
   Custom/Aiden-derived short fixture when it detects that stale transcript.
@@ -234,7 +234,7 @@ across the flip is expected, not a regression. Compare like with like: same buil
 ### iOS device
 
 - Paired physical iPhone (never Simulator for real engine)
-- Speed models visibly verified in Settings through XCUITest
+- Voice models visibly verified Ready in Settings through XCUITest
 - `scripts/ios_device.sh preflight` before bench/gate
 - Physical-device playbook: [`ios-device-testing.md`](ios-device-testing.md)
 
@@ -697,7 +697,7 @@ in [`testing-runbook.md`](testing-runbook.md).
 
 ```sh
 scripts/ios_device.sh device-state
-# Verify Custom, Design, and Clone Speed visibly in Settings, then run the matrix.
+# Verify Custom, Design, and Clone models visibly Ready in Settings, then run the matrix.
 scripts/ui_test.sh ios benchmark
 
 # Targeted diagnostic example (not the full-matrix acceptance result):
@@ -772,6 +772,9 @@ scripts/macos_test.sh profile custom:speed:
 
 scripts/macos_test.sh profile --kind memory custom:speed:
 
+# Metal System Trace + os_signpost (MLX GPU command buffers and shader kernels; kept by default):
+scripts/macos_test.sh profile --kind metal custom:speed:
+
 # The low-perturbation timing witness: os_signpost only, on the gate bench's seed.
 scripts/macos_test.sh profile --kind witness
 
@@ -832,8 +835,14 @@ The memory profile's default 180-second safety cap is only a maximum; exact-targ
 recording early. The retained-memory lane ([§4.11](#411-retained-memory-qualification)) owns
 repeated retained growth.
 
+The macOS Metal profile (`--kind metal`, DW-04) records one cold and one warm medium take under
+Apple's `Metal System Trace` template plus `os_signpost` (`Metal System Trace + os_signpost`,
+120-second default cap via `QVOICE_MAC_METAL_PROFILE_DURATION`), capturing MLX GPU command buffers
+and shader kernels for Instruments or `xcprof` inspection while keeping raw trace size bounded.
+
 Produces `build/artifacts/macos/profiles/<run-id>/<run-id>.trace` containing Time Profiler samples and
-`os_signpost` rows in one capture; the memory kind adds Allocations and VM Tracker. **In-process
+`os_signpost` rows in one capture; the memory kind adds Allocations and VM Tracker, and the metal
+kind captures `Metal System Trace` plus `os_signpost`. **In-process
 only** — the CLI process rather than
 the app. The lane is PASS-only: a tracer failure, benchmark failure, invalid trace, or failed publication
 returns nonzero without creating history. It retains only the newest raw failure per platform and
@@ -853,15 +862,16 @@ validates the trace through `xctrace export --toc`; there is no blind startup sl
 attach to the exact `Vocello` PID while generating via UI. Traces remain untracked. On
 success the registry retains the digest, settings, extracted summary, original ephemeral path, and
 retention policy, then the runner removes a CPU profile's raw trace; pass `--keep-trace` to retain
-it explicitly. A memory profile keeps its raw trace by default (`keptByDefault`): xctrace cannot
-export its allocation and VM tables, so the trace is its only memory evidence. The same complete
+it explicitly. Memory and Metal profiles keep their raw traces by default (`keptByDefault`): `xctrace`
+cannot export a memory profile's allocation and VM tables or a Metal System Trace's GPU shader
+tables, so the trace is their primary evidence. The same complete
 retention validation applies to schema-v2 records and quality-bearing
 schema-v3 records; neither a schema downgrade nor omission of quality evidence is allowed to repair
 a failed publication. Verify a source repair in a new run while preserving the original failure.
-The tracer stage requires at least 5 GiB free for CPU profiles and 15 GiB for memory
-profiles. The prerequisite macOS CLI build has an 8 GiB floor, so the complete CPU-profile command
-effectively requires 8 GiB; memory remains 15 GiB because Allocations can emit tens of megabytes
-per second.
+The tracer stage requires at least 5 GiB free for CPU and witness profiles and 15 GiB for memory
+and Metal profiles. The prerequisite macOS CLI build has an 8 GiB floor, so the complete CPU-profile
+command effectively requires 8 GiB; memory and Metal remain 15 GiB because Allocations and Metal
+System Trace can emit tens of megabytes per second.
 
 ### 4.9 UI-driven generation (macOS app)
 
@@ -1435,7 +1445,7 @@ must fail depends on the families:
 
 ### 5.5 iOS on-device lane
 
-Requires Built-in Voice and Voice Design **Speed** installed on the paired iPhone, and Speech
+Requires the Built-in Voice and Voice Design models installed on the paired iPhone, and Speech
 Recognition permission: grant **Settings → Privacy → Speech Recognition → Vocello** once before the
 first output-gated run.
 
@@ -1672,7 +1682,7 @@ older rows stay readable but are marked memory-contract-incomplete and excluded 
 | `generationID` | String | Correlation key (UUID). |
 | `layer` | String | `engine` / `app` / `merged` (`engine-service` and the iOS `engine-extension` layers are retired and appear only in older records). |
 | `mode` | String? | `custom` / `design` / `clone`. |
-| `modelID` | String? | Resolved model variant id (e.g. `pro_custom_quality`). |
+| `modelID` | String? | Resolved model variant id (e.g. `pro_custom_speed`; `*_quality` IDs appear only in pre-RF-59 records). |
 | `warmState` | String? | `cold` / `warm` — the benchmark cell. |
 | `usedStreaming` | Bool? | Streaming vs quality-first. |
 | `finishReason` | String? | Typed terminal reason: `eos` / `maxTokens` / `cancelled` / `failed` / `completed` / `superseded` / `unknown`. Compatibility input also accepts `max_tokens` and `canceled`; v7 typed payloads encode the canonical values. |
@@ -2546,11 +2556,11 @@ device or XCUITest.
 |---------|--------------|-----|
 | Custom/Design "cold" shows `warm` | Proactive warmup ran | `QWENVOICE_SUPPRESS_WARMUP=1` for UI; CLI unloads explicitly |
 | Clone missing from matrix | No enrolled voice | `scripts/macos_test.sh models ensure` |
-| `preflightModels` fails Quality | Speed-only fixture | Install Quality weights or use `--variants speed` |
+| `--variants quality` rejected | Quality tier retired (RF-59) | Use `--variants speed` (the single hybrid compatibility variant ID) |
 | Summarizer empty | Wrong diagnostics dir / gate off | Confirm `QWENVOICE_DEBUG=1`; check `engine/generations.jsonl` |
 | RTF vs decode ms disagree | Different time bases + lazy MLX | RTF spans the whole request, decode ms the token loop; read [§6.8](#rtf-vs-decode-ms-read-together-dont-diff-naively) and [§7.3](#73-decode-breakdown-lazy-mlx); use a signpost trace |
 | All QC warn:dropout on long | Often natural pauses | Run the fixed-seed exact-WAV cohort; inspect the punctuation-aware budget, ASR consensus, and prosody evidence |
-| iOS bench timeout | Model missing / device diagnostics did not complete | `scripts/ios_device.sh console`; install Speed model |
+| iOS bench timeout | Model missing / device diagnostics did not complete | `scripts/ios_device.sh console`; install the required voice model |
 | Clone cold row appears | Corrupt matrix ordering, generation map, or frozen evidence | **Hard failure:** inspect `bench-results.json` or the UI generation map plus `benchmark-evidence.json`, repair the producer/selection mismatch, and rerun. Never relabel or ignore a Clone cold row. |
 
 ---

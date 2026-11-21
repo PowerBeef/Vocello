@@ -22,7 +22,7 @@ initialize on the iOS Simulator.
 > The testing strategy lives in [`testing-runbook.md`](testing-runbook.md);
 > device lanes (`scripts/ios_device.sh`) in [`ios-device-testing.md`](ios-device-testing.md);
 > generation-engine internals in [`../ARCHITECTURE.md`](../ARCHITECTURE.md);
-> tone/delivery prompt-writing in [`../qwen_tone.md`](../qwen_tone.md).
+> tone/delivery prompt-writing in [`qwen3-tts-prompting-guide.md`](qwen3-tts-prompting-guide.md).
 > String Catalog ownership, typed presentation text, and pseudo-localization acceptance are in
 > [`localization.md`](localization.md).
 > The compact UI state map and lane assumptions are [§7](#7-compact-ui-state-map); the export
@@ -388,8 +388,8 @@ purchase sheet, purchase-sheet contrast, and clipped text in Design and Clone at
 maintainer accepted these as a 3.0 known limitation (BKL-31).
 
 `iosSettings_openSourceRow` pushes `screen_openSourceLicenses`. The offline browser is generated from
-the exact application SwiftPM resolution, owned-runtime license/NOTICE/origin records, and the six
-production model revisions. Rows expose `iosAttributionRow_<componentID>` and
+the exact application SwiftPM resolution, owned-runtime license/NOTICE/origin records, and the three
+hybrid production model revisions (RF-59). Rows expose `iosAttributionRow_<componentID>` and
 `iosModelAttributionRow_<modelID>-<variantID>`; the 44-point
 `iosSettings_openSourceBackButton` returns to About. Each detail exposes complete license text,
 applicable NOTICE/origin text, pinned identity, and the upstream source without requiring network access.
@@ -604,10 +604,10 @@ one tier per preset: Happy and Angry ship their normal copy (DP-22 measured the 
 distinction only at the normal tier; `EmotionPreset.normalTierShippedIDs`) and every other preset
 ships its strong copy. `EmotionIntensity` survives internally so the delivery matrix harness can still address
 both texts and drafts saved earlier resolve to exactly what they stored. Or write a **custom tone** (free text, 500-char cap) — see
-[`../qwen_tone.md`](../qwen_tone.md) for the prompt-writing rules (combine emotion + pace +
-pitch + timbre; negative constraints like "without laughing" work; English is the current preset
-baseline, while freeform directions need not match the spoken language; describe the sound, not a
-persona). Comparative instruction-language quality remains unqualified; see the
+[`qwen3-tts-prompting-guide.md`](qwen3-tts-prompting-guide.md) for the prompt-writing rules (combine emotion + pace +
+pitch + timbre; describe the sound, not a persona; English is the current preset baseline, while
+freeform directions need not match the spoken language; note that negative constraints like "without
+laughing" are unmeasured and lack ablation support). Comparative instruction-language quality remains unqualified; see the
 [dated language research](../audits/2026-09-21-instruction-language-research.md).
 
 ### Languages — `GenerationSemantics` / language picker
@@ -736,7 +736,7 @@ in-session Studio mode, and the Studio selector changes the composer in place.
 
 Never validate with an iOS Simulator, Simulator Browser, a third-party UI-automation driver, or a
 committed coordinate table. A check no lane covers gets its own XCUITest scenario; what XCUITest
-cannot drive is the maintainer's, by hand (`CLAUDE.md`).
+cannot drive is the maintainer's, by hand (`AGENTS.md`).
 
 ---
 

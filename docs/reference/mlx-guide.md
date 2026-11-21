@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-11
+reviewed: 2026-11-21
 summary: Project-specific MLX reference for the Qwen3-TTS engine on mlx-swift 0.32.3 — lazy evaluation and the pipelined per-frame step, MLX error scopes, quantization mechanics and the per-layer recipe, the KV cache, sampler and seed behaviour, cache clearing and memory posture, the version pins and the pin-move procedure (§9).
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Package.swift
@@ -14,9 +14,9 @@ sourceOfTruth:
 # MLX Guide for Vocello
 
 > **Living document.** When this guide disagrees with the code, the code wins: fix this file.
-> Reviewed 2026-10-20 against the shipping pins (mlx-swift 0.32.3, mlx-swift-lm 3.32.3,
-> swift-transformers 1.3.5 and swift-huggingface 1.0.0, moved together by CONV-21 on 2026-10-16) and
-> the RF-18 sampling changes of 2026-10-20. Finding IDs (BG-1, DEP-n, A-n, B-n, D-n, F-n) are the
+> Reviewed 2026-11-21 against the shipping pins (mlx-swift 0.32.3, mlx-swift-lm 3.32.3,
+> swift-transformers 1.3.5 and swift-huggingface 1.0.0, moved together by CONV-21 on 2026-10-16),
+> the RF-18 sampling changes of 2026-10-20, and the RF-55/RF-59 `attn` hybrid artifacts of 2026-11-13. Finding IDs (BG-1, DEP-n, A-n, B-n, D-n, F-n) are the
 > [engine runtime audit](../audits/2026-10-16-engine-runtime-audit.md)'s; upstream issue citations
 > (`QwenLM#n`, `MA#n`, `MAS#n`) come from the
 > [Qwen3-TTS model research](../audits/2026-10-17-qwen3-tts-model-research.md).
@@ -147,10 +147,15 @@ the iPhone's foreground permit) is engine structure:
 
 ### 3.1 Weight-only affine groupwise quantization
 
-| Variant | Bits | Group size | Platforms |
+Since RF-55/RF-59 (2026-11-13), Vocello ships one mixed-precision **`attn` hybrid** model per mode on
+both macOS and iPhone (the internal compatibility variant ID stays `speed`; the earlier 3.0 two-tier
+4-bit Speed and macOS-only 8-bit Quality packages are retired; see [`hybrid-model.md`](hybrid-model.md)):
+
+| Component | Bits | Group size | Platforms |
 |---|---|---|---|
-| **Speed** | 4 | 64 | macOS and iPhone (the iPhone's only variant) |
-| **Quality** | 8 | 64 | macOS only |
+| Base (talker MLP, code predictor, projections, heads) | 4 | 64 | macOS and iPhone |
+| Talker text embedding (`model.text_embedding`) | 8 | 64 | macOS and iPhone |
+| Talker attention (`model.layers.{0..27}.self_attn.{q,k,v,o}_proj`, 112 modules) | 8 | 64 | macOS and iPhone |
 
 Each group of 64 weights is stored as 4-bit or 8-bit integers with a per-group scale and bias
 (MLX's `QuantizationMode.affine`). The quantized matmul dequantizes inside the kernel; activations
@@ -160,9 +165,10 @@ not used.
 ### 3.2 The per-layer recipe and how the loader applies it
 
 - **Where the recipe lives.** The checkpoint's `config.json` carries a global `quantization` entry
-  (group size and bits) and per-layer entries. Vocello's one per-layer entry is
-  `model.text_embedding` at 8 bits, group 64, affine, in both tiers, written by
-  `scripts/convert_text_embedding_8bit.py` (2026-07-26).
+  (group size 64, 4-bit affine) and **113** per-layer 8-bit affine (group 64) entries:
+  `model.text_embedding` (originally written by `scripts/convert_text_embedding_8bit.py` on 2026-07-26)
+  plus the 112 talker attention projections `model.layers.{0..27}.self_attn.{q,k,v,o}_proj`
+  (assembled by `scripts/build_hybrid_model.py` in RF-55).
 - **What the loader does** (`Qwen3TTSLoading.swift:359-372`). `quantize(model: talker)` runs a per-path
   closure that quantizes a module only when the checkpoint holds `<path>.scales`, and uses the
   per-layer entry when one names the path, the global entry otherwise. The artifact therefore decides
@@ -185,8 +191,8 @@ not used.
   says the code predictor is "extremely sensitive to precision" (QwenLM#43); the context is
   half-precision assertion failures on CUDA, not a quality comparison of quantized weights
   (corrected 2026-11-11). No quantized checkpoint was ever evaluated upstream, and Vocello's
-  artifacts quantize all 51 code-predictor linear and head modules in both tiers, which the local
-  model files confirm.
+  shipped `attn` hybrid artifacts keep all 51 code-predictor linear and head modules quantized at
+  4 bits (RF-55), which the local model files confirm.
 - How much quantization changes output was research open question 7. A pre-screen of 2026-11-11
   gives a first answer for clone fidelity
   ([review §4.2](../audits/2026-11-11-qwen3-tts-quality-report-review.md#42-4-bit-against-8-bit) and
@@ -559,7 +565,7 @@ internal-diagnostics knobs only:
 
 The 0.6B models were considered as an iPhone speed and footprint lever and **ruled out by maintainer
 decision (2026-07-02)**: Voice Design exists only at 1.7B, and Vocello ships one model family
-(1.7B Speed 4-bit / Quality 8-bit) across all three modes. Do not reopen it without a new maintainer
+(1.7B `attn` hybrid, RF-59; replacing the earlier 1.7B Speed 4-bit / Quality 8-bit tiers) across all three modes. Do not reopen it without a new maintainer
 decision. [`ios-engine-optimization.md`](ios-engine-optimization.md) is historical background.
 
 ---
@@ -813,9 +819,9 @@ override key names and a digest, never raw values.
 # Build and run with telemetry
 QWENVOICE_DEBUG=1 ./scripts/build.sh run
 
-# Bench a full matrix
+# Bench a full matrix (one hybrid model per mode; `speed` is the internal compatibility variant ID)
 QWENVOICE_DEBUG=1 ./build/vocello bench --modes custom,design,clone \
-  --variants speed,quality --lengths short,medium,long --warm 3
+  --variants speed --lengths short,medium,long --warm 3
 
 # Force constrained-tier behaviour on a development Mac
 QWENVOICE_DEBUG=1 QWENVOICE_FORCE_MEMORY_CLASS=floor_8gb_mac \

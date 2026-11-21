@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: release-qa
 reviewed: 2026-11-15
 summary: What the interrupted Mac and CLI 3.1 release run of 2026-11-14 showed, each issue's cause as far as it was traced, and the decisions and work left before RF-61's gate can pass.

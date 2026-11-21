@@ -461,9 +461,10 @@ was bench-rejected for float drift on short chunks.
 
 ## 7. The shipped codec artifact
 
-All six PowerBeef02 artifacts share `speech_tokenizer/model.safetensors`: fp32, 682,293,092 bytes,
+All three PowerBeef02 hybrid artifacts share `speech_tokenizer/model.safetensors`: fp32, 682,293,092 bytes,
 SHA-256 `836b7b357f5ea43e889936a3709af68dfe3751881acefe4ecf0dbd30ba571258`
-(`config/model-artifact-receipts.json`). It is byte-identical to Qwen's own
+(receipts live in `Sources/Resources/qwenvoice_ios_model_catalog.json`;
+`config/model-artifact-receipts.json` holds Mac-only receipts and is empty since RF-59). It is byte-identical to Qwen's own
 `Qwen/Qwen3-TTS-Tokenizer-12Hz` file (research §7, verified against the receipts). The decoder and
 encoder weights are not quantized.
 

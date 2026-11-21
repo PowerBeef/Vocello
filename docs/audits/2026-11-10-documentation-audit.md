@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: release-qa
 reviewed: 2026-11-10
 summary: Read-only audit, on 2026-11-10 at 232a0bcb, of the README, CLAUDE.md, the agent skills and agents, CONTRIBUTING, SECURITY and every active document under docs/ for inaccurate, stale and duplicated statements, each checked against source. The audit itself changed no document; on the maintainer's request the fixes were made the same day, and section 7 records them and what was left.

@@ -99,7 +99,7 @@ QC findings:
 | B | The ~586 ms "dropout" investigation | ✅ done — root-caused | this doc + `641a541` baseline note |
 | C | Punctuation-aware audioQC recalibration | ✅ done + verified | `ac86b8a` (now `GenerationOutputAdapter.swift`) |
 | D | CodePredictor RoPE fusion | ✅ **done — closed by §H P3** (`f3cd2aa`): +26%, realtime crossed | §H |
-| E | MLXSwift / mlx-swift-lm version bump | ✅ done 2026-08-01 (§Q: 0.31.6 / 3.31.4, kept after the same-day A/B) | §Q + [.claude/rules/native.md](../.claude/rules/native.md) "MLX is the only backend" (the pins move together, benchmark-gated) |
+| E | MLXSwift / mlx-swift-lm version bump | ✅ done 2026-08-01 (§Q: 0.31.6 / 3.31.4, kept after the same-day A/B) | §Q + [.agents/plugins/vocello/rules/native.md](../.agents/plugins/vocello/rules/native.md) "MLX is the only backend" (the pins move together, benchmark-gated) |
 | F | iPhone 1.7B-4bit program — feasibility + WS0b profiling + compile/KV spikes | 🔬 see §F: compile rejected; **iOS RAM premise corrected — streaming peaks ~3 GB flat, KV windowing unneeded** | this doc + session plan |
 
 ## Grounding (the headline conclusion)

@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
 reviewed: 2026-10-20
 summary: The living convergence ADR — interprets config/runtime-refactor-contract.json (the sole phase-status authority), records the promotion history, and defines the streaming/quality invariants.
@@ -27,7 +27,9 @@ sourceOfTruth:
 
 Keep early first/later codec frames, the preview-vs-lossless split, request-local sampling v2, tiered
 `Memory.cacheLimit` with soft relief (no hard production `memoryLimit`), XPC engine isolation on
-macOS (superseded 2026-09-15: the Mac engine runs in-process), and the 1.7B Speed/Quality matrix. Do not chase A100 first-packet figures, reopen 0.6B, or
+macOS (superseded 2026-09-15: the Mac engine runs in-process), and the 1.7B Speed/Quality matrix
+(superseded 2026-11-13 by RF-59, which converged Speed and Quality into one 1.7B `attn` hybrid per
+mode). Do not chase A100 first-packet figures, reopen 0.6B, or
 add Core ML / custom Metal during convergence. The characterization fixtures that
 named the latency/memory cells were retired on 2026-09-12, after every phase had closed.
 

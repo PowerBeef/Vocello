@@ -155,8 +155,10 @@ frame's step graph is submitted with `asyncEval`, and the previous chunk's mater
 overlap it (the `.pipelined` step policy; mlx-guide §4.3). The Mimi decoder keeps causal state across
 partitions. The actor-owned suspending producer materializes `[Float]` in the caller's isolation
 before its awaited sink, and the final chunk always has an explicit barrier before terminal
-completion and atomic WAV publication. Compatibility stream methods remain only behind the narrowed
-load and prewarm bridge and are not product generation authority.
+completion and atomic WAV publication. Implementation compatibility modules (`MLXAudioCore`,
+`MLXAudioCodecs`, `MLXAudioTTS`) remain checked in only for package-internal implementation
+compatibility, not product generation authority (both the legacy SPI and internal characterization
+surfaces were retired on 2026-07-23; see `COMPATIBILITY.json`).
 
 Cancellation terminates the producer, resets reusable state, and produces exactly one terminal
 result. The generation gate permits one owner, transfers FIFO, and handles cancellation after
@@ -178,8 +180,9 @@ audio drain, and model EOS moves the same operation lease to product finalizatio
 releasing it. The adapter must drain every frame, finalize and reopen the WAV, run mandatory Fast QC,
 publish or clean up atomically, and return the opaque generation and lease token. An identical
 repeated acknowledgment is idempotent; a stale or conflicting token cannot release a newer lease.
-The old fixed-count mixed facade event channel remains only as a package characterization surface;
-QwenVoiceCore product generation does not use it.
+The old fixed-count mixed facade event channel and internal characterization surfaces were retired
+on 2026-07-23 (`COMPATIBILITY.json` enforces `internalCharacterizationSurfaces: []` fail-closed);
+`QwenVoiceCore` product generation uses only the classified session.
 
 ## Memory and caches
 

@@ -57,10 +57,11 @@ materialized to `[Float]` before the awaited send, so no `MLXArray` crosses a ta
 prepared state, coalesced progress, model terminal, bounded PCM-free diagnostics, cancellation, and
 product finalization remain independent. Custom, Design, and Clone now use that classified session
 through QwenVoiceCore's `GenerationOutputAdapter`; direct compatibility streams are not product
-generation authority. The old combined facade event session remains a package-internal
-characterization surface only. `VocelloQwen3LegacyCompatibility` was retired; loading, metadata,
-prewarm and schema-3 clone-prompt persistence/adoption now use actor-owned public surfaces.
-The empty retired-SPI inventories in `COMPATIBILITY.json` are enforced fail-closed.
+generation authority. Both `VocelloQwen3LegacyCompatibility` and the old combined facade event
+session / internal characterization surfaces were retired on 2026-07-23; loading, metadata, prewarm,
+generation and schema-3 clone-prompt persistence/adoption now use actor-owned public surfaces.
+The empty retired-SPI and `internalCharacterizationSurfaces` inventories in `COMPATIBILITY.json` are
+enforced fail-closed.
 
 The implementation-only `AudioGeneration.audio` compatibility event also carries `[Float]`,
 not `MLXArray`. Its four Qwen producers call `audio(materializing:)` while still owning the
@@ -103,7 +104,7 @@ boundary. The facade exposes owned Vocello contracts and opaque adapters; it doe
 MLX or `MLXAudio*` implementation declarations.
 
 Keep MLX dependency versions synchronized with `project.yml`; the lockstep rule is in
-`.claude/rules/native.md` and the pin-bump procedure in `docs/reference/mlx-guide.md` §9.3.
+`.agents/plugins/vocello/rules/native.md` and the pin-bump procedure in `docs/reference/mlx-guide.md` §9.3.
 
 ```swift
 .package(path: "Packages/VocelloQwen3Core")

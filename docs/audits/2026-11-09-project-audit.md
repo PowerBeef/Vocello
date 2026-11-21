@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: release-qa
 reviewed: 2026-11-09
 summary: Read-only audit of the whole project on 2026-11-09 at f3689d2a, three days before the planned App Review submission. Covers the release path, the engine and runtime, the iPhone and Mac apps, tooling, CI, guardrails, process and the website. It changes no code, roadmap item or App Store Connect field; every recommendation waits for the maintainer. Section 10 records the 2026-11-10 verification of its findings and where each is now tracked.

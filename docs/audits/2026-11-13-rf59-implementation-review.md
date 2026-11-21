@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: backend-mlx
 reviewed: 2026-11-13
 summary: Review of the RF-59 implementation (one hybrid model per mode, retired-folder reclamation, the model update for 3.0 users, the research folder) - what holds, two defects found by reading the code, the verification still owed, and ordered follow-up instructions.

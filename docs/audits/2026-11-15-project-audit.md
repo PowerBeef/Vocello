@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: release-qa
 reviewed: 2026-11-15
 summary: A whole-project audit before the Mac and CLI 3.1 release — engine, apps, CLI and storage, test harnesses and lanes, tooling and CI, instructions and documentation — with every finding, its evidence, and a recommended order.

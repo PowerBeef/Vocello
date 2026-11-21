@@ -93,10 +93,12 @@ python3 scripts/model_host_availability.py probe \
 ```
 
 On 2026-09-01 North America passed both the three one-byte checks and full SHA-256 verification of
-the three largest pinned iOS files (4,024,541,635 bytes total) with no retry/rate-limit header. The
-local run is useful host evidence but cannot authorize regional closure: `compose` accepts only
-fresh full-digest inputs from every declared region with a qualified external execution-authority
-and identity digest. Europe and East Asia therefore remain required. An outage never authorizes
+the three largest pinned iOS files (4,024,541,635 bytes total) with no retry/rate-limit header.
+`compose` requires fresh full-digest inputs from every declared region with a qualified external
+execution-authority and identity digest for multi-region closure; by the maintainer's 2026-10-12
+ASR-09 decision, however, a fresh full-artifact North America proof (within its 24-hour freshness
+window) suffices for 3.x while Europe and East Asia are accepted as residual risk
+([`content-rights-review.md`](content-rights-review.md#asr-09-model-downloads-are-verified-for-north-america-only)). An outage never authorizes
 automatic host fallback or artifact substitution. The pinned artifact must recover unchanged, or
 reviewer guidance directs a retry/support path while the release remains blocked.
 
@@ -222,10 +224,12 @@ nominal thermal). Observed disk cost on the Mac was 12 GiB for the 16.2 GB catal
 > f16. 2026.08.06.1 kept it and added the Article 50 marking generator to every artifact; its Mac proof ran on
 > 2026-08-08 (an isolated `pro_custom_speed` install at the new 1,708,583,689-byte plan, the marking
 > file byte-exact against its pinned digest, zero retries) and its iPhone acceptance is the
-> 2026-08-29 run in "Diagnostics and acceptance". The current 2026.09.14.1 restores the fp32 speech
+> 2026-08-29 run in "Diagnostics and acceptance". 2026.09.14.1 restored the fp32 speech
 > tokenizer after the f16 codec opened streamed clone takes with a burst (roadmap MV-07,
-> OPTIMIZATION.md §R) and changes nothing else; its fresh delivery evidence rides the next
-> release's battery, since static completeness never substitutes for live proof.
+> OPTIMIZATION.md §R) and changed nothing else. The current `artifactVersion` is `2026.11.13.1`,
+> shipping the three `attn` hybrid artifacts (`RF-55`/`RF-59`; [hybrid-model.md](hybrid-model.md));
+> fresh delivery evidence rides the release battery, since static completeness never substitutes for
+> live proof.
 
 The iOS ledger is atomically written, versioned, and contains only privacy-safe identifiers and
 relative paths. It records the logical request, model and artifact version, expected and verified

@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: release-qa
 reviewed: 2026-11-15
 summary: The step-by-step plan to remediate every finding of the 2026-11-15 project audit, in order — decisions first, then what must land before the 3.1 tag, the release sitting, the publication flip, and everything that can follow 3.1.

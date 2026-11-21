@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
 reviewed: 2026-10-18
 summary: Read-only audit of the development workflow and tooling (dev loop, CI, hooks, verification system, Apple build and observability settings, the maintainer's Claude Code setup) with verified findings and a phased improvement programme for velocity, code accuracy and Apple-optimized engineering quality. Recommendations only; nothing is scheduled until the maintainer picks a phase.

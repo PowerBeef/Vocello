@@ -88,7 +88,9 @@ enum Qwen3TTSReferenceAudio {
     /// step. A reference with no sound, or shorter than two windows, is
     /// returned as given. Returns `[T']`.
     static func edgesTrimmedAndFaded(_ audio: MLXArray) throws -> MLXArray {
-        let samples = try canonicalMonoBatch(audio)[0].asType(.float32).asArray(Float.self)
+        let mono = try canonicalMonoBatch(audio)[0].asType(.float32)
+        try evalForReadback(mono)
+        let samples = mono.asArray(Float.self)
         return MLXArray(edgesTrimmedAndFaded(samples))
     }
 

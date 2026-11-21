@@ -67,9 +67,29 @@ public enum IOSBackgroundGenerationPolicy {
     /// Leaving the foreground is a shutdown of in-flight work, not a user cancel.
     public static let cancellationReason: GenerationCancellationReason = .shutdown
 
+    /// Whether the engine holds resident weights or is running proactive model
+    /// work (load, prewarm, clone prime) that must finish cancelling/unloading
+    /// inside a finite `UIBackgroundTask` before iOS suspends the process (RB-04).
+    public static func requiresBackgroundReleaseTime(
+        loadState: EngineLoadState,
+        clonePreparationState: ClonePreparationState,
+        hasInFlightPreparation: Bool = false
+    ) -> Bool {
+        if hasInFlightPreparation || clonePreparationState.phase == .preparing {
+            return true
+        }
+        switch loadState {
+        case .starting, .loaded, .running, .failed:
+            return true
+        case .idle:
+            return false
+        }
+    }
+
     public static func backgroundPlan(
         hasActiveGeneration: Bool,
-        studioWork: IOSBackgroundGenerationWork
+        studioWork: IOSBackgroundGenerationWork,
+        hasInFlightPreparationOrLoadedModel: Bool = false
     ) -> IOSBackgroundTransitionPlan {
         let studioInterruption: IOSBackgroundInterruption?
         switch studioWork {
@@ -81,7 +101,9 @@ public enum IOSBackgroundGenerationPolicy {
             studioInterruption = nil
         }
         return IOSBackgroundTransitionPlan(
-            requestsBackgroundTime: hasActiveGeneration || studioWork != .idle,
+            requestsBackgroundTime: hasActiveGeneration
+                || studioWork != .idle
+                || hasInFlightPreparationOrLoadedModel,
             studioInterruption: studioInterruption,
             cancelsUnownedEngineGeneration: hasActiveGeneration && studioWork == .idle,
             cancellationReason: cancellationReason,

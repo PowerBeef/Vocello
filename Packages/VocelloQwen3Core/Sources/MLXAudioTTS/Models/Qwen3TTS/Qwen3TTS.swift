@@ -1766,7 +1766,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         guard frames > 0 else {
             return (0, false)
         }
-        let reference = Qwen3TTSPrimedDecoderStateCache.referenceKey(
+        let reference = try Qwen3TTSPrimedDecoderStateCache.referenceKey(
             referenceCodes: referenceCodes,
             pieceFrames: pieceFrames
         )

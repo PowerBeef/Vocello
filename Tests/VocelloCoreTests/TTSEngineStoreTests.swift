@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 @testable import QwenVoiceCore
+import VocelloQwen3Core
 import VocelloSharedPolicies
 import XCTest
 import os
@@ -1526,6 +1527,73 @@ final class TTSEngineStoreTests: XCTestCase {
         }
     }
 
+    /// RB-04: a cold proactive `ensureModelLoadedIfNeeded` does not publish
+    /// `.starting` while `runtime.loadModel` is suspended on the GPU, so
+    /// `TTSEngineStore.hasInFlightPreparationOrLoadedModel` must still return
+    /// `true` while it is in flight (requesting a finite `UIBackgroundTask` on
+    /// foreground exit), remain `true` while weights are resident, and drop to
+    /// `false` once unloaded.
+    func testColdProactiveEnsureModelLoadedRaisesHasInFlightPreparationOrLoadedModel() async throws {
+        try skipIfThermalGateBlocksProactiveWarm()
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-rb04-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let coordinator = ColdHoldingLoadCoordinator()
+        let engine = MLXTTSEngine(
+            modelRegistry: try ContractBackedModelRegistry(manifestURL: contractURL),
+            modelAssetStore: LocalModelAssetStore(
+                rootDirectory: root.appendingPathComponent("models", isDirectory: true),
+                descriptors: []
+            ),
+            audioPreparationService: NativeAudioPreparationService(),
+            documentIO: LocalDocumentIO(
+                importedReferenceDirectory: root.appendingPathComponent("imported", isDirectory: true)
+            ),
+            streamSessionsDirectory: root.appendingPathComponent("streams", isDirectory: true),
+            loadCoordinator: coordinator,
+            streamingSessionFactory: { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in
+                fatalError("This RB-04 test never starts a generation.")
+            },
+            idleUnloadDelayOverride: Self.residentIdleWindow,
+            allocatorControl: .inert
+        )
+        defer { engine.stop() }
+        let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
+        try await store.initialize(appSupportDirectory: root)
+        XCTAssertEqual(store.loadState, .idle)
+        XCTAssertFalse(store.hasInFlightPreparationOrLoadedModel)
+
+        let proactiveLoad = Task { @MainActor in
+            await store.ensureModelLoadedIfNeeded(id: "pro_clone")
+        }
+        let held = expectation(description: "cold proactive load reached coordinator")
+        Task {
+            await coordinator.waitUntilFirstLoadHeld()
+            held.fulfill()
+        }
+        await fulfillment(of: [held], timeout: 10)
+
+        XCTAssertEqual(store.loadState, .idle, "cold ensureModelLoadedIfNeeded leaves loadState .idle while loading")
+        XCTAssertEqual(store.clonePreparationState, .idle)
+        XCTAssertTrue(
+            store.hasInFlightPreparationOrLoadedModel,
+            "cold proactive load in flight must request background release time on foreground exit"
+        )
+
+        await coordinator.releaseFirstLoad()
+        await proactiveLoad.value
+
+        XCTAssertEqual(store.loadState, .loaded(modelID: "pro_clone"))
+        XCTAssertTrue(
+            store.hasInFlightPreparationOrLoadedModel,
+            "resident idle weights must still request background release time on foreground exit"
+        )
+
+        try await store.unloadModel()
+        XCTAssertEqual(store.loadState, .idle)
+        XCTAssertFalse(store.hasInFlightPreparationOrLoadedModel)
+    }
+
     private func assertCancellationIsNotAFailure(
         _ weights: ResidentWeights,
         resident: String,
@@ -1573,4 +1641,111 @@ final class TTSEngineStoreTests: XCTestCase {
             payload: .custom(speakerID: "aiden", deliveryStyle: "Impersonate a celebrity announcer.")
         )
     }
+}
+
+/// Holds its very first `loadModel` call so RB-04 can inspect `TTSEngineStore`
+/// while a cold proactive `ensureModelLoadedIfNeeded` is suspended in flight.
+private actor ColdHoldingLoadCoordinator: MLXModelCoordinating {
+    private var hasHeld = false
+    private var heldContinuation: CheckedContinuation<Void, Never>?
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var releasedEarly = false
+
+    func waitUntilFirstLoadHeld() async {
+        guard heldContinuation == nil else { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func releaseFirstLoad() {
+        guard let heldContinuation else {
+            releasedEarly = true
+            return
+        }
+        self.heldContinuation = nil
+        heldContinuation.resume()
+    }
+
+    func qwen3Capabilities(for id: String) async throws -> Qwen3TTSModelCapabilities {
+        Self.capabilities
+    }
+
+    func loadModel(
+        id: String,
+        capabilityProfile: NativeLoadCapabilityProfile
+    ) async throws -> NativeModelLoadResult {
+        if !hasHeld {
+            hasHeld = true
+            if releasedEarly {
+                let pending = waiters
+                waiters.removeAll()
+                pending.forEach { $0.resume() }
+            } else {
+                await withCheckedContinuation { continuation in
+                    heldContinuation = continuation
+                    let pending = waiters
+                    waiters.removeAll()
+                    pending.forEach { $0.resume() }
+                }
+            }
+        }
+        let facts = VocelloQwen3LoadedModelFacts(
+            identity: VocelloQwen3ModelIdentity(
+                modelID: id,
+                repositoryID: "fixture/repository",
+                revision: "fixture",
+                artifactVersion: "fixture"
+            ),
+            sampleRate: 24_000,
+            capabilities: VocelloQwen3CapabilitySet([VocelloQwen3Capability]()),
+            loadDiagnostics: VocelloQwen3RuntimeDiagnosticsSnapshot()
+        )
+        return NativeModelLoadResult(
+            model: UnsafeSpeechGenerationModel(engine: VocelloQwen3Engine(), facts: facts),
+            modelRuntimeIdentity: ModelRuntimeIdentity(resolvedModelID: id),
+            didLoad: true,
+            capabilityProfile: capabilityProfile,
+            qwen3Capabilities: Self.capabilities,
+            timingsMS: [:],
+            booleanFlags: [:],
+            stringFlags: [:]
+        )
+    }
+
+    func unloadModel() async {}
+    func isPrewarmed(identityKey: String) async -> Bool { false }
+    func markPrewarmed(identityKey: String) async {}
+    func clearPrewarmState() async {}
+    func setTelemetryRecorder(_ recorder: NativeTelemetryRecorder?) async {}
+    func requiresUnloadAfterRuntimeFailure() async -> Bool { false }
+
+    private static let capabilities = Qwen3TTSModelCapabilities(
+        modelSize: .pro1b7,
+        familyType: .baseClone,
+        supportsInstructionControl: false,
+        supportsVoiceClone: true,
+        supportsXVectorOnlyClone: true,
+        requiresSpeakerEncoder: true,
+        tokenizerProfile: Qwen3TTSTokenizerProfile(
+            name: "qwen3",
+            sampleRateHz: 24_000,
+            frameRateHz: 12.5,
+            decoderQuantizers: 16,
+            encoderValidQuantizers: 8,
+            encoderConfiguredQuantizers: 8,
+            codebookSize: 2_048,
+            semanticCodebookSize: 4_096
+        ),
+        generationDefaults: Qwen3TTSGenerationDefaultsProfile(
+            checkpointMaxNewTokens: nil,
+            wrapperFallbackMaxNewTokens: 2_048,
+            appPolicyMaxNewTokens: 2_048,
+            temperature: 0.9,
+            topP: 1,
+            topK: 50,
+            doSample: true,
+            repetitionPenalty: 1.05,
+            source: .appPolicy
+        ),
+        artifactAvailability: .publicArtifact
+    )
 }

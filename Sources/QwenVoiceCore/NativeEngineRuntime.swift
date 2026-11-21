@@ -2096,22 +2096,64 @@ actor NativeEngineRuntime {
         // during the warmup — enough to trip the memory-warning full unload of
         // the model it had just loaded — while the prewarm route stays within
         // the ordinary generation envelope (~300 ms, no spike).
-        try ensureActiveClonePrimeToken(token)
-        try await model.prewarmVoiceClone(
-            text: lightweightWarmupText,
-            language: language,
-            cloneHandle: cloneHandle
+        let warmupText = lightweightWarmupText
+        return try await primeCloneConditioningUnderPrewarmSlot(
+            identity: conditioning.internalIdentity,
+            token: token,
+            startedAt: startedAt,
+            prewarm: { @concurrent () async throws in
+                try await model.prewarmVoiceClone(
+                    text: warmupText,
+                    language: language,
+                    cloneHandle: cloneHandle
+                )
+            },
+            timings: { @concurrent () async -> [String: Int] in
+                await model.latestPreparationTimingsMS()
+            }
         )
-        try ensureActiveClonePrimeToken(token)
+    }
+
+    /// Number of callers currently queued behind the active `prewarmSlot`
+    /// holder; exposed internally for deterministic seam tests.
+    var prewarmSlotWaiterCount: Int {
+        prewarmSlot.waiterCount
+    }
+
+    /// Serializes clone priming against memory trims (`trimMemory`) and in-take
+    /// prewarms via `prewarmSlot` (RB-02), matching `ensureWarmStateIfNeeded`
+    /// and `ensureDesignConditioningWarmStateIfNeeded`. Registers `defer` only
+    /// after `acquirePrewarmSlot()` succeeds so a cancelled waiter never
+    /// releases another holder's slot.
+    func primeCloneConditioningUnderPrewarmSlot(
+        identity: GenerationSemantics.CloneReferenceIdentity,
+        token: UUID? = nil,
+        startedAt: ContinuousClock.Instant = .now,
+        prewarm: @Sendable @concurrent () async throws -> Void,
+        timings: @Sendable @concurrent () async -> [String: Int] = { @concurrent () async -> [String: Int] in [:] }
+    ) async throws -> [String: Int] {
+        if let token {
+            try ensureActiveClonePrimeToken(token)
+        }
+        let prewarmSlotWaitMS = try await acquirePrewarmSlot()
+        defer { releasePrewarmSlot() }
+        if let token {
+            try ensureActiveClonePrimeToken(token)
+        }
+        try await prewarm()
+        if let token {
+            try ensureActiveClonePrimeToken(token)
+        }
         await loadCoordinator.markPrewarmed(
-            identityKey: GenerationSemantics.PrewarmIdentity.clone(
-                conditioning.internalIdentity
-            ).cacheKey
+            identityKey: GenerationSemantics.PrewarmIdentity.clone(identity).cacheKey
         )
 
-        var timings = await model.latestPreparationTimingsMS()
-        timings["prime_clone_reference"] = startedAt.elapsedMilliseconds
-        return timings
+        var collectedTimings = await timings()
+        collectedTimings["prime_clone_reference"] = startedAt.elapsedMilliseconds
+        if prewarmSlotWaitMS > 0 {
+            collectedTimings["prewarm_slot_wait_ms"] = prewarmSlotWaitMS
+        }
+        return collectedTimings
     }
 
     private struct DesignConditioningWarmState: Sendable {

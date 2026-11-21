@@ -73,7 +73,20 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
 
     var isReady: Bool { frontendState.isReady }
     var visibleErrorMessage: String? { frontendState.visibleErrorMessage }
+    /// Whether the engine has proactive loads, clone priming, or resident weights
+    /// that require a finite `UIBackgroundTask` to cancel/unload cleanly before
+    /// iOS suspends the process (RB-04). Tracks `inFlightPreparationDepth` too
+    /// because cold `ensureModelLoadedIfNeeded` leaves `loadState == .idle`
+    /// while `runtime.loadModel` is suspended on the GPU.
+    var hasInFlightPreparationOrLoadedModel: Bool {
+        IOSBackgroundGenerationPolicy.requiresBackgroundReleaseTime(
+            loadState: loadState,
+            clonePreparationState: clonePreparationState,
+            hasInFlightPreparation: inFlightPreparationDepth > 0
+        )
+    }
     private(set) var frontendState: TTSEngineFrontendState
+    private var inFlightPreparationDepth = 0
 
     private let backend: AnyTTSEngineBackend
     private let memoryBudgetPolicy: IOSMemoryBudgetPolicy
@@ -262,6 +275,8 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
     }
 
     func loadModel(id: String) async throws {
+        inFlightPreparationDepth += 1
+        defer { inFlightPreparationDepth -= 1 }
         try await guardModelAdmission(shouldSurfaceError: false, reason: "load_model")
         try await backend.loadModel(id: id)
         syncFromBackend()
@@ -288,6 +303,8 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
 
     func ensureModelLoadedIfNeeded(id: String) async {
         guard await allowsProactiveWarmOperations(reason: "ensure_model_loaded") else { return }
+        inFlightPreparationDepth += 1
+        defer { inFlightPreparationDepth -= 1 }
         await backend.ensureModelLoadedIfNeeded(id: id)
         syncFromBackend()
         notifyMemoryContextDidChange()
@@ -295,6 +312,8 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
 
     func prewarmModelIfNeeded(for request: GenerationRequest) async {
         guard await allowsProactiveWarmOperations(reason: "prewarm_model") else { return }
+        inFlightPreparationDepth += 1
+        defer { inFlightPreparationDepth -= 1 }
         await backend.prewarmModelIfNeeded(for: request)
         syncFromBackend()
         notifyMemoryContextDidChange()
@@ -304,6 +323,8 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
         for request: GenerationRequest
     ) async -> InteractivePrefetchDiagnostics? {
         guard await allowsProactiveWarmOperations(reason: "prefetch_interactive_readiness") else { return nil }
+        inFlightPreparationDepth += 1
+        defer { inFlightPreparationDepth -= 1 }
         let diagnostics = await backend.prefetchInteractiveReadinessIfNeeded(for: request)
         syncFromBackend()
         notifyMemoryContextDidChange()
@@ -312,6 +333,8 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
 
     func ensureCloneReferencePrimed(modelID: String, reference: CloneReference) async throws {
         guard await allowsProactiveWarmOperations(reason: "clone_reference_prime") else { return }
+        inFlightPreparationDepth += 1
+        defer { inFlightPreparationDepth -= 1 }
         try await backend.ensureCloneReferencePrimed(modelID: modelID, reference: reference)
         syncFromBackend()
         notifyMemoryContextDidChange()

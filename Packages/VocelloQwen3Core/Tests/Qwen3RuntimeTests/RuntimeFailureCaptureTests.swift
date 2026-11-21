@@ -171,6 +171,41 @@ final class RuntimeFailureCaptureTests: XCTestCase {
         XCTAssertEqual(completion.audio, [2, 4, 6])
     }
 
+    /// RB-01: `Qwen3TTSReferenceAudio.edgesTrimmedAndFaded(_: MLXArray)` and
+    /// `Qwen3TTSPrimedDecoderStateCache.referenceKey(referenceCodes:pieceFrames:)`
+    /// both read MLX buffers back to Swift memory (`asArray` / `asData`). Under
+    /// an outer `VocelloQwen3MLXErrorScope` they must probe with `evalForReadback`
+    /// first so an allocation failure throws `.allocation` instead of trapping
+    /// on a nil base address in Release builds.
+    func testEdgesTrimmedAndFadedAndReferenceKeyProbeAllocationFailuresInsteadOfTrapping() throws {
+        let trimScope = VocelloQwen3MLXErrorScope()
+        XCTAssertThrowsError(
+            try trimScope.capture { () throws -> MLXArray in
+                // 1D lazy graph backed by an oversized 2D allocation: valid mono
+                // shape for `canonicalMonoBatch`, guaranteed to fail MLX allocation.
+                let oversizedMono = Self.oversizedArray().sum(axis: 0)
+                return try Qwen3TTSReferenceAudio.edgesTrimmedAndFaded(oversizedMono)
+            }
+        ) { error in
+            XCTAssertEqual(error as? VocelloQwen3RuntimeFailure, .allocation)
+        }
+        XCTAssertNil(trimScope.failure, "the readback probe, not the outer scope, caught the error")
+
+        let keyScope = VocelloQwen3MLXErrorScope()
+        XCTAssertThrowsError(
+            try keyScope.capture { () throws -> String in
+                let oversizedCodes = Self.oversizedArray().asType(.int32)
+                return try Qwen3TTSPrimedDecoderStateCache.referenceKey(
+                    referenceCodes: oversizedCodes,
+                    pieceFrames: 25
+                )
+            }
+        ) { error in
+            XCTAssertEqual(error as? VocelloQwen3RuntimeFailure, .allocation)
+        }
+        XCTAssertNil(keyScope.failure, "the readback probe, not the outer scope, caught the error")
+    }
+
     /// BG-01 review: an unleased artifact operation marks the loaded model for
     /// unload only for an evaluation error its scope recorded or an allocation
     /// failure; a file error from mlx-swift's own I/O leaves the model intact.

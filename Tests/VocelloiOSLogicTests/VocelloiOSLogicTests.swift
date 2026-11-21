@@ -228,6 +228,57 @@ final class VocelloiOSLogicTests: XCTestCase {
         XCTAssertEqual(policy.trimLevelForPressureEvent(snapshot: healthy, isBackgroundTransition: true), .fullUnload)
     }
 
+    /// RB-05: the clone-capability launch gate must be derived from
+    /// `IOSMemoryBudgetPolicy.iPhoneShippingDefault` so hybrid Clone's working
+    /// peak (~3,500 MiB) stays `.healthy` at the threshold instead of colliding
+    /// with proportionally scaled `.guarded`/`.critical` bands (as the legacy
+    /// 4.5 GB threshold did).
+    func testCloneCapableMinimumProcessLimitAlignsWithScaledFootprintBands() {
+        let policy = IOSMemoryBudgetPolicy.iPhoneShippingDefault
+        let mebibyte = UInt64(1_048_576)
+        let threshold = policy.minimumCloneCapableProcessLimitBytes()
+        let peakBytes = IOSMemoryBudgetPolicy.hybridCloneWorkingPeakMiB * mebibyte
+
+        // Rejects the legacy 4.5 GB limit (~4,291.5 MiB) and 6 GB class (3,600 MiB).
+        XCTAssertEqual(threshold, 4_779 * mebibyte)
+        XCTAssertGreaterThan(threshold, 4_500_000_000)
+        XCTAssertLessThan(3_600 * mebibyte, threshold)
+        // Admits the 5,000 MiB `iphone15pro` floor and real 6,144 MiB entitled iPhones.
+        XCTAssertLessThanOrEqual(threshold, 5_000 * mebibyte)
+        XCTAssertLessThanOrEqual(threshold, 6_144 * mebibyte)
+
+        // At the threshold, a hybrid Clone peak classifies `.healthy` under both
+        // headroom and scaled aggregate footprint bands; 1 MiB below trips `.guarded`.
+        let atThreshold = snapshot(headroom: threshold - peakBytes, footprint: peakBytes)
+        let atThresholdContext = policy.context(appSnapshot: atThreshold, reason: "rb05", source: "test")
+        XCTAssertEqual(policy.band(for: atThreshold), .healthy)
+        XCTAssertEqual(atThresholdContext.aggregatePressureBand, .healthy)
+        XCTAssertEqual(atThresholdContext.pressureBand, .healthy)
+
+        let belowThresholdBudget = threshold - mebibyte
+        let belowThreshold = snapshot(headroom: belowThresholdBudget - peakBytes, footprint: peakBytes)
+        let belowThresholdContext = policy.context(appSnapshot: belowThreshold, reason: "rb05", source: "test")
+        XCTAssertEqual(belowThresholdContext.aggregatePressureBand, .guarded)
+
+        // Contrast: at the legacy 4.5 GB budget, the same 3,500 MiB peak tripped
+        // `.guarded` because the scaled guarded band dropped to 3,143 MiB.
+        let legacyBudget: UInt64 = 4_500_000_000
+        let atLegacy = snapshot(headroom: legacyBudget - peakBytes, footprint: peakBytes)
+        let atLegacyContext = policy.context(appSnapshot: atLegacy, reason: "rb05", source: "test")
+        XCTAssertEqual(atLegacyContext.aggregatePressureBand, .guarded)
+
+        // Unscaled fallback policy (referenceProcessBudgetBytes == nil) still clears peak + healthy headroom.
+        let unscaled = IOSMemoryBudgetPolicy(
+            healthyHeadroomBytes: 768 * mebibyte,
+            guardedHeadroomBytes: 384 * mebibyte,
+            criticalGPUWorkingSetUsageRatio: 0.80,
+            aggregateGuardedFootprintBytes: 4_500 * mebibyte,
+            aggregateCriticalFootprintBytes: 5_200 * mebibyte,
+            referenceProcessBudgetBytes: nil
+        )
+        XCTAssertEqual(unscaled.minimumCloneCapableProcessLimitBytes(), (3_500 + 768) * mebibyte)
+    }
+
     func testCancellationReasonIsTypedAndRoundTrips() throws {
         let summary = GenerationCancellationSummary(
             generationID: UUID(uuidString: "00000000-0000-0000-0000-000000000001"),

@@ -315,13 +315,13 @@ final class Qwen3QualityFirstDecodeWindowTests: XCTestCase {
         let first = try makeTinyTokenizer().decoder
         let second = try makeTinyTokenizer().decoder
         let codes = fixtureCodes(frameCount: 12, zeroFrames: []).transposed(0, 2, 1)
-        let reference = Qwen3TTSPrimedDecoderStateCache.referenceKey(referenceCodes: codes, pieceFrames: 25)
+        let reference = try Qwen3TTSPrimedDecoderStateCache.referenceKey(referenceCodes: codes, pieceFrames: 25)
         let contiguousCopy = MLXArray(codes.asArray(Int32.self), codes.shape)
-        XCTAssertEqual(reference, Qwen3TTSPrimedDecoderStateCache.referenceKey(
+        XCTAssertEqual(reference, try Qwen3TTSPrimedDecoderStateCache.referenceKey(
             referenceCodes: contiguousCopy, pieceFrames: 25))
-        XCTAssertNotEqual(reference, Qwen3TTSPrimedDecoderStateCache.referenceKey(
+        XCTAssertNotEqual(reference, try Qwen3TTSPrimedDecoderStateCache.referenceKey(
             referenceCodes: codes, pieceFrames: 7))
-        XCTAssertNotEqual(reference, Qwen3TTSPrimedDecoderStateCache.referenceKey(
+        XCTAssertNotEqual(reference, try Qwen3TTSPrimedDecoderStateCache.referenceKey(
             referenceCodes: fixtureCodes(frameCount: 12, zeroFrames: [3]).transposed(0, 2, 1), pieceFrames: 25))
 
         first.resetStreamingState()

@@ -473,6 +473,11 @@ public struct IOSMemoryBudgetPolicy: Hashable, Codable, Sendable {
         referenceProcessBudgetBytes: ShippingBandMiB.referenceProcessBudget * 1_048_576
     )
 
+    /// Expected peak physical footprint for hybrid Clone on iPhone, in MiB:
+    /// the measured 3.0 Speed Clone peak (~3,332 MiB on the `iphone15pro`
+    /// profile) plus the 3.1 hybrid attention weight delta (~168 MiB).
+    public static let hybridCloneWorkingPeakMiB: UInt64 = 3_500
+
     /// The least measured budget the bands are scaled to. A reading below it
     /// is not a process limit an installed model fits in, so it is treated as
     /// no reading.
@@ -488,15 +493,63 @@ public struct IOSMemoryBudgetPolicy: Hashable, Codable, Sendable {
         return measured
     }
 
+    /// A footprint band scaled proportionally to a measured process budget
+    /// (RF-47). Shared between runtime band evaluation and the launch clone
+    /// capability gate so the two cannot drift apart (RB-05).
+    func scaledFootprintBand(_ bandBytes: UInt64, atProcessLimitBytes measured: UInt64) -> UInt64 {
+        guard let referenceProcessBudgetBytes, referenceProcessBudgetBytes > 0,
+              measured >= Self.minimumPlausibleProcessBudgetBytes
+        else { return bandBytes }
+        return UInt64(Double(bandBytes) / Double(referenceProcessBudgetBytes) * Double(measured))
+    }
+
     /// A footprint band at this snapshot's own budget: the band's share of
     /// the reference budget, applied to the measured one (RF-47). At the
     /// reference budget it is the band itself; without a measured budget it
     /// is the band unchanged.
     func footprintBand(_ bandBytes: UInt64, for snapshot: IOSMemorySnapshot) -> UInt64 {
-        guard let referenceProcessBudgetBytes, referenceProcessBudgetBytes > 0,
-              let measured = measuredProcessBudget(for: snapshot)
-        else { return bandBytes }
-        return UInt64(Double(bandBytes) / Double(referenceProcessBudgetBytes) * Double(measured))
+        guard let measured = measuredProcessBudget(for: snapshot) else { return bandBytes }
+        return scaledFootprintBand(bandBytes, atProcessLimitBytes: measured)
+    }
+
+    /// Minimum entitled per-app process budget required to enable in-process
+    /// Clone encoders (`.fullCapabilities`) without colliding with this
+    /// policy's scaled footprint bands (RB-05).
+    ///
+    /// At the returned budget, a `workingPeakMiB` Clone take stays strictly
+    /// below the scaled `.guarded` footprint band (so it neither fires
+    /// immediate `.hardTrim` nor collides with scaled `.critical` auto-cancel)
+    /// and retains at least `healthyHeadroomBytes` of headroom. For
+    /// `iPhoneShippingDefault` (`4,500 MiB` guarded at `6,144 MiB` reference)
+    /// and `hybridCloneWorkingPeakMiB` (`3,500 MiB`), this resolves to
+    /// `4,779 MiB` (`5,011,144,704` bytes) — admitting the `5,000 MiB`
+    /// `iphone15pro` floor and real entitled 8 GB / 12 GB iPhones (~`6,144 MiB`)
+    /// while rejecting budgets where scaled `.critical` would threaten Clone.
+    public func minimumCloneCapableProcessLimitBytes(
+        workingPeakMiB: UInt64 = Self.hybridCloneWorkingPeakMiB
+    ) -> UInt64 {
+        let mib: UInt64 = 1_048_576
+        let peakBytes = workingPeakMiB * mib
+        let headroomFloor = peakBytes + healthyHeadroomBytes
+        guard let referenceProcessBudgetBytes,
+              let aggregateGuardedFootprintBytes,
+              referenceProcessBudgetBytes > 0,
+              aggregateGuardedFootprintBytes > 0
+        else {
+            return max(peakBytes, headroomFloor)
+        }
+        let scaledMiB = UInt64(
+            ceil(
+                Double(workingPeakMiB)
+                    * Double(referenceProcessBudgetBytes)
+                    / Double(aggregateGuardedFootprintBytes)
+            )
+        )
+        var candidateBytes = max(scaledMiB * mib, headroomFloor)
+        if scaledFootprintBand(aggregateGuardedFootprintBytes, atProcessLimitBytes: candidateBytes) <= peakBytes {
+            candidateBytes += mib
+        }
+        return candidateBytes
     }
 
     /// Worst evidence band over a whole generation, persisted on engine

@@ -1077,6 +1077,108 @@ final class ActiveGenerationCoordinatorTests: XCTestCase {
         }
     }
 
+    /// RB-03: if Model A is resident and a take on Model B cancels before Model B
+    /// loads, `loadState` must re-derive `.loaded(modelID: A)` from the runtime
+    /// rather than publishing `.loaded(modelID: B)` (which would let
+    /// `ModelDeletionSequence` skip unloading Model A and delete live mmap'd weights).
+    @MainActor
+    func testCancelledCrossModelGenerationBeforeLoadPreservesResidentModelLoadState() async throws {
+        try await withResidentEngine(resident: "pro_custom", warmRequests: .cancelDescriptorLookup) { engine, coordinator, published in
+            let request = Self.designGenerationRequest()
+            do {
+                _ = try await engine.generate(request)
+                XCTFail("expected CancellationError")
+            } catch is CancellationError {}
+
+            XCTAssertEqual(
+                engine.loadState,
+                .loaded(modelID: "pro_custom"),
+                "resident Model A must remain published when Model B's take cancelled before loading"
+            )
+            XCTAssertFalse(published.includesAFailure)
+            XCTAssertNil(engine.visibleErrorMessage)
+            let beforeIdle = await coordinator.events
+            XCTAssertEqual(
+                beforeIdle,
+                ["load", "capabilities"],
+                "Model B cancelled at descriptor lookup without touching Model A"
+            )
+            try await Self.assertIdleUnloadRuns(engine: engine, coordinator: coordinator, after: beforeIdle)
+        }
+    }
+
+    /// RB-03: if a take on Model B cancels inside `loadModel` (after
+    /// `NativeEngineRuntime` unloaded resident weights), `loadState` must become
+    /// `.idle` rather than `.loaded(modelID: B)`.
+    @MainActor
+    func testCancelledGenerationAfterRuntimeUnloadPublishesIdleLoadState() async throws {
+        try await withResidentEngine(resident: "pro_custom", warmRequests: .cancelBodyLoad) { engine, coordinator, published in
+            let request = Self.designGenerationRequest()
+            do {
+                _ = try await engine.generate(request)
+                XCTFail("expected CancellationError")
+            } catch is CancellationError {}
+
+            let events = await coordinator.events
+            XCTAssertEqual(
+                events,
+                ["load", "capabilities", "load", "unload"],
+                "Model B load reached coordinator and runtime unloaded resident weights"
+            )
+            XCTAssertEqual(
+                engine.loadState,
+                .idle,
+                "a cancelled take whose load unloaded weights must publish .idle, never .loaded(request.modelID)"
+            )
+            XCTAssertFalse(published.includesAFailure)
+            XCTAssertNil(engine.visibleErrorMessage)
+        }
+    }
+
+    /// RB-03: if a storage-full error occurs during `loadModel` (which unloads
+    /// resident weights in `NativeEngineRuntime`), `handleGenerationFailure` must
+    /// publish `.idle` (while keeping the storage error message) instead of
+    /// claiming `.loaded(modelID: request.modelID)` with nothing resident.
+    @MainActor
+    func testLoadTimeStorageFailureAfterRuntimeUnloadPublishesIdleNotLoaded() async throws {
+        try await withResidentEngine(resident: "pro_custom", warmRequests: .failBodyLoadStorageFull) { engine, coordinator, _ in
+            let request = Self.designGenerationRequest()
+            do {
+                _ = try await engine.generate(request)
+                XCTFail("expected storage failure")
+            } catch {
+                XCTAssertTrue(MLXTTSEngine.isStorageFailure(error), "expected storage failure, got \(error)")
+            }
+
+            let events = await coordinator.events
+            XCTAssertEqual(
+                events,
+                ["load", "capabilities", "load", "unload"],
+                "load-time ENOSPC reached coordinator load and runtime unloaded resident weights"
+            )
+            XCTAssertEqual(
+                engine.loadState,
+                .idle,
+                "a load-time storage failure that left nothing resident must publish .idle"
+            )
+            XCTAssertNotNil(engine.visibleErrorMessage)
+        }
+    }
+
+    private static func designGenerationRequest() -> GenerationRequest {
+        let outputPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-rb03-\(UUID().uuidString).wav")
+            .path
+        return GenerationRequest(
+            mode: .design,
+            modelID: "pro_design",
+            text: "Testing RB-03 cancellation load state.",
+            outputPath: outputPath,
+            shouldStream: true,
+            payload: .design(voiceDescription: "Warm narrator", deliveryStyle: nil)
+        )
+    }
+
     /// Returns once `coordinator` holds the operation's load; fails, rather
     /// than hangs, when the operation never reaches it.
     @MainActor
@@ -1235,6 +1337,9 @@ actor ResidentLoadCoordinator: MLXModelCoordinating {
         /// Voice prewarm then fails at the unloaded runtime actor, and a
         /// clone prime of a missing reference fails at clone conditioning.
         case proceed
+        /// Every descriptor lookup throws a raw cancellation before any load
+        /// begins, leaving an earlier resident model untouched.
+        case cancelDescriptorLookup
         /// Every descriptor lookup fails, before the runtime loads or warms
         /// anything, so the weights an earlier load left stay resident
         /// behind the failure (PA-32).
@@ -1248,6 +1353,8 @@ actor ResidentLoadCoordinator: MLXModelCoordinating {
         case cancelBodyLoad
         /// Every load after a lookup fails.
         case failBodyLoad
+        /// Every load after a lookup fails with a storage-full (`ENOSPC`) error.
+        case failBodyLoadStorageFull
         /// The second lookup, a warm's prewarm step after its load, throws a
         /// raw cancellation, as a warm whose intent changed there ends.
         case cancelPrewarmStep
@@ -1298,6 +1405,8 @@ actor ResidentLoadCoordinator: MLXModelCoordinating {
         events.append("capabilities")
         lookups += 1
         switch (warmRequests, lookups) {
+        case (.cancelDescriptorLookup, _):
+            throw CancellationError()
         case (.failDescriptorLookup, _):
             throw WarmRequestFailure()
         case (.cancelPrewarmStep, 2), (.cancelPrewarmStepAfterRuntimeFailure, 2):
@@ -1335,6 +1444,8 @@ actor ResidentLoadCoordinator: MLXModelCoordinating {
                 throw CancellationError()
             case .failBodyLoad:
                 throw WarmRequestFailure()
+            case .failBodyLoadStorageFull:
+                throw CocoaError(.fileWriteOutOfSpace)
             default:
                 break
             }
@@ -1378,9 +1489,10 @@ actor ResidentLoadCoordinator: MLXModelCoordinating {
     /// runtime's capability check and runs its body.
     private static func capabilities(for id: String) -> Qwen3TTSModelCapabilities {
         let isClone = id.hasSuffix("_clone")
+        let isDesign = id.hasSuffix("_design")
         return Qwen3TTSModelCapabilities(
             modelSize: .pro1b7,
-            familyType: isClone ? .baseClone : .customVoice,
+            familyType: isClone ? .baseClone : (isDesign ? .voiceDesign : .customVoice),
             supportsInstructionControl: !isClone,
             supportsVoiceClone: isClone,
             supportsXVectorOnlyClone: isClone,

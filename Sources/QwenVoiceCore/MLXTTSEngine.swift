@@ -1602,34 +1602,13 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 cancellationReason: cancellationIngress.reason,
                 isTaskCancelled: Task.isCancelled
             ) {
-                // A runtime failure recorded while the take unwound unloads the
-                // model before the terminal, as the failure path does, so the
-                // load state never claims a model that is gone.
-                let unloaded = await unloadAfterCapturedRuntimeFailureIfNeeded(error)
-                // A take that `stop()` cancelled leaves the stopped engine's state alone:
-                // the stop reset it, and its own cleanup unloads the model.
-                let stopped = wasStopped(since: startedIn)
-                if !stopped {
-                    loadState = unloaded ? .idle : .loaded(modelID: request.modelID)
-                }
-                // Preserve the UI's no-visible-error cancellation contract while
-                // still closing the service-layer transport accumulator.
-                let coordinatorReason = await activeGenerationCoordinator.currentCancellationReason
-                let reason = cancellationIngress.reason ?? coordinatorReason ?? .user
-                await yieldEvent(
-                    .cancelled(
-                        GenerationCancellationSummary(
-                            generationID: request.generationID,
-                            reason: reason
-                        )
-                    ),
-                    generationID: deliveryGenerationID
+                await settleCancelledGeneration(
+                    error: error,
+                    request: request,
+                    cancellationIngress: cancellationIngress,
+                    deliveryGenerationID: deliveryGenerationID,
+                    startedIn: startedIn
                 )
-                let delivery = eventRouter.snapshot(for: deliveryGenerationID)
-                await recordEventDeliveryLossIfNeeded(delivery, request: request)
-                if !stopped {
-                    rearmIdleUnloadAfterCancelledTake(request, unloaded: unloaded)
-                }
                 throw CancellationError()
             }
             if NativeGenerationTerminalClassifier.isRetryableAllocationFailure(error) {
@@ -1691,25 +1670,13 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                         cancellationReason: cancellationIngress.reason,
                         isTaskCancelled: Task.isCancelled
                     ) {
-                        // A runtime failure recorded while the take unwound unloads the
-                        // model before the terminal, as the failure path does, so the
-                        // load state never claims a model that is gone.
-                        let unloaded = await unloadAfterCapturedRuntimeFailureIfNeeded(error)
-                        loadState = unloaded ? .idle : .loaded(modelID: request.modelID)
-                        let coordinatorReason = await activeGenerationCoordinator.currentCancellationReason
-                        let reason = cancellationIngress.reason ?? coordinatorReason ?? .user
-                        await yieldEvent(
-                            .cancelled(
-                                GenerationCancellationSummary(
-                                    generationID: request.generationID,
-                                    reason: reason
-                                )
-                            ),
-                            generationID: deliveryGenerationID
+                        await settleCancelledGeneration(
+                            error: error,
+                            request: request,
+                            cancellationIngress: cancellationIngress,
+                            deliveryGenerationID: deliveryGenerationID,
+                            startedIn: startedIn
                         )
-                        let delivery = eventRouter.snapshot(for: deliveryGenerationID)
-                        await recordEventDeliveryLossIfNeeded(delivery, request: request)
-                        rearmIdleUnloadAfterCancelledTake(request, unloaded: unloaded)
                         throw CancellationError()
                     }
                     let unloadedAfterRetry = await unloadAfterCapturedRuntimeFailureIfNeeded(error)
@@ -1732,7 +1699,12 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                         ),
                         appSupportDirectory: diagnosticAppSupportBox.url
                     )
-                    handleGenerationFailure(surfacedError, request: request, unloaded: unloadedAfterRetry)
+                    await handleGenerationFailure(
+                        surfacedError,
+                        request: request,
+                        unloaded: unloadedAfterRetry,
+                        startedIn: startedIn
+                    )
                     let failureEvent = GenerationEvent.failed(surfacedError.localizedDescription)
                     await yieldEvent(failureEvent, generationID: deliveryGenerationID)
                     latestEvent = failureEvent
@@ -1762,7 +1734,12 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 ),
                 appSupportDirectory: diagnosticAppSupportBox.url
             )
-            handleGenerationFailure(surfacedError, request: request, unloaded: unloadedAfterFailure)
+            await handleGenerationFailure(
+                surfacedError,
+                request: request,
+                unloaded: unloadedAfterFailure,
+                startedIn: startedIn
+            )
             let failureEvent = GenerationEvent.failed(surfacedError.localizedDescription)
             await yieldEvent(failureEvent, generationID: deliveryGenerationID)
             latestEvent = failureEvent
@@ -1899,16 +1876,69 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         }
     }
 
+    /// Settles a cancelled generation attempt (initial or allocation-retry) by
+    /// deriving `loadState` from what `runtime` actually holds (RB-03, matching
+    /// `settleCancelledModelOperation`) rather than trusting `request.modelID`.
+    /// When `stop()` ran since `startedIn`, published state and idle unload are
+    /// left untouched while the `.cancelled` event still closes the transport.
+    private func settleCancelledGeneration(
+        error: Error,
+        request: GenerationRequest,
+        cancellationIngress: GenerationCancellationIngress,
+        deliveryGenerationID: UUID,
+        startedIn: UInt64
+    ) async {
+        // A runtime failure recorded while the take unwound unloads the model
+        // before the terminal, as the failure path does, so the load state
+        // never claims a model that is gone.
+        let unloaded = await unloadAfterCapturedRuntimeFailureIfNeeded(error)
+        let residentModelID: String? = unloaded ? nil : await runtime.loadedModelID()
+        if !wasStopped(since: startedIn) {
+            if let residentModelID {
+                loadState = .loaded(modelID: residentModelID)
+                await reconcilePrimedClonePreparationWithRuntime()
+            } else {
+                loadState = .idle
+                clonePreparationState = .idle
+            }
+        }
+        // Preserve the UI's no-visible-error cancellation contract while still
+        // closing the service-layer transport accumulator.
+        let coordinatorReason = await activeGenerationCoordinator.currentCancellationReason
+        let reason = cancellationIngress.reason ?? coordinatorReason ?? .user
+        await yieldEvent(
+            .cancelled(
+                GenerationCancellationSummary(
+                    generationID: request.generationID,
+                    reason: reason
+                )
+            ),
+            generationID: deliveryGenerationID
+        )
+        let delivery = eventRouter.snapshot(for: deliveryGenerationID)
+        await recordEventDeliveryLossIfNeeded(delivery, request: request)
+        if !wasStopped(since: startedIn) {
+            rearmIdleUnloadAfterCancelledTake(request, residentModelID: residentModelID)
+        }
+    }
+
     /// A cancelled take is not a failure: the model it leaves resident keeps
     /// the idle unload the take cancelled, as a cancelled warm or prime does
     /// (AUD-10), instead of staying loaded until the next model operation.
-    private func rearmIdleUnloadAfterCancelledTake(_ request: GenerationRequest, unloaded: Bool) {
-        guard !unloaded else { return }
-        scheduleIdleUnloadIfNeeded(
-            modelID: request.modelID,
-            mode: request.mode,
-            isBatch: request.batchTotal != nil
-        )
+    private func rearmIdleUnloadAfterCancelledTake(
+        _ request: GenerationRequest,
+        residentModelID: String?
+    ) {
+        guard let residentModelID else { return }
+        if residentModelID == request.modelID {
+            scheduleIdleUnloadIfNeeded(
+                modelID: residentModelID,
+                mode: request.mode,
+                isBatch: request.batchTotal != nil
+            )
+        } else {
+            scheduleIdleUnloadIfNeeded(modelID: residentModelID, isBatch: false)
+        }
     }
 
     /// After MLX raised an error mid-generation the loaded model may hold
@@ -2567,24 +2597,45 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     }
 
     /// A take that failed for want of storage (a full disk, an output folder
-    /// that refuses writes) leaves the engine ready: the visible error names
-    /// the storage and the load state keeps the model, so Studio does not say
-    /// the engine needs attention (BKL-33). Every other generation failure
-    /// marks the engine failed, as before.
-    private func handleGenerationFailure(_ error: Error, request: GenerationRequest, unloaded: Bool) {
+    /// that refuses writes) leaves the engine ready when weights remain
+    /// resident: the visible error names the storage and `loadState` reflects
+    /// the actual resident model reported by `runtime.loadedModelID()` (RB-03,
+    /// BKL-33), never claiming `request.modelID` when a load-time failure left
+    /// nothing resident or left another model resident. Every other generation
+    /// failure marks the engine failed, as before.
+    private func handleGenerationFailure(
+        _ error: Error,
+        request: GenerationRequest,
+        unloaded: Bool,
+        startedIn: UInt64
+    ) async {
+        guard !wasStopped(since: startedIn) else { return }
         guard Self.isStorageFailure(error) else {
             handle(error)
             return
         }
         visibleErrorMessage = presentedDescription(of: error)
-        guard !unloaded else {
+        let residentModelID: String? = unloaded ? nil : await runtime.loadedModelID()
+        guard !wasStopped(since: startedIn) else { return }
+        guard let residentModelID else {
             loadState = .idle
+            clonePreparationState = .idle
             return
         }
-        loadState = .loaded(modelID: request.modelID)
+        loadState = .loaded(modelID: residentModelID)
+        await reconcilePrimedClonePreparationWithRuntime()
+        guard !wasStopped(since: startedIn) else { return }
         // The take cancelled the idle unload, and the failure path re-arms it
         // only over a failed or idle state, so the model kept here arms it.
-        scheduleIdleUnloadIfNeeded(modelID: request.modelID, isBatch: request.batchTotal != nil)
+        if residentModelID == request.modelID {
+            scheduleIdleUnloadIfNeeded(
+                modelID: residentModelID,
+                mode: request.mode,
+                isBatch: request.batchTotal != nil
+            )
+        } else {
+            scheduleIdleUnloadIfNeeded(modelID: residentModelID, isBatch: false)
+        }
     }
 
     /// Whether `error` is about where the take goes rather than the engine.

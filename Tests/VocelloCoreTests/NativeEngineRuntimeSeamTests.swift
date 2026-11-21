@@ -354,6 +354,151 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
         await assertPrewarmSlotIsFree(runtime)
     }
 
+    /// RB-02: clone conditioning priming holds `prewarmSlot` across its
+    /// suspended MLX prewarm body so a warning-level `.softTrim` waits for the
+    /// slot rather than clearing clone caches concurrently.
+    @concurrent func testCloneConditioningPrimeSerializesWithSoftTrimViaPrewarmSlot() async throws {
+        let fixture = RuntimeSeamFixture()
+        let runtime = fixture.runtime
+        _ = try await runtime.loadModel(id: RuntimeSeam.cloneModel)
+        let baselineCount = fixture.log.entries.count
+
+        let prewarmHold = RuntimeSeamGate()
+        let log = fixture.log
+        let identity = GenerationSemantics.CloneReferenceIdentity(
+            modelID: RuntimeSeam.cloneModel,
+            refAudio: "/nonexistent/rb02-reference.wav",
+            refText: "A synthetic seam transcript."
+        )
+        let primeTask = Task { @concurrent () async throws -> [String: Int] in
+            try await runtime.primeCloneConditioningUnderPrewarmSlot(
+                identity: identity,
+                prewarm: { @concurrent () async throws in
+                    log.append("clonePrewarm:entered")
+                    await prewarmHold.wait()
+                    log.append("clonePrewarm:exited")
+                }
+            )
+        }
+        await waitForEntries(fixture.log, prefix: "clonePrewarm:entered")
+
+        let trimTask = Task { @concurrent () async in
+            await runtime.trimMemory(level: .softTrim, reason: "memory_warning")
+        }
+        // Deterministically prove `trimTask` actually parked on `prewarmSlot`
+        // rather than still booting when we check `entriesWhilePriming`.
+        try await waitForPrewarmSlotWaiters(runtime, expected: 1)
+
+        let entriesWhilePriming = Array(fixture.log.entries.dropFirst(baselineCount))
+        XCTAssertEqual(
+            entriesWhilePriming,
+            ["clonePrewarm:entered"],
+            "warning .softTrim must wait on prewarmSlot until clone priming exits"
+        )
+
+        await prewarmHold.release()
+        _ = try await primeTask.value
+        await trimTask.value
+
+        let entriesAfter = Array(fixture.log.entries.dropFirst(baselineCount))
+        XCTAssertEqual(
+            entriesAfter,
+            [
+                "clonePrewarm:entered",
+                "clonePrewarm:exited",
+                "markPrewarmed:\(GenerationSemantics.PrewarmIdentity.clone(identity).cacheKey)",
+                RuntimeSeam.clearCache,
+                RuntimeSeam.clearCache,
+            ],
+            "softTrim must clear caches only after clone priming finishes and releases prewarmSlot"
+        )
+        await assertPrewarmSlotIsFree(runtime)
+    }
+
+    /// RB-02: a clone prime cancelled while queued on a held `prewarmSlot`
+    /// never enters its body and never releases the holder's slot; a stale
+    /// clone-prime token also cancels cleanly without touching the slot.
+    @concurrent func testCancelledClonePrimeWaitingOnPrewarmSlotPreservesHoldersSlot() async throws {
+        let fixture = RuntimeSeamFixture()
+        let runtime = fixture.runtime
+        _ = try await runtime.loadModel(id: RuntimeSeam.customModel)
+        let holder = await startHoldingHardTrim(fixture)
+        let whileHeld = fixture.log.entries
+
+        let identity = GenerationSemantics.CloneReferenceIdentity(
+            modelID: RuntimeSeam.customModel,
+            refAudio: "/nonexistent/rb02-cancelled.wav",
+            refText: nil
+        )
+        let log = fixture.log
+
+        // 1. Stale token rejects before touching the slot or running prewarm.
+        do {
+            _ = try await runtime.primeCloneConditioningUnderPrewarmSlot(
+                identity: identity,
+                token: UUID(),
+                prewarm: { @concurrent () async throws in
+                    log.append("clonePrewarm:stale-token-must-not-run")
+                }
+            )
+            XCTFail("expected CancellationError for inactive clone-prime token")
+        } catch is CancellationError {}
+
+        // 2. Real queued waiter cancelled while parked on `prewarmSlot`.
+        let primeTask = Task { @concurrent () async -> (any Error)? in
+            do {
+                _ = try await runtime.primeCloneConditioningUnderPrewarmSlot(
+                    identity: identity,
+                    prewarm: { @concurrent () async throws in
+                        log.append("clonePrewarm:must-not-run")
+                    }
+                )
+                return nil
+            } catch {
+                return error
+            }
+        }
+        try await waitForPrewarmSlotWaiters(runtime, expected: 1)
+        primeTask.cancel()
+        let primeError = await primeTask.value
+        XCTAssertTrue(primeError is CancellationError, "expected CancellationError, got \(String(describing: primeError))")
+        let remainingWaiters = await runtime.prewarmSlotWaiterCount
+        XCTAssertEqual(remainingWaiters, 0, "cancelled waiter must detach from prewarmSlot")
+        XCTAssertEqual(fixture.log.entries, whileHeld, "cancelled clone prime must not enter body or run side effects")
+
+        let warm = await startContendingWarm(fixture)
+        XCTAssertEqual(
+            RuntimeSeam.count(of: "isPrewarmed:", in: fixture.log.entries),
+            1,
+            "the cancelled clone prime must not release the slot owned by the hard trim"
+        )
+
+        await fixture.coordinator.release(.clearPrewarm)
+        await holder.value
+        _ = try await warm.value.get()
+        await assertPrewarmSlotIsFree(runtime)
+    }
+
+    @concurrent private func waitForPrewarmSlotWaiters(
+        _ runtime: NativeEngineRuntime,
+        expected: Int,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        let deadline = ContinuousClock.now + .seconds(5)
+        while await runtime.prewarmSlotWaiterCount < expected, ContinuousClock.now < deadline {
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+        let observed = await runtime.prewarmSlotWaiterCount
+        XCTAssertGreaterThanOrEqual(
+            observed,
+            expected,
+            "expected \(expected) waiter(s) queued on prewarmSlot, observed \(observed)",
+            file: file,
+            line: line
+        )
+    }
+
     // MARK: - Runtime caches
 
     /// On a Mac the Qwen3 runtime caches survive an idle or explicit unload
@@ -670,6 +815,27 @@ private enum RuntimeSeam {
         await coordinator.roundTrip()
         _ = await runtime.loadedModelID()
         await coordinator.roundTrip()
+    }
+}
+
+/// One-shot async gate used to hold a seam closure deterministically until the
+/// test releases it.
+private actor RuntimeSeamGate {
+    private var released = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        guard !released else { return }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func release() {
+        released = true
+        let pending = waiters
+        waiters.removeAll()
+        pending.forEach { $0.resume() }
     }
 }
 

@@ -100,6 +100,67 @@ final class IOSBackgroundGenerationPolicyTests: XCTestCase {
         XCTAssertEqual(plan.cancellationReason, .shutdown)
     }
 
+    /// RB-04: proactive loads, clone priming, and idle resident weights (>2.2 GB)
+    /// must request a finite `UIBackgroundTask` on foreground exit so GPU work
+    /// and model unloads finish before suspension, without fabricating a Studio
+    /// interruption notice or an unowned-generation cancel.
+    func testBackgroundWithPreparationOrLoadedModelRequestsBackgroundTimeWithoutStudioNotice() {
+        let plan = IOSBackgroundGenerationPolicy.backgroundPlan(
+            hasActiveGeneration: false,
+            studioWork: .idle,
+            hasInFlightPreparationOrLoadedModel: true
+        )
+
+        XCTAssertTrue(plan.requestsBackgroundTime)
+        XCTAssertNil(plan.studioInterruption)
+        XCTAssertFalse(plan.cancelsUnownedEngineGeneration)
+        XCTAssertEqual(plan.releaseReason, IOSBackgroundGenerationPolicy.releaseReason)
+
+        XCTAssertFalse(
+            IOSBackgroundGenerationPolicy.requiresBackgroundReleaseTime(
+                loadState: .idle,
+                clonePreparationState: .idle
+            )
+        )
+        XCTAssertTrue(
+            IOSBackgroundGenerationPolicy.requiresBackgroundReleaseTime(
+                loadState: .starting,
+                clonePreparationState: .idle
+            )
+        )
+        XCTAssertTrue(
+            IOSBackgroundGenerationPolicy.requiresBackgroundReleaseTime(
+                loadState: .loaded(modelID: "pro_clone"),
+                clonePreparationState: .idle
+            )
+        )
+        XCTAssertTrue(
+            IOSBackgroundGenerationPolicy.requiresBackgroundReleaseTime(
+                loadState: .idle,
+                clonePreparationState: .preparing(key: "voice-1")
+            )
+        )
+        XCTAssertTrue(
+            IOSBackgroundGenerationPolicy.requiresBackgroundReleaseTime(
+                loadState: .running(modelID: "pro_custom", label: "Preparing voice reference", fraction: nil),
+                clonePreparationState: .idle
+            )
+        )
+        XCTAssertTrue(
+            IOSBackgroundGenerationPolicy.requiresBackgroundReleaseTime(
+                loadState: .idle,
+                clonePreparationState: .idle,
+                hasInFlightPreparation: true
+            )
+        )
+        XCTAssertTrue(
+            IOSBackgroundGenerationPolicy.requiresBackgroundReleaseTime(
+                loadState: .failed(message: "Transient failure"),
+                clonePreparationState: .idle
+            )
+        )
+    }
+
     // MARK: - Cancellation order
 
     func testTypedNonUserReasonsReachTheEngineBarrierBeforeTheSwiftTaskIsCancelled() {

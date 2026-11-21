@@ -253,7 +253,8 @@ struct QVoiceiOSApp: App {
     private func handleForegroundExit() {
         let plan = IOSBackgroundGenerationPolicy.backgroundPlan(
             hasActiveGeneration: deps.engine?.hasActiveGeneration ?? false,
-            studioWork: backgroundGeneration.studioWork
+            studioWork: backgroundGeneration.studioWork,
+            hasInFlightPreparationOrLoadedModel: deps.engine?.hasInFlightPreparationOrLoadedModel ?? false
         )
         let exitEpoch = backgroundGeneration.beginForegroundExit(
             requestsBackgroundTime: plan.requestsBackgroundTime

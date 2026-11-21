@@ -385,7 +385,8 @@ final class Qwen3TTSPrimedDecoderStateCache: @unchecked Sendable {
 
     /// The reference part of a key: the piece size, then the codes' type,
     /// shape and the SHA-256 of their bytes in logical order.
-    static func referenceKey(referenceCodes: MLXArray, pieceFrames: Int) -> String {
+    static func referenceKey(referenceCodes: MLXArray, pieceFrames: Int) throws -> String {
+        try evalForReadback(referenceCodes)
         let data = referenceCodes.asData(access: .copy)
         let digest = SHA256.hash(data: data.data).map { String(format: "%02x", $0) }.joined()
         let shape = data.shape.map(String.init).joined(separator: "x")

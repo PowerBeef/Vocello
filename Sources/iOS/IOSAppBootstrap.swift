@@ -132,17 +132,19 @@ extension QVoiceiOSApp {
     }
 
     /// Minimum **entitled per-app memory budget** to load the clone/speaker encoders
-    /// in-process. Clone (`.fullCapabilities`) keeps those encoders resident for the whole
-    /// session (~0.6 GB) on top of the ~2.3 GB model + a ~0.4 GB priming spike (~3.3 GB
-    /// peak). The `increased-memory-limit` entitlement raises the per-app Jetsam budget
-    /// (NOT total RAM): ~50% of RAM default → ~75% entitled (community-measured; Apple
-    /// publishes no exact figure). So 8 GB iPhones (15/16/17, all Pro) get ~5–5.5 GB and
-    /// 12 GB (17 Pro / Air) ~8–8.5 GB — clone fits on *every entitled* device. 4.5 GB
-    /// clears the 3.3 GB peak + ~1.2 GB working headroom and aligns with the policy's
-    /// 4.5 GB guarded / 5.2 GB critical footprint thresholds; it self-disables if a
-    /// device's real budget is too low. (Runtime priming is separately gated on the
-    /// healthy memory band in `TTSEngineStore.ensureCloneReferencePrimed`.)
-    static let cloneCapableMinimumProcessLimitBytes: UInt64 = 4_500_000_000
+    /// in-process. Derived directly from `IOSMemoryBudgetPolicy.iPhoneShippingDefault`
+    /// (`minimumCloneCapableProcessLimitBytes()`, `4,779 MiB` / ~`5.01 GB`, RB-05)
+    /// so hybrid Clone (~`3,500 MiB` working peak: 3.0's ~`3,332 MiB` + ~`168 MiB`
+    /// hybrid attention delta) stays strictly below the policy's proportionally scaled
+    /// `.guarded` footprint band and well below `.critical` auto-cancellation. Entitled
+    /// 8 GB and 12 GB iPhones with `increased-memory-limit` (Game Mode off) are
+    /// typically granted ~`6,144 MiB` (and the conservative `iphone15pro` floor profile
+    /// is `5,000 MiB`), so Clone stays enabled on entitled 8 GB+ devices while
+    /// self-disabling if a device's dynamic budget drops too low. (Runtime priming is
+    /// separately gated on the healthy memory band in
+    /// `TTSEngineStore.ensureCloneReferencePrimed`.)
+    static let cloneCapableMinimumProcessLimitBytes: UInt64 =
+        IOSMemoryBudgetPolicy.iPhoneShippingDefault.minimumCloneCapableProcessLimitBytes()
 
     /// `.fullCapabilities` (clone enabled) when the measured entitled per-app limit clears
     /// the threshold, else the memory-conscious `.iOSProductionDefault`. Read once at

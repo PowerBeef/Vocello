@@ -742,8 +742,9 @@ count against that limit. The increased-memory entitlement raises it
 `os_proc_available_memory()` stays the runtime read. The measured limits and peaks per OS are
 [mlx-guide §5.5](mlx-guide.md#55-ios-memory-specifics)'s. At launch,
 `IOSAppBootstrap.cloneCapableLoadProfile()` enables the clone encoders only when
-`impliedProcessLimitBytes` (footprint plus available memory) is at least 4.5 GB
-(`Sources/iOS/IOSAppBootstrap.swift:144-157`).
+`impliedProcessLimitBytes` (footprint plus available memory) clears
+`IOSMemoryBudgetPolicy.iPhoneShippingDefault.minimumCloneCapableProcessLimitBytes()` (4,779 MiB /
+~5.01 GB, `Sources/iOS/IOSAppBootstrap.swift`).
 
 ### 14.2 Thermal throttling and sustained performance
 

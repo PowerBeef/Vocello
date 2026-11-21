@@ -235,7 +235,9 @@ the current token cap (§9, OPTIMIZATION.md §F.2).
 - **Clone gate (measured, not RAM-guessed).** `IOSAppBootstrap.cloneCapableLoadProfile()` picks
   `.fullCapabilities` (clone encoders resident, ~0.6 GB on top of the model) only when the **measured
   entitled per-app limit** `IOSMemorySnapshot.capture(role: .app).impliedProcessLimitBytes ≥
-  4_500_000_000` (4.5 GB); otherwise `.iOSProductionDefault` (= `withoutCloneEncoders`). It logs
+  IOSMemoryBudgetPolicy.iPhoneShippingDefault.minimumCloneCapableProcessLimitBytes()` (4,779 MiB /
+  ~5.01 GB, derived from the proportionally scaled `.guarded` band for hybrid Clone's ~3,500 MiB
+  working peak); otherwise `.iOSProductionDefault` (= `withoutCloneEncoders`). It logs
   `[bootstrap] clone gate: entitled per-app limit ≈ N MB → …`. (This replaced an earlier total-RAM
   gate that mis-fired; the runtime `os_proc_available_memory` read is authoritative.)
 - **No dedicated custom prewarm.** `customPrewarmPolicy: .skipDedicatedCustomPrewarm` — the prewarm
@@ -374,7 +376,7 @@ viability is inferred from the bounded streaming evidence, not proven.
 the full on-device matrix on the 17 Pro under the 8 GB tier's entitled budget —
 `scripts/ios_device.sh bench --memory-profile iphone15pro …` clamps the effective per-process limit to
 **5,000 MB** (the conservative bottom of the entitled band) inside `IOSMemorySnapshot.capture()`, so
-bands, admission, and the clone gate (5,000 ≥ 4,500 ⇒ stays ON) all behave as on the smaller device;
+bands, admission, and the clone gate (5,000 MiB ≥ 4,779 MiB ⇒ stays ON) all behave as on the smaller device;
 rows self-stamp `notes.memoryProfile`. **Measured 2026-06-09 (iPhone 17 Pro, post-§H engine;
 "RTF" = decode speedup): custom/long RTF 1.89, physFoot 2,723 MB (margin 2,277 MB); clone RTF 1.62, physFoot 3,332 MB
 (margin 1,668 MB); 0 trims, QC pass, clone gate ON (proven by execution) — profiled PASS on the

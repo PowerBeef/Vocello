@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-10
+reviewed: 2026-11-21
 summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store — account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.
 sourceOfTruth:
   - project.yml
@@ -25,17 +25,19 @@ XCUITest evidence. External TestFlight distribution, App Review submission, and 
 release require the exact-tag iOS manifest in
 [`quality-promotion.md`](quality-promotion.md).
 
-**Current state (2026-11-10):** `release.yml` has archived, verified and uploaded the 3.0.0
-candidates (ASR-10 closed on build 24's release run 40103005257). Builds 26 and 27 are in the
-TestFlight Public Beta under the maintainer's RF-17 waiver. Build 30 (`v3.0.0-ios.9`, `14c51659`)
-is the App Review candidate: it carries the download confirmation (RF-41) and the localized
-unsupported-device screen (RF-42). The checkpoint
-([`../development-progress.md`](../development-progress.md), Resume now) owns its live state. The
-App Review submission waits for the exact-tag iOS promotion (RF-17), the open release items, and
-the maintainer's go (RF-16). The
-[App Review readiness audit](../audits/2026-11-04-app-review-readiness.md) ranks the remaining
-review risks. Any App
-Store Connect metadata change, upload or submission still needs its own authorization.
+**Current state (2026-11-21):** Since 2026-11-14 there is no iPhone 3.0 App Store release — the Mac
+app and `vocello` CLI shipped 3.1.0 (`v3.1.0`), and iPhone submits directly as **3.1.0** (`project.yml`
+`MARKETING_VERSION` 3.1.0). `release.yml` archived, verified and uploaded the historical 3.0.0 train
+(ASR-10 closed on build 24; builds 26 and 27 remain in the 3.0 Public Beta under the maintainer's RF-17
+waiver; build 30 `v3.0.0-ios.9` is superseded) and has uploaded internal 3.1.0 candidates
+(`v3.1.0-ios.1` through `v3.1.0-ios.3`, build 33 `VALID` in TestFlight). The checkpoint
+([`../development-progress.md`](../development-progress.md), Resume now) owns the live candidate
+state. The App Review submission waits for the iPhone-window checks (`RF-35`, `RF-41`, `RF-42`),
+exact-tag iOS promotion (`RF-17`), the open release items, and the maintainer's go (`RF-16`). The
+[App Review readiness audit](../audits/2026-11-04-app-review-readiness.md) is the historical 3.0 review
+baseline. Any App Store Connect metadata change (including bumping the App Store Connect version record
+from 3.0.0 to 3.1.0 and pasting the updated [`app-store-listing.md`](app-store-listing.md) copy), upload
+or submission still needs its own explicit authorization.
 Physical-device XCUITest runs separately at coherent checkpoints; CI and archive packaging are
 deterministic-only ([`testing-runbook.md`](testing-runbook.md)). Local development builds derive the
 signing team from the keychain's Apple Development certificate (`scripts/ios_device.sh`).
@@ -68,9 +70,10 @@ download it automatically.
       any capability change.
 - [x] App record exists in App Store Connect for `com.patricedery.vocello`, with one `en-US`
       localization. Version 3.0.0 (Prepare for Submission) replaced the unreleased 1.0 draft on
-      2026-10-12, in category Productivity (secondary Utilities since 2026-11-04) (RF-02). Its train
-      holds builds 24 to 27 and 29 (build 28's release run timed out before its upload), and build
-      30 is the candidate; every candidate needs an unused build number (§4, ASR-08).
+      2026-10-12, in category Productivity (secondary Utilities since 2026-11-04) (RF-02), and will be
+      updated to **3.1.0** on explicit maintainer request ahead of submission. The 3.0.0 train held
+      builds 24–27 and 29–30; the 3.1.0 train holds internal candidates `v3.1.0-ios.1`–`v3.1.0-ios.3`
+      (build 33). Every new candidate needs an unused build number (§4, ASR-08).
 - [x] App Store installation eligibility is as close to the app's runtime hardware floor as the
       capability allows. The built bundle requires exactly `arm64` and Apple's
       `iphone-performance-gaming-tier`; the runtime guard independently enforces iPhone 15 Pro or
@@ -88,8 +91,8 @@ download it automatically.
 Built-in output export. The StoreKit entitlement owner and output-provenance export boundary are
 implemented, and the local StoreKit exports scenario passed (RF-13). The product has en-US,
 fr-CA and fr-FR names and descriptions. Still open:
-- the Paid Apps agreement and its banking and tax steps, which are the maintainer's (RF-02); 3.0
-  ships outside the EU, so the EU trader step waits for the EU release (BKL-41);
+- the Paid Apps agreement and its banking and tax steps, which are the maintainer's (RF-02); 3.1
+  ships outside the EU initially, so the EU trader step waits for the EU release (BKL-41);
 - the product's review screenshot and the purchase checks on the processed TestFlight build (RF-12);
 - review, which happens with the first submission.
 Monetization and App Store submission apply only to iOS. The macOS app remains distributed through
@@ -208,20 +211,20 @@ is complete.
 - [ ] **Accessibility declaration** (Accessibility Nutrition Labels): none is entered. It does not
       block the submission. Apple's App Store Connect help (read 2026-11-10) says the labels are
       voluntary for now, and that support can be published only for a device with a live App Store
-      version, so before 3.0 is live the most that can exist is a saved draft. Complete it only from
+      version, so before 3.1 is live the most that can exist is a saved draft. Complete it only from
       the exact-candidate accessibility evidence; do not infer supported features from source or
       historical device runs. Apple's test is that every common task (first launch, purchase and
       settings included) can be completed with the feature. Draft for iPhone, approved by
-      the maintainer on 2026-11-10. Save it in App Store Connect after RF-15's rows on build 30
-      confirm Dark Interface from their screenshots, and publish it once 3.0 is live; each is an
-      App Store Connect write on the maintainer's go:
+      the maintainer on 2026-11-10. Save it in App Store Connect after RF-15's rows on the 3.1
+      submission candidate confirm Dark Interface from their screenshots, and publish it once 3.1 is
+      live; each is an App Store Connect write on the maintainer's go:
 
       | Feature | Draft answer | Basis |
       |---|---|---|
       | VoiceOver | Not claimed | Only XCTest's automated audit has run; the hand VoiceOver pass is open (RF-15), as are AUD-06 and BKL-59 |
       | Voice Control | Not claimed | Never evaluated |
       | Larger Text | Not claimed | Maintainer decision of 2026-10-24 until BKL-31 is fixed |
-      | Dark Interface | Claim, once build 30's lane screenshots confirm it | The app is dark only: `UIUserInterfaceStyle` is Dark and the window forces the dark scheme |
+      | Dark Interface | Claim, once the 3.1 candidate's lane screenshots confirm it | The app is dark only: `UIUserInterfaceStyle` is Dark and the window forces the dark scheme |
       | Differentiate Without Color Alone | Not claimed | No grayscale walk has been done |
       | Sufficient Contrast | Not claimed | Same decision; the purchase sheet failed the contrast audit on build 24 |
       | Reduced Motion | Not claimed | Source honors the setting in two places; never checked on a device |
@@ -242,17 +245,18 @@ is complete.
 ## 2. App Review demo notes (paste into "App Review Information → Notes")
 
 The notes text to paste is in [`app-store-listing.md`](app-store-listing.md#app-review-notes-4000),
-with the rest of the 3.0.0 listing draft. No demo account is needed (no login); the notes spell out
+with the rest of the 3.1.0 listing draft. No demo account is needed (no login); the notes spell out
 the model download requirement so the app is not judged non-functional under Guideline 2.1.
 
 Storage guidance is grounded in `IOSModelDeliverySupport.ensureSufficientDiskSpace`:
 `max(2 × bytes, bytes + 256 MiB)`. The coordinator supplies the bytes still to fetch, without
 shared components already installed or bytes already received;
-[`model-delivery.md`](model-delivery.md#shared-component-store) owns the rule. A first model on a
-fresh install needs approximately 4.10–4.15 GB of available space and later models need less; the
-4.5 GB advice provides reviewer headroom, not a different
-runtime policy or a guarantee against concurrent storage use. Recheck against the candidate
-catalog before pasting these notes into App Store Connect.
+[`model-delivery.md`](model-delivery.md#shared-component-store) owns the rule. For the 3.1 hybrid
+artifacts (`2.226–2.250 GB` decimal), a first model on a fresh install needs approximately
+`4.45–4.50 GB` decimal (`4.15–4.19 GiB`) of available space and later models need less; the `5 GB`
+advice in the listing notes provides reviewer headroom, not a different runtime policy or a guarantee
+against concurrent storage use. Recheck against the candidate catalog before pasting these notes into
+App Store Connect.
 
 Before using these notes, close ASR-09. By the maintainer's 2026-10-12 decision, North America,
 where App Review runs, is the verified download region, and Europe and East Asia stay unverified as
@@ -282,10 +286,10 @@ hours of submission remains (ASR-09).
       placeholders, insecure URLs, and ungoverned response-time promises.
 - [x] The production support route returned HTTPS 200 with the expected monitored contact, response owner,
       and privacy link. The `en-US` localization read back the exact governed Support URL in App Store
-      Connect on 2026-08-27, on the 1.0 draft that version 3.0.0 replaced. Verify it again on 3.0.0,
+      Connect on 2026-08-27, on the 1.0 draft that version 3.0.0 replaced. Verify it again on 3.1.0,
       and add the same URL to any new localization.
 - [x] The accessible in-app Open Source & Licenses browser reads the deterministic offline manifest generated
-      from the exact SwiftPM graph, owned-runtime NOTICE/origins, and all six catalog-pinned model cards.
+      from the exact SwiftPM graph, owned-runtime NOTICE/origins, and all three catalog-pinned hybrid model cards (plus upstream lineage in `config/third-party-attribution-policy.json`).
       Archive/IPA verification rejects a missing, malformed, duplicated, or byte-different manifest.
 - [x] App Store Connect declares `USES_THIRD_PARTY_CONTENT` and read it back on 2026-08-27.
 - [x] The maintainer's ASR-04 rights decisions for Qwen outputs and built-in speaker presentation,
@@ -326,8 +330,8 @@ For a TestFlight candidate, push `main`, wait for its `CI required` check, then 
 already has, then signs the next `v<version>-ios.N` tag with the configured SSH key, verifies it and
 pushes only that tag. That push runs the iPhone path of `release.yml` alone (source authority, the
 signed archive, IPA verification and evidence, and the TestFlight upload; no Mac packages) once the
-`release` environment is approved. Claude Code may run the script on the maintainer's request
-(CLAUDE.md: Main is the only published branch); any other release tag stays maintainer-run.
+`release` environment is approved. Antigravity may run the script on the maintainer's request
+(AGENTS.md: Main is the only published branch); any other release tag stays maintainer-run.
 
 To rebuild an existing tag instead, run the **Release** workflow from the Actions tab, choosing the version tag itself under
 "Use workflow from" and entering the same `tag`, with `archive_ios = true`, `package_macos = false`
@@ -371,7 +375,7 @@ rejects a reused build number at the altool upload, so a missed check fails the 
 replace an existing build.
 
 **Distributing a processed candidate.** Each step is an App Store Connect or GitHub write, done by
-the maintainer or by Claude Code on the maintainer's request for that candidate.
+the maintainer or by Antigravity on the maintainer's request for that candidate.
 
 1. The run pauses for the `release` environment. Approve it in the Actions tab or with
    `gh api -X POST repos/PowerBeef/Vocello/actions/runs/<run>/pending_deployments

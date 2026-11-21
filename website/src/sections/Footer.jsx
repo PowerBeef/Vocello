@@ -51,7 +51,7 @@ export const Footer = ({ page = "home" }) => (
               <li><a href={REPO} target="_blank" rel="noreferrer">GitHub</a></li>
               <li><a href={RELEASE_NOTES} target="_blank" rel="noreferrer">Release notes</a></li>
               <li><a href={RELEASES} target="_blank" rel="noreferrer">Releases</a></li>
-              <li><a href={`${REPO}/blob/main/docs/qwen_tone.md`} target="_blank" rel="noreferrer">Docs</a></li>
+              <li><a href={`${REPO}/blob/main/docs/reference/qwen3-tts-prompting-guide.md`} target="_blank" rel="noreferrer">Docs</a></li>
               <li><a href={`${REPO}/blob/main/LICENSE`} target="_blank" rel="noreferrer">MIT License</a></li>
             </ul>
           </div>

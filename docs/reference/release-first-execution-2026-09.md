@@ -204,23 +204,24 @@ Between September 4 and October 12 the release did not move:
 
 ## The path
 
-The status is as of November 10 and `config/roadmap.json` is current. The path carries no dates
-since the maintainer removed them on November 10: each step ends at its exit, and the core overhaul
-precedes the candidate that steps 5 to 8 run on.
+The status below reflects the 2026-11-21 state; `config/roadmap.json` is the live authority. The path
+carries no dates since the maintainer removed them on November 10: each step ends at its exit, the core
+overhaul and Mac/CLI 3.1.0 release (`RF-61`) are shipped, and the remaining steps close on the iPhone
+3.1.0 submission candidate.
 
 | Step | Items | Exit | Who | Status |
 | --- | --- | --- | --- | --- |
-| 1 — decisions | RF-02, ASR-02, ASR-04, ASR-09 | Recorded privacy, rights and region answers; App Store Connect prerequisites, including the Paid Apps agreement | Maintainer; Claude drafts the facts | Resumed Nov 1; ASR-04 closed Nov 1; RF-02's account steps (private record) and ASR-02's readback were moved to Nov 9 and are overdue; ASR-09's fresh proof due Nov 12, within 24 hours of submission |
-| 2 — before the freeze | RF-14; AUD-01, AUD-02, AUD-07, AUD-09, F-01, F-16, DA-04; BG-01, CONV-21, RF-18, RF-19 | D3 the default; the blockers' code fixes with deterministic tests; the engine-audit items with their iPhone proofs | Claude; the phone in an announced window | Done except AUD-01, AUD-02, AUD-07 and AUD-09, whose device proof comes from RF-15 (due Nov 9) |
-| 3 — export purchase | RF-13 | The purchase lane passes on the phone | Claude, in a phone window | Done Oct 16 |
-| 4 — freeze | ASR-08, RF-09 | Build unused; exact-SHA CI green; `focusLock.freeze` recorded; the `v3.0.0` tag | Maintainer pushes the tag | Done: frozen Oct 23 at `e7a8e2ae`, the signed `v3.0.0` commit |
-| 5 — archive and TestFlight | ASR-10, ASR-07, RF-12 | A `v3.0.0-ios.N` candidate tag (or an `archive_ios` dispatch) archives, verifies and uploads to internal TestFlight; the processed build installs with personal data preserved | Maintainer requests the tag; Claude installs | ASR-10 and ASR-07 done Oct 24; build 29 (`v3.0.0-ios.8`) in TestFlight and attached to version 3.0.0 on Nov 1, superseded by the candidate that carries RF-41, not yet cut; RF-12's owned-export row waits on RF-02 |
-| 6 — acceptance and promotion | RF-15, ASR-06, RF-17 | Risk-based acceptance of the processed build, with a machine screen of its takes; exact-tag promotion evidence | Claude and the phone | On the candidate that carries the core overhaul (builds 29 and 30 are superseded for the submission), after RF-02, on dates the maintainer sets |
-| 7 — store materials | ASR-05, ASR-11 | Screenshots, metadata, privacy answers, reviewer notes; the read-only account check | Maintainer; Claude prepares | ASR-05's listing text and review details entered Nov 1, its review notes and category updated Nov 4, its screenshots and ASR-11 overdue since Nov 9 |
-| 8 — submission | RF-16 | The maintainer submits for App Review | Maintainer | On the maintainer's go, after the core overhaul; no date |
+| 1 — decisions | RF-02, ASR-02, ASR-04, ASR-09 | Recorded privacy, rights and region answers; App Store Connect prerequisites, including the Paid Apps agreement | Maintainer; Antigravity drafts the facts | ASR-04 closed Nov 1; RF-02 account steps (private record) and ASR-02 readback remain; ASR-09 fresh North America proof runs within 24 hours of submission |
+| 2 — before the freeze | RF-14; AUD-01, AUD-02, AUD-07, AUD-09, F-01, F-16, DA-04; BG-01, CONV-21, RF-18, RF-19 | D3 the default; the blockers' code fixes with deterministic tests; the engine-audit items with their iPhone proofs | Antigravity; the phone in an announced window | Done except AUD-01, AUD-02, AUD-07 and AUD-09, whose device proof comes from RF-15 |
+| 3 — export purchase | RF-13 | The purchase lane passes on the phone | Antigravity, in a phone window | Done Oct 16 |
+| 4 — freeze & Mac/CLI 3.1.0 | ASR-08, RF-09, RF-61 | Build unused; exact-SHA CI green; `focusLock.freeze` recorded; Mac/CLI 3.1.0 shipped | Maintainer pushes the tag | Frozen Oct 23 (`e7a8e2ae`, `v3.0.0`); Mac/CLI 3.1.0 (`v3.1.0`, `RF-61`) published Nov 17 |
+| 5 — archive and TestFlight | ASR-10, ASR-07, RF-12 | A `v3.1.0-ios.N` candidate tag archives, verifies and uploads to internal TestFlight; the processed build installs with personal data preserved | Maintainer requests the tag; Antigravity verifies | ASR-10 and ASR-07 done Oct 24; 3.0 builds 29–30 superseded; internal 3.1.0 candidates (`v3.1.0-ios.1`–`v3.1.0-ios.3`, build 33) uploaded; RF-12 owned-export row waits on RF-02 |
+| 6 — acceptance and promotion | RF-15, ASR-06, RF-17 | Risk-based acceptance of the processed 3.1.0 build, with a machine screen of its takes; exact-tag promotion evidence | Antigravity and the phone | Waiting for an announced iPhone window on the 3.1.0 submission candidate after RF-02 |
+| 7 — store materials | ASR-05, ASR-11, RF-63 | Screenshots, 3.1.0 metadata, privacy answers, reviewer notes; the read-only account check | Maintainer; Antigravity prepares | 3.0.0 copy entered Nov 1–10; 3.1.0 listing/review-notes draft reconciled in `app-store-listing.md`; screenshots, ASC 3.1.0 update and ASR-11 remain |
+| 8 — submission | RF-16 | The maintainer submits 3.1.0 for App Review | Maintainer | On the maintainer's go; no date |
 
-No Mac or CLI item runs beside the path any more: RF-10 closed by decision on November 1, and RF-23
-(Sparkle updates), RF-30 and RF-31 wait for the submission.
+Mac and CLI 3.1.0 (`RF-10`, `RF-23`, `RF-31`, `RF-61`) and the CI cutover to GA `xcode-27` (`DW-04`)
+have shipped; `RF-30` (CLI History writes) waits for a follow-up release.
 
 **Step 1 resumed on November 1** (it was on hold from October 13). ASR-04 is attested and closed;
 RF-02's remaining account steps and ASR-02's App Privacy readback are left. The Paid Apps agreement
@@ -228,9 +229,10 @@ can take days to activate after RF-02's last step, which is why RF-02 comes firs
 
 The blockers' device proof comes from RF-15, so they close after it and before RF-16. Group the phone
 work into as few windows as possible, and use the phone only in windows the maintainer announces. The
-next window is one session on the candidate that carries the core overhaul (builds 29 and 30 are
-superseded for the submission), after RF-02: RF-17's six records and its manifest, RF-15 with its purchase rows, the AUD items, ASR-06,
-RF-35's cellular download, RF-12's Airplane Mode export and ASR-05's screenshots. DW-03 and DW-04 are parked until the submission.
+next window is one session on the 3.1.0 candidate (3.0 builds 29 and 30 are superseded for submission),
+after RF-02: RF-17's six records and its manifest, RF-15 with its purchase rows, the AUD items, ASR-06,
+RF-35's cellular download, RF-41/RF-42 device checks, RF-12's Airplane Mode export and ASR-05's
+screenshots.
 
 ## Rules while the focus lock holds
 
@@ -263,10 +265,7 @@ RF-35's cellular download, RF-12's Airplane Mode export and ASR-05's screenshots
 The maintainer lifts the focus lock and picks the next primary plan from the parked work:
 - the audio QC programme (labels, detectors, PA-16 and QC-04/06/08);
 - the 201-take campaign and the full acceptance matrix;
-- macOS and CLI 3.0 qualification and publication (RF-08, RF-10);
-- CI's move to Xcode 27 (DW-04; the report-only `xcode-preview.yml` already runs the preview image);
-- the engine-remediation and development-workflow items left unfinished at the freeze;
-- the audit and benchmark backlogs.
+- the remaining engine-remediation, CLI History (`RF-30`) and audit/benchmark backlogs.
 
 ## Standing constraints
 
@@ -278,7 +277,7 @@ The maintainer lifts the focus lock and picks the next primary plan from the par
   since 2026-10-27. The updated Developer Program License Agreement, the Paid Apps agreement, tax and
   banking remain the maintainer's. See the
   [app guide](ios-app-guide.md#ios-export-purchase).
-- **Version.** 3.0.0; `project.yml` owns the build number, which moves with each candidate. A fresh
+- **Version.** 3.1.0; `project.yml` owns the build number, which moves with each candidate. A fresh
   read-only check confirms the build is unused immediately before the archive.
 - **No substitutes.** No diagnostics or development build stands in for the processed candidate. No
   faked entitlement replaces the purchase.
@@ -286,7 +285,7 @@ The maintainer lifts the focus lock and picks the next primary plan from the par
   separate approval.
 - **Related documents:** the [content-rights packet](content-rights-review.md), the
   [submission procedure](ios-appstore-submission.md), the [quality-promotion contract](quality-promotion.md)
-  and the candidate [v3.0.0 release notes](../releases/v3.0.0.md).
+  and the [v3.1.0 release notes](../releases/v3.1.0.md).
 
 ## Historical programme checkpoints
 

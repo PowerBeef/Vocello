@@ -1,35 +1,31 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-10
-summary: App Store listing for Vocello for iPhone 3.0.0 (en-US), entered in App Store Connect on 2026-11-01 at the maintainer's request. It covers the subtitle, promotional text, description, keywords, What's New, URLs and the App Review notes. Further changes to App Store Connect need a separate request.
+reviewed: 2026-11-21
+summary: App Store listing draft for Vocello for iPhone 3.1.0 (en-US), updated from the 2026-11-01/10 App Store Connect 3.0.0 entry for the 3.1.0 hybrid model sizes and free-space requirements. Pushing updates to App Store Connect needs a separate explicit request.
 sourceOfTruth:
   - config/public-product-facts.json
   - Sources/Resources/qwenvoice_contract.json
   - Sources/Resources/Localizable.xcstrings
   - Sources/Resources/qwenvoice_production_model_catalog.json
   - config/support-contact.json
-  - docs/releases/v3.0.0.md
+  - docs/releases/v3.1.0.md
   - docs/reference/content-rights-review.md
 ---
-# App Store listing: Vocello for iPhone 3.0.0 (en-US)
+# App Store listing: Vocello for iPhone 3.1.0 (en-US)
 
-**Status: entered in App Store Connect on 2026-11-01 (ASR-05).** At the maintainer's request, the
-subtitle "Local AI voice studio", the promotional text, description, keywords and marketing URL, and
-the App Review contact and notes were written as drafted below and read back byte-identical. What's
-New is not offered on a first App Store version and stays empty. On 2026-11-02, after the iPhone 15
-Pro farm runs and the decision to keep it as the floor, the description and the review notes gained
-the speed and live-preview sentences below, written and read back the same way. On 2026-11-04, after the
-[App Review readiness audit](../audits/2026-11-04-app-review-readiness.md), the notes' last paragraph
-became the Safeguards paragraph below, answering Guideline 1.2's AI content wording, 4.2.3(ii) and
-cloning consent. The same day every claim here was checked against the app, and the promotional text and
-review-notes steps 2, 3 and 5 were tightened; all of it was written and read back the same way. On
-2026-11-10, with the decision to keep refusing iPad (RF-42), the notes gained a paragraph asking for
-review on an iPhone 15 Pro or later, and step 2 and the Safeguards paragraph gained the download
-confirmation that build 30 shows (RF-41). The notes are 3,802 of 4,000 characters and read back
-byte-identical. They describe build 30, the candidate that will be submitted: at the maintainer's
-request it replaced build 29 on version 3.0.0 on 2026-11-10, read back. Any later change to App
-Store Connect is a separate, explicit request; keep this file and App Store Connect in step.
+**Status: 3.1.0 draft reconciled with `main` (App Store Connect still holds the 2026-11-10 3.0.0 entry until an explicit update request).**
+On 2026-11-01 (ASR-05), at the maintainer's request, the subtitle "Local AI voice studio", the
+promotional text, description, keywords and marketing URL, and the App Review contact and notes were
+entered in App Store Connect on version 3.0.0 and read back byte-identical. On 2026-11-02 (iPhone 15
+Pro floor), 2026-11-04 ([App Review readiness audit](../audits/2026-11-04-app-review-readiness.md)
+Safeguards paragraph), and 2026-11-10 (RF-41 download confirmation and RF-42 iPad refusal on build 30),
+the listing and review notes were updated and read back byte-identical. Since 2026-11-14 there is no
+iPhone 3.0 App Store release: iPhone submits directly as **3.1.0** (`project.yml` `MARKETING_VERSION`
+3.1.0, `artifactVersion` `2026.11.13.1` hybrid models). The copy below is updated for 3.1.0's exact
+model byte counts and storage headroom so it matches the live 3.1.0 app UI before being written to
+App Store Connect. Any change to App Store Connect requires a separate, explicit maintainer request;
+keep this file and App Store Connect in step.
 
 The copy follows `website/PRODUCT.md`:
 - it says local, not on-device;
@@ -47,7 +43,7 @@ Apple's limit.
 | Subtitle (30) | Local AI voice studio | 21. Alternatives: "Text to speech, made locally" (28), "Private AI text to speech" (25). |
 | Privacy Policy URL | https://vocello.vercel.app/privacy | Already set; matches the runbook. |
 
-## Version 3.0.0
+## Version 3.1.0
 
 ### Promotional text (170)
 
@@ -84,7 +80,7 @@ Private by design
 
 Before you start
 
-- Vocello requires an iPhone 15 Pro or later. Generation is fastest on the newest iPhones; on an iPhone 15 Pro, a take can take longer to generate than it lasts, so the live preview may pause while it catches up. That is normal, and the finished take plays without pauses. Each voice mode uses its own model of about 2 GB, downloaded once over Wi-Fi, or over cellular data if you allow it in Settings; keep at least 4.5 GB free while a model installs.
+- Vocello requires an iPhone 15 Pro or later. Generation is fastest on the newest iPhones; on an iPhone 15 Pro, a take can take longer to generate than it lasts, so the live preview may pause while it catches up. That is normal, and the finished take plays without pauses. Each voice mode uses its own model of about 2.2 GB, downloaded once over Wi-Fi, or over cellular data if you allow it in Settings; keep at least 5 GB free while a model installs.
 - Generation, listening, History and Saved Voices are free in every mode, and so is exporting Built-in Voice takes. One optional in-app purchase, Design & Clone Export, unlocks exporting Voice Design and Voice Cloning audio.
 - Takes come from an AI model and can contain mistakes, such as a missing word or a delivery that misses the request. Vocello rejects takes that fail its audio check instead of saving them; generate again for a different take.
 ```
@@ -109,7 +105,7 @@ names only descriptively.
 App Store Connect may not offer this field on an app's first App Store version. If it does:
 
 ```text
-Vocello 3.0 runs on a new engine shared with the Mac app. Built-in Voice and Voice Design takes now read the whole script before they speak, every generated take is marked as AI-generated, a take's seed can be pinned from History, the interface is available in ten languages, and imported Clone references are reviewed before they are saved.
+Vocello 3.1 runs on a local engine shared with the Mac app with one improved model per mode. Built-in Voice and Voice Design takes read the whole script before they speak, every generated take is marked as AI-generated, a take's seed can be pinned from History, the interface is available in ten languages, and imported Clone references are reviewed before they are saved.
 ```
 
 ## App Review notes (4000)
@@ -123,7 +119,7 @@ Vocello generates speech locally on the iPhone. It ships with no bundled model w
 Please review on an iPhone 15 Pro or later. Recent iPad models meet the same hardware capability, so the app installs on them, but Vocello does not run on iPad: it shows an unsupported-device message there.
 
 1. On first launch, go through the three onboarding pages.
-2. Open Settings → Models & Files → Voice Models and tap Install for the mode you want to review, then Download in the confirmation that shows the download's size. Built-in Voice is 2,049,696,897 bytes, Voice Design 2,049,696,404 bytes and Voice Cloning 2,073,713,977 bytes; one model is enough for its mode. Downloads use Wi-Fi unless the Download over cellular switch on that screen is turned on. Each one needs at least 4.5 GB of free space and can take several minutes. Progress shows the exact bytes downloaded, and the final verification and installation show as an indeterminate finishing step. A download can be cancelled and restarted, and one interrupted in the background is picked up after relaunch. Once a model shows Ready, its mode works without a network connection.
+2. Open Settings → Models & Files → Voice Models and tap Install for the mode you want to review, then Download in the confirmation that shows the download's size. Built-in Voice is 2,225,870,484 bytes, Voice Design 2,225,869,991 bytes and Voice Cloning 2,249,887,307 bytes; one model is enough for its mode. Downloads use Wi-Fi unless the Download over cellular switch on that screen is turned on. Each one needs at least 5 GB of free space and can take several minutes. Progress shows the exact bytes downloaded, and the final verification and installation show as an indeterminate finishing step. A download can be cancelled and restarted, and one interrupted in the background is picked up after relaunch. Once a model shows Ready, its mode works without a network connection.
 3. In Studio, type a short line, choose a speaker where the mode has one, and tap Generate. Voice Design also needs a voice description first: tap the speech-bubble chip marked + above Generate and describe the voice, for example "a warm, deep narrator". Generate stays dimmed until the description and the line are both filled. Speed depends on the iPhone: on iPhone 17 Pro a take generates in about half its own length, while on the oldest supported model, iPhone 15 Pro, it takes about one and a half to a little over two times as long as the audio it produces. While generating, the live preview starts playing early; on slower iPhones it may pause while generation catches up, then continue. This is expected behavior, not a hang. The finished take plays without pauses and is saved to History.
 4. Voice Cloning needs the switch "I own or have permission to clone the voices I use" in Settings → Privacy & Permissions. Its reference is recorded with the microphone or imported from an audio file the user has rights to. Microphone and Speech Recognition are requested only to record a reference and transcribe it locally.
 5. In-app purchase: Design & Clone Export (non-consumable) unlocks exporting Voice Design and Voice Cloning audio through the share sheet. Generation, listening, History and Built-in Voice export are free. Open it from Settings → Design & Clone Export, or by exporting a Voice Design or Voice Cloning take; Restore Purchases is on the same sheet.
@@ -147,7 +143,7 @@ Entered in App Store Connect on 2026-11-10 at the maintainer's request and read 
 ```text
 Design & Clone Export is a one-time, non-consumable purchase. It unlocks exporting audio made with Voice Design and Voice Cloning through the share sheet. Generation, listening, History and exporting Built-in Voice takes are free and need no purchase.
 
-To reach it: open Settings → Design & Clone Export. It also appears when you tap Share or Download on a Voice Design or Voice Cloning take. To make such a take, install the Voice Design model first (Settings → Models & Files → Voice Models → Install, then Download; about 2 GB), then in Studio choose Voice Design, describe a voice, type a line and tap Generate.
+To reach it: open Settings → Design & Clone Export. It also appears when you tap Share or Download on a Voice Design or Voice Cloning take. To make such a take, install the Voice Design model first (Settings → Models & Files → Voice Models → Install, then Download; about 2.2 GB), then in Studio choose Voice Design, describe a voice, type a line and tap Generate.
 
 Restore Purchases is on the same sheet. No account or sign-in is needed.
 ```

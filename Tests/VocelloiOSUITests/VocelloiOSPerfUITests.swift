@@ -538,38 +538,35 @@ final class VocelloiOSPerfUITests: VocelloiOSUITestCase {
         let leftPoint = rootCoordinate(
             for: CGPoint(x: scrubberFrame.minX + scrubberFrame.width * 0.15, y: scrubberFrame.midY)
         )
-        // 84% of the 30 s seeded WAV (~25.2 s): far ahead of what uninterrupted
-        // autoplay could reach during ~7-9 s of drags, yet ~4.8 s before EOF.
-        let highTargetPoint = rootCoordinate(
-            for: CGPoint(x: scrubberFrame.minX + scrubberFrame.width * 0.84, y: scrubberFrame.midY)
-        )
+        // 80% of the 30 s seeded WAV (~24.0 s): leaves 6 s before EOF during
+        // forward holds so playback never finishes between drags.
         let rightPoint = rootCoordinate(
-            for: CGPoint(x: scrubberFrame.minX + scrubberFrame.width * 0.85, y: scrubberFrame.midY)
+            for: CGPoint(x: scrubberFrame.minX + scrubberFrame.width * 0.80, y: scrubberFrame.midY)
         )
         let beforeWindow = Date()
         let log = VocelloPerfPhaseLog()
         measuredCycles("ios-player-scrub", cycles: 8, actionsPerCycle: 1, phaseLog: log) { drag in
             let actionStart = Self.epochMS()
             let forward = drag.isMultiple(of: 2)
-            // End the final drag with a full sweep from 15% to 78% so
-            // post-window ground truth proves scrubbing jumped playback time
-            // well beyond natural autoplay.
-            let from = drag == 7 ? leftPoint : (forward ? leftPoint : rightPoint)
-            let to = drag == 7 ? highTargetPoint : (forward ? rightPoint : leftPoint)
+            // Odd final drag (drag == 7) sweeps right -> left back to 15% (~4.5 s),
+            // which uninterrupted forward autoplay can never reach after ~10-20 s of drags.
+            let from = forward ? leftPoint : rightPoint
+            let to = forward ? rightPoint : leftPoint
             from.press(forDuration: 0.1, thenDragTo: to)
             Thread.sleep(forTimeInterval: 0.4)
             log.append("action", from: actionStart, to: Self.epochMS())
         }
         XCTAssertTrue(
             VocelloUIWait.condition(
-                "scrubber playback position to outpace uninterrupted autoplay",
+                "scrubber playback position to rewind behind uninterrupted autoplay",
                 timeout: 3
             ) {
                 guard let currentSeconds = Self.parsePlaybackSeconds(scrubber.value as? String) else {
                     return false
                 }
-                let elapsedSeconds = Int(Date().timeIntervalSince(beforeWindow).rounded(.up))
-                return currentSeconds >= max(19, initialSeconds + elapsedSeconds + 4)
+                let elapsedSeconds = Int(Date().timeIntervalSince(beforeWindow).rounded(.down))
+                let uninterruptedSeconds = min(30, initialSeconds + elapsedSeconds)
+                return currentSeconds <= 11 && currentSeconds + 4 <= uninterruptedSeconds
             }
         )
     }

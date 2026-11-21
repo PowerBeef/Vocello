@@ -531,15 +531,17 @@ final class VocelloiOSPerfUITests: VocelloiOSUITestCase {
             XCTFail("Expected m:ss playback value on iosPlayer_scrubber, got \(String(describing: scrubber.value))")
             return
         }
-        XCTAssertLessThan(initialSeconds, 5, "Seeded player should start near 0:00 before scrubbing")
+        // `VocelloUIWait.enabled` + `settledFrame` take ~5-6 s over XCUITest while
+        // the 30 s seeded track autoplays from 0:00.
+        XCTAssertLessThan(initialSeconds, 10, "Seeded player should start near the beginning before scrubbing")
 
         let leftPoint = rootCoordinate(
             for: CGPoint(x: scrubberFrame.minX + scrubberFrame.width * 0.15, y: scrubberFrame.midY)
         )
-        // 78% of the 30 s seeded WAV (~23.4 s): far ahead of what uninterrupted
-        // autoplay could reach during ~7 s of drags, yet ~5.5 s before EOF.
+        // 84% of the 30 s seeded WAV (~25.2 s): far ahead of what uninterrupted
+        // autoplay could reach during ~7-9 s of drags, yet ~4.8 s before EOF.
         let highTargetPoint = rootCoordinate(
-            for: CGPoint(x: scrubberFrame.minX + scrubberFrame.width * 0.78, y: scrubberFrame.midY)
+            for: CGPoint(x: scrubberFrame.minX + scrubberFrame.width * 0.84, y: scrubberFrame.midY)
         )
         let rightPoint = rootCoordinate(
             for: CGPoint(x: scrubberFrame.minX + scrubberFrame.width * 0.85, y: scrubberFrame.midY)

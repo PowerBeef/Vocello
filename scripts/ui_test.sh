@@ -1025,7 +1025,7 @@ else:
     warn "ui-preflight: no Apple Development team found; set QWENVOICE_DEVELOPMENT_TEAM"
     return 1
   }
-  python3 "$ROOT_DIR/scripts/ios_signing_identity.py" check --team "$team" >&2 || {
+  python3 "$ROOT_DIR/scripts/lib/ios_signing_identity.py" check --team "$team" >&2 || {
     warn "ui-preflight: no usable Apple Development signing identity for team $team"
     return 1
   }

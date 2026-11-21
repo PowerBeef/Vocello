@@ -558,7 +558,7 @@ class IOSBuildLogTests(unittest.TestCase):
         sandbox.helper(PUBLISHER, "exit 0")
         sandbox.helper("scripts/lane_ledger.py", "exit 0")
         sandbox.helper("scripts/tree_fingerprint.py", "echo fixture-fingerprint")
-        sandbox.helper("scripts/ios_signing_identity.py", "exit 0")
+        sandbox.helper("scripts/lib/ios_signing_identity.py", "exit 0")
         sandbox.helper(
             "scripts/lib/ios_coredevice_probe.py",
             'echo \'{"reachable":true,"identifier":"fixture-iphone","productType":"iPhone18,1","availableForDevelopment":true,"lock":{"deviceLocked":false}}\'\n',
@@ -599,7 +599,7 @@ class IOSBuildLogTests(unittest.TestCase):
 
     def test_ios_preflight_refuses_non_canonical_iphone_for_publishing_perf_and_benchmark(self) -> None:
         shell = UIFunctionShell(self)
-        shell.helper("scripts/ios_signing_identity.py", "exit 0")
+        shell.helper("scripts/lib/ios_signing_identity.py", "exit 0")
         profiles_dest = shell.path / "benchmarks/hardware-profiles.json"
         profiles_dest.parent.mkdir(parents=True, exist_ok=True)
         profiles_dest.write_text((ROOT / "benchmarks/hardware-profiles.json").read_text(encoding="utf-8"), encoding="utf-8")

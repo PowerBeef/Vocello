@@ -123,48 +123,53 @@ enum VocelloUISettingsReveal {
             let texts = container.staticTexts.allElementsBoundByIndex.filter {
                 $0.exists && $0.isHittable
             }
+            // Cache each text's frame once so directional filtering stays O(N)
+            // in IPC accessibility snapshots rather than O(N^2) on long pages
+            // like OpenSourceLicensesScreen.
+            let textEntries = texts.map { (element: $0, frame: $0.frame) }
             // A swipe the scroll view cannot follow (near its end, with bounce off) lands
             // as a tap on whatever control holds the anchor: on a toggle row's caption it
             // flipped Download over cellular on every swipe (2026-10-25, run
             // 20261025-173415-0398b5f1). Text outside every control goes first.
             let controls = controlFrames(in: container)
-            let freeTexts = texts.filter { text in
-                let center = CGPoint(x: text.frame.midX, y: text.frame.midY)
+            let freeEntries = textEntries.filter { entry in
+                let center = CGPoint(x: entry.frame.midX, y: entry.frame.midY)
                 return !controls.contains { $0.contains(center) }
             }
+            let visibleEntries = textEntries.filter { entry in
+                visible.contains(CGPoint(x: entry.frame.midX, y: entry.frame.midY))
+            }
             let wanted = delta < 0 ? delta - 12 : delta + 12
-            let destinationFor: (XCUIElement) -> (XCUIElement, CGFloat)? = { candidate in
-                let offsets = texts.compactMap { text -> (XCUIElement, CGFloat)? in
-                    let offset = text.frame.midY - candidate.frame.midY
-                    guard offset * wanted > 0, visible.contains(CGPoint(x: text.frame.midX, y: text.frame.midY)) else {
-                        return nil
-                    }
-                    return (text, offset)
+            let destinationFor: ((element: XCUIElement, frame: CGRect)) -> (XCUIElement, CGFloat)? = { candidate in
+                let offsets = visibleEntries.compactMap { entry -> (XCUIElement, CGFloat)? in
+                    let offset = entry.frame.midY - candidate.frame.midY
+                    guard offset * wanted > 0 else { return nil }
+                    return (entry.element, offset)
                 }
                 // The nearest text at least the wanted distance away, else the farthest.
                 let farEnough = offsets.filter { abs($0.1) >= abs(wanted) }.min { abs($0.1) < abs($1.1) }
                 return farEnough ?? offsets.max(by: { abs($0.1) < abs($1.1) })
             }
-            let hasFullDrag: (XCUIElement) -> Bool = { candidate in
+            let hasFullDrag: ((element: XCUIElement, frame: CGRect)) -> Bool = { candidate in
                 guard let dest = destinationFor(candidate) else { return false }
                 return abs(dest.1) >= abs(wanted)
             }
-            var anchors = freeTexts.filter(hasFullDrag)
+            var anchors = freeEntries.filter(hasFullDrag)
             var chosen = VocelloUITouchScrollAnchor.index(
                 frames: anchors.map(\.frame), visible: visible, desiredDelta: delta)
             if chosen == nil {
                 observations.append("no full-distance control-free touch anchor; falling back to text inside a control")
-                anchors = texts.filter(hasFullDrag)
+                anchors = textEntries.filter(hasFullDrag)
                 chosen = VocelloUITouchScrollAnchor.index(
                     frames: anchors.map(\.frame), visible: visible, desiredDelta: delta)
             }
             if chosen == nil {
-                anchors = freeTexts.filter { destinationFor($0) != nil }
+                anchors = freeEntries.filter { destinationFor($0) != nil }
                 chosen = VocelloUITouchScrollAnchor.index(
                     frames: anchors.map(\.frame), visible: visible, desiredDelta: delta)
             }
             if chosen == nil {
-                anchors = texts.filter { destinationFor($0) != nil }
+                anchors = textEntries.filter { destinationFor($0) != nil }
                 chosen = VocelloUITouchScrollAnchor.index(
                     frames: anchors.map(\.frame), visible: visible, desiredDelta: delta)
             }
@@ -189,7 +194,7 @@ enum VocelloUISettingsReveal {
                     return
                 }
                 observations.append("dragOffsetY=\(destination.1)")
-                anchor.press(forDuration: 0.05, thenDragTo: destination.0, withVelocity: .slow, thenHoldForDuration: 0.2)
+                anchor.element.press(forDuration: 0.05, thenDragTo: destination.0, withVelocity: .slow, thenHoldForDuration: 0.2)
             }
         }
         return false

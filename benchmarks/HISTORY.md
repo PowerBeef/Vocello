@@ -1835,6 +1835,7 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-11-21 | [`ios-xcui-perf-20261121-200255-00f49267`](runs/ui-perf/ios-xcui-perf-20261121-200255-00f49267.json) | canonical | canonical | passedWithWarnings | not-applicable | 12 | — | `eed3842d0004` | `0aff6a5bd9c4` | baseline | ios-perf-cal-3 |
+| 2026-11-22 | [`ios-xcui-perf-20261122-012923-b890c982`](runs/ui-perf/ios-xcui-perf-20261122-012923-b890c982.json) | canonical | canonical | passedWithWarnings | not-applicable | 12 | — | `8eb449501804` | `0aff6a5bd9c4` | vs ios-xcui-perf-20261121-200255-00f49267: compatible | ios-perf-cal-4 |
 
 ## ui-perf / ios / iphone-17-pro / config `42ae56926af0`
 

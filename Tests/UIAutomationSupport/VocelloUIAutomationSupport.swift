@@ -145,11 +145,25 @@ enum VocelloUISettingsReveal {
                 let farEnough = offsets.filter { abs($0.1) >= abs(wanted) }.min { abs($0.1) < abs($1.1) }
                 return farEnough ?? offsets.max(by: { abs($0.1) < abs($1.1) })
             }
-            var anchors = freeTexts.filter { destinationFor($0) != nil }
+            let hasFullDrag: (XCUIElement) -> Bool = { candidate in
+                guard let dest = destinationFor(candidate) else { return false }
+                return abs(dest.1) >= abs(wanted)
+            }
+            var anchors = freeTexts.filter(hasFullDrag)
             var chosen = VocelloUITouchScrollAnchor.index(
                 frames: anchors.map(\.frame), visible: visible, desiredDelta: delta)
             if chosen == nil {
-                observations.append("no directional control-free touch anchor; falling back to text inside a control")
+                observations.append("no full-distance control-free touch anchor; falling back to text inside a control")
+                anchors = texts.filter(hasFullDrag)
+                chosen = VocelloUITouchScrollAnchor.index(
+                    frames: anchors.map(\.frame), visible: visible, desiredDelta: delta)
+            }
+            if chosen == nil {
+                anchors = freeTexts.filter { destinationFor($0) != nil }
+                chosen = VocelloUITouchScrollAnchor.index(
+                    frames: anchors.map(\.frame), visible: visible, desiredDelta: delta)
+            }
+            if chosen == nil {
                 anchors = texts.filter { destinationFor($0) != nil }
                 chosen = VocelloUITouchScrollAnchor.index(
                     frames: anchors.map(\.frame), visible: visible, desiredDelta: delta)

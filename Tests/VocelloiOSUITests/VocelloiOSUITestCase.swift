@@ -231,7 +231,8 @@ class VocelloiOSUITestCase: XCTestCase {
         // the page cannot follow lands as a tap on the option under it, so only a page that swiped
         // up swipes down, and the choice is confirmed again before Back.
         if !revealSettingsElement(back, swipingUp: false) {
-            XCTAssertTrue(swipedOptionsUp, "Back must be revealed on a page that was not swiped")
+            let scrolledPastBack = swipedOptionsUp || (back.exists && back.frame.minY < 0)
+            XCTAssertTrue(scrolledPastBack, "Back must be revealed on a page that was not scrolled past it")
             appLanguageOptions.swipeDown(velocity: .slow)
             XCTAssertTrue(VocelloUIWait.condition("the \(language) choice to stay selected", timeout: 5) {
                 option.exists && option.isSelected

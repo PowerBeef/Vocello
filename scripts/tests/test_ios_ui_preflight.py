@@ -19,10 +19,14 @@ def probe(**fields: object) -> dict[str, object]:
 
 class IOSUIPreflightTests(unittest.TestCase):
     def run_preflight(self, reported: dict[str, object], team: str = "TEAMFIXTURE",
-                      mirroring: bool = False):
+                      mirroring: bool = False, signing_ok: bool = True):
         shell = UIFunctionShell(self)
+        shell.helper("scripts/lib/ios_signing_identity.py", "exit 0" if signing_ok else "exit 1")
         # Always stubbed: the real check would read this Mac's process list.
         body = (
+            f"ROOT_DIR={quote(shell.path)}\n"
+            "lane=smoke\n"
+            "no_publish=0\n"
             f"ios_mirroring_running() {{ return {0 if mirroring else 1}; }}\n"
             f"ios_probe() {{ echo probed >&2; printf '%s' {quote(json.dumps(reported))}; }}\n"
             f"derive_team() {{ printf '%s' {quote(team)}; [[ -n {quote(team)} ]]; }}\n"
@@ -69,6 +73,11 @@ class IOSUIPreflightTests(unittest.TestCase):
         completed = self.run_preflight(probe(), team="")
         self.assertEqual(completed.returncode, 1)
         self.assertIn("no Apple Development team", completed.stderr)
+
+    def test_an_unusable_signing_identity_fails(self) -> None:
+        completed = self.run_preflight(probe(), signing_ok=False)
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("no usable Apple Development signing identity", completed.stderr)
 
 
 if __name__ == "__main__":

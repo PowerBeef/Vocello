@@ -63,7 +63,7 @@ from lib import ui_perf_thresholds as calibration_rules  # noqa: E402
 from lib import ui_perf_lane  # noqa: E402
 from lib import ui_perf_samples  # noqa: E402
 from lib.build_provenance import ProvenanceError, load_build_provenance  # noqa: E402
-from lib.ui_perf_samples import PHASE_NAMES, overlap_fraction, span_hitch  # noqa: E402
+from lib.ui_perf_samples import overlap_fraction  # noqa: E402
 
 EXPECTED_SCENARIOS = [
     "ios-idle-baseline",

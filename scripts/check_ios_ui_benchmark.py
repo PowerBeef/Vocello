@@ -12,7 +12,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
-from typing import Any, TypeGuard
+from typing import TypeGuard
 import sys
 
 SCRIPT_DIR = Path(__file__).resolve().parent

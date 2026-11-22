@@ -1262,6 +1262,7 @@
           "enum": [
             "cpu",
             "memory",
+            "metal",
             "witness"
           ]
         },

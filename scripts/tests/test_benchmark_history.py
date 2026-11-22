@@ -2587,6 +2587,36 @@ class BenchmarkHistoryTests(unittest.TestCase):
             with self.subTest(name=name), self.assertRaises(history.HistoryError):
                 history.record_manifest(self.write_manifest(manifest, candidate))
 
+    def test_a_metal_profile_publishes_with_embedded_time_profiler_rows(self) -> None:
+        run_id = "profile-metal"
+        summary = dict(self.witness_trace_summary())
+        summary["capturedRowsBySchema"] = {
+            **summary["capturedRowsBySchema"],
+            "metal-gpu-intervals": 64,
+            "time-profile": 120,
+        }
+        summary["capturedDataRowCount"] = sum(summary["capturedRowsBySchema"].values())
+        manifest = self.profile_producer_manifest(
+            run_id, quality=True, policy="keptByDefault", profile_kind="metal",
+            template="Metal System Trace + os_signpost", summary=summary,
+        )
+        record = json.loads(history.record_manifest(self.write_manifest(manifest, run_id)).read_text())
+        self.assertEqual(record["evidence"]["trace"]["captureSettings"]["profileKind"], "metal")
+        self.assertNotIn("cpuSampleCount", record["evidence"]["trace"]["summary"])
+
+        bad_summary = dict(summary)
+        bad_summary["capturedRowsBySchema"] = {
+            **summary["capturedRowsBySchema"],
+            "cpu-profile": 12,
+        }
+        bad_summary["capturedDataRowCount"] = sum(bad_summary["capturedRowsBySchema"].values())
+        bad_manifest = self.profile_producer_manifest(
+            f"{run_id}-bad-cpu", quality=True, policy="keptByDefault", profile_kind="metal",
+            template="Metal System Trace + os_signpost", summary=bad_summary,
+        )
+        with self.assertRaisesRegex(history.HistoryError, "CPU sampler rows"):
+            history.record_manifest(self.write_manifest(bad_manifest, f"{run_id}-bad-cpu"))
+
     def test_production_profile_retention_publishes_v2_and_v3_without_downgrade(self) -> None:
         for quality in (False, True):
             for policy in ("summaryOnly", "keptExplicitly"):

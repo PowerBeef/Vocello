@@ -3040,7 +3040,12 @@ def validate_trace_summary(record: dict[str, Any]) -> None:
     template = str(trace.get("template", ""))
     named = {name for name in TRACE_CPU_SAMPLER_SCHEMAS.values() if name in template}
     sampled = {name for schema, name in TRACE_CPU_SAMPLER_SCHEMAS.items() if rows.get(schema)}
-    if named != sampled:
+    if profile_kind == "metal":
+        # Apple's Metal System Trace template bundles Time Profiler alongside the
+        # Metal GPU instruments, so time-profile rows are permitted while CPU Profiler is not.
+        if not sampled.issubset({"Time Profiler"}):
+            raise HistoryError("trace CPU sampler rows do not match the sampler its template names")
+    elif named != sampled:
         raise HistoryError("trace CPU sampler rows do not match the sampler its template names")
     if named and (record.get("run") or {}).get("platform") == "macos":
         measurement = (record.get("inputs") or {}).get("lineageMeasurementVersion")
@@ -3145,7 +3150,8 @@ def validate_trace_summary(record: dict[str, Any]) -> None:
     require_digest(summary["tocDigest"], "evidence.trace.summary.tocDigest", allow_na=False)
     cpu_rows = sum(rows.get(name, 0) for name in ("cpu-profile", "time-profile"))
     signpost_rows = sum(value for name, value in rows.items() if "signpost" in name.lower())
-    if cpu_rows != summary.get("cpuSampleCount", 0) or signpost_rows != summary["signpostEventCount"]:
+    check_cpu_rows = profile_kind != "metal" or "cpuSampleCount" in summary
+    if (check_cpu_rows and cpu_rows != summary.get("cpuSampleCount", 0)) or signpost_rows != summary["signpostEventCount"]:
         raise HistoryError("trace summary row counts do not match CPU/signpost totals")
     if sum(rows.values()) != summary["capturedDataRowCount"]:
         raise HistoryError("trace summary captured-row total is inconsistent")

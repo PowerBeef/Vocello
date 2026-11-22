@@ -128,11 +128,12 @@ Lanes, learned on the 3.1 run (2026-11-14):
 
 ## Hard boundaries
 
-- **Release focus (until the 3.1 iOS submission; the Mac and CLI 3.1 ship first, RF-61):** the
-  `focusLock` in `config/roadmap.json` makes `release-first-3-0-2026-09` the only plan with live work,
-  at most `focusLock.maxInFlight` items in flight (`roadmap.py validate` enforces it).
-  `focusLock.decision` is the authority for the order and the gates: no target dates, and the core
-  overhaul and the output-quality remediation come before the iOS submission.
+- **Release focus (until the 3.2 iOS submission; Mac and CLI 3.1 shipped under RF-61, no more 3.1
+  TestFlight builds):** the `focusLock` in `config/roadmap.json` makes `release-first-3-0-2026-09`
+  the only plan with live work, at most `focusLock.maxInFlight` items in flight (`roadmap.py
+  validate` enforces it). `focusLock.decision` is the authority for the order and the gates: no
+  target dates, and Pack B (`RF-68`, `RF-69`) and RF-57-screened Pack C (`RF-70`) land before the
+  3.2 release (`RF-71` on Mac/CLI) and the 3.2.0 iOS App Store submission (`v3.2.0-ios.N`).
   - **Classify every new finding.** A release blocker joins that plan with a gate: an App Review
     rejection risk, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata
     mismatch on iOS. Anything else becomes one parked line in `post-3-0-backlog-2026-10`, with no

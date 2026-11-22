@@ -18,11 +18,50 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 21, night: Wave 5 physical-iPhone 3.1.0 calibration & qualification complete on local `main` (ready for push)
+### November 21, late night: `c0750fe7` pushed & native CI green; CI lint/test fix landed; roadmap retargeted to 3.2.0 (`RF-68`..`RF-71`)
+
+Local `main` (`4f273cb4..c0750fe7`) was pushed to `origin/main` at the maintainer's request, both
+triggered workflows completed, the small lint/test regressions were fixed locally (`65436f01`), and
+the roadmap was updated per the maintainer's 2026-11-21 decision.
+
+- **Push CI & Release Rehearsal on `c0750fe7`:**
+  - **All native Xcode jobs PASSED on GA `xcode-27`:** `macOS deterministic tests` (12m09s, incl.
+    Main Thread Checker, CLI identity, macOS XCUITest compile), `iOS compile check (device SDK)`
+    (11m39s, incl. `VocelloiOS`, policy tests, and all 3 iOS XCUITest bundles), `macOS ThreadSanitizer
+    subset` (10m04s), and `Rehearse iOS archive prerequisites` (2m55s).
+  - **Fixed locally in `65436f01` (`DW-04`):** cleared 5 unused imports flagged by pinned `ruff 0.17.1`
+    (`check_ios_ui_benchmark.py`, `check_ios_ui_perf.py`, `check_macos_ui_perf.py`) and updated
+    `test_ios_ui_preflight.py` (signing-identity stub + `ROOT_DIR`/`lane`/`no_publish`) and
+    `test_required_step_ledger.py` (`ui-build` in `ui-ios-control-audit` `optionalSteps`), which were
+    the sole failures in `Repository contracts`, `Python tests (linux)` (3/2,749), and `Rehearse macOS
+    package` (3/3,161). Verified locally with `ruff` (0 findings PASS) and routed `scripts/dev.sh check`
+    (108/108 passed).
+- **2026-11-21 Roadmap Decision (`config/roadmap.json`, `docs/ROADMAP.md`, `AGENTS.md`, `release-first-execution-2026-09.md`):**
+  - **No more 3.1 TestFlight builds** and no iOS 3.1 release (Mac & CLI 3.1.0 shipped Nov 17 under
+    `RF-61`; internal 3.1.0 builds 31–33 are historical/superseded).
+  - **3.2.0 is the new target for the iOS App Store submission** (`v3.2.0-ios.N` candidates).
+  - **Pack B & Pack C pulled ahead of 3.2:**
+    - `RF-68`: Engine Pack B (part 1) — sample-preserving MLX/Metal safety, memory (`A-08`, `A-27`) &
+      hot-loop performance.
+    - `RF-69`: Engine Pack B (part 2) — sample-preserving runtime, Mac/CLI `EngineHostLease`, Fast QC
+      & delivery hardening.
+    - `RF-70` (blocked by `RF-68`): Engine Pack C — `RF-57`-screened quality upgrades (zero-weight
+      Korean `D1`, Bundle A `+24.12 MB`, Bundle B `+99.62 MB`).
+    - `RF-71` (blocked by `RF-68`, `RF-69`, `RF-70`): Ship Vocello and the `vocello` CLI 3.2 on the Mac.
+  - `RF-12`, `RF-15`, `RF-16`, `RF-17`, `RF-62`, `RF-63` retargeted to `3.2.0` (`RF-12`, `RF-16`,
+    `RF-17` blocked by `RF-68`, `RF-69`, `RF-70`); `RF-35`, `RF-41`, `RF-42` moved back to `planned`
+    behind `RF-12` (0 staleness warnings; all 3 focus-lock `in-flight` slots free for `RF-68`..`RF-70`).
+- **Next:**
+  1. Push the local CI fix + 3.2 roadmap commits to `origin/main` once explicitly authorized, and
+     confirm push CI + Release rehearsal green.
+  2. Begin **Pack B** (`RF-68` & `RF-69`, sample-preserving, Mac-driven) in parallel or sequence,
+     then run **Pack C** (`RF-70`, `RF-57`-screened Korean `D1`, Bundle A, Bundle B) before bumping to
+     `3.2.0` for Mac/CLI (`RF-71`) and cutting `v3.2.0-ios.1` (`RF-12`).
+
+### November 21, night: Wave 5 physical-iPhone 3.1.0 calibration & qualification complete (`c0750fe7`, pushed)
 
 Physical-iPhone **Wave 5** completed on the paired iPhone 17 Pro (iOS 27.2.1, Xcode 27.2, wired USB
-+ clean checkpoints). Local `main` is clean and **not yet pushed** — waiting on explicit maintainer
-request to push to `origin/main` and watch push CI on `xcode-27`.
++ clean checkpoints) and was pushed to `origin/main` at `c0750fe7`.
 
 - **Wave 5 On-Device Evidence & Calibrations:**
   - **`ios benchmark` (3.1 hybrid, 29/29 PASS, 0 refusals):**
@@ -79,11 +118,8 @@ request to push to `origin/main` and watch push CI on `xcode-27`.
     Audio/About; fixed the final AX-XXXL `VocelloUISettingsReveal` short-drag stall and cached
     per-step staticText frames (`31a71e40`, `12a76ed3`, `2ecf5ceb`, `9b68d928`). An optional full
     `ios localization` re-run can confirm AX-XXXL Voice Models green in the next window.
-- **Next:**
-  1. Push local `main` to `origin/main` once explicitly authorized and watch push CI on `xcode-27`.
-  2. When ready for iOS 3.1.0 TestFlight candidate upload, cut the next `v3.1.0-ios.N` tag via
-     `python3 scripts/ios_candidate_tag.py` after push CI passes.
-  3. Packs B/C remain deferred post-3.1 behind `RF-57`.
+- **Outcome:** Pushed at `c0750fe7` (see entry above); superseded for TestFlight by the 2026-11-21
+  decision targeting `3.2.0`.
 
 ### November 21: iOS dev/test/bench overhaul (Waves 1–4) & Pack A release blockers (`RB-01`..`RB-12`) landed locally
 

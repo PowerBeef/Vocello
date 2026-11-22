@@ -4,11 +4,11 @@
 > Open work lives in `config/roadmap.json`; finished items and completed plans are in
 > `config/roadmap-archive.json` and only count toward progress here.
 
-**Current execution plan: Vocello 3.1 — the Mac and CLI release, then the iOS App Store submission** (`release-first-3-0-2026-09`).
+**Current execution plan: Vocello 3.2 — Pack B/C engine upgrades, the 3.2 Mac and CLI release, and the iOS App Store submission** (`release-first-3-0-2026-09`).
 Follow its ordered milestones; the other plans retain the underlying defect records
 and deferred backlog. Milestone progress is not a release-readiness score.
 
-**Focus lock** (decided 2026-10-23): The iOS 3.1 App Store submission is the release goal (maintainer decision of 2026-11-14, below; it was 3.0 until then). The Mac app and the CLI 3.0.0 are public since 2026-10-23, released from the signed v3.0.0 commit e7a8e2ae, which is the freeze commit. iPhone candidates are v<version>-ios.N tags cut by scripts/ios_candidate_tag.py on the maintainer's request; since the freeze the maintainer has added iPhone changes only as items of this plan (RF-35, RF-36, RF-37). A new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Post-3-0-backlog items that need no iPhone stay authorized (2026-10-16): each is closed in the change that fixes it, so it never takes an in-flight slot. The engine-remediation-2026-10 programme's unfinished items stay parked until the submission, then resume, except those the core overhaul takes up (decisions of 2026-11-10, below). Mac-only requests follow as items of this plan without changing the iPhone candidate. The CLI's shared History and its parity record and extended qualification (RF-30, RF-31) wait for the submission; the CLI 3.0 reads History but does not write it. The iPhone is used only in windows the maintainer announces. Nobody listens for 3.0: machine screens catch gross failures only, and the processed candidate gets risk-based acceptance. Restated on 2026-10-28 to match the decisions recorded since in RF-35 to RF-39; every earlier step, including superseded in-flight caps and the plan to archive the iPhone app from v3.0.0 itself, is in git log -p config/roadmap.json. Maintainer decisions of 2026-11-10: the target dates are removed from the roadmap and the release, so no item carries a due date and the order of work is set by gates; and the core overhaul of the runtime (the speed and memory work researched that day) is performed before the iOS App Store submission, which must be fully App Store compliant. The overhaul's items are RF-44 to RF-48: stages 0, 1, 2a, 3 and 4 of docs/audits/2026-11-10-apple-silicon-performance-research.md, the stages whose output is bit-identical. Its sample-changing stages are not in the plan. Maintainer decision of 2026-11-11: output quality is remediated before the iOS App Store submission. The findings verified in docs/audits/2026-11-11-qwen3-tts-quality-report-review.md become items RF-50 to RF-56 of this plan, taking up the matching parts of ER-03, ER-04, ER-05 and PA-16; the submission waits until the engine and its output are as good as they can be. The tooling, test procedures, benchmark harness and audio QC analysis the remediation leans on are audited too (RF-57). Nobody listens still: a change that alters samples lands only behind a machine screen whose decision rule is recorded before its takes are generated. Publishing a model artifact and moving a dependency pin still need the maintainer's specific request. Maintainer decision of 2026-11-14: there is no iOS 3.0 release; every platform's next release is 3.1. The Mac app and the CLI 3.1 ship first, once their Mac gates pass (RF-61), and the iPhone 3.1 submission follows on its own gates; items that name 3.0.0 for the iPhone now mean 3.1.0, and iPhone candidates are v3.1.0-ios.N tags. The iPhone-only checks of RF-51, RF-52, RF-55, RF-58, RF-59 and RF-60 wait for a phone window and do not block the Mac and CLI release.
+**Focus lock** (decided 2026-10-23): The iOS 3.2 App Store submission is the release goal (maintainer decision of 2026-11-21, below; it was 3.0 until 2026-11-14 and 3.1 until 2026-11-21). The Mac app and the CLI 3.0.0 are public since 2026-10-23, released from the signed v3.0.0 commit e7a8e2ae, which is the freeze commit. iPhone candidates are v<version>-ios.N tags cut by scripts/ios_candidate_tag.py on the maintainer's request; since the freeze the maintainer has added iPhone changes only as items of this plan (RF-35, RF-36, RF-37). A new finding joins this plan only if it risks App Review rejection, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata mismatch on iOS; everything else is parked. Post-3-0-backlog items that need no iPhone stay authorized (2026-10-16): each is closed in the change that fixes it, so it never takes an in-flight slot. The engine-remediation-2026-10 programme's unfinished items stay parked until the submission, then resume, except those the core overhaul takes up (decisions of 2026-11-10, below). Mac-only requests follow as items of this plan without changing the iPhone candidate. The CLI's shared History and its parity record and extended qualification (RF-30, RF-31) wait for the submission; the CLI 3.0 reads History but does not write it. The iPhone is used only in windows the maintainer announces. Nobody listens for 3.0: machine screens catch gross failures only, and the processed candidate gets risk-based acceptance. Restated on 2026-10-28 to match the decisions recorded since in RF-35 to RF-39; every earlier step, including superseded in-flight caps and the plan to archive the iPhone app from v3.0.0 itself, is in git log -p config/roadmap.json. Maintainer decisions of 2026-11-10: the target dates are removed from the roadmap and the release, so no item carries a due date and the order of work is set by gates; and the core overhaul of the runtime (the speed and memory work researched that day) is performed before the iOS App Store submission, which must be fully App Store compliant. The overhaul's items are RF-44 to RF-48: stages 0, 1, 2a, 3 and 4 of docs/audits/2026-11-10-apple-silicon-performance-research.md, the stages whose output is bit-identical. Its sample-changing stages are not in the plan. Maintainer decision of 2026-11-11: output quality is remediated before the iOS App Store submission. The findings verified in docs/audits/2026-11-11-qwen3-tts-quality-report-review.md become items RF-50 to RF-56 of this plan, taking up the matching parts of ER-03, ER-04, ER-05 and PA-16; the submission waits until the engine and its output are as good as they can be. The tooling, test procedures, benchmark harness and audio QC analysis the remediation leans on are audited too (RF-57). Nobody listens still: a change that alters samples lands only behind a machine screen whose decision rule is recorded before its takes are generated. Publishing a model artifact and moving a dependency pin still need the maintainer's specific request. Maintainer decision of 2026-11-14: there is no iOS 3.0 release; every platform's next release is 3.1. The Mac app and the CLI 3.1 ship first, once their Mac gates pass (RF-61), and the iPhone 3.1 submission follows on its own gates; items that name 3.0.0 for the iPhone now mean 3.1.0, and iPhone candidates are v3.1.0-ios.N tags. The iPhone-only checks of RF-51, RF-52, RF-55, RF-58, RF-59 and RF-60 wait for a phone window and do not block the Mac and CLI release. Maintainer decision of 2026-11-21: Mac and CLI 3.1.0 shipped on 2026-11-17 (RF-61) and there are no more 3.1 TestFlight builds or an iOS 3.1 release; every platform's next release is 3.2, and 3.2.0 is the new target for the iOS App Store submission (v3.2.0-ios.N candidates). The engine audit's sample-preserving Pack B (RF-68, RF-69) and RF-57-screened Pack C (RF-70: zero-weight Korean D1, Bundle A and Bundle B) move into this plan to land before the 3.2 release (RF-71 for Mac and CLI 3.2, and RF-12/RF-15/RF-17/RF-16 for iOS 3.2). Items that name 3.0.0 or 3.1.0 for the iPhone submission now mean 3.2.0.
 Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 **Frozen** at `e7a8e2aed6c483f4156eb8b2f6b0467ede1c2f04`: every later commit names an item of this plan in its subject.
@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 53/90 (59%) |
+| `release-first-3-0-2026-09` | active | release-qa | 53/94 (56%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 13/17 (76%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (77)
+### Mac, remotely (81)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -119,9 +119,13 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `RF-52` (planned) Quality remediation, stage 2: clone conditioning parity
 - `RF-54` (planned) Quality remediation, stage 4: the decoder's 72-frame attention window
 - `RF-57` (planned) Audit the tooling the quality remediation relies on
+- `RF-68` (planned) Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance (also: iPhone)
+- `RF-69` (planned) Engine Pack B (part 2): sample-preserving runtime, Mac/CLI lease, Fast QC and delivery hardening
+- `RF-70` (planned) Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B) (also: At the keyboard, iPhone)
+- `RF-71` (planned) Ship Vocello and the vocello CLI 3.2 on the Mac (also: At the keyboard)
 - `UIF-08` (parked) Native acceptance of the iOS-derived screens on current source
 
-### At the keyboard (17)
+### At the keyboard (19)
 
 Needs the maintainer present: a permission prompt, a keychain or password, a release or account action only they may perform.
 
@@ -136,14 +140,16 @@ Needs the maintainer present: a permission prompt, a keychain or password, a rel
 - `ER-07` (parked) iPhone memory budget from measured limits
 - `PA-10` (parked) Release signing is isolated from dispatch and build inputs (also: Mac, remotely)
 - `RF-02` (planned) complete Apple prerequisites and the consolidated qualified-decision packet
-- `RF-12` (planned) Upload the verified 3.1.0 IPA to internal TestFlight and install the processed candidate (also: iPhone)
-- `RF-16` (planned) Submit 3.1.0 for App Review on the maintainer's explicit go
+- `RF-12` (planned) Upload the verified 3.2.0 IPA to internal TestFlight and install the processed candidate (also: iPhone)
+- `RF-16` (planned) Submit 3.2.0 for App Review on the maintainer's explicit go
 - `RF-23` (parked) The Mac app offers new versions and installs them through Sparkle
 - `RF-48` (planned) Core overhaul, stage 4: finalization, preview and the heat pause (also: iPhone)
-- `RF-62` (planned) Answer the new App Store age-rating descriptors when filing 3.1.0
-- `RF-63` (planned) Fit the 3.1 App Review notes into what is left of the 4,000 characters
+- `RF-62` (planned) Answer the new App Store age-rating descriptors when filing 3.2.0
+- `RF-63` (planned) Fit the 3.2 App Review notes into what is left of the 4,000 characters
+- `RF-70` (planned) Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B) (also: Mac, remotely, iPhone)
+- `RF-71` (planned) Ship Vocello and the vocello CLI 3.2 on the Mac (also: Mac, remotely)
 
-### iPhone (59)
+### iPhone (61)
 
 Needs the paired iPhone, in a window the maintainer announces.
 
@@ -190,12 +196,12 @@ Needs the paired iPhone, in a window the maintainer announces.
 - `PA-18` (parked) Public claims match what each download ships
 - `PA-20` (parked) Accessibility and localization reach every surface (also: Mac, remotely)
 - `PA-30` (parked) Leftovers from PA-21, PA-22 and AUD-05 (also: Mac, remotely)
-- `RF-12` (planned) Upload the verified 3.1.0 IPA to internal TestFlight and install the processed candidate (also: At the keyboard)
-- `RF-15` (planned) Risk-based acceptance of the processed 3.1.0 candidate on the iPhone
+- `RF-12` (planned) Upload the verified 3.2.0 IPA to internal TestFlight and install the processed candidate (also: At the keyboard)
+- `RF-15` (planned) Risk-based acceptance of the processed 3.2.0 candidate on the iPhone
 - `RF-17` (planned) Exact-tag iOS quality promotion
-- `RF-35` (in-flight) iPhone model downloads may use cellular data, off by default with an opt-in switch
-- `RF-41` (in-flight) iPhone model downloads show their size and ask before they start
-- `RF-42` (in-flight) Decide how Vocello behaves on the iPads that can install it
+- `RF-35` (planned) iPhone model downloads may use cellular data, off by default with an opt-in switch
+- `RF-41` (planned) iPhone model downloads show their size and ask before they start
+- `RF-42` (planned) Decide how Vocello behaves on the iPads that can install it
 - `RF-44` (planned) Core overhaul, stage 0: instruments and the regression net (also: Mac, remotely)
 - `RF-45` (planned) Core overhaul, stage 1: submission layer (also: Mac, remotely)
 - `RF-47` (planned) Core overhaul, stage 3: memory (also: Mac, remotely)
@@ -205,13 +211,15 @@ Needs the paired iPhone, in a window the maintainer announces.
 - `RF-59` (planned) One model: the attn hybrid replaces Speed and Quality, and the model selector is retired
 - `RF-65` (planned) Measure the shipped hybrid on an iPhone 15 Pro
 - `RF-66` (planned) Record a demo video of the shipping flow on a physical iPhone
+- `RF-68` (planned) Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance (also: Mac, remotely)
+- `RF-70` (planned) Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B) (also: Mac, remotely, At the keyboard)
 - `VLR-07` (parked) Complete physical-device closure and publish the privacy-safe report
 
-## Vocello 3.1 — the Mac and CLI release, then the iOS App Store submission
+## Vocello 3.2 — Pack B/C engine upgrades, the 3.2 Mac and CLI release, and the iOS App Store submission
 
 `release-first-3-0-2026-09` · **active** · release-qa · adopted 2026-09-04
 
-November 14 restatement (focusLock): Vocello 3.1 ships on the Mac and the CLI first (RF-61), then on the iPhone; there is no iOS 3.0 release. October 12 rebaseline (focusLock): submit Vocello 3.0 for iPhone through eight ordered steps. (1) Maintainer decisions: account prerequisites, privacy answers, content rights and region scope (RF-02, ASR-02, ASR-04, ASR-09). (2) Before the freeze: the timeboxed quality A/B (RF-14) and the confirmed blockers' code fixes (AUD-01, AUD-02, AUD-07, AUD-09, F-01, F-16, DA-04). (3) The export purchase on the phone (RF-13). (4) Build-number check and freeze (ASR-08, RF-09). (5) Signed archive, IPA verification and internal TestFlight: each candidate is a v<version>-ios.N tag cut by scripts/ios_candidate_tag.py (ASR-10, ASR-07, RF-12). (6) Risk-based acceptance of the processed candidate and the exact-tag quality promotion (RF-15, ASR-06, RF-17). (7) Screenshots, metadata and the App Store Connect check (ASR-05, ASR-11). (8) Submission on the maintainer's explicit go (RF-16). The Mac app and the CLI 3.0.0 shipped first (2026-10-23; RF-10 finishes their qualification); the full 201-take campaign, the QC detector programme and the CLI's History and parity work (RF-30, RF-31) follow the submission.
+November 21 restatement (focusLock): Mac and CLI 3.1.0 shipped on 2026-11-17 (RF-61) and there are no more 3.1 TestFlight builds or iOS 3.1 release; Pack B (RF-68, RF-69) and Pack C (RF-70) land before 3.2, Mac and CLI 3.2 ship (RF-71), and 3.2.0 is the new target for the iOS App Store submission (v3.2.0-ios.N candidates). November 14 restatement (focusLock): Vocello 3.1 ships on the Mac and the CLI first (RF-61), then on the iPhone; there is no iOS 3.0 release. October 12 rebaseline (focusLock): submit Vocello 3.0 for iPhone through eight ordered steps. (1) Maintainer decisions: account prerequisites, privacy answers, content rights and region scope (RF-02, ASR-02, ASR-04, ASR-09). (2) Before the freeze: the timeboxed quality A/B (RF-14) and the confirmed blockers' code fixes (AUD-01, AUD-02, AUD-07, AUD-09, F-01, F-16, DA-04). (3) The export purchase on the phone (RF-13). (4) Build-number check and freeze (ASR-08, RF-09). (5) Signed archive, IPA verification and internal TestFlight: each candidate is a v<version>-ios.N tag cut by scripts/ios_candidate_tag.py (ASR-10, ASR-07, RF-12). (6) Risk-based acceptance of the processed candidate and the exact-tag quality promotion (RF-15, ASR-06, RF-17). (7) Screenshots, metadata and the App Store Connect check (ASR-05, ASR-11). (8) Submission on the maintainer's explicit go (RF-16). The Mac app and the CLI 3.0.0 shipped first (2026-10-23; RF-10 finishes their qualification); the full 201-take campaign, the QC detector programme and the CLI's History and parity work (RF-30, RF-31) follow the submission.
 
 Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](reference/release-first-execution-2026-09.md)
 
@@ -229,16 +237,16 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `DW-03` | parked | Development workflow: product-side quality (audit Phase 2) | — |
 | `DW-04` | parked | Development workflow: longer-term modernization (audit Phase 3) | — |
 | `RF-02` | planned | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
-| `RF-12` | planned | Upload the verified 3.1.0 IPA to internal TestFlight and install the processed candidate | `ASR-07` |
-| `RF-15` | planned | Risk-based acceptance of the processed 3.1.0 candidate on the iPhone | `RF-12` |
-| `RF-16` | planned | Submit 3.1.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `RF-35`, `RF-36`, `RF-41`, `RF-42`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04`, `RF-45`, `RF-46`, `RF-47`, `RF-48`, `RF-50`, `RF-51`, `RF-52`, `RF-53`, `RF-54`, `RF-55`, `RF-57`, `RF-62`, `RF-63`, `RF-65`, `RF-66` |
-| `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09`, `RF-45`, `RF-46`, `RF-47`, `RF-48`, `RF-50`, `RF-51`, `RF-52`, `RF-53`, `RF-54`, `RF-55` |
+| `RF-12` | planned | Upload the verified 3.2.0 IPA to internal TestFlight and install the processed candidate | `ASR-07`, `RF-68`, `RF-69`, `RF-70` |
+| `RF-15` | planned | Risk-based acceptance of the processed 3.2.0 candidate on the iPhone | `RF-12` |
+| `RF-16` | planned | Submit 3.2.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `RF-35`, `RF-36`, `RF-41`, `RF-42`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04`, `RF-45`, `RF-46`, `RF-47`, `RF-48`, `RF-50`, `RF-51`, `RF-52`, `RF-53`, `RF-54`, `RF-55`, `RF-57`, `RF-62`, `RF-63`, `RF-65`, `RF-66`, `RF-68`, `RF-69`, `RF-70` |
+| `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09`, `RF-45`, `RF-46`, `RF-47`, `RF-48`, `RF-50`, `RF-51`, `RF-52`, `RF-53`, `RF-54`, `RF-55`, `RF-68`, `RF-69`, `RF-70` |
 | `RF-23` | parked | The Mac app offers new versions and installs them through Sparkle | — |
 | `RF-30` | parked | Cross-process History for the app and the CLI | — |
 | `RF-31` | parked | CLI parity record, documentation and qualification | — |
-| `RF-35` | in-flight | iPhone model downloads may use cellular data, off by default with an opt-in switch | — |
-| `RF-41` | in-flight | iPhone model downloads show their size and ask before they start | — |
-| `RF-42` | in-flight | Decide how Vocello behaves on the iPads that can install it | — |
+| `RF-35` | planned | iPhone model downloads may use cellular data, off by default with an opt-in switch | `RF-12` |
+| `RF-41` | planned | iPhone model downloads show their size and ask before they start | `RF-12` |
+| `RF-42` | planned | Decide how Vocello behaves on the iPads that can install it | `RF-12` |
 | `RF-44` | planned | Core overhaul, stage 0: instruments and the regression net | — |
 | `RF-45` | planned | Core overhaul, stage 1: submission layer | `RF-44` |
 | `RF-46` | planned | Core overhaul, stage 2a: the frame pipeline, identity-preserving | `RF-44` |
@@ -250,10 +258,14 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-55` | planned | Quality remediation, stage 5: model precision and the hybrid model | `RF-50` |
 | `RF-57` | planned | Audit the tooling the quality remediation relies on | — |
 | `RF-59` | planned | One model: the attn hybrid replaces Speed and Quality, and the model selector is retired | `RF-55` |
-| `RF-62` | planned | Answer the new App Store age-rating descriptors when filing 3.1.0 | — |
-| `RF-63` | planned | Fit the 3.1 App Review notes into what is left of the 4,000 characters | — |
+| `RF-62` | planned | Answer the new App Store age-rating descriptors when filing 3.2.0 | — |
+| `RF-63` | planned | Fit the 3.2 App Review notes into what is left of the 4,000 characters | — |
 | `RF-65` | planned | Measure the shipped hybrid on an iPhone 15 Pro | — |
 | `RF-66` | planned | Record a demo video of the shipping flow on a physical iPhone | — |
+| `RF-68` | planned | Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance | — |
+| `RF-69` | planned | Engine Pack B (part 2): sample-preserving runtime, Mac/CLI lease, Fast QC and delivery hardening | — |
+| `RF-70` | planned | Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B) | `RF-68` |
+| `RF-71` | planned | Ship Vocello and the vocello CLI 3.2 on the Mac | `RF-68`, `RF-69`, `RF-70` |
 
 ### Open items in detail
 
@@ -295,13 +307,13 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-02`** (planned) — complete Apple prerequisites and the consolidated qualified-decision packet.
   gate: Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement and version checks and a confirmed-unused build number. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; the maintainer's own privacy and rights decisions are recorded before closure (2026-10-12: no paid counsel), including the Paid Apps agreement, tax and banking the export purchase needs. Authentication failures remain failures.
 
-- **`RF-12`** (planned) — Upload the verified 3.1.0 IPA to internal TestFlight and install the processed candidate.
+- **`RF-12`** (planned) — Upload the verified 3.2.0 IPA to internal TestFlight and install the processed candidate.
   gate: After ASR-10 and ASR-07 pass, upload the verified IPA to internal TestFlight (the archive-ios dispatch with upload_to_testflight, separately authorized by the maintainer) and install the processed build on the paired iPhone, preserving personal data during the upgrade; a fresh install needs another phone or a verified backup and separate approval. Never substitute a diagnostics or development build for the processed candidate. On that build, an owned export unlock still saves and shares Design and Clone audio with the phone in Airplane Mode (moved from RF-13, 2026-10-16: only the live App Store's offline cache was left untested).
 
-- **`RF-15`** (planned) — Risk-based acceptance of the processed 3.1.0 candidate on the iPhone.
+- **`RF-15`** (planned) — Risk-based acceptance of the processed 3.2.0 candidate on the iPhone.
   gate: On the processed TestFlight build, through the repository XCUITest stack (rows it cannot drive: the maintainer by hand; decision 2026-11-17) with no Simulator, diagnostics build, retry or historical substitution: iOS smoke; first-run onboarding and the shipping model download; a take in each mode (Built-in, Design, Clone from a recorded reference, with playback after recording) in English and French; long-form generation and segment regeneration; export without and with the purchase, restore, and a cancelled or unverified purchase (AUD-07); saved-voice save and delete (F-01; replacement is macOS-only, covered by repository tests, maintainer decision 2026-10-14); a one-word script (DA-04); the dependency-failure launch path and a file opened during onboarding (AUD-01); an offline relaunch; VoiceOver through Studio, Settings and the purchase sheet; the largest accessibility text size on Studio and Settings; and a machine screen of about 30 targeted takes across modes, languages and presets for gross failures (Fast QC, end of take, the better ASR family's edit rate and the language check; maintainer decision 2026-10-13: nobody listens), with subtle defects covered by RF-14's known limitation. Each failure is fixed (a new candidate reruns the affected rows) or accepted by the maintainer as a recorded known limitation. The 201-take campaign (ICA-04) and the full matrix (ASR-12) follow the submission.
 
-- **`RF-16`** (planned) — Submit 3.1.0 for App Review on the maintainer's explicit go.
+- **`RF-16`** (planned) — Submit 3.2.0 for App Review on the maintainer's explicit go.
   gate: Every other item of this plan is closed and App Store Connect is complete: metadata, screenshots, privacy answers, content rights, age rating, export compliance, reviewer notes and the export purchase attached to the version. The maintainer explicitly authorizes and submits; approval is not guaranteed, and a rejection reopens only the cited issue.
 
 - **`RF-17`** (planned) — Exact-tag iOS quality promotion.
@@ -319,13 +331,13 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
   gate: config/cli-parity.json maps every app feature to a command or a recorded exclusion; cli.md and an agent guide document the contract and MCP; the extended qualifier proves the History round trip, voices, long-form, MCP generate and cancel and app coexistence on the installed pkg and the copied DMG folder (RF-10); the CLI ships with the Mac release.
   unparkWhen: The iOS 3.0 submission is done.
 
-- **`RF-35`** (in-flight) — iPhone model downloads may use cellular data, off by default with an opt-in switch.
+- **`RF-35`** (planned) — iPhone model downloads may use cellular data, off by default with an opt-in switch.
   gate: Maintainer decision 2026-10-24: Wi-Fi only stays the default, and a Download over cellular switch in Settings > Models & Files > Voice Models lets a download start over cellular. The background session allows cellular and each request carries the switch's value, so with it off nothing changes (Wi-Fi Assist cannot reroute a download); macOS is unchanged. Turning the switch on or off applies to downloads that start afterwards. Done when deterministic tests cover the request flag, the copy is in all ten interface languages, the control audit exercises the switch, the routed check passes, the Swift review finds no blocker, and, proportionate to the change (maintainer 2026-10-24), the new candidate passes the RF-15 navigation row and one model reinstall over Wi-Fi unattended, plus one attended check on cellular with Wi-Fi off: with the switch off a download waits, and with it on a download completes. The iPhone freeze moves to the commit that carries it.
 
-- **`RF-41`** (in-flight) — iPhone model downloads show their size and ask before they start.
+- **`RF-41`** (planned) — iPhone model downloads show their size and ask before they start.
   gate: Guideline 4.2.3(ii): before a new model download starts, from a Voice Models row's Install or Update or from Studio's install button, the app shows the model's download size and the networks it may use, and asks for confirmation; Repair and Retry continue an already confirmed download without asking. Onboarding states that each model is about 2 GB. Done when deterministic tests cover the navigation change, the copy is in all ten interface languages, every UI test that starts a download confirms it, the routed check passes, the Swift review finds no blocker, and a new candidate carries it, with RF-17's records and RF-15's rows rerun on that candidate.
 
-- **`RF-42`** (in-flight) — Decide how Vocello behaves on the iPads that can install it.
+- **`RF-42`** (planned) — Decide how Vocello behaves on the iPads that can install it.
   gate: The maintainer records a decision for the iPads that satisfy iphone-performance-gaming-tier: admit them in iPhone compatibility mode with device evidence for memory and layout, or keep the unsupported-device screen with its body line localized and without the raw machine identifier. Either way the App Review notes state the device requirement, and any code change rides on the candidate that carries RF-41.
 
 - **`RF-44`** (planned) — Core overhaul, stage 0: instruments and the regression net.
@@ -361,17 +373,29 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-59`** (planned) — One model: the attn hybrid replaces Speed and Quality, and the model selector is retired.
   gate: The maintainer publishes the three hybrid artifacts and receipts pin them with exact sizes and SHA-256 digests; the catalog offers one model per mode on both platforms, and neither app shows a Speed/Quality choice; every mode's installed Speed and Quality folders are removed once any mode's model verifies (maintainer decision 2026-11-13); vocello accepts --variant quality, models use and prefer-lower-memory with a notice; memory bands follow the hybrid's measured peak; the formal speed lane and the iPhone's memory and speed (a farm run or an announced phone window) are recorded before the iOS submission; public facts, the README, website copy and benchmark baselines (a new lineage) follow with the release.
 
-- **`RF-62`** (planned) — Answer the new App Store age-rating descriptors when filing 3.1.0.
+- **`RF-62`** (planned) — Answer the new App Store age-rating descriptors when filing 3.2.0.
   gate: In App Store Connect the age-rating questionnaire answers Apple's new Shared Location and Dating and Relationships descriptors (no for both, which is what the app does) before submission and well before the January 12, 2027 deadline, the standing rating decision is unchanged, and the read-back is recorded with ASR-11's live audit.
 
-- **`RF-63`** (planned) — Fit the 3.1 App Review notes into what is left of the 4,000 characters.
-  gate: The review notes in docs/reference/app-store-listing.md describe the 3.1 candidate (one model per mode, its exact size), say that the diagnostics are dormant in the shipped build, keep the iPhone 15 Pro preview-pause paragraph, and name Settings > Help & Support (iosSettings_supportRow, which opens the support page and its contact) as the in-app contact and report path Guideline 1.2 asks of AI content creation apps; they stay at or under 4,000 characters and are read back from App Store Connect byte-identical.
+- **`RF-63`** (planned) — Fit the 3.2 App Review notes into what is left of the 4,000 characters.
+  gate: The review notes in docs/reference/app-store-listing.md describe the 3.2 candidate (one model per mode, its exact size), say that the diagnostics are dormant in the shipped build, keep the iPhone 15 Pro preview-pause paragraph, and name Settings > Help & Support (iosSettings_supportRow, which opens the support page and its contact) as the in-app contact and report path Guideline 1.2 asks of AI content creation apps; they stay at or under 4,000 characters and are read back from App Store Connect byte-identical.
 
 - **`RF-65`** (planned) — Measure the shipped hybrid on an iPhone 15 Pro.
   gate: On an iPhone 15 Pro, with the shipped hybrid and a memory-qualified run: real-time factor rested and heat-soaked, a long-form run's heat-pause behavior, and peak memory against the device's budget; the result is recorded whichever way it falls, and a poor one becomes a listing or review-notes statement decided before submission.
 
 - **`RF-66`** (planned) — Record a demo video of the shipping flow on a physical iPhone.
   gate: A screen recording from a signed candidate on a physical iPhone shows first launch, the download size prompt, the download, a take, the cloning consent screen and the export purchase, with no claim the status bar contradicts, and it is attached or linked for App Review.
+
+- **`RF-68`** (planned) — Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance.
+  gate: With bit-identical fixed-seed PCM digests (scripts/pcm_identity.py) across Custom, Design and Clone: eliminate one-shot MLX Error::check() double-eval consumption in Qwen3TTS and AudioSealGenerator via a single try evalForReadback(...); replace silent try? BaseConfiguration quantization fallback with explicit parse errors, [.noUnusedKeys, .shapeMismatch] weight verification and fused projection logging; fix A-08 Mimi encoder KV retention and super-linear concatenation growth with per-encode local caches; replace A-27's 16.8 MB square decoder causal mask with a rectangular [seqLen, totalLen] mask; hoist and prewarm CodePredictorCompiledPlan across takes (dropping the 10 unused KV buffers), telemetry-gate per-frame introspectionStepScalars, deduplicate back-to-back cache clears and evaluate AudioSeal weight caching (H2) or lazy repetition penalty (A3) only where memory-neutral and bit-identical; land minor package hygiene (streaming tensor rank, control-token-only clone refText, validateChatTemplateTokenCount, mixed-precision sibling check). Verified by VocelloCoreTests, Qwen3RuntimeTests, vocello-swift-review, Mac benchmark/memory lanes and an announced iPhone check.
+
+- **`RF-69`** (planned) — Engine Pack B (part 2): sample-preserving runtime, Mac/CLI lease, Fast QC and delivery hardening.
+  gate: With zero audio-sample change: close the six Mac/CLI EngineHostLease and MacEngineHostCoordinator edge cases (zombie failure/unload lease, Delete Model TOCTOU, MCP install_model self-blocking reclaim, unlink-before-close inode race, .starting state publication, 8 GB admission TOCTOU) with direct coordinator tests; close remaining MLXTTSEngine stop()/B-05 catches, latestEventDrainTask restart in initialize() and forMemoryRelief: true on OOM/allocation-retry unloads; remove redundant post-watermark AudioQualityGate re-evaluation in IOSLongFormProjectRunner, address spine C-04/C-05, Carbon dskFulErr (-34) storage classification, explicit --language korean caution, GenerationHistoryOutboxStore POSIX rename(2)+fsync, accurate APFS fsync comments, backend-risk-spine G-06/G-07 status and a .hybrid telemetry tier; harden HuggingFaceDownloader (HTTP 416 clean retry, CLI cancellation handler), SharedModelComponentStore (EINTR flock retry, lease-checked retired reclaim, Mac single-row free-space preflight) and iOS versioned staging and installStagedModel scope (E-03/ER-10). Verified by deterministic tests, routed check and vocello-swift-review.
+
+- **`RF-70`** (planned) — Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B).
+  gate: Every sample-changing candidate sits behind a pre-registered RF-57 paired machine screen with a measured self-test noise floor before takes are generated (nobody listens). In order: (1) re-screen zero-weight full-text conditioning (D1, QWENVOICE_FULL_TEXT_CONDITIONING=on) for Korean/CJK long-form under Expressive + attn; (2) screen Bundle A (attn-io, +24.12 MB zero-requantization: 8-bit talker.text_projection, talker.codec_head, code_predictor.small_to_mtp_projection and code_predictor.lm_head[0..14]); (3) screen Bundle B (attn-io-edge, +99.62 MB zero-requantization: Bundle A + 8-bit layers.{0,1,26,27}.mlp) after RF-68's memory savings; screen 8-bit code_predictor.codec_embedding (-58.7 MB) or 6-bit MLPs (Bundle C) only if BF16 requantization is separately authorized. Adopt only winners that clear their recorded rules and iPhone memory headroom (staying clear of the 5,000 MiB floor's 3,662 MiB guarded band); publishing any new model artifacts requires explicit maintainer authorization, followed by exact SHA-256 catalog/receipt updates and 3.1-to-3.2 model update proof.
+
+- **`RF-71`** (planned) — Ship Vocello and the vocello CLI 3.2 on the Mac.
+  gate: Vocello and the vocello CLI 3.2.0 are public on the Mac. Before the tag: MARKETING_VERSION 3.2.0 with a build number above the last release tag's; Mac benchmark, memory, language and UI-perf lanes recorded on the 3.2 engine (and reseeded baselines/lineage if RF-70 updates model artifacts or alters samples); docs/releases/v3.2.0.md passes check_release_notes.py; README charts, website copy/numbers and config/public-product-facts.json describe 3.2; push CI, release rehearsal, full macOS smoke and engine bench pass on the release commit. Then the maintainer's signed v3.2.0 tag builds a verified draft through release.yml; the macOS promotion lanes and signed CLI qualification pass on the tag checkout; the maintainer promotes the release and the website deploys with it.
 
 ## Specialist-audit remediation
 

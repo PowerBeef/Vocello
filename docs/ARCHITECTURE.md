@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-15
+reviewed: 2026-11-21
 summary: System architecture — engine core, the in-process request lifecycle on macOS and iOS, model management, telemetry layers, and the engine invariants each surface must preserve.
 sourceOfTruth:
   - project.yml
@@ -53,8 +53,8 @@ hardware is separately defined as Mac mini M6 16 GB (since 2026-09-22; the retir
 Release identities live in [`project.yml`](../project.yml) (`MARKETING_VERSION`,
 `CURRENT_PROJECT_VERSION`); public facts live in `config/public-product-facts.json`: the stable
 macOS release is **Vocello 3.1.0**, the Mac app with the signed `vocello` CLI package, and the iPhone
-app is a **public TestFlight beta** until its **3.1.0** App Store release (there is no 3.0 App Store
-release).
+app is a **public TestFlight beta** targeting **3.2.0** for its App Store release (there is no iOS
+3.0 or 3.1 App Store release, and no more 3.1 TestFlight builds since 2026-11-21).
 
 > For repo conventions,
 > build commands, engine invariants, and release process, read [`AGENTS.md`](../AGENTS.md).
@@ -65,9 +65,11 @@ release).
 ## 1. Module & target dependency graph
 
 The Xcode project is generated from [`project.yml`](../project.yml) (XcodeGen
-2.46.0). There are 13 targets split into **frameworks** and **apps/CLI/tests**; since
+2.46.0). There are 15 targets split into **frameworks** and **apps/CLI/tests**; since
 2026-09-15 no target is macOS-only except the app, the CLI, the CLI's `VocelloCLICore` framework
 (2026-10-19), the CLI's share of the app, `VocelloDesktopCore` (2026-10-21), and their test bundles.
+Since 2026-11-21 (`deca64ee`), `VocelloiOSPolicies` isolates pure iOS-only policies into a static
+framework linked only by `VocelloiOS`, `VocelloCoreTests` and `VocelloiOSLogicTests`.
 
 ```mermaid
 graph TD
@@ -83,6 +85,7 @@ graph TD
     QwenVoiceCore["QwenVoiceCore<br/>(engine core · iOS+macOS)"]:::fw
     QwenVoiceBackendCore["QwenVoiceBackendCore<br/>(provenance + policy vocabulary · iOS+macOS)"]:::fw
     VocelloSharedPolicies["VocelloSharedPolicies<br/>(runtime/Studio policies · iOS+macOS)"]:::fw
+    VocelloiOSPolicies["VocelloiOSPolicies<br/>(pure iOS policies · iOS+macOS host tests)"]:::fw
     VocelloCLICore["VocelloCLICore<br/>(CLI runtime + parsing · macOS)"]:::macfw
     VocelloDesktopCore["VocelloDesktopCore<br/>(the app's store, History, settings · macOS)"]:::macfw
     VocelloCoreTests["VocelloCoreTests<br/>(macOS unit tests)"]:::app
@@ -98,6 +101,7 @@ graph TD
 
     VocelloiOS --> QwenVoiceCore
     VocelloiOS --> VocelloSharedPolicies
+    VocelloiOS --> VocelloiOSPolicies
     VocelloiOS --> GRDB
 
     VocelloCLI --> VocelloCLICore
@@ -110,8 +114,10 @@ graph TD
 
     VocelloCoreTests --> QwenVoiceCore
     VocelloCoreTests --> VocelloSharedPolicies
+    VocelloCoreTests --> VocelloiOSPolicies
     VocelloCoreTests -.->|"@testable import"| VocelloCLICore
 
+    VocelloiOSPolicies --> VocelloSharedPolicies
     VocelloSharedPolicies --> QwenVoiceCore
     QwenVoiceCore --> QwenVoiceBackendCore
 
@@ -138,10 +144,12 @@ for the exact link graph.)
 | `QwenVoiceCore` | framework.static | iOS + macOS | `QwenVoiceCore` | `com.qwenvoice.core` | **Engine core**: `TTSEngine` protocol, `MLXTTSEngine`, generation semantics, runtime, memory policy, telemetry. |
 | `QwenVoiceBackendCore` | framework.static | iOS + macOS | `QwenVoiceBackendCore` | `com.qwenvoice.backend-core` | Backend provenance, generation defaults and policy vocabulary, finish reason, and the minimal synthesis abstraction. MLX loading, synthesis, and codecs live in `QwenVoiceCore` and the owned Qwen3 runtime. |
 | `VocelloSharedPolicies` | framework.static | iOS + macOS | `VocelloSharedPolicies` | `com.qwenvoice.shared-policies` | Pure platform-neutral runtime-release, generation-ownership, Studio attempt-authority, foreground-exit, retry-policy, handoff and notification types compiled once instead of 4-5x by path across `QwenVoice`, `VocelloiOS`, `VocelloDesktopCore`, `VocelloCoreTests` and `VocelloiOSLogicTests` (P2-3 / DW-03). |
+| `VocelloiOSPolicies` | framework.static | iOS + macOS | `VocelloiOSPolicies` | `com.patricedery.vocello.ios-policies` | Pure iOS-only policies (device eligibility, storage protection, download ledger, background `URLSession` completion coordinator, attribution manifest, upgrade/Make Room decisions) linked only by `VocelloiOS`, `VocelloCoreTests` and `VocelloiOSLogicTests` with zero link on `QwenVoice` or `VocelloCLI` (Wave 4 / DW-03). |
 | `VocelloCoreTests` | bundle.unit-test | macOS | `VocelloCoreTests` | `com.qwenvoice.core.tests` | Core semantics, typed telemetry compatibility, atomic/readable output contracts, the host-runnable iOS policy assertions from `Tests/VocelloiOSLogicTests`, which this target also compiles, and the shared orchestrators compiled by path (engine store over a fake engine, Studio coordinator, History database service, export gate, iPhone model inventory, long-form coordinator and runner). |
 | `VocelloiOSLogicTests` | bundle.unit-test | iOS | `VocelloiOSLogicTests` | `com.patricedery.vocello.logic-tests` | Duplicate standalone, app-host-free platform policy compile for catalog/ledger, memory, cancellation, storage gating, and privacy-safe diagnostics. Ordinary CI compiles this bundle for the physical-device SDK. Xcode 27 (`27.2`) does not support executing a tool-hosted app-free bundle on a physical-device destination, so this target is compile-only; its shared assertions execute in `VocelloCoreTests`. |
 | `VocelloMacUITests` | bundle.ui-testing | macOS | `VocelloMacUITests` | `com.qwenvoice.app.uitests` | Explicit native-app smoke and benchmark XCUITest lanes. |
-| `VocelloiOSUITests` | bundle.ui-testing | iOS | `VocelloiOSUITests` | `com.patricedery.vocello.uitests` | Explicit paired-physical-iPhone smoke/benchmark lanes plus the isolated opt-in model-delivery lifecycle proof; never Simulator. |
+| `VocelloiOSUITests` | bundle.ui-testing | iOS | `VocelloiOSUITests` | `com.patricedery.vocello.uitests` | Explicit paired-physical-iPhone smoke, localization, perf and benchmark lanes plus the isolated opt-in model-delivery lifecycle proof (`queue`, `upgrade`, `acceptance`); never Simulator. |
+| `VocelloiOSPurchaseUITests` | bundle.ui-testing | iOS | `VocelloiOSPurchaseUITests` | `com.patricedery.vocello.purchaseuitests` | Opt-in local StoreKit purchase XCUITest runner over `SKTestSession` (`VocelloExports.storekit`); the sole owned target with `SWIFT_TREAT_WARNINGS_AS_ERRORS: NO` due to `StoreKitTest` SDK header deprecations. |
 | `VocelloiOSCandidateUITests` | bundle.ui-testing | iOS | `VocelloiOSCandidateUITests` | `com.patricedery.vocello.candidateuitests` | Standalone black-box runner; no target-app dependency, no diagnostics, and no replacement of the preinstalled distribution app. |
 
 ### Testing lanes (see [`docs/reference/testing-runbook.md`](reference/testing-runbook.md))
@@ -189,23 +197,23 @@ worktree lock state. Join or stop delegated work before measured lanes; when lif
 is unavailable, use lead-only execution. See [`reference/development-workflow.md`](reference/development-workflow.md)
 for the operational sequence and hook trust limitations.
 
-**Seven shared schemes**: the five XcodeGen schemes, `QwenVoice` (macOS app + deterministic unit/integration tests), `VocelloiOS`
-(iOS app), `VocelloMacUI` (explicit macOS XCUITest), and `VocelloiOSUI` (explicit physical-device
-iOS XCUITest), and `VocelloiOSCandidateUI` (standalone preinstalled-candidate runner), plus the separately rendered `VocelloCLI` and `VocelloiOSLogic` (standalone iOS
+**Eight shared schemes**: the six XcodeGen schemes, `QwenVoice` (macOS app + deterministic unit/integration tests), `VocelloiOS`
+(iOS app), `VocelloMacUI` (explicit macOS XCUITest), `VocelloiOSUI` (explicit physical-device
+iOS XCUITest), `VocelloiOSPurchaseUI` (local StoreKit purchase XCUITest), and `VocelloiOSCandidateUI` (standalone preinstalled-candidate runner), plus the separately rendered `VocelloCLI` and `VocelloiOSLogic` (standalone iOS
 policy XCTest) schemes. XcodeGen cannot directly render those tool and app-host-free test
 schemes (verified unchanged through 2.46.0), so checked-in templates bind to their generated target IDs. The UI schemes are isolated from ordinary test actions; ordinary CI executes the shared
 policy assertions through `VocelloCoreTests`, compiles `VocelloiOSLogic` for the generic device SDK,
-and never executes that standalone bundle; it compiles the `VocelloMacUI` and `VocelloiOSUI` bundles
-(build-for-testing) and never executes them either. A single shippable config,
+and never executes that standalone bundle; it compiles all four UI test bundles (`VocelloMacUI`, `VocelloiOSUI`, `VocelloiOSPurchaseUI`, `VocelloiOSCandidateUI`, build-for-testing) and never executes them either. A single shippable config,
 **`Release`**, is the only config — there is no `Debug` config or generic `DEBUG` symbol.
 
 ### Key layering rule
 
-`QwenVoiceBackendCore` ← `QwenVoiceCore` ← `VocelloSharedPolicies` ← `{apps, VocelloDesktopCore ← VocelloCLICore ← CLI}`.
+`QwenVoiceBackendCore` ← `QwenVoiceCore` ← `VocelloSharedPolicies` ← `{VocelloiOSPolicies ← VocelloiOS, QwenVoice, VocelloDesktopCore ← VocelloCLICore ← CLI}`.
 BackendCore is a narrow, dependency-light contract/provenance layer; `QwenVoiceCore` and the owned
 Qwen3 runtime implement model loading, synthesis, streaming, and codecs; `VocelloSharedPolicies`
 compiles pure multiplatform runtime, Studio, ownership and retry policies once for both apps,
-desktop core and unit tests. Every host reaches the engine in-process through
+desktop core and unit tests, while `VocelloiOSPolicies` keeps pure iOS-only policies linked strictly
+into the iOS app and test targets. Every host reaches the engine in-process through
 `QwenVoiceCore` alone; the platform differences live in the bootstraps
 (`MacEngineBootstrap`, `QVoiceiOSApp.makeBackend`, `CLIRuntime`), never in a second engine module.
 

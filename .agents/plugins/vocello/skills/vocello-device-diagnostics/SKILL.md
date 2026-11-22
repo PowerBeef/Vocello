@@ -11,9 +11,10 @@ Read `docs/reference/ios-device-testing.md` and `docs/reference/native-engineeri
 `scripts/ios_device.sh help` to select its current verb; begin with `doctor`, `preflight`, or
 `device-state --json-v2` when the environment is uncertain. Prefer retained logs and crashes first.
 Run only the relevant `scripts/ios_device.sh <verb> <options>` (for profiling, use
-`profile --kind cpu|memory|metal|witness`, where `metal` captures an Instruments Metal System Trace
-and `witness` captures an untimed signpost witness, and analyze retained `.trace` bundles with
-`axiom_xcprof_analyze`); this driver is headless, not a native UI driver.
+`profile --kind cpu|memory|metal|witness` over wired USB — Wi-Fi CoreDevice drops `xctrace` — where
+`metal` captures an Instruments Metal System Trace and `witness` captures an untimed signpost
+witness, and analyze retained `.trace` bundles with `axiom_xcprof_analyze`); this driver is
+headless, not a native UI driver.
 
 Use a quiet committed checkpoint for measured `bench`, `lang-bench`, `memory`, and `profile` lanes
 (all build `-O wholemodule` in the optimized iOS arena), after joining all subagents

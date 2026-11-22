@@ -5,7 +5,7 @@ description: Read-only assessment of a tag or candidate against exact-source CI,
 
 # Release readiness (read-only)
 
-Apply this procedure to the tag or candidate (for example `v3.1.0`) the user asked for.
+Apply this procedure to the tag or candidate (for example `v3.2.0` or `v3.2.0-ios.1`) the user asked for.
 
 Read `docs/reference/quality-promotion.md`, `docs/reference/macos-release-qa.md`,
 `docs/reference/ios-appstore-submission.md` and `docs/reference/tooling-and-evidence.md`. Require or

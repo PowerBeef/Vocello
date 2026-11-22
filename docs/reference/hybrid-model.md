@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-15
+reviewed: 2026-11-21
 summary: Vocello's hybrid (mixed-precision) Qwen3-TTS model, RF-55 — the recipe and why, how it is built from the two 3.0 artifacts, the identity proof, the evidence that chose it, how it was delivered, and what one model means for the backend.
 sourceOfTruth:
   - scripts/build_hybrid_model.py
@@ -237,9 +237,14 @@ view: `attn` replaces both Speed and Quality, and the selector goes (RF-59). Its
 - **Tooling.** The publisher reads a hybrid's quantization as the runtime does (4-bit, its config's
   top-level bits), and quality promotion's `quality-generation` capability applies nowhere.
 
-**Left:** the iPhone's memory, speed and footprint bands and the benchmark baselines.
+**iPhone qualification & next steps (2026-11-21):** Wave 5 measured the shipped `attn` hybrid on
+the canonical iPhone 17 Pro (`5cc8ed43`: UI benchmark 29/29 PASS in `f1e8631c`, retained memory 9/9
+PASS with 0 MB retained growth in `c2b75046` — warm Custom 1,969 MB, Design 1,949 MB, Clone 2,503 MB /
+3,584 MB cold peak; `cloneCapableMinimumProcessLimitBytes` aligned to 4,779 MiB in `1d8397f6`).
 `config/public-product-facts.json`, the README and the website moved to the one model with the 3.1
-publication (RF-61). RF-58 (one take variation, Expressive) landed first.
+Mac/CLI publication (RF-61). RF-58 (one take variation, Expressive) landed first. Further hybrid
+refinements (Pack C: `RF-70`, zero-weight Korean `D1`, Bundle A `+24.12 MB`, Bundle B `+99.62 MB`)
+sit behind `RF-57` machine screens ahead of the 3.2 release and 3.2.0 iOS App Store submission.
 
 ## 7. Licence and attribution
 
@@ -270,6 +275,7 @@ manifest (`scripts/attribution_manifest.py rebuild`) follows the catalog and
 The manifest carries the same fields for each model, and the tool refuses an entry whose base or
 parent is not pinned to an exact revision, or that carries no `redistributionDecision`. That decision
 reads `pending-qualified-review` for all three hybrids, as it did for the 3.0 artifacts when they
-shipped: it is a standing item, not a change of 3.1. The iPhone's Open Source Licenses screen reads
-`baseRepo` and `baseRevision` only, so it shows the 4-bit base; the 8-bit base is in the bundled
-manifest and not yet on that screen.
+shipped: it is a standing item, not a change of 3.1. Since `f269200d` (Pack A `RB-11`, extracted
+into `VocelloiOSPolicies` and visually verified on iPhone 17 Pro in `6da29045`), the iPhone's Open
+Source Licenses screen renders `baseRepo`/`baseRevision`, `additionalBases` (the 8-bit parent), and
+`builtFrom` lineage directly from the bundled manifest.

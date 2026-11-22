@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-11-10
+reviewed: 2026-11-21
 summary: iOS physical-device testing — deterministic compile lanes, device preparation, explicit XCUITest lanes (smoke, candidate rows, purchase, control audit, perf), pause and resume, headless diagnostics and retained evidence.
 sourceOfTruth:
   - scripts/ios_device.sh
@@ -25,7 +25,8 @@ the maintainer's, by hand ([below](#checks-xcuitest-does-not-cover)).
 
 ```sh
 scripts/dev.sh check                # advisory local loop; the commit lint is the only local block
-scripts/dev.sh ios                  # ./scripts/build_foundation_targets.sh ios --incremental (phone-free generic compile)
+scripts/dev.sh ios [--fast] [--ui]  # phone-free generic device-SDK compile (--fast owned -Onone, --ui XCUITest bundles)
+scripts/dev.sh test --ios           # run all VocelloiOSLogicTests classes on the macOS host
 ./scripts/check_project_inputs.sh   # the deterministic contract gate on its own
 ```
 
@@ -197,6 +198,7 @@ scripts/ui_test.sh ios perf [--label RUN_ID]
 # Explicit isolated background-transfer diagnostics, not a normal UI lane:
 scripts/ui_test.sh ios model-download --scenario diagnose
 scripts/ui_test.sh ios model-download --scenario queue
+scripts/ui_test.sh ios model-download --scenario upgrade
 scripts/ui_test.sh ios model-download --scenario acceptance
 scripts/ui_test.sh ios model-download --scenario soak --iterations 3
 scripts/ui_test.sh ios model-download --scenario recover
@@ -639,7 +641,9 @@ runs do not qualify new source or guarantee Xcode bootstrap reliability.
 
 ### UI-performance lane (`ios perf`)
 
-The probe writes `frames-<launchEpochMS>-<scenario>.jsonl` to the devicectl-pullable
+`VocelloiOSPerfUITests` runs 12 snapshot-free scripted scenarios at parity with macOS (7 confirmatory
+scenarios plus `ios-harness-control`, `ios-history-filter`, `ios-history-filter-paged`,
+`ios-player-scrub` and `ios-generation-active`). The probe writes `frames-<launchEpochMS>-<scenario>.jsonl` to the devicectl-pullable
 `<app container>/Library/Caches/Vocello/diagnostics/ui-perf/` tree; markers travel through the on-device test
 runner's stdout into `xcodebuild.log`, so marker and probe share the device clock. The
 `perf-validation` step pulls diagnostics and runs `scripts/check_ios_ui_perf.py`, which
@@ -655,13 +659,13 @@ measure (the macOS history-scroll baseline of 456 ms/s hitch — ~33 Hz effectiv
 canonical example). Artifacts: `ui-perf-report.json` and `ui-perf-gate.txt` under the run
 directory, probe JSONL under `diagnostics/ui-perf/`. **Copy
 `ui-perf-report.json` out of the run directory after any counted baseline that did not use
-`--retain-result`. For a multi-run campaign, prefer `--retain-result`: it preserves the complete
+`--retain-result`.** For a multi-run campaign, prefer `--retain-result`: it preserves the complete
 run bundle until the evidence set closes, while compact PASS history remains the durable tracked
-record. Warn-only ceilings live in
-`config/ui-perf-thresholds-ios.json` (IUI-6, derived from the three counted
-sessions; a breach marks the scenario and run `passedWithWarnings`, never
-failed), and on the canonical iPhone profile a PASS emits registry evidence
-and publishes a platform-`ios` `ui-perf` record — the macOS UI-7 twin
+record. `spread-v1` ceilings live in `config/ui-perf-thresholds-ios.json` (calibrated 2026-11-21
+from three counted `iphone-17-pro` runs, closing `AV-14`); breaches on the seven enforced
+confirmatory scenarios fail the run (exit 1, no evidence published), while non-enforced/exploratory
+scenarios stay warn-only or unceilinged. On the canonical iPhone profile a PASS emits registry
+evidence and publishes a platform-`ios` `ui-perf` record — the macOS UI-7 twin
 ([iOS UI refresh audit](../audits/2026-08-29-ios-ui-refresh.md)).
 
 ## Pause and resume
@@ -944,21 +948,29 @@ installing or launching the app unless `xcrun xctrace list devices` reports that
 the unreliable physical-device Darwin-notification callback. Any target suspended by a later failure
 is terminated automatically.
 
-For allocation and VM evidence, use the Instruments memory profile:
+For allocation/VM, Metal GPU, or signpost-witness evidence (wired USB required — Wi-Fi CoreDevice
+drops `xctrace` immediately on iOS 27.2.1), use the Instruments profile kinds:
 
 ```sh
 scripts/ios_device.sh profile --kind memory custom:speed:
+scripts/ios_device.sh profile --kind metal custom:speed:
+scripts/ios_device.sh profile --kind witness custom:speed:
 ```
 
-This keeps CPU Profiler and correlated `os_signpost` data while adding Allocations and VM Tracker in
-the same exact-PID trace through Apple's Allocations template, whose VM Tracker takes no automatic
-snapshots; publication checks that setting in the captured trace, as on the Mac (audit #51). Every
-iPhone profile stops recording once its take's sentinel appears rather than at the time limit
-(audit #52). The lane forces verbose run-scoped samples. New publishable device runs require
-telemetry schema v8 and evidence manifest v2: exact start/periodic/boundary/stop sidecars, summary
-agreement, zero capture failures, and no gap between samples above the policy's unobserved-gap bound
-(twice the sampler cadence, at least 1,000 ms on the iPhone until an iPhone record calibrates it;
-`config/memory-qualification-policy.json`). Critical
+`--kind memory` keeps CPU Profiler and correlated `os_signpost` data while adding Allocations and
+VM Tracker in the same exact-PID trace through Apple's Allocations template, whose VM Tracker takes
+no automatic snapshots; publication checks that setting in the captured trace, as on the Mac (audit
+#51). `--kind metal` records `Metal System Trace` + `os_signpost` (keeping raw traces by default
+like `memory`, inspectable via `axiom_xcprof_analyze`); `--kind witness` captures a signpost-only
+timing witness. Every iPhone profile stops recording once its take's sentinel appears rather than at
+the time limit (audit #52). The lane forces verbose run-scoped samples. New publishable device runs
+require telemetry schema v8 and evidence manifest v2: exact start/periodic/boundary/stop sidecars,
+summary agreement, zero capture failures, and no gap between samples above the policy's
+unobserved-gap bound (twice the sampler cadence, calibrated on iPhone 17 Pro to `500 ms` with
+`retainedMemoryV2.calibration.ios` `growthLimitMB = 16.0` in `config/memory-qualification-policy.json`
+on 2026-11-21; malloc-stack instrumentation under `--kind memory` can exceed the uninstrumented 500 ms
+gap during cold load, in which case the raw trace is still retained locally while publication rejects
+the uncalibrated gap). Critical
 pressure, an app memory warning/exit, `hardTrim`, or `fullUnload` fails publication; guarded pressure
 or `softTrim` is explicit warning evidence. The exception is the routine post-generation cache clear the
 iPhone tier runs after every take (source `post-generation`, reason `post_generation_cache_clear`):

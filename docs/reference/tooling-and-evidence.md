@@ -2,7 +2,7 @@
 status: active
 owner: release-qa
 summary: Tooling, CI, packaging, benchmark and evidence rule; Antigravity loads it on demand through .agents/plugins/vocello/rules/tooling.md when matching files are touched.
-reviewed: 2026-11-20
+reviewed: 2026-11-21
 paths:
   - "scripts/**"
   - ".github/**"
@@ -40,7 +40,8 @@ rules they enforce:
   (`config/tsan-policy.json`). A failing nightly lane keeps one open `nightly` issue; the nightly's
   report-only jobs and `xcode-preview.yml` gate nothing and file no issue.
 - Ordinary CI never executes XCUITest, a model or a device. It compiles `VocelloiOS`, the policy-test
-  bundle and the three XCUITest bundles and runs the macOS deterministic bundles; `repo_invariants.sh`
+  bundle and all four XCUITest bundles (`VocelloMacUI`, `VocelloiOSUI`, `VocelloiOSPurchaseUI`,
+  `VocelloiOSCandidateUI`) and runs the macOS deterministic bundles; `repo_invariants.sh`
   check 2 forbids execution in any workflow (`test-without-building`, `scripts/ui_test.sh`, an
   `xcodebuild`/`xcb_run` `test` action), not compilation.
 - Generated files (`docs/ROADMAP.md`, the documentation index `docs/INDEX.md`, the production model
@@ -199,7 +200,11 @@ rules they enforce:
   outside the confirmatory set. The committed `enforce` list in `config/ui-perf-thresholds.json`
   enforces seven macOS scenarios (`idle-baseline`, `sidebar-navigation`, `delivery-menu`,
   `settings-scroll`, `composer-typing`, `history-filter`, `history-filter-paged`), while
-  `history-scroll`, `window-resize` and `sidebar-navigation-warms` remain warn-only. A recalibration derives the
+  `history-scroll`, `window-resize` and `sidebar-navigation-warms` remain warn-only; on iOS,
+  `config/ui-perf-thresholds-ios.json` (`scripts/check_ios_ui_perf.py`) enforces all seven
+  confirmatory scenarios (`ios-idle-baseline`, `ios-tab-navigation`, `ios-history-scroll`,
+  `ios-voices-scroll`, `ios-settings-scroll`, `ios-composer-typing`, `ios-sheet-present-dismiss`,
+  calibrated 2026-11-21 under `AV-14`). A recalibration derives the
   ceilings from the run-to-run spread of at least three counted runs with a 1.25-1.3x floor
   (`--derive-thresholds`, with `--scenarios` for a list other than the confirmatory one). A run off
   the contract's calibration profile or refresh interval, or under a contract marked

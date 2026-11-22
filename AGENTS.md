@@ -41,23 +41,29 @@ and re-render in one call. `docs/ARCHITECTURE.md` traces ownership and lifecycle
 
 ## Architecture
 
-- **Targets** (`project.yml`, Release only, macOS/iOS 26.0, Swift 6, warnings as errors except the iOS
-  UI-test bundle; strict memory safety, NonisolatedNonsendingByDefault, InferIsolatedConformances and
-  MemberImportVisibility on): `QwenVoice` (macOS app `Vocello.app`), `VocelloiOS` (module
-  `QVoiceiOS`), `VocelloCLI` (`vocello`); static frameworks `QwenVoiceCore` (product engine),
-  `QwenVoiceBackendCore` (provenance/policy vocabulary), `VocelloSharedPolicies` (pure multiplatform
-  runtime/Studio/ownership/retry policies compiled once for both apps, desktop core and unit tests),
-  `VocelloDesktopCore` (the Mac app's UI-free
-  History, settings, engine store, long-form and line-batch logic, compiled by path for the CLI) and
-  `VocelloCLICore` (the CLI's runtime and parsing, which the tests import instead of compiling by
-  path); `VocelloCoreTests` (macOS host for core and iOS-logic tests), compile-only
-  `VocelloiOSLogicTests`, and three XCUITest bundles. The macOS app compiles the remaining shared
-  `Sources/iOS` and `Sources/iOSSupport` files by path; that shared code, not a shared data folder,
-  is the "shared store".
-- **Layering:** `QwenVoiceBackendCore` ← `QwenVoiceCore` ← `VocelloSharedPolicies` ← {apps,
-  `VocelloDesktopCore` ← `VocelloCLICore` ← CLI}. Platform differences live only in the bootstraps (`MacEngineBootstrap`,
-  `IOSAppBootstrap`, `CLIRuntime`), which all call `NativeRuntimeFactory.make`. Never reintroduce a
-  separate engine process.
+- **Targets** (`project.yml`, 15 targets, Release only, macOS/iOS 26.0, Swift 6, warnings as errors
+  on all owned targets except `VocelloiOSPurchaseUITests`, whose `StoreKitTest` SDK module header
+  deprecates `SKPaymentTransactionState`; strict memory safety, `NonisolatedNonsendingByDefault`,
+  `InferIsolatedConformances` and `MemberImportVisibility` on): `QwenVoice` (macOS app
+  `Vocello.app`), `VocelloiOS` (module `QVoiceiOS`), `VocelloCLI` (`vocello`); static frameworks
+  `QwenVoiceCore` (product engine), `QwenVoiceBackendCore` (provenance/policy vocabulary),
+  `VocelloSharedPolicies` (pure multiplatform runtime/Studio/ownership/retry policies compiled once
+  for both apps, desktop core and unit tests), `VocelloiOSPolicies` (pure iOS-only policies —
+  eligibility, storage protection, download ledger, background session completion, attribution —
+  linked only by `VocelloiOS`, `VocelloCoreTests` and `VocelloiOSLogicTests`, zero link on macOS
+  app/CLI), `VocelloDesktopCore` (the Mac app's UI-free History, settings, engine store, long-form
+  and line-batch logic, compiled by path for the CLI) and `VocelloCLICore` (the CLI's runtime and
+  parsing, which the tests import instead of compiling by path); `VocelloCoreTests` (macOS host for
+  core and iOS-logic tests), compile-only `VocelloiOSLogicTests`, and four XCUITest bundles
+  (`VocelloMacUITests`, `VocelloiOSUITests`, `VocelloiOSPurchaseUITests`,
+  `VocelloiOSCandidateUITests`). The macOS app compiles the remaining shared `Sources/iOS` and
+  `Sources/iOSSupport` files by path; that shared code, not a shared data folder, is the "shared
+  store".
+- **Layering:** `QwenVoiceBackendCore` ← `QwenVoiceCore` ← `VocelloSharedPolicies` ←
+  {`VocelloiOSPolicies` ← `VocelloiOS`, `QwenVoice`, `VocelloDesktopCore` ← `VocelloCLICore` ← CLI}.
+  Platform differences live only in the bootstraps (`MacEngineBootstrap`, `IOSAppBootstrap`,
+  `CLIRuntime`), which all call `NativeRuntimeFactory.make`. Never reintroduce a separate engine
+  process.
 - **Generation flow:** view → coordinator (`StudioGenerationCoordinator`, attempt tokens) →
   `IOSSingleTakeGenerationExecutor` (the one short-form executor; long-form and Mac line batches have
   their own runners) → `TTSEngineStore.generate` (admission) → `MLXTTSEngine` (typed cancellation,
@@ -93,12 +99,12 @@ scripts/dev.sh check --dry-run --json # the routed plan check would run
 scripts/dev.sh check                  # lint, contracts, selected tests, touched native lanes
 scripts/dev.sh check --since <ref>    # also everything committed since <ref>
 scripts/dev.sh check --paths <p...>   # plan, lint and gate only these paths while unrelated dirty work waits
-scripts/dev.sh test --only Class      # targeted XCTest (also Class/testMethod and A,B); --repeat N hunts flakes
+scripts/dev.sh test --only Class      # targeted XCTest (also Class/testMethod, A,B, --ios for iOS logic); --repeat N hunts flakes
 scripts/dev.sh py scripts/tests/test_x.py::Class::test_y   # selected pytest node ids
 scripts/dev.sh qc <args...>           # QC v2 harness (scripts/qc.py) on the selected Python
 "$(python3 scripts/select_python.py)" -m pytest scripts/tests/test_x.py -k expr  # -k: not in dev.sh py
 scripts/dev.sh build | run            # warm incremental macOS development build / launch
-scripts/dev.sh ios                    # generic device-SDK compile; no phone involved
+scripts/dev.sh ios [--fast] [--ui]    # generic device-SDK compile (no phone; --fast owned -Onone, --ui XCUITest bundles)
 scripts/dev.sh regen                  # derived artifacts, and the project when its inputs changed
 scripts/dev.sh triage <run-dir> --json  # summarize retained evidence without rerunning
 ```
@@ -124,6 +130,9 @@ Lanes, learned on the 3.1 run (2026-11-14):
   move for it (decision of 2026-11-15).
 - **The website check needs Playwright's browsers** (`npx playwright install chromium webkit`, a
   download: ask). The `browser` subagent is a stand-in, not the verdict.
+- **iPhone Instruments (`xctrace`) needs wired USB** (`scripts/ios_device.sh profile --kind
+  cpu|memory|metal|witness`; Wi-Fi CoreDevice disconnects Instruments immediately). Multi-run
+  `ui_test.sh --no-publish` calibrations need `--retain-result` so result pruning keeps prior runs.
 - **Read a lane's `--help` before passing options.**
 
 ## Hard boundaries

@@ -2,7 +2,7 @@
 status: active
 owner: release-qa
 reviewed: 2026-11-21
-summary: App Store listing draft for Vocello for iPhone 3.1.0 (en-US), updated from the 2026-11-01/10 App Store Connect 3.0.0 entry for the 3.1.0 hybrid model sizes and free-space requirements. Pushing updates to App Store Connect needs a separate explicit request.
+summary: App Store listing draft for Vocello for iPhone 3.2.0 (en-US), reconciled from the 2026-11-01/10 App Store Connect 3.0.0 entry against the shipped 3.1.0 hybrid baseline (to be reconciled again if RF-70 updates model sizes before 3.2.0 submission). Pushing updates to App Store Connect needs a separate explicit request.
 sourceOfTruth:
   - config/public-product-facts.json
   - Sources/Resources/qwenvoice_contract.json
@@ -12,20 +12,21 @@ sourceOfTruth:
   - docs/releases/v3.1.0.md
   - docs/reference/content-rights-review.md
 ---
-# App Store listing: Vocello for iPhone 3.1.0 (en-US)
+# App Store listing: Vocello for iPhone 3.2.0 (en-US)
 
-**Status: 3.1.0 draft reconciled with `main` (App Store Connect still holds the 2026-11-10 3.0.0 entry until an explicit update request).**
+**Status: 3.2.0 target draft reconciled with `main`'s 3.1.0 `attn` hybrid baseline (App Store Connect still holds the 2026-11-10 3.0.0 entry until an explicit update request; re-check byte counts if `RF-70` adopts a new hybrid artifact before submission).**
 On 2026-11-01 (ASR-05), at the maintainer's request, the subtitle "Local AI voice studio", the
 promotional text, description, keywords and marketing URL, and the App Review contact and notes were
 entered in App Store Connect on version 3.0.0 and read back byte-identical. On 2026-11-02 (iPhone 15
 Pro floor), 2026-11-04 ([App Review readiness audit](../audits/2026-11-04-app-review-readiness.md)
 Safeguards paragraph), and 2026-11-10 (RF-41 download confirmation and RF-42 iPad refusal on build 30),
-the listing and review notes were updated and read back byte-identical. Since 2026-11-14 there is no
-iPhone 3.0 App Store release: iPhone submits directly as **3.1.0** (`project.yml` `MARKETING_VERSION`
-3.1.0, `artifactVersion` `2026.11.13.1` hybrid models). The copy below is updated for 3.1.0's exact
-model byte counts and storage headroom so it matches the live 3.1.0 app UI before being written to
-App Store Connect. Any change to App Store Connect requires a separate, explicit maintainer request;
-keep this file and App Store Connect in step.
+the listing and review notes were updated and read back byte-identical. By the maintainer's 2026-11-21
+decision there is no iPhone 3.0 or 3.1 App Store release and no more 3.1 TestFlight builds: iPhone
+submits directly as **3.2.0** after Pack B (`RF-68`, `RF-69`) and Pack C (`RF-70`) land. The copy
+below currently reflects `main`'s `artifactVersion` `2026.11.13.1` hybrid model byte counts and
+storage headroom, and will be reconciled with any `RF-70` artifact update before being written to App
+Store Connect. Any change to App Store Connect requires a separate, explicit maintainer request; keep
+this file and App Store Connect in step.
 
 The copy follows `website/PRODUCT.md`:
 - it says local, not on-device;
@@ -43,7 +44,7 @@ Apple's limit.
 | Subtitle (30) | Local AI voice studio | 21. Alternatives: "Text to speech, made locally" (28), "Private AI text to speech" (25). |
 | Privacy Policy URL | https://vocello.vercel.app/privacy | Already set; matches the runbook. |
 
-## Version 3.1.0
+## Version 3.2.0
 
 ### Promotional text (170)
 
@@ -105,7 +106,7 @@ names only descriptively.
 App Store Connect may not offer this field on an app's first App Store version. If it does:
 
 ```text
-Vocello 3.1 runs on a local engine shared with the Mac app with one improved model per mode. Built-in Voice and Voice Design takes read the whole script before they speak, every generated take is marked as AI-generated, a take's seed can be pinned from History, the interface is available in ten languages, and imported Clone references are reviewed before they are saved.
+Vocello 3.2 runs on a local engine shared with the Mac app with one improved model per mode. Built-in Voice and Voice Design takes read the whole script before they speak, every generated take is marked as AI-generated, a take's seed can be pinned from History, the interface is available in ten languages, and imported Clone references are reviewed before they are saved.
 ```
 
 ## App Review notes (4000)

@@ -25,19 +25,22 @@ XCUITest evidence. External TestFlight distribution, App Review submission, and 
 release require the exact-tag iOS manifest in
 [`quality-promotion.md`](quality-promotion.md).
 
-**Current state (2026-11-21):** Since 2026-11-14 there is no iPhone 3.0 App Store release — the Mac
-app and `vocello` CLI shipped 3.1.0 (`v3.1.0`), and iPhone submits directly as **3.1.0** (`project.yml`
-`MARKETING_VERSION` 3.1.0). `release.yml` archived, verified and uploaded the historical 3.0.0 train
-(ASR-10 closed on build 24; builds 26 and 27 remain in the 3.0 Public Beta under the maintainer's RF-17
-waiver; build 30 `v3.0.0-ios.9` is superseded) and has uploaded internal 3.1.0 candidates
-(`v3.1.0-ios.1` through `v3.1.0-ios.3`, build 33 `VALID` in TestFlight). The checkpoint
-([`../development-progress.md`](../development-progress.md), Resume now) owns the live candidate
-state. The App Review submission waits for the iPhone-window checks (`RF-35`, `RF-41`, `RF-42`),
-exact-tag iOS promotion (`RF-17`), the open release items, and the maintainer's go (`RF-16`). The
-[App Review readiness audit](../audits/2026-11-04-app-review-readiness.md) is the historical 3.0 review
-baseline. Any App Store Connect metadata change (including bumping the App Store Connect version record
-from 3.0.0 to 3.1.0 and pasting the updated [`app-store-listing.md`](app-store-listing.md) copy), upload
-or submission still needs its own explicit authorization.
+**Current state (2026-11-21):** Mac and `vocello` CLI shipped **3.1.0** (`v3.1.0`, `RF-61`) on
+2026-11-17. By the maintainer's 2026-11-21 decision, there are **no more 3.1 TestFlight builds** and
+no iPhone 3.0 or 3.1 App Store release: **3.2.0** (`v3.2.0-ios.N` candidates) is the new target for
+the iOS App Store submission after Pack B (`RF-68`, `RF-69`) and `RF-57`-screened Pack C (`RF-70`)
+land (`project.yml` remains at `3.1.0` until the 3.2 version bump). `release.yml` archived, verified
+and uploaded the historical 3.0.0 train (ASR-10 closed on build 24; builds 26 and 27 remain in the
+3.0 Public Beta under the maintainer's RF-17 waiver; build 30 `v3.0.0-ios.9` is superseded) and
+internal 3.1.0 candidates (`v3.1.0-ios.1` through `v3.1.0-ios.3`, build 33 `VALID` in TestFlight,
+now superseded). The checkpoint ([`../development-progress.md`](../development-progress.md), Resume
+now) owns the live candidate state. The App Review submission waits for `RF-68`..`RF-70`, the 3.2.0
+candidate upload (`RF-12`), the iPhone-window checks (`RF-35`, `RF-41`, `RF-42`, `RF-15`), exact-tag
+iOS promotion (`RF-17`), the open release items, and the maintainer's go (`RF-16`). The
+[App Review readiness audit](../audits/2026-11-04-app-review-readiness.md) is the historical 3.0
+review baseline. Any App Store Connect metadata change (including bumping the App Store Connect
+version record from 3.0.0 to 3.2.0 and pasting the reconciled [`app-store-listing.md`](app-store-listing.md)
+copy), upload or submission still needs its own explicit authorization.
 Physical-device XCUITest runs separately at coherent checkpoints; CI and archive packaging are
 deterministic-only ([`testing-runbook.md`](testing-runbook.md)). Local development builds derive the
 signing team from the keychain's Apple Development certificate (`scripts/ios_device.sh`).
@@ -71,9 +74,10 @@ download it automatically.
 - [x] App record exists in App Store Connect for `com.patricedery.vocello`, with one `en-US`
       localization. Version 3.0.0 (Prepare for Submission) replaced the unreleased 1.0 draft on
       2026-10-12, in category Productivity (secondary Utilities since 2026-11-04) (RF-02), and will be
-      updated to **3.1.0** on explicit maintainer request ahead of submission. The 3.0.0 train held
-      builds 24–27 and 29–30; the 3.1.0 train holds internal candidates `v3.1.0-ios.1`–`v3.1.0-ios.3`
-      (build 33). Every new candidate needs an unused build number (§4, ASR-08).
+      updated to **3.2.0** on explicit maintainer request ahead of submission. The 3.0.0 train held
+      builds 24–27 and 29–30 and the superseded internal 3.1.0 train held `v3.1.0-ios.1`–`v3.1.0-ios.3`
+      (build 33); the next candidate train is `v3.2.0-ios.N`. Every new candidate needs an unused build
+      number (§4, ASR-08).
 - [x] App Store installation eligibility is as close to the app's runtime hardware floor as the
       capability allows. The built bundle requires exactly `arm64` and Apple's
       `iphone-performance-gaming-tier`; the runtime guard independently enforces iPhone 15 Pro or
@@ -91,7 +95,7 @@ download it automatically.
 Built-in output export. The StoreKit entitlement owner and output-provenance export boundary are
 implemented, and the local StoreKit exports scenario passed (RF-13). The product has en-US,
 fr-CA and fr-FR names and descriptions. Still open:
-- the Paid Apps agreement and its banking and tax steps, which are the maintainer's (RF-02); 3.1
+- the Paid Apps agreement and its banking and tax steps, which are the maintainer's (RF-02); 3.2
   ships outside the EU initially, so the EU trader step waits for the EU release (BKL-41);
 - the product's review screenshot and the purchase checks on the processed TestFlight build (RF-12);
 - review, which happens with the first submission.

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-20
+reviewed: 2026-11-21
 summary: Setting up a new Mac, the local edit loop, the commit lint and how push CI routes lanes; scripts/dev.sh is the interface and CI on main is the gate.
 sourceOfTruth:
   - scripts/dev.sh
@@ -224,7 +224,7 @@ xcode-build-server, its config can target the warm `build/cache/xcode/macos` are
 scripts/dev.sh check --dry-run       # what the dirty tree needs
 scripts/dev.sh check                 # lint, contracts, selected Python tests, native lanes touched
 scripts/dev.sh check --since origin/main  # the same over an unpushed batch of commits
-scripts/dev.sh test --only FooTests  # one XCTest class on the incremental test build
+scripts/dev.sh test --only FooTests  # one XCTest class on the incremental test build (--ios runs all VocelloiOSLogicTests classes)
 scripts/dev.sh test --only FooTests --repeat 50  # flaky hunting: up to 50 runs, stops at the first failure
 scripts/dev.sh py                    # Python consumers of the changed tooling (--all, --lane, or modules)
 scripts/dev.sh contracts             # the contract gate alone (check_project_inputs.sh --local)
@@ -233,7 +233,7 @@ scripts/dev.sh build | run           # warm incremental macOS development build 
 ./scripts/build.sh cli && build/vocello models list  # the development CLI
 npm --prefix website run check       # the website's lint, tests, build and browser tests
 scripts/hooks/commit_lint.sh --staged  # the commit safeguard, callable directly
-scripts/dev.sh ios                   # generic device-SDK compile (incremental, no phone)
+scripts/dev.sh ios [--fast] [--ui]   # generic device-SDK compile (incremental, no phone; --fast owned -Onone, --ui XCUITest bundles)
 scripts/dev.sh regen                 # regenerate roadmap render, docs index, catalog, inventories, charts, attributions
 scripts/dev.sh ci                    # every gate push CI runs, serially, when you want the push green first time
 git add <assigned-files>
@@ -247,7 +247,7 @@ lanes agree. `scripts/dev.sh check` compiles the affected XCUITest bundles throu
 It also builds the `vocello` executable (`./scripts/build.sh cli --version`, CI's command) when a
 source the CLI links changes (`Sources/VocelloCLI`, the cores, `Packages/`) or `project.yml` does:
 the macOS test host never compiles the executable's own sources (BKL-75).
-Push CI compiles all three bundles too (Mac, iOS and iOS candidate; `--gate`, after the deterministic builds in their arenas) and never
+Push CI compiles all four UI test bundles too (`VocelloMacUI`, `VocelloiOSUI`, `VocelloiOSPurchaseUI`, and `VocelloiOSCandidateUI`; `--gate`, after the deterministic builds in their arenas) and never
 runs them. XCUITest-only sources never reach the `swift` lane, since no deterministic bundle or TSan
 subset compiles them: `Tests/VocelloMacUITests` routes to `macos_ui`, which runs `macos-tests` for
 the bundle compile alone, and `Tests/VocelloiOSUITests` routes to `ios` alone
@@ -641,10 +641,11 @@ For any multi-file feature, runtime optimization or debt wave, run one determini
    on every live XCUITest run directory.
 
 **GPU / MLX profiling (`--kind metal`):** run `scripts/macos_test.sh profile --kind metal --lead-only`
-(with zero active workers) to capture a bounded Metal System Trace + `os_signpost` `.trace` bundle
-(1 cold + 1 warm medium take, 120 s default cap, 15 GiB disk floor, kept by default for history),
-then inspect it offline via `axiom_xcprof_analyze` / `axiom_xcprof_compare` or
-`.agents/workflows/qc_experiment_synthesizer.py`.
+or `scripts/ios_device.sh profile --kind metal --lead-only` (over wired USB on iPhone — Wi-Fi
+CoreDevice disconnects Instruments immediately), with zero active workers, to capture a bounded
+Metal System Trace + `os_signpost` `.trace` bundle (1 cold + 1 warm medium take, 120 s default cap,
+15 GiB disk floor, kept by default for history), then inspect it offline via `axiom_xcprof_analyze`
+/ `axiom_xcprof_compare` or `.agents/workflows/qc_experiment_synthesizer.py`.
 
 **Xcode 27 / Swift 6.4 pin (`DW-04`):** on 2026-11-20 CI, nightly, release rehearsal, release,
 promote-release and CodeQL cut over to GitHub's GA `xcode-27` runner image (`Xcode 27.2` build

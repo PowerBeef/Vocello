@@ -23,7 +23,8 @@ device IDs. Before any phone lane quit iPhone Mirroring (`scripts/ios_device.sh 
 XCUITest breaks under it and `ui-preflight` refuses while it runs; the phone must then be unlocked.
 When lifecycle tracking is unavailable, declare `--lead-only` (or `QVOICE_LEAD_ONLY=1`) only after
 joining all workers. Explain the lane and expected device interaction, then run
-`scripts/ui_test.sh --lead-only ios <lane> <options>`.
+`scripts/ui_test.sh --lead-only ios <lane> <options>` (pass `--retain-result` for multi-run
+`--no-publish` calibrations so pruning preserves prior passing runs).
 
 Use installed models; new large downloads need specific authorization. Preserve failed artifacts.
 Read `scripts/dev.sh triage <run-directory> --json` (the read-only `vocello-xcresult-triage` subagent

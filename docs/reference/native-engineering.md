@@ -2,7 +2,7 @@
 status: active
 owner: backend-and-platform
 summary: Native engineering rule for the engine, macOS app and iOS app; Antigravity loads it on demand through .agents/plugins/vocello/rules/native.md when matching files are touched.
-reviewed: 2026-11-10
+reviewed: 2026-11-21
 paths:
   - "Sources/**"
   - "Packages/**"
@@ -184,10 +184,13 @@ physical-device or macOS XCUITest lane at a coherent checkpoint.
 
 ## Build hygiene
 
-- **Warnings are errors** for every owned target except the iOS UI-test bundle
-  (`SWIFT_TREAT_WARNINGS_AS_ERRORS` in `project.yml`); the owned MLX package keeps its own settings.
-  Fix the warning; don't silence it with a pragma. The iOS UI-test bundle compiles with warnings
-  tolerated, so check its log for new ones.
+- **Warnings are errors** for every owned target except `VocelloiOSPurchaseUITests`
+  (`SWIFT_TREAT_WARNINGS_AS_ERRORS` in `project.yml`; `VocelloiOSUITests` and
+  `VocelloiOSCandidateUITests` enforce warnings as errors since Wave 1, while
+  `VocelloiOSPurchaseUITests` keeps warnings visible because Apple's `StoreKitTest` Clang module
+  header deprecates `SKPaymentTransactionState`). The owned MLX package enforces warnings as errors
+  on 4 of its 5 targets (`MLXAudioTTS` waits on upstream `MLXArray: Sendable`). Fix the warning;
+  don't silence it with a pragma.
 - **Strict memory safety is on** (`SWIFT_STRICT_MEMORY_SAFETY`):
   - Mark every unsafe construct with `unsafe`.
   - A `@preconcurrency import` needs `@unsafe` as well.

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-15
+reviewed: 2026-11-21
 summary: The single telemetry and benchmarking reference — which benchmark lane to run, preflight and the macOS CLI/app and iOS device procedures, the Phase 2-3 language bench, per-generation typed telemetry schemas and fields, PASS-only publication, lineage and baselines, and the artifact map.
 sourceOfTruth:
   - Sources/QwenVoiceCore/NativeTelemetrySampler.swift
@@ -142,7 +142,7 @@ UI heartbeat        —                       yes                    yes
 | **iOS device** | `scripts/ios_device.sh bench` | In-process | iPhone tier, Jetsam, on-device RTF (headless diagnostics, single take) |
 | **iOS UI benchmark** | `scripts/ui_test.sh ios benchmark` | In-process | Full UI matrix through XCUITest on the paired physical iPhone; telemetry gated per take |
 | **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Twelve scripted SwiftUI scenarios with the in-app frame probe; ceilings that warn unless the contract enforces the scenario; canonical-hardware runs publish `ui-perf` registry records; lane contract in [`macos-testing.md`](macos-testing.md) (history: [the 2026-08 macOS UI audit](../audits/2026-08-04-macos-ui-refresh.md)) |
-| **iOS UI frame health** | `scripts/ui_test.sh ios perf` | No engine claims (UI-only) | Nine scripted scenarios on the paired physical iPhone with the pinned-60 Hz in-app probe; `check_ios_ui_perf.py` structural + canonical-hardware gate with warn-only ceilings from [`config/ui-perf-thresholds-ios.json`](../../config/ui-perf-thresholds-ios.json); canonical-iPhone runs publish platform-`ios` `ui-perf` registry records; lane contract in [`ios-device-testing.md`](ios-device-testing.md) (history: IUI-6, [the 2026-08 iOS UI audit](../audits/2026-08-29-ios-ui-refresh.md)) |
+| **iOS UI frame health** | `scripts/ui_test.sh ios perf` | No engine claims (UI-only) | Twelve snapshot-free scripted scenarios on the paired physical iPhone with the pinned-60 Hz in-app probe; `check_ios_ui_perf.py` structural + canonical-hardware gate with enforced confirmatory ceilings (7 confirmatory scenarios, calibrated 2026-11-21 under `AV-14`) from [`config/ui-perf-thresholds-ios.json`](../../config/ui-perf-thresholds-ios.json); canonical-iPhone runs publish platform-`ios` `ui-perf` registry records; lane contract in [`ios-device-testing.md`](ios-device-testing.md) (history: IUI-6, [the 2026-08 iOS UI audit](../audits/2026-08-29-ios-ui-refresh.md)) |
 | **Language bench** | `scripts/macos_test.sh lang-bench` / `scripts/ios_device.sh lang-bench` | In-process | Language hint contract and spoken-output verification ([§5](#5-language-bench)) |
 
 **Important:** CLI bench numbers are **not** identical to macOS UI numbers. Compare like with
@@ -751,7 +751,7 @@ friction, use the headless §4.7 `ios_device.sh bench` lane.
 
 | Phase | Tool |
 |-------|------|
-| Independent trace capture | `scripts/ios_device.sh profile --kind cpu|memory` (separate headless generation/profile lane) |
+| Independent trace capture | `scripts/ios_device.sh profile --kind cpu\|memory\|metal\|witness` over wired USB (separate headless generation/profile lane) |
 | Trace analysis | Instruments / `xcrun xctrace`; optional `xcprof` on `PATH` |
 | UI failure | `.xcresult` activities, failure diagnostics, and screenshot attachments |
 | Crash post-mortem | Xcode Organizer; optional `xcsym` on `PATH` |
@@ -2324,7 +2324,7 @@ otherwise, `ui-perf` records are v2; schema-v1 history is read-only) are:
 | `instrument-profile` | macOS/iOS profile commands | Memory-qualified target generation PASS, exact PID, tracer success, valid trace TOC, non-empty exported performance rows, and run/generation/take/cell-correlated signposts |
 | `memory-qualification` | macOS/iOS `memory` commands | Fixed policy topology, v8 sidecar qualification, output/QC success, and within-mode retained-footprint growth ≤5% of the canonical profile's RAM |
 | `prosody-calibration` | `publish_benchmark_history.py prosody` (producer `prosody_calibration.py` deleted 2026-10-01, `c44d0205`) | Required corpus coverage with no analysis failure |
-| `ui-perf` | `ui_test.sh macos|ios perf` via `check_macos_ui_perf.py` / `check_ios_ui_perf.py` (registered 2026-08 with the macOS frame-health lane) | Structural gate PASS (every expected scenario once each: twelve on macOS, nine on iOS; coverage/refresh sanity), canonical hardware profile, and crash delta; a threshold breach warns (`passedWithWarnings`) unless the contract's `enforce` list names the scenario, where it fails the run; iOS records carry the platform-aware ceilings from `config/ui-perf-thresholds-ios.json` |
+| `ui-perf` | `ui_test.sh macos\|ios perf` via `check_macos_ui_perf.py` / `check_ios_ui_perf.py` (registered 2026-08 with the macOS frame-health lane) | Structural gate PASS (every expected scenario once each: twelve on macOS, twelve on iOS; coverage/refresh sanity), canonical hardware profile, and crash delta; a threshold breach warns (`passedWithWarnings`) unless the contract's `enforce` list names the scenario, where it fails the run; iOS records carry the enforced confirmatory ceilings from `config/ui-perf-thresholds-ios.json` |
 
 Schema-v1 `telemetry-overhead` records remain readable historical evidence, but new overhead runs
 are local observer-effect diagnostics and do not publish ([§4.12](#412-telemetry-overhead-parity-lane)).

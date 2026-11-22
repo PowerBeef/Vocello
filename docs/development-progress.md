@@ -51,9 +51,15 @@ the roadmap was updated per the maintainer's 2026-11-21 decision.
   - `RF-12`, `RF-15`, `RF-16`, `RF-17`, `RF-62`, `RF-63` retargeted to `3.2.0` (`RF-12`, `RF-16`,
     `RF-17` blocked by `RF-68`, `RF-69`, `RF-70`); `RF-35`, `RF-41`, `RF-42` moved back to `planned`
     behind `RF-12` (0 staleness warnings; all 3 focus-lock `in-flight` slots free for `RF-68`..`RF-70`).
-- **Next:**
-  1. Push the local CI fix + 3.2 roadmap commits to `origin/main` once explicitly authorized, and
-     confirm push CI + Release rehearsal green.
+- **Docs, instructions & `AGENTS.md` reconciled (2026-11-21):** synced `AGENTS.md`, `ARCHITECTURE.md`,
+  `native-engineering.md`, `tooling-and-evidence.md`, `development-workflow.md`, `ios-device-testing.md`,
+  `telemetry-and-benchmarking.md`, `hybrid-model.md`, `ios-appstore-submission.md`,
+  `app-store-listing.md`, and `.agents/plugins/vocello/skills/*` with the 15-target / 8-scheme project
+  (`VocelloiOSPolicies`, warnings-as-errors on `VocelloiOSUITests` & `VocelloiOSCandidateUITests`),
+  Wave 5 calibrated iOS `ui-perf` enforcement (12 scenarios, 7 enforced), wired-USB `xctrace` Metal/CPU/witness
+  profiling, `RB-11` hybrid attribution rendering, and the 3.2.0 iOS submission target.
+- **Next (next session):**
+  1. Confirm push CI & Release rehearsal green on the pushed 2026-11-21 tip.
   2. Begin **Pack B** (`RF-68` & `RF-69`, sample-preserving, Mac-driven) in parallel or sequence,
      then run **Pack C** (`RF-70`, `RF-57`-screened Korean `D1`, Bundle A, Bundle B) before bumping to
      `3.2.0` for Mac/CLI (`RF-71`) and cutting `v3.2.0-ios.1` (`RF-12`).

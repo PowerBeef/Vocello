@@ -1070,6 +1070,12 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-12 | [`ios-profile-20260712-211953-64c758be`](runs/instrument-profile/ios-profile-20260712-211953-64c758be.json) | instrumented | exploratory | passed | memory-contract-incomplete | 1 | — | `1ef1669326b5` dirty | `excluded` | baseline | instrument-profile |
 
+## instrument-profile / ios / iphone-17-pro / config `cfccfcffb1f8`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-22 | [`ios-cpu-profile-20261122-010506-af2fc0e1`](runs/instrument-profile/ios-cpu-profile-20261122-010506-af2fc0e1.json) | instrumented | instrumented | passedWithWarnings | qualified | 4 | 0.58 | `1a10801d758e` | `excluded` | baseline | instrument-cpu-profile |
+
 ## instrument-profile / ios / iphone-17-pro / config `ea5dddcc1ad1`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

@@ -359,8 +359,10 @@ final class VocelloiOSModelDownloadUITests: VocelloiOSUITestCase {
         VocelloUIScreenshot.attach(app, named: "ios-model-upgrade-later-rows")
 
         // Relaunch without re-seeding: Later must persist in the update ledger and never ask again.
+        // The app may restore the Settings tab it was on before termination, so wait for the root
+        // tab dock rather than assuming Studio is the active tab.
         launchAppForExplicitModelUpdatePrompt(additionalEnvironment: baseEnvironment)
-        XCTAssertTrue(VocelloUIWait.exists(element("screen_studio"), timeout: 30))
+        XCTAssertTrue(VocelloUIWait.exists(element("rootTab_studio"), timeout: 30))
         let unexpectedPrompt = VocelloUIWait.settles("no model-update prompt after Later", timeout: 6) {
             self.alertButton(id: "iosModelUpdatePromptConfirm", englishLabel: "Update").exists
         }

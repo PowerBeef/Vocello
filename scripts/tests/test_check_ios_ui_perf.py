@@ -258,24 +258,31 @@ class IOSUIPerfFixture(unittest.TestCase):
             set(checker.EXPECTED_SCENARIOS))
 
     def test_emit_evidence_writes_a_registry_manifest_including_the_warn_path(self):
-        # A hitch breach on a confirmatory scenario must flow warn-only from
-        # the checker through the evidence manifest: run and take status
+        # A hitch breach on a warn-only confirmatory scenario must flow warn-only
+        # from the checker through the evidence manifest: run and take status
         # passedWithWarnings, gate still PASS — the offline half of the
         # IUI-6 end-to-end warn-path proof.
+        shipped = json.loads(
+            (Path(checker.REPO_ROOT) / "config" / "ui-perf-thresholds-ios.json").read_text())
+        warn_only = dict(shipped)
+        warn_only.pop("enforce", None)
+        warn_only_path = self.root / "warn-only-thresholds.json"
+        warn_only_path.write_text(json.dumps(warn_only))
+        expected_ceiling = int(round(warn_only["hitchCeilingMSPerS"]["ios-voices-scroll"]))
+        expected_code = f"uiperf.hitch:ios-voices-scroll(500/{expected_ceiling})"
         log = self.write_run(hitch_by_scenario={"ios-voices-scroll": 500.0})
         original = checker.verify_canonical_iphone
         checker.verify_canonical_iphone = lambda diagnostics, run_id: "iphone-17-pro"
         try:
             status, report = self.run_checker(
-                log, require_canonical=True, emit_evidence=True)
+                log, thresholds=warn_only_path, require_canonical=True, emit_evidence=True)
         finally:
             checker.verify_canonical_iphone = original
         self.assertEqual(status, 0)
         assert report is not None
         self.assertEqual(report["status"], "passedWithWarnings")
         self.assertEqual(report["evidence"], "registry")
-        self.assertEqual(
-            report["thresholds"]["warnings"], ["uiperf.hitch:ios-voices-scroll(500/90)"])
+        self.assertEqual(report["thresholds"]["warnings"], [expected_code])
         manifest = json.loads((self.root / "benchmark-evidence.json").read_text())
         self.assertEqual(manifest["benchmarkKind"], "ui-perf")
         self.assertEqual(manifest["platform"], "ios")
@@ -283,8 +290,7 @@ class IOSUIPerfFixture(unittest.TestCase):
         record = manifest["historyRecord"]
         self.assertEqual(record["run"]["matrixScope"], "canonical")
         self.assertEqual(record["run"]["platform"], "ios")
-        self.assertEqual(
-            record["run"]["warnings"], ["uiperf.hitch:ios-voices-scroll(500/90)"])
+        self.assertEqual(record["run"]["warnings"], [expected_code])
         self.assertEqual(record["hardware"], {"profileID": "iphone-17-pro"})
         self.assertEqual(record["models"], [])
         hardware = manifest["hardware"]

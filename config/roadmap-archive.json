@@ -6745,6 +6745,31 @@
         "benchmark:macos-xcui-perf-20261121-022535-5f431af8",
         "benchmark:macos-xcui-perf-20261121-023945-eb6a564b"
       ]
+    },
+    {
+      "id": "AV-14",
+      "plan": "autonomous-validation-remediation-2026-08",
+      "title": "re-baseline the benchmark harness under the standard RTF definition (consent-bound runs)",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "After the 2026-09-12 harness fixes: (1) run `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` and re-save `benchmarks/baselines/mac-gate-bench.json` from a three-take run so it carries `rtfDefinition`, `rtfMAD`, n=3 and the host OS/Xcode identity; (2) one canonical `scripts/ui_test.sh macos benchmark` and one `scripts/ui_test.sh ios benchmark` run publish the first records with `run.rtfDefinition`, validate the provenance-bound optimization label, the iOS cell-length check and the sleep hold; (3) one macOS and one iOS `perf` run re-derive the warn-only thresholds under the clipped window arithmetic and the macOS environment row; (4) repin `scripts/generate_readme_charts.py` and the website chart to the new canonical macOS record. (5) one macOS `scripts/macos_test.sh lang-bench --subset quick` run publishes the first whisper-verified (`focused`, single-family) macOS language record and exercises the producer on generated audio under the host-quiet preflight. Each run needs explicit consent (model download, phone).",
+      "sourceOfTruth": [
+        "scripts/summarize_generation_telemetry.py",
+        "scripts/publish_benchmark_history.py",
+        "scripts/generate_readme_charts.py",
+        "config/ui-perf-thresholds.json",
+        "config/ui-perf-thresholds-ios.json",
+        "scripts/lib/host_preflight.sh"
+      ],
+      "updated": "2026-11-21",
+      "notes": "macOS clauses (1)-(5) completed 2026-09-13 (see git history). iOS standard-RTF benchmark (2) completed with ios-xcui-benchmark-20261121-180730-f1e8631c (3.1 hybrid, 29/29 pass). iOS ui-perf threshold derivation (3) completed 2026-11-21 via spread-v1 over three counted Wave 5 iphone-17-pro runs (ios-xcui-perf-20261121-200255-00f49267, ios-xcui-perf-20261122-012923-b890c982, ios-xcui-perf-20261122-014227-2dc60e89) with all seven confirmatory scenarios enforced in config/ui-perf-thresholds-ios.json.",
+      "evidence": [
+        "run:ios-xcui-benchmark-20261121-180730-f1e8631c",
+        "run:ios-xcui-perf-20261121-200255-00f49267",
+        "run:ios-xcui-perf-20261122-012923-b890c982",
+        "run:ios-xcui-perf-20261122-014227-2dc60e89",
+        "file:config/ui-perf-thresholds-ios.json"
+      ]
     }
   ]
 }

@@ -19,7 +19,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 | --- | --- | --- | --- |
 | `release-first-3-0-2026-09` | active | release-qa | 53/90 (59%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
-| `autonomous-validation-remediation-2026-08` | parked | release-qa | 12/17 (71%) |
+| `autonomous-validation-remediation-2026-08` | parked | release-qa | 13/17 (76%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
 | `delivery-prompting-2026-08` | parked | backend-mlx | 33/34 (97%) |
 | `engine-remediation-2026-10` | parked | backend-and-platform | 0/14 (0%) |
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (78)
+### Mac, remotely (77)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -53,7 +53,6 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `AUD-12` (parked) Migrate off the deprecated audio-session interruption keys (also: iPhone)
 - `AV-08` (parked) P2 — qualify multilingual output beyond a single cohort (also: iPhone)
 - `AV-13` (parked) XCUITest coverage for the identifiers never exercised (82 macOS, 38 iOS at the 2026-09-22 recount) (also: iPhone)
-- `AV-14` (parked) re-baseline the benchmark harness under the standard RTF definition (consent-bound runs)
 - `AV-17` (parked) First canonical Mac mini M6 16 GB baseline and recalibration (consent-bound runs)
 - `BKL-09` (parked) Privacy and security hygiene (also: iPhone)
 - `BKL-19` (parked) macOS UI smoke raises a Speech Recognition prompt after every lane rebuild
@@ -425,7 +424,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 | `AV-08` | parked | P2 — qualify multilingual output beyond a single cohort | `QC-04` |
 | `AV-09` | parked | P2 — make stateful physical-device lanes independently repeatable | — |
 | `AV-13` | parked | XCUITest coverage for the identifiers never exercised (82 macOS, 38 iOS at the 2026-09-22 recount) | — |
-| `AV-14` | parked | re-baseline the benchmark harness under the standard RTF definition (consent-bound runs) | — |
 | `AV-17` | parked | First canonical Mac mini M6 16 GB baseline and recalibration (consent-bound runs) | `BT-01`, `BT-02`, `BT-03`, `BT-04` |
 
 ### Open items in detail
@@ -441,10 +439,6 @@ Narrative authority: [`docs/development-progress.md`](development-progress.md)
 - **`AV-13`** (parked) — XCUITest coverage for the identifiers never exercised (82 macOS, 38 iOS at the 2026-09-22 recount).
   gate: The 2026-09-11 XCUITest audit found 78 of 102 macOS and 34 of 93 iOS accessibility identifiers never exercised. macOS: add acceptance coverage, in the existing lane structure, for Voice Design and Voice Cloning generation through the visible controls, saved-voice enrollment (recording to enrollment and Save), History playback, export and delete, the seed pin, the Settings model download route, and batch cancel; each lane asserts real persisted state and restores user data. iOS: extend the control-audit plan (config/ios-control-audit.json) and the smoke or control-audit classes so onboarding, on-device recording, save-as-voice, History recovery, delivery advisories and enrollment warnings are source-bound, observed on the paired iPhone through genuine controls and cleaned up, and replace the remaining English-label lookups (History clear and delete confirmations, seed unpin menu, Play/Pause labels) with stable identifiers or accessibility values in Sources/iOS. No hidden markers or seeded state. Validated only by explicitly requested scripts/ui_test.sh macos <lane> and scripts/ui_test.sh ios <lane> runs.
   unparkWhen: After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09.
-
-- **`AV-14`** (parked) — re-baseline the benchmark harness under the standard RTF definition (consent-bound runs).
-  gate: After the 2026-09-12 harness fixes: (1) run `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` and re-save `benchmarks/baselines/mac-gate-bench.json` from a three-take run so it carries `rtfDefinition`, `rtfMAD`, n=3 and the host OS/Xcode identity; (2) one canonical `scripts/ui_test.sh macos benchmark` and one `scripts/ui_test.sh ios benchmark` run publish the first records with `run.rtfDefinition`, validate the provenance-bound optimization label, the iOS cell-length check and the sleep hold; (3) one macOS and one iOS `perf` run re-derive the warn-only thresholds under the clipped window arithmetic and the macOS environment row; (4) repin `scripts/generate_readme_charts.py` and the website chart to the new canonical macOS record. (5) one macOS `scripts/macos_test.sh lang-bench --subset quick` run publishes the first whisper-verified (`focused`, single-family) macOS language record and exercises the producer on generated audio under the host-quiet preflight. Each run needs explicit consent (model download, phone).
-  unparkWhen: The iOS benchmark records exist (ios-xcui-benchmark-20261027-175531-87319beb and 20261103-181710-c657e53a); left is step 3, re-deriving config/ui-perf-thresholds-ios.json, after the 3.0 iOS submission.
 
 - **`AV-17`** (parked) — First canonical Mac mini M6 16 GB baseline and recalibration (consent-bound runs).
   gate: On mac-mini-m6-16gb (live `publish_benchmark_history.py verify-hardware --platform macos` PASS): (1) QWENVOICE_GATE_BENCH_SEED=1 scripts/macos_test.sh gate at least three times on one clean commit seeds a pooled baseline (five warm takes each), committed as benchmarks/baselines/mac-gate-bench.json with its published records; (2) one clean scripts/ui_test.sh macos benchmark publishes the first canonical M6 ui-generation record, and in the same commit the charts are regenerated (pooled medians of the newest lineage and build) and the README prose and the website medians, provenance line, anchor and pool size are updated; (3) counted scripts/ui_test.sh macos perf sessions re-derive config/ui-perf-thresholds.json with calibrationProfile mac-mini-m6-16gb; (4) scripts/macos_test.sh memory publishes the first M6 memory-qualification record after a maintainer decision on keeping retained-memory-v1 (5% of 16 GiB) or adopting a floor-anchored v2; (5) retired with the v1 audio QC on 2026-10-01 (QC v2's models run on the M6 within budget, QC-01); (6) decide whether a forced floor8GBMac diagnostic lane covers the 8 GB support floor. M2 records are never rewritten or compared.

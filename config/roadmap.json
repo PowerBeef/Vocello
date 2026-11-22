@@ -1449,28 +1449,6 @@
       "unparkWhen": "After the 3.0 iOS App Store submission lifts the focus lock (config/roadmap.json focusLock); earlier only if the maintainer confirms it as a release blocker and it is re-homed into release-first-3-0-2026-09."
     },
     {
-      "id": "AV-14",
-      "plan": "autonomous-validation-remediation-2026-08",
-      "title": "re-baseline the benchmark harness under the standard RTF definition (consent-bound runs)",
-      "status": "parked",
-      "blockedBy": [],
-      "gate": "After the 2026-09-12 harness fixes: (1) run `QWENVOICE_GATE_BENCH=1 scripts/macos_test.sh gate` and re-save `benchmarks/baselines/mac-gate-bench.json` from a three-take run so it carries `rtfDefinition`, `rtfMAD`, n=3 and the host OS/Xcode identity; (2) one canonical `scripts/ui_test.sh macos benchmark` and one `scripts/ui_test.sh ios benchmark` run publish the first records with `run.rtfDefinition`, validate the provenance-bound optimization label, the iOS cell-length check and the sleep hold; (3) one macOS and one iOS `perf` run re-derive the warn-only thresholds under the clipped window arithmetic and the macOS environment row; (4) repin `scripts/generate_readme_charts.py` and the website chart to the new canonical macOS record. (5) one macOS `scripts/macos_test.sh lang-bench --subset quick` run publishes the first whisper-verified (`focused`, single-family) macOS language record and exercises the producer on generated audio under the host-quiet preflight. Each run needs explicit consent (model download, phone).",
-      "sourceOfTruth": [
-        "scripts/summarize_generation_telemetry.py",
-        "scripts/publish_benchmark_history.py",
-        "scripts/generate_readme_charts.py",
-        "config/ui-perf-thresholds.json",
-        "config/ui-perf-thresholds-ios.json",
-        "scripts/lib/host_preflight.sh"
-      ],
-      "needs": [
-        "mac"
-      ],
-      "updated": "2026-11-10",
-      "notes": "macOS clauses done on September 13: (1) gate bench PASS after three harness fixes (6ab8c461 clock divisor, b1824091 warm-only verdict, b88d6d03 footprint dispersion), baseline re-saved from mac-gate-bench-20260912-225643-0fd52c77, first standard-RTF gate record mac-gate-bench-20260912-234613-c8f8a8c6; (2) canonical UI records macos-xcui-benchmark-20260913-170946-488a9ed0 and 181112-6cb80773, the latter paired with CLI matrix macos-engine-20260913-180702-42b26142 (engine rtf equal within 0.04; the UI adds 60 to 120 ms to the first chunk); (3) macos-xcui-perf-20260913-174907-79e014f2 after ee97e92c; (4) charts and website repinned (ae676061, 4ea74266); (5) mac-lang-bench-20260913-000655-546b90cf after acba7581 and 5ca95a73. Open: the iOS halves of (2) and (3); run ios-xcui-benchmark-20260913-184908-a94cbc47 aborted before its build because CoreDevice reported the paired iPhone unavailable. The replay cache-policy flake is fixed in 5619004c. September 21: the paired phone was available, but smoke observed Update Available for Custom, Design and Clone. No iOS benchmark or perf run was launched against stale catalog readiness; no new timing, RAM, QC or threshold claims are made.",
-      "unparkWhen": "The iOS benchmark records exist (ios-xcui-benchmark-20261027-175531-87319beb and 20261103-181710-c657e53a); left is step 3, re-deriving config/ui-perf-thresholds-ios.json, after the 3.0 iOS submission."
-    },
-    {
       "id": "AV-17",
       "plan": "autonomous-validation-remediation-2026-08",
       "title": "First canonical Mac mini M6 16 GB baseline and recalibration (consent-bound runs)",

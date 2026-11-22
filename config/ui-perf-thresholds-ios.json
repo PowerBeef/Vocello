@@ -1,9 +1,14 @@
 {
   "schemaVersion": 1,
-  "basis": "Warn-only first cut derived from the three counted five-run sessions on the canonical iPhone 17 Pro (IUI-2 baseline 2026-08-12, IUI-4 wave-1 after 2026-08-13, IUI-5 wave-2 after 2026-08-15; tables in docs/audits/2026-08-29-ios-ui-refresh.md): hitch ceilings sit ~1.5-2x the worst session median and gap ceilings ~2x the worst clean observation, tightened where the P4 keep-alive regression (IUI-5 part-1 bisect) must breach (tab-navigation 119-155 ms/s and voices-scroll 115-118 ms/s both warn). Warn-only: a breach marks the scenario and run passedWithWarnings and never blocks publication; promotion to hard ceilings requires repeated baseline sessions showing stable spread (macOS UI-7 precedent). Exploratory scenarios (ios-player-scrub, ios-generation-active) carry no ceilings by design. Since 2026-09-25 the contract names its calibration profile and the probe's pinned 60 Hz refresh (audit #77): a run on another canonical iPhone or refresh rate carries uiperf.uncalibrated:iphone-17-pro instead of ceiling verdicts until check_ios_ui_perf.py --derive-thresholds re-derives it from at least three counted sessions.",
+  "basis": "Derived with spread-v1 from 3 counted ui-perf runs on iphone-17-pro (ios-xcui-perf-20261121-200255-00f49267, ios-xcui-perf-20261122-012923-b890c982, ios-xcui-perf-20261122-014227-2dc60e89) by check_*_ui_perf.py --derive-thresholds. Per confirmatory scenario: max(1.3 x median, median + 3 x (max - min)); hitch rounded up to 0.5 ms/s (floor 5), gap to 10 ms (floor 40). Warn-only.",
   "calibrationProfile": "iphone-17-pro",
   "calibrationRefreshIntervalMS": 16.67,
-  "derivationRule": "iui-6-manual",
+  "calibrationRuns": [
+    "ios-xcui-perf-20261121-200255-00f49267",
+    "ios-xcui-perf-20261122-012923-b890c982",
+    "ios-xcui-perf-20261122-014227-2dc60e89"
+  ],
+  "derivationRule": "spread-v1",
   "warnOnly": true,
   "confirmatoryScenarios": [
     "ios-idle-baseline",
@@ -14,22 +19,216 @@
     "ios-composer-typing",
     "ios-sheet-present-dismiss"
   ],
+  "enforce": [
+    "ios-idle-baseline",
+    "ios-tab-navigation",
+    "ios-history-scroll",
+    "ios-voices-scroll",
+    "ios-settings-scroll",
+    "ios-composer-typing",
+    "ios-sheet-present-dismiss"
+  ],
+  "enforceDescription": "warnOnly is the default posture: a hitch or max-gap ceiling breach is a warning code. A scenario named in enforce fails the run instead (exit 1, report status failed, no evidence manifest) when it breaches either ceiling on the calibration profile and refresh interval; it must have both ceilings in this contract. Enforced since 2026-11-21 (AV-14, DW-04) for all seven confirmatory scenarios after the Wave 3 snapshot-free iOS UI-perf overhaul and three counted iphone-17-pro calibration runs (ios-xcui-perf-20261121-200255-00f49267, ios-xcui-perf-20261122-012923-b890c982, ios-xcui-perf-20261122-014227-2dc60e89). Exploratory scenarios carry no ceilings by design. A run that is uncalibrated (another profile or refresh interval, or calibrationStale) enforces nothing.",
   "hitchCeilingMSPerS": {
     "ios-idle-baseline": 5.0,
-    "ios-tab-navigation": 115.0,
-    "ios-history-scroll": 140.0,
-    "ios-voices-scroll": 90.0,
-    "ios-settings-scroll": 110.0,
-    "ios-composer-typing": 60.0,
-    "ios-sheet-present-dismiss": 180.0
+    "ios-tab-navigation": 186.0,
+    "ios-history-scroll": 103.5,
+    "ios-voices-scroll": 80.5,
+    "ios-settings-scroll": 43.0,
+    "ios-composer-typing": 51.0,
+    "ios-sheet-present-dismiss": 187.5
   },
   "maxGapCeilingMS": {
     "ios-idle-baseline": 40.0,
-    "ios-tab-navigation": 220.0,
-    "ios-history-scroll": 170.0,
-    "ios-voices-scroll": 120.0,
-    "ios-settings-scroll": 130.0,
-    "ios-composer-typing": 140.0,
-    "ios-sheet-present-dismiss": 320.0
+    "ios-tab-navigation": 120.0,
+    "ios-history-scroll": 110.0,
+    "ios-voices-scroll": 90.0,
+    "ios-settings-scroll": 70.0,
+    "ios-composer-typing": 100.0,
+    "ios-sheet-present-dismiss": 110.0
+  },
+  "derivationInputs": {
+    "ios-idle-baseline": {
+      "hitchTimeMSPerS": {
+        "values": [
+          0.009,
+          0.038,
+          0.061
+        ],
+        "median": 0.038,
+        "range": 0.052,
+        "relativeRange": 1.3684,
+        "multiplier": 5.1053,
+        "ceiling": 5.0
+      },
+      "maxGapMS": {
+        "values": [
+          16.7,
+          16.71,
+          16.71
+        ],
+        "median": 16.71,
+        "range": 0.01,
+        "relativeRange": 0.0006,
+        "multiplier": 1.3,
+        "ceiling": 40.0
+      }
+    },
+    "ios-tab-navigation": {
+      "hitchTimeMSPerS": {
+        "values": [
+          122.059,
+          132.017,
+          110.749
+        ],
+        "median": 122.059,
+        "range": 21.268,
+        "relativeRange": 0.1742,
+        "multiplier": 1.5227,
+        "ceiling": 186.0
+      },
+      "maxGapMS": {
+        "values": [
+          83.9,
+          92.49,
+          84.61
+        ],
+        "median": 84.61,
+        "range": 8.59,
+        "relativeRange": 0.1015,
+        "multiplier": 1.3046,
+        "ceiling": 120.0
+      }
+    },
+    "ios-history-scroll": {
+      "hitchTimeMSPerS": {
+        "values": [
+          62.717,
+          71.465,
+          73.333
+        ],
+        "median": 71.465,
+        "range": 10.616,
+        "relativeRange": 0.1485,
+        "multiplier": 1.4456,
+        "ceiling": 103.5
+      },
+      "maxGapMS": {
+        "values": [
+          83.35,
+          83.35,
+          83.35
+        ],
+        "median": 83.35,
+        "range": 0.0,
+        "relativeRange": 0.0,
+        "multiplier": 1.3,
+        "ceiling": 110.0
+      }
+    },
+    "ios-voices-scroll": {
+      "hitchTimeMSPerS": {
+        "values": [
+          54.187,
+          50.722,
+          44.309
+        ],
+        "median": 50.722,
+        "range": 9.878,
+        "relativeRange": 0.1947,
+        "multiplier": 1.5842,
+        "ceiling": 80.5
+      },
+      "maxGapMS": {
+        "values": [
+          66.68,
+          66.68,
+          67.69
+        ],
+        "median": 66.68,
+        "range": 1.01,
+        "relativeRange": 0.0151,
+        "multiplier": 1.3,
+        "ceiling": 90.0
+      }
+    },
+    "ios-settings-scroll": {
+      "hitchTimeMSPerS": {
+        "values": [
+          21.177,
+          10.708,
+          10.558
+        ],
+        "median": 10.708,
+        "range": 10.619,
+        "relativeRange": 0.9917,
+        "multiplier": 3.9751,
+        "ceiling": 43.0
+      },
+      "maxGapMS": {
+        "values": [
+          50.01,
+          50.01,
+          50.01
+        ],
+        "median": 50.01,
+        "range": 0.0,
+        "relativeRange": 0.0,
+        "multiplier": 1.3,
+        "ceiling": 70.0
+      }
+    },
+    "ios-composer-typing": {
+      "hitchTimeMSPerS": {
+        "values": [
+          20.385,
+          23.411,
+          13.351
+        ],
+        "median": 20.385,
+        "range": 10.06,
+        "relativeRange": 0.4935,
+        "multiplier": 2.4805,
+        "ceiling": 51.0
+      },
+      "maxGapMS": {
+        "values": [
+          50.01,
+          62.16,
+          54.33
+        ],
+        "median": 54.33,
+        "range": 12.15,
+        "relativeRange": 0.2236,
+        "multiplier": 1.6709,
+        "ceiling": 100.0
+      }
+    },
+    "ios-sheet-present-dismiss": {
+      "hitchTimeMSPerS": {
+        "values": [
+          87.556,
+          113.89,
+          108.323
+        ],
+        "median": 108.323,
+        "range": 26.334,
+        "relativeRange": 0.2431,
+        "multiplier": 1.7293,
+        "ceiling": 187.5
+      },
+      "maxGapMS": {
+        "values": [
+          74.64,
+          83.35,
+          73.97
+        ],
+        "median": 74.64,
+        "range": 9.38,
+        "relativeRange": 0.1257,
+        "multiplier": 1.377,
+        "ceiling": 110.0
+      }
+    }
   }
 }

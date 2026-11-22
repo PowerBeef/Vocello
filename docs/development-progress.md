@@ -18,68 +18,72 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 21, afternoon: Wave 5 physical-iPhone calibration & qualification paused cleanly (resume here)
+### November 21, night: Wave 5 physical-iPhone 3.1.0 calibration & qualification complete on local `main` (ready for push)
 
-Live physical-iPhone **Wave 5** progress on paired iPhone 17 Pro (iOS 27.2.1, Xcode 27.2, local `main`,
-**not yet pushed** — push after Wave 5 completes and maintainer authorizes):
+Physical-iPhone **Wave 5** completed on the paired iPhone 17 Pro (iOS 27.2.1, Xcode 27.2, wired USB
++ clean checkpoints). Local `main` is clean and **not yet pushed** — waiting on explicit maintainer
+request to push to `origin/main` and watch push CI on `xcode-27`.
 
-- **Completed & verified on physical iPhone 17 Pro:**
+- **Wave 5 On-Device Evidence & Calibrations:**
   - **`ios benchmark` (3.1 hybrid, 29/29 PASS, 0 refusals):**
-    `ios-xcui-benchmark-20261121-180730-f1e8631c` recorded at `5cc8ed43` (10 Custom + 10 Design +
-    9 Clone with `A_warm_elderly_woman`; all 4 named screenshots verified clean).
+    `ios-xcui-benchmark-20261121-180730-f1e8631c` (`5cc8ed43`; 10 Custom + 10 Design + 9 Clone
+    with `A_warm_elderly_woman`; 4 named screenshots verified clean).
   - **`ios_device.sh memory` (3.1 hybrid, 9/9 PASS, 0 MB retained growth) + calibration:**
-    `ios-memory-qualification-20261121-182637-c2b75046` recorded and applied via
-    `derive_memory_calibration.py --write` to `config/memory-qualification-policy.json` (`5cc8ed43`:
-    `retainedMemoryV2.calibration.ios` `growthLimitMB = 16.0`, `floorTiers` `floorMS = 500.0`).
-    Warm `physFoot`: Custom `1969 MB`, Design `1949 MB`, Clone `2503 MB` (cold peak `3584 MB`,
-    `2560 MB` headroom remaining — confirms `RB-05` `4.5 GiB` Clone gate).
-  - **`ios perf` snapshot-free suite (3 consecutive 12/12 PASS runs on `eed3842d`):**
-    100% probe coverage across all 12 scenarios (`idle 0.009–0.014`, `settings-scroll 13.6–21.2`,
-    `composer-typing 20.4–21.7`, `voices-scroll 41.1–54.2`, `history-scroll 62.4–74.1`,
-    `sheet-present-dismiss 87.6–95.1 ms/s`). Pass 3 (`ios-xcui-perf-20261121-200255-00f49267`) is
-    recorded in `benchmarks/runs/ui-perf/`; passes 1 and 2 (`eded2311`, `300adc73`) were compacted
-    by `--ui-keep 1` because they used `--no-publish` without `--retain-result`.
-  - **`ios model-download --scenario queue` (PASS, 108.8s):**
-    `ios-xcui-model-download-20261121-201559-ff88637e` proved Pack A `RB-06`, `RB-08`, `RB-10`,
-    `RB-12` live on device (clean prepare/start cancel + `Queued` state restored across relaunch;
-    screenshots `002`, `007`, `008` reviewed clean).
-  - **Device/harness fixes committed during Wave 5 (`06aac009`..`eed3842d`):**
-    - `06aac009`: fixed stale `scripts/ios_signing_identity.py` path in `scripts/ui_test.sh`.
-    - `05e4386c` + `9ef04fb8`: fixed `BKL-16` iOS `UITextView` replacement in
-      `VocelloUITextEntry.replace` (coordinate-free, passes `repo_invariants.sh`) and modal
-      dismissal before autoplay restore.
-    - `85b71574` + `eed3842d`: fixed `test08PlayerScrub` setup headroom and backward final-scrub
-      assertion against uninterrupted autoplay.
-- **Exact resume steps for the next physical-iPhone window:**
-  1. **Fix 1-line `upgrade` XCUITest assertion before re-running `model-download --scenario upgrade`:**
-     In `ios-xcui-model-download-20261121-202958-5cbb5883`, Phase 1 passed (normal "Update Voice
-     Models?" alert, `Later`, Voice Models `Update Required` rows, and relaunch with **no**
-     re-prompt), then failed at
-     `Tests/VocelloiOSUITests/VocelloiOSModelDownloadUITests.swift:363` waiting for
-     `screen_studio` because the app restored the **Settings** tab after relaunch (`044-failure`).
-     Wait for `rootTab_studio` (or `rootTabDock`) instead of `screen_studio`, compile
-     `scripts/dev.sh ios --ui`, commit, and run
-     `scripts/ui_test.sh --lead-only ios model-download --scenario upgrade`.
-  2. **2 more published `ios perf` runs + `AV-14` threshold calibration:**
-     Run `scripts/ui_test.sh --lead-only ios perf --label ios-perf-cal-4` and `ios-perf-cal-5`
-     **without `--no-publish`** (so each records into `benchmarks/runs/ui-perf/` before
-     `--ui-keep 1` prunes), then derive `spread-v1` ceilings in `config/ui-perf-thresholds-ios.json`
-     with `python3 scripts/check_ios_ui_perf.py --derive-thresholds <3 run IDs> --write config/ui-perf-thresholds-ios.json`.
-  3. **Remaining functional & matrix lanes:**
-     - `scripts/ui_test.sh --lead-only ios localization`
-     - `scripts/ui_test.sh --lead-only ios smoke` (full suite, ~20–25 min; inspect
-       `<run>/screenshots/index.json` + `RB-11` attribution screenshots)
-     - `scripts/ios_device.sh --lead-only lang-bench --subset full`
-  4. **Wired-USB `xctrace` profiling baselines (`metal`, `cpu`, `memory`, `witness`):**
-     Over Wi-Fi (`transport: localNetwork`, `tunnelState: disconnected`), `xctrace` exited
-     immediately (`Cannot find process for provided pid` / `Device got disconnected`). Plug the
-     iPhone in via USB on a clean tree, run `scripts/ios_device.sh --lead-only profile --kind
-     metal|cpu|memory|witness` (commit each published record between runs or keep tree clean;
-     pass `--keep-trace` on `cpu` to validate `axiom_xcprof_analyze` on the `.trace`).
-  5. **Wrap-up:** run `scripts/dev.sh lint && ./scripts/check_project_inputs.sh --python none`,
-     update roadmap/checkpoint, remind maintainer to re-enable iPhone Auto-Lock if disabled
-     (`scripts/ui_test.sh ios screen-protection --scenario inspect|enable`), and push local `main`
-     only after explicit maintainer authorization.
+    `ios-memory-qualification-20261121-182637-c2b75046` (`5cc8ed43`) calibrated
+    `config/memory-qualification-policy.json` (`retainedMemoryV2.calibration.ios`
+    `growthLimitMB = 16.0`, `floorTiers` `floorMS = 500.0`). Warm `physFoot`: Custom `1969 MB`,
+    Design `1949 MB`, Clone `2503 MB` (cold peak `3584 MB`, `2560 MB` headroom remaining —
+    confirms Pack A `RB-05` `4.5 GiB` Clone gate).
+  - **Wired-USB `xctrace` profiling baselines + `axiom_xcprof_analyze` validation:**
+    - `metal` (`ios-metal-profile-20261122-004303-62fc2244`, `1a10801d`): `23.3 tok/s` warm,
+      `1952 MB physFoot`, 142,990 captured Metal/signpost/Time Profiler rows (fixed
+      `benchmarks/schema-v3.json` `profileKind` enum + `scripts/benchmark_history.py` embedded
+      `time-profile` acceptance + unit test).
+    - `cpu --keep-trace` (`ios-cpu-profile-20261122-010506-af2fc0e1`, `9fcfb630`): `24.4 tok/s`
+      warm (`1.95×RT`), `1987 MB physFoot`, validated end-to-end with `axiom_xcprof_analyze` +
+      preserved iOS dSYM (`17,997` symbolicated CPU samples; noted non-shipped
+      `IOSPullableDiagnosticsMirror.syncGenerationTelemetry` at ~75% of diagnostics-runner CPU).
+    - `witness` (`ios-witness-profile-20261122-010852-a0085eed`, `43371913`): `25.7 tok/s` warm
+      (`2.06×RT`), `377 ms` first chunk, `1975 MB physFoot`.
+    - `memory` (`ios-memory-profile-20261122-010716-e232a884` & `011044-6468584f`): captured
+      Allocations + VM Tracker `.trace` cleanly over USB; publication tripped the newly tightened
+      uninstrumented `500 ms` `floorTiers` unobserved-gap bound (`669.4 ms` / `789.9 ms` under
+      malloc-stack instrumentation during cold load; traces retained, policy kept strict).
+  - **3× counted snapshot-free `ios perf` + `AV-14` closed (`bc350530`):**
+    `ios-xcui-perf-20261121-200255-00f49267`, `ios-xcui-perf-20261122-012923-b890c982`, and
+    `ios-xcui-perf-20261122-014227-2dc60e89` all passed 12/12 with 100% probe coverage; derived
+    `spread-v1` ceilings and enabled confirmatory enforcement in `config/ui-perf-thresholds-ios.json`,
+    closing `AV-14` (`18/18` `test_check_ios_ui_perf.py` PASS).
+  - **Pack A model delivery & RF-59 upgrade proofs live on device:**
+    - `ios model-download --scenario queue` (`ios-xcui-model-download-20261121-201559-ff88637e`):
+      **PASS (108.8s)** — `RB-06`, `RB-08`, `RB-10`, `RB-12` (prepare cancel + `Queued` relaunch
+      restoration; screenshots reviewed clean).
+    - `ios model-download --scenario upgrade` (`ios-xcui-model-download-20261122-012545-cdcd6211`):
+      **PASS (91.5s)** — normal Update prompt + `Later` relaunch persistence + low-space Make Room
+      prompt + active transfer (`10.9 MB/s`) + clean cancel (fixed `rootTab_studio` relaunch wait
+      at `8eb44950`; screenshots reviewed clean).
+  - **Full `ios smoke` (`ios-xcui-smoke-20261122-030658-6da29045`): 4/4 PASS (15 min):**
+    `testPhysicalDeviceSmokeJourney` (518.8s, including critical memory-pressure recovery and
+    visually verified `RB-11` hybrid `Additional base` / `Built from` attribution in
+    `010-ios-settings-model-attribution-pro_custom-speed.png`), `testRecordThenPlayReviewsTheClip`
+    (34.0s), `testStudioModesKeepTheirDockLayout` (46.3s), `testZLongFormProjectJourney` (290.7s,
+    2:17 project complete).
+  - **Headless `lang-bench --subset full` (`ios-lang-bench-20261122-011722-250a84c4`):**
+    **23/23 `spoken_content=PASS`**, `hint_gate=PASS`, `diagnostics_fail=0` across all 10
+    languages on both `qwen3-asr` and `whisper` (nearly all `0.000` WER/CER); on-device Apple
+    Speech `output_gate` passed all 12 installed locales (`en-CA`, `fr-CA`, `de-DE`, `zh-CN`) and
+    flagged only the 6 locales without iOS dictation packs installed (`es`, `ja`, `ru`, `pt`, `it`,
+    `ko`).
+  - **`ios localization` (`ios-xcui-localization-20261122-021927-fcb2d313`) + harness fixes:**
+    Passed all 10 languages, Default, French-Default, AX-L (incl. Voice Models), and AX-XXXL
+    Audio/About; fixed the final AX-XXXL `VocelloUISettingsReveal` short-drag stall and cached
+    per-step staticText frames (`31a71e40`, `12a76ed3`, `2ecf5ceb`, `9b68d928`). An optional full
+    `ios localization` re-run can confirm AX-XXXL Voice Models green in the next window.
+- **Next:**
+  1. Push local `main` to `origin/main` once explicitly authorized and watch push CI on `xcode-27`.
+  2. When ready for iOS 3.1.0 TestFlight candidate upload, cut the next `v3.1.0-ios.N` tag via
+     `python3 scripts/ios_candidate_tag.py` after push CI passes.
+  3. Packs B/C remain deferred post-3.1 behind `RF-57`.
 
 ### November 21: iOS dev/test/bench overhaul (Waves 1–4) & Pack A release blockers (`RB-01`..`RB-12`) landed locally
 

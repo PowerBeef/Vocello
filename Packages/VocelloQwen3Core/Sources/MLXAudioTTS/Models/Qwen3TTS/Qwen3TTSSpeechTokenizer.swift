@@ -1130,7 +1130,7 @@ final class Qwen3TTSSpeechTokenizerDecoder: Module {
     /// A-26 (RF-52): a copy of the streaming history, or `nil` when the
     /// pre-transformer cache is not the key/value cache this decoder makes and
     /// can restore.
-    func streamingStateSnapshot() -> Qwen3DecoderStreamingSnapshot? {
+    func streamingStateSnapshot() throws -> Qwen3DecoderStreamingSnapshot? {
         var transformerStates: [[MLXArray]]?
         if let transformerCache {
             var states: [[MLXArray]] = []
@@ -1153,7 +1153,7 @@ final class Qwen3TTSSpeechTokenizerDecoder: Module {
             layerStates: layerStates,
             transformerStates: transformerStates
         )
-        eval(snapshot.arrays)
+        try withError { eval(snapshot.arrays) }
         return snapshot
     }
 
@@ -1333,12 +1333,13 @@ final class Qwen3TTSSpeechTokenizer: Module {
         return (wav, audioLengths)
     }
 
-    func streamingDecode(_ audioCodes: MLXArray, chunkTokens: Int = 100) -> [MLXArray] {
+    func streamingDecode(_ audioCodes: MLXArray, chunkTokens: Int = 100) throws -> [MLXArray] {
         let codes = audioCodes.transposed(0, 2, 1)
         let totalTokens = codes.dim(-1)
         var chunks = [MLXArray]()
 
         decoder.resetStreamingState()
+        defer { decoder.resetStreamingState() }
 
         var startIndex = 0
         while startIndex < totalTokens {
@@ -1346,12 +1347,11 @@ final class Qwen3TTSSpeechTokenizer: Module {
             let chunk = codes[0..., 0..., startIndex ..< endIndex]
             var wavChunk = decoder.streamingStep(chunk)
             wavChunk = wavChunk.squeezed(axis: 1)
-            eval(wavChunk)
+            try withError { eval(wavChunk) }
             chunks.append(wavChunk)
             startIndex = endIndex
         }
 
-        decoder.resetStreamingState()
         return chunks
     }
 

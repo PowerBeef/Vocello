@@ -14,7 +14,7 @@
 
 import Foundation
 import MLX
-import VocelloQwen3Core
+@testable import VocelloQwen3Core
 import XCTest
 
 @testable import MLXAudioMark
@@ -247,6 +247,58 @@ final class AudioSealParityTests: XCTestCase {
             try VocelloQwen3AudioMarking.markedPCM(syntheticPCM(count: 3_200), weightsURL: url),
             "incomplete marking weights must never produce unmarked output"
         )
+    }
+
+    /// RF-68 (B1.1): stages 1 and 2 of the windowed embedder must probe their
+    /// own MLX evaluations via `withError` so errors throw directly instead of
+    /// being consumed by an outer error handler ahead of stage 3 readback.
+    func testWindowedStagesThrowMLXErrorsDirectlyInsteadOfConsumingOuterScope() throws {
+        func corruptWeightsURL(tensorName: String, badBiasLength: Int) throws -> URL {
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("AudioSealCorrupt-\(UUID().uuidString)", isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+            let url = directory.appendingPathComponent("audioseal_wm16_generator_fp16.safetensors")
+            var arrays = SyntheticAudioSealWeights.arrays()
+            XCTAssertNotNil(arrays[tensorName], "fixture has no tensor \(tensorName)")
+            arrays[tensorName] = MLXArray.zeros([badBiasLength], type: Float.self).asType(.float16)
+            try save(arrays: arrays, url: url)
+            return url
+        }
+
+        // Stage 1 (encoderConvs): mismatched input conv bias triggers an MLX broadcast error.
+        let stage1Generator = try AudioSealGenerator(
+            weightsURL: try corruptWeightsURL(
+                tensorName: "encoder.model.0.conv.conv.inner_conv.bias",
+                badBiasLength: 5
+            )
+        )
+        let stage1Scope = VocelloQwen3MLXErrorScope()
+        XCTAssertThrowsError(
+            try stage1Scope.capture { () throws -> [Float] in
+                try stage1Generator.watermark(pcm: syntheticPCM())
+            }
+        ) { error in
+            XCTAssertEqual(error as? VocelloQwen3RuntimeFailure, .mlx)
+        }
+        XCTAssertNil(stage1Scope.failure, "stage 1 withError, not the outer scope, must catch the MLX error")
+
+        // Stage 2 (frameStages): mismatched bottleneck output conv bias triggers an MLX error after stage 1 succeeds.
+        let stage2Generator = try AudioSealGenerator(
+            weightsURL: try corruptWeightsURL(
+                tensorName: "encoder.model.15.conv.conv.inner_conv.bias",
+                badBiasLength: 129
+            )
+        )
+        let stage2Scope = VocelloQwen3MLXErrorScope()
+        XCTAssertThrowsError(
+            try stage2Scope.capture { () throws -> [Float] in
+                try stage2Generator.watermark(pcm: syntheticPCM())
+            }
+        ) { error in
+            XCTAssertEqual(error as? VocelloQwen3RuntimeFailure, .mlx)
+        }
+        XCTAssertNil(stage2Scope.failure, "stage 2 withError, not the outer scope, must catch the MLX error")
     }
 }
 

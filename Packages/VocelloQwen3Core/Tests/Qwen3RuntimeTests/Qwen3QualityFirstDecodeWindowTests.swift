@@ -113,7 +113,7 @@ final class Qwen3QualityFirstDecodeWindowTests: XCTestCase {
         XCTAssertEqual(tokenizer.decodeUpsampleRate, tokenizer.decoder.totalUpsample)
         for frameCount in [1, 24, 25, 26, 63] {
             let codes = fixtureCodes(frameCount: frameCount, zeroFrames: [])
-            let chunks = tokenizer.streamingDecode(
+            let chunks = try tokenizer.streamingDecode(
                 codes, chunkTokens: Qwen3TTSModel.qualityFirstDecoderChunkFrames
             )
             let decoded = concatenated(chunks, axis: -1)[0]
@@ -133,7 +133,7 @@ final class Qwen3QualityFirstDecodeWindowTests: XCTestCase {
         let firstGroupNonZero = frameCount - zeroFrames.count
         XCTAssertLessThan(firstGroupNonZero, frameCount, "fixture must contain generated code 0")
 
-        let audio = Qwen3TTSModel.decodeQualityFirstWindow(
+        let audio = try Qwen3TTSModel.decodeQualityFirstWindow(
             tokenizer, codes: codes, referenceFrameCount: 0
         )
         XCTAssertEqual(audio.dim(0), frameCount * tokenizer.decodeUpsampleRate)
@@ -150,12 +150,12 @@ final class Qwen3QualityFirstDecodeWindowTests: XCTestCase {
         let codes = fixtureCodes(frameCount: totalFrames, zeroFrames: [2, 20, totalFrames - 1])
         let rate = tokenizer.decodeUpsampleRate
 
-        let full = Qwen3TTSModel.decodeQualityFirstWindow(
+        let full = try Qwen3TTSModel.decodeQualityFirstWindow(
             tokenizer, codes: codes, referenceFrameCount: 0
         ).asArray(Float.self)
         XCTAssertEqual(full.count, totalFrames * rate)
 
-        let generated = Qwen3TTSModel.decodeQualityFirstWindow(
+        let generated = try Qwen3TTSModel.decodeQualityFirstWindow(
             tokenizer, codes: codes, referenceFrameCount: referenceFrames
         ).asArray(Float.self)
         XCTAssertEqual(generated.count, generatedFrames * rate)
@@ -176,7 +176,7 @@ final class Qwen3QualityFirstDecodeWindowTests: XCTestCase {
         let referenceFrames = 31
         let generatedFrames = 40
         let codes = fixtureCodes(frameCount: referenceFrames + generatedFrames, zeroFrames: [])
-        let expected = Qwen3TTSModel.decodeQualityFirstWindow(
+        let expected = try Qwen3TTSModel.decodeQualityFirstWindow(
             tokenizer, codes: codes, referenceFrameCount: referenceFrames
         ).asArray(Float.self)
         // Quantizer-major `[1, groups, frames]`, as the prompt's reference

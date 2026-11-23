@@ -1742,10 +1742,17 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         pieceFrames: Int = Qwen3TTSModel.qualityFirstDecoderChunkFrames
     ) throws -> Int {
         let frames = referenceCodes.dim(2)
-        for start in stride(from: 0, to: frames, by: max(1, pieceFrames)) {
-            try Task.checkCancellation()
-            let end = min(frames, start + max(1, pieceFrames))
-            eval(decoder.streamingStep(referenceCodes[0..., 0..., start ..< end]))
+        do {
+            for start in stride(from: 0, to: frames, by: max(1, pieceFrames)) {
+                try Task.checkCancellation()
+                let end = min(frames, start + max(1, pieceFrames))
+                try withError {
+                    eval(decoder.streamingStep(referenceCodes[0..., 0..., start ..< end]))
+                }
+            }
+        } catch {
+            decoder.resetStreamingState()
+            throw error
         }
         return frames
     }
@@ -1775,7 +1782,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             return (frames, true)
         }
         let primed = try primeStreamingDecoder(decoder, referenceCodes: referenceCodes, pieceFrames: pieceFrames)
-        if let snapshot = decoder.streamingStateSnapshot() {
+        if let snapshot = try decoder.streamingStateSnapshot() {
             primedStates.store(snapshot, forReference: reference, decoder: decoder)
         }
         return (primed, false)
@@ -1793,9 +1800,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         codes: MLXArray,
         referenceFrameCount: Int,
         chunkTokens: Int = Qwen3TTSModel.qualityFirstDecoderChunkFrames
-    ) -> MLXArray {
+    ) throws -> MLXArray {
         var audioChunks = [MLXArray]()
-        for chunk in speechTokenizer.streamingDecode(codes, chunkTokens: chunkTokens) {
+        for chunk in try speechTokenizer.streamingDecode(codes, chunkTokens: chunkTokens) {
             audioChunks.append(chunk)
         }
         var audio = concatenated(audioChunks, axis: -1)[0]
@@ -1810,7 +1817,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             audio = audio[window]
         }
 
-        eval(audio)
+        try evalForReadback(audio)
         return audio
     }
 
@@ -1818,9 +1825,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         _ codes: MLXArray,
         referenceFrameCount: Int,
         chunkTokens: Int = Qwen3TTSModel.qualityFirstDecoderChunkFrames
-    ) -> MLXArray {
+    ) throws -> MLXArray {
         guard let speechTokenizer else { return MLXArray.zeros([1]) }
-        return Self.decodeQualityFirstWindow(
+        return try Self.decodeQualityFirstWindow(
             speechTokenizer,
             codes: codes,
             referenceFrameCount: referenceFrameCount,
@@ -2560,10 +2567,14 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             guard let materializedEventSink else { return }
             let flushEvalStartedAt = ContinuousClock.now
             // Once per chunk under `.pipelined`, on the same allocation-free
-            // entry point as every loop interval.
-            os_signpost(.begin, log: stepSignpostLog, name: "Audio Chunk Flush")
-            eval(pending.audioChunk)
-            os_signpost(.end, log: stepSignpostLog, name: "Audio Chunk Flush")
+            // entry point as every loop interval. Evaluate once via
+            // `evalForReadback` so MLX's one-shot `Error::check()` is never
+            // consumed by a bare `eval` ahead of readback.
+            do {
+                os_signpost(.begin, log: stepSignpostLog, name: "Audio Chunk Flush")
+                defer { os_signpost(.end, log: stepSignpostLog, name: "Audio Chunk Flush") }
+                try evalForReadback(pending.audioChunk)
+            }
             // Flush wait lands in the running audio-chunk-eval totals (its
             // chunk's own delta closed at assembly; this shifts attribution by
             // at most one chunk in the diagnostic breakdown). Its own interval
@@ -2578,7 +2589,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 cloneAudioChunkEvalTotal += flushElapsed
             }
             try Task.checkCancellation()
-            try evalForReadback(pending.audioChunk)
             let materializedSamples = pending.audioChunk.asArray(Float.self)
             if let timings = pending.timings {
                 let handoffStartedAt = ContinuousClock.now
@@ -2799,24 +2809,34 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             os_signpost(.end, log: stepSignpostLog, name: "Codec Embedding Assembly")
             codecEmbeddingAssemblyTotal += codecEmbeddingStartedAt.elapsed
             let streamStepEvalStartedAt = ContinuousClock.now
-            os_signpost(.begin, log: stepSignpostLog, name: "Step Eval Flush")
-            switch (streamStepEvalPolicy, stepIntrospection) {
-            case (.full, let introspection?):
-                eval(inputEmbeds, isEOS, introspection.entropy, introspection.eosProbability)
-            case (.full, nil):
-                eval(inputEmbeds, isEOS)
-            case (.pipelined, let introspection?):
-                asyncEval(inputEmbeds, isEOS, introspection.entropy, introspection.eosProbability)
-            case (.pipelined, nil):
-                asyncEval(inputEmbeds, isEOS)
-            case (.eosOnly, let introspection?):
-                eval(isEOS, introspection.entropy, introspection.eosProbability)
-            case (.eosOnly, nil):
-                eval(isEOS)
-            case (.deferred, _):
-                break
+            do {
+                os_signpost(.begin, log: stepSignpostLog, name: "Step Eval Flush")
+                defer { os_signpost(.end, log: stepSignpostLog, name: "Step Eval Flush") }
+                switch (streamStepEvalPolicy, stepIntrospection) {
+                case (.full, let introspection?):
+                    try withError {
+                        eval(inputEmbeds, isEOS, introspection.entropy, introspection.eosProbability)
+                    }
+                case (.full, nil):
+                    try withError {
+                        eval(inputEmbeds, isEOS)
+                    }
+                case (.pipelined, let introspection?):
+                    asyncEval(inputEmbeds, isEOS, introspection.entropy, introspection.eosProbability)
+                case (.pipelined, nil):
+                    asyncEval(inputEmbeds, isEOS)
+                case (.eosOnly, let introspection?):
+                    try withError {
+                        eval(isEOS, introspection.entropy, introspection.eosProbability)
+                    }
+                case (.eosOnly, nil):
+                    try withError {
+                        eval(isEOS)
+                    }
+                case (.deferred, _):
+                    break
+                }
             }
-            os_signpost(.end, log: stepSignpostLog, name: "Step Eval Flush")
             let streamStepEvalElapsed = streamStepEvalStartedAt.elapsed
             streamStepEvalTotal += streamStepEvalElapsed
             // The eval call is the enqueue. Only `.pipelined` has a separate,
@@ -3165,11 +3185,15 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     cloneFirstChunkDecoderTokens = codesForDecoder.dim(2)
                 }
                 let audioChunkEvalStartedAt = ContinuousClock.now
-                os_signpost(.begin, log: stepSignpostLog, name: "Audio Chunk Eval")
-                // STREAM-001: the final chunk is a synchronous completion barrier. Returning
-                // before materialization can race playback handoff and truncate the preview.
-                eval(audioChunk)
-                os_signpost(.end, log: stepSignpostLog, name: "Audio Chunk Eval")
+                do {
+                    os_signpost(.begin, log: stepSignpostLog, name: "Audio Chunk Eval")
+                    defer { os_signpost(.end, log: stepSignpostLog, name: "Audio Chunk Eval") }
+                    // STREAM-001: the final chunk is a synchronous completion barrier. Returning
+                    // before materialization can race playback handoff and truncate the preview.
+                    // Evaluate once via `evalForReadback` so MLX's one-shot `Error::check()`
+                    // cannot be consumed before `asArray` below.
+                    try evalForReadback(audioChunk)
+                }
                 let audioChunkEvalElapsed = audioChunkEvalStartedAt.elapsed
                 audioChunkEvalTotal += audioChunkEvalElapsed
                 if isPureVoiceDesign {
@@ -3182,7 +3206,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 let materializedSamples: [Float]?
                 if materializedEventSink != nil {
                     try Task.checkCancellation()
-                    try evalForReadback(audioChunk)
                     materializedSamples = audioChunk.asArray(Float.self)
                 } else {
                     materializedSamples = nil
@@ -3312,11 +3335,10 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
 
         // The in-context reference cut and the generated tail both come from
         // explicit frame counts (qualityFirstSampleRange), never from the
-        // decoded length or from counting non-zero codes.
-        let audio = decodeChunk(decodeCodes, referenceFrameCount: referenceFrameCount)
-
+        // decoded length or from counting non-zero codes. `decodeQualityFirstWindow`
+        // evaluates the returned waveform once through `evalForReadback`.
         let finalDecodeEvalStartedAt = ContinuousClock.now
-        eval(audio)
+        let audio = try decodeChunk(decodeCodes, referenceFrameCount: referenceFrameCount)
         // Capture final KV-cache footprint for non-streaming runs (no chunk
         // boundaries fired, so the peak trackers haven't been updated) BEFORE
         // clearing the generation cache, which resets the KV-cache offset.

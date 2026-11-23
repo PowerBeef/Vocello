@@ -333,36 +333,41 @@ public final class AudioSealGenerator {
         var bottleneckParts = [MLXArray]()
         var frame = 0
         while frame < totalFrames {
-            autoreleasepool {
+            try autoreleasepool {
                 let coreEnd = min(frame + coreFrames, totalFrames)
                 let windowStartFrame = max(0, frame - marginFrames)
                 let windowStart = windowStartFrame * stride
                 let windowEnd = min(pcm.count, (coreEnd + marginFrames) * stride)
                 let x = MLXArray(Array(pcm[windowStart ..< windowEnd]))
                     .reshaped([1, windowEnd - windowStart, 1])
-                let window = encoderConvs(x)
-                let lo = frame - windowStartFrame
-                let hi = min(lo + (coreEnd - frame), window.dim(1))
-                let core = window[0..., lo ..< hi, 0...]
-                core.eval()
-                bottleneckParts.append(core)
+                try withError {
+                    let window = encoderConvs(x)
+                    let lo = frame - windowStartFrame
+                    let hi = min(lo + (coreEnd - frame), window.dim(1))
+                    let core = window[0..., lo ..< hi, 0...]
+                    core.eval()
+                    bottleneckParts.append(core)
+                }
                 frame = coreEnd
             }
         }
         let bottleneck = concatenated(bottleneckParts, axis: 1)
 
         // Stage 2: exact full-sequence frame-rate stages (LSTMs + message).
-        let lstmOut = autoreleasepool { () -> MLXArray in
-            let out = frameStages(bottleneck)
-            out.eval()
+        var lstmOut = bottleneck
+        try autoreleasepool {
+            try withError {
+                let out = frameStages(bottleneck)
+                out.eval()
+                lstmOut = out
+            }
             Memory.clearCache()
-            return out
         }
 
-        // Stage 3: windowed decoder convolutions → delta samples. Only this
-        // stage reads arrays back, so only its evaluation is probed: a failure
-        // in stages 1-2 re-raises here, and the caller's error scope reports
-        // one that a retried evaluation got past.
+        // Stage 3: windowed decoder convolutions → delta samples. Every stage
+        // probes its own `eval()` via `withError` because MLX's one-shot
+        // `Error::check()` atomically clears on first evaluation: a bare
+        // `eval()` in stages 1–2 would consume the error ahead of readback.
         var out = [Float](repeating: 0, count: pcm.count)
         frame = 0
         while frame < totalFrames {
@@ -370,17 +375,23 @@ public final class AudioSealGenerator {
                 let coreEnd = min(frame + coreFrames, totalFrames)
                 let windowStartFrame = max(0, frame - marginFrames)
                 let windowEndFrame = min(totalFrames, coreEnd + marginFrames)
-                let window = decoderConvs(lstmOut[0..., windowStartFrame ..< windowEndFrame, 0...])
                 let sampleLo = (frame - windowStartFrame) * stride
                 let coreStart = frame * stride
                 let coreSampleEnd = min(coreEnd * stride, pcm.count)
                 let span = coreSampleEnd - coreStart
-                let deltaSlice = window[0..., sampleLo ..< min(sampleLo + span, window.dim(1)), 0]
-                    .reshaped([-1])
-                try withError { deltaSlice.eval() }
-                let delta = deltaSlice.asArray(Float.self)
-                for i in 0 ..< min(span, delta.count) {
-                    out[coreStart + i] = Self.markedSample(pcm[coreStart + i], delta: delta[i])
+                var evaluatedSlice: MLXArray?
+                try withError {
+                    let window = decoderConvs(lstmOut[0..., windowStartFrame ..< windowEndFrame, 0...])
+                    let deltaSlice = window[0..., sampleLo ..< min(sampleLo + span, window.dim(1)), 0]
+                        .reshaped([-1])
+                    deltaSlice.eval()
+                    evaluatedSlice = deltaSlice
+                }
+                if let deltaSlice = evaluatedSlice {
+                    let delta = deltaSlice.asArray(Float.self)
+                    for i in 0 ..< min(span, delta.count) {
+                        out[coreStart + i] = Self.markedSample(pcm[coreStart + i], delta: delta[i])
+                    }
                 }
                 frame = coreEnd
             }

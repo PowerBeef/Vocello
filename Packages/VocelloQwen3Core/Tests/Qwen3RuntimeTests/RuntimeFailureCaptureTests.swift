@@ -1,3 +1,4 @@
+import Foundation
 import MLX
 @testable import MLXAudioTTS
 @testable import VocelloQwen3Core
@@ -222,6 +223,96 @@ final class RuntimeFailureCaptureTests: XCTestCase {
         XCTAssertFalse(VocelloQwen3Engine.unleasedFailureMarksModelForUnload(
             recorded: nil, error: CancellationError()
         ))
+    }
+
+    /// RF-68 (B1.1): `streamingDecode`, `decodeQualityFirstWindow`,
+    /// `primeStreamingDecoder`, and `streamingStateSnapshot` must probe their
+    /// `eval` calls via `withError` / `evalForReadback` so MLX's one-shot
+    /// `Error::check()` throws directly instead of being consumed by the outer
+    /// scope and leaving poisoned state behind.
+    func testDecoderStreamingEvalAndSnapshotThrowMLXErrorsDirectlyInsteadOfPoisoningState() throws {
+        let decoderConfig = try Qwen3DecoderPartitionTests.tinyDecoderConfig()
+        var tokenizerConfig = try JSONDecoder().decode(
+            Qwen3TTSTokenizerConfig.self, from: Data("{}".utf8)
+        )
+        tokenizerConfig.decoderConfig = decoderConfig
+        tokenizerConfig.decodeUpsampleRate = (decoderConfig.upsampleRates + decoderConfig.upsamplingRatios)
+            .reduce(1, *)
+        let tokenizer = Qwen3TTSSpeechTokenizer(config: tokenizerConfig, includeEncoder: false)
+
+        // Valid-shaped `[1, 4, 2]` lazy codec tensor backed by a 256 GiB allocation.
+        let oversizedTimeMajor = Self.oversizedArray().sum(axis: 0)[0 ..< 8]
+            .asType(.int32)
+            .reshaped([1, 4, 2])
+        let oversizedQuantizerMajor = oversizedTimeMajor.transposed(0, 2, 1)
+
+        // 1. `streamingDecode` throws via its own `withError` probe and resets decoder state.
+        let decodeScope = VocelloQwen3MLXErrorScope()
+        XCTAssertThrowsError(
+            try decodeScope.capture { () throws -> [MLXArray] in
+                try tokenizer.streamingDecode(oversizedTimeMajor, chunkTokens: 4)
+            }
+        ) { error in
+            XCTAssertEqual(error as? VocelloQwen3RuntimeFailure, .allocation)
+        }
+        XCTAssertNil(decodeScope.failure, "streamingDecode must catch the error via withError, not the outer scope")
+        XCTAssertNil(tokenizer.decoder.transformerCache, "failed streamingDecode must reset streaming state")
+
+        // 2. `decodeQualityFirstWindow` propagates the MLX error via `withError` / `evalForReadback`.
+        let windowScope = VocelloQwen3MLXErrorScope()
+        XCTAssertThrowsError(
+            try windowScope.capture { () throws -> MLXArray in
+                try Qwen3TTSModel.decodeQualityFirstWindow(
+                    tokenizer,
+                    codes: oversizedTimeMajor,
+                    referenceFrameCount: 0,
+                    chunkTokens: 4
+                )
+            }
+        ) { error in
+            XCTAssertEqual(error as? VocelloQwen3RuntimeFailure, .allocation)
+        }
+        XCTAssertNil(windowScope.failure, "decodeQualityFirstWindow must catch the error via withError, not the outer scope")
+
+        // 3. `primeStreamingDecoder` throws via `withError` and resets partial decoder state.
+        let primeScope = VocelloQwen3MLXErrorScope()
+        XCTAssertThrowsError(
+            try primeScope.capture { () throws -> Int in
+                try Qwen3TTSModel.primeStreamingDecoder(
+                    tokenizer.decoder,
+                    referenceCodes: oversizedQuantizerMajor,
+                    pieceFrames: 4
+                )
+            }
+        ) { error in
+            XCTAssertEqual(error as? VocelloQwen3RuntimeFailure, .allocation)
+        }
+        XCTAssertNil(primeScope.failure, "primeStreamingDecoder must catch the error via withError, not the outer scope")
+        XCTAssertNil(tokenizer.decoder.transformerCache, "failed priming must reset decoder streaming state")
+
+        // 4. `streamingStateSnapshot()` throws via `withError` if evaluating a layer state fails.
+        let healthyCodes = MLXArray([Int32](repeating: 1, count: 8)).reshaped([1, 2, 4])
+        tokenizer.decoder.resetStreamingState()
+        defer { tokenizer.decoder.resetStreamingState() }
+        _ = try Qwen3TTSModel.primeStreamingDecoder(tokenizer.decoder, referenceCodes: healthyCodes, pieceFrames: 4)
+        let carriers = tokenizer.decoder.streamingStateCarriers()
+        let targetCarrier = try XCTUnwrap(
+            carriers.values.first { $0.streamingState != nil }
+        )
+        let originalShape = try XCTUnwrap(targetCarrier.streamingState?.shape)
+        let elementCount = originalShape.reduce(1, *)
+        targetCarrier.streamingState = Self.oversizedArray().sum(axis: 0)[0 ..< elementCount]
+            .reshaped(originalShape)
+
+        let snapshotScope = VocelloQwen3MLXErrorScope()
+        XCTAssertThrowsError(
+            try snapshotScope.capture { () throws -> Qwen3DecoderStreamingSnapshot? in
+                try tokenizer.decoder.streamingStateSnapshot()
+            }
+        ) { error in
+            XCTAssertEqual(error as? VocelloQwen3RuntimeFailure, .allocation)
+        }
+        XCTAssertNil(snapshotScope.failure, "streamingStateSnapshot must catch the error via withError, not the outer scope")
     }
 
     /// 2^36 float32 elements (256 GiB): larger than any device's maximum

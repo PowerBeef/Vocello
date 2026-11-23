@@ -339,4 +339,135 @@ final class Qwen3CodePredictorCompiledTests: XCTestCase {
             "re-allocating lazy per-pass buffers must reproduce identical pass-0 logits"
         )
     }
+
+    /// RF-68: tracing a hoisted `CodePredictorCompiledPlan` on one OS thread and
+    /// releasing the model/plan on another OS thread (as Swift Concurrency
+    /// cooperative threads routinely do across load/prewarm/unload) must release
+    /// 100% of predictor and fused-projection weights from `Memory.activeMemory`
+    /// even while the tracing thread stays alive.
+    func testCrossThreadPlanDeinitReleasesPredictorWeightsWhileTraceThreadStaysAlive() throws {
+        let json: [String: Any] = [
+            "vocab_size": 1024,
+            "hidden_size": 256,
+            "intermediate_size": 512,
+            "num_hidden_layers": 2,
+            "num_attention_heads": 4,
+            "num_key_value_heads": 2,
+            "head_dim": 64,
+            "hidden_act": "silu",
+            "max_position_embeddings": 128,
+            "rms_norm_eps": 1e-6,
+            "rope_theta": 10_000,
+            "attention_bias": false,
+            "attention_dropout": 0,
+            "num_code_groups": 4,
+        ]
+        let config = try JSONDecoder().decode(
+            Qwen3TTSTalkerCodePredictorConfig.self,
+            from: JSONSerialization.data(withJSONObject: json)
+        )
+        let sampling = CompiledPassSampling(temperature: 0.9, topK: 8, castsLogitsToFloat32: true)
+
+        Memory.clearCache()
+        let baselineActive = Memory.activeMemory
+
+        final class Holder: @unchecked Sendable {
+            var predictor: Qwen3TTSCodePredictor?
+            var framePlan: CodePredictorCompiledPlan?
+            var perPassPlan: CodePredictorCompiledPlan?
+            var traceThreadID: ObjectIdentifier?
+            var deinitThreadID: ObjectIdentifier?
+            var peakActiveDuringTrace: Int = 0
+        }
+        let holder = Holder()
+        let traceDone = DispatchSemaphore(value: 0)
+        let allowTraceThreadExit = DispatchSemaphore(value: 0)
+        let traceExited = DispatchSemaphore(value: 0)
+
+        let traceThread = Thread {
+            defer { traceExited.signal() }
+            holder.traceThreadID = ObjectIdentifier(Thread.current)
+            // Run in a nested function so ARC releases all local references on
+            // `traceThread`'s stack before `allowTraceThreadExit.wait()`, even
+            // under `-Onone` test builds.
+            func buildAndTrace() {
+                // `talkerHiddenSize: 512 != hidden_size: 256` exercises
+                // `small_to_mtp_projection` (quantized `Linear` with `bias: true`),
+                // matching the shipped 1.7B models' `2048 -> 1024` layout.
+                let predictor = Qwen3TTSCodePredictor(config: config, talkerHiddenSize: 512)
+                XCTAssertNotNil(predictor.projection)
+                quantize(model: predictor, groupSize: 64, bits: 4)
+                eval(predictor)
+                let summary = predictor.fuseProjections()
+                XCTAssertGreaterThan(summary.fusedGroupCount, 0)
+
+                let framePlan = CodePredictorCompiledPlan(
+                    predictor: predictor, dtype: .float32, sampling: sampling
+                )
+                let perPassPlan = CodePredictorCompiledPlan(predictor: predictor, dtype: .float32)
+
+                let hidden = MLXRandom.normal([1, 1, 512], key: MLXRandom.key(7))
+                let embed = MLXRandom.normal([1, 1, 512], key: MLXRandom.key(8))
+                let keys = (0 ..< 3).map { MLXRandom.key(UInt64(20 + $0)) }
+                let frame = framePlan.runFrame(codeHidden: hidden, code0Embed: embed, keys: keys)
+                let pass0Logits = perPassPlan.run(
+                    pass: 0, codeHidden: hidden, code0Embed: embed, token: nil
+                )
+                // Pass 1 has seqLen == 1, exercising both `fusedQKV`/`fusedGateUp`
+                // and `codecEmbedding[0]` inside `compiledPass`.
+                let pass1Logits = perPassPlan.run(
+                    pass: 1, codeHidden: nil, code0Embed: nil,
+                    token: MLXArray([Int32(0)]).reshaped(1, 1)
+                )
+                eval(frame.codes + [frame.embeddingSum, pass0Logits, pass1Logits])
+                perPassPlan.releasePerPassBuffers()
+
+                holder.peakActiveDuringTrace = Memory.activeMemory
+                holder.predictor = predictor
+                holder.framePlan = framePlan
+                holder.perPassPlan = perPassPlan
+            }
+            buildAndTrace()
+            traceDone.signal()
+            // Keep the tracing thread (and its thread_local MLX CompileCache)
+            // alive until after the memory assertion, matching Swift's
+            // long-lived cooperative worker threads.
+            allowTraceThreadExit.wait()
+        }
+        traceThread.start()
+        traceDone.wait()
+        defer {
+            allowTraceThreadExit.signal()
+            traceExited.wait()
+        }
+
+        let loadedDelta = holder.peakActiveDuringTrace - baselineActive
+        XCTAssertGreaterThan(
+            loadedDelta, 2 * 1024 * 1024,
+            "synthetic quantized predictor must occupy > 2 MiB active MLX memory so retention is unmistakable"
+        )
+
+        let deinitDone = DispatchSemaphore(value: 0)
+        let deinitThread = Thread {
+            holder.deinitThreadID = ObjectIdentifier(Thread.current)
+            holder.framePlan = nil
+            holder.perPassPlan = nil
+            holder.predictor = nil
+            Memory.clearCache()
+            deinitDone.signal()
+        }
+        deinitThread.start()
+        deinitDone.wait()
+
+        XCTAssertNotEqual(holder.traceThreadID, holder.deinitThreadID)
+        let retainedAfterCrossThreadDeinit = Memory.activeMemory - baselineActive
+        // Fused projections alone occupy 480 KiB on this fixture; `< 64 KiB`
+        // fails decisively if either `parameters()` or `fusedQKV`/`fusedGateUp`
+        // stops flowing through `compile(inputs:)`.
+        XCTAssertLessThan(
+            retainedAfterCrossThreadDeinit,
+            64 * 1024,
+            "cross-thread plan deinit leaked \(retainedAfterCrossThreadDeinit) bytes while tracing thread stayed alive"
+        )
+    }
 }

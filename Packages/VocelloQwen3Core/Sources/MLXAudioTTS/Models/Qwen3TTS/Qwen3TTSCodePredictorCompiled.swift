@@ -91,6 +91,15 @@ struct CompiledPassSampling: Equatable, Hashable, Sendable {
 /// and released at the end of a take.
 final class CodePredictorCompiledPlan {
     private let predictor: Qwen3TTSCodePredictor
+    /// Flattened weight arrays (module parameters plus fused projections) passed
+    /// as `compile(inputs:)` state so MLX's thread-local `CompileCache` traces
+    /// weights as zero-byte placeholders instead of capturing weight buffers by
+    /// value. Without this, unloading a `Qwen3TTSModel` on a different Swift
+    /// Concurrency cooperative thread than the thread that traced the plan
+    /// permanently leaks ~180 MiB of code-predictor weights per model switch
+    /// because `mlx-swift`'s `CompiledFunction.deinit` only erases the
+    /// deallocating thread's `thread_local` cache.
+    private let weightInputs: [MLXArray]
     private let passCount: Int
     private let layerCount: Int
     /// One K and one V buffer per layer, allocated lazily only for per-pass
@@ -118,10 +127,37 @@ final class CodePredictorCompiledPlan {
 
     init(predictor: Qwen3TTSCodePredictor, dtype: DType, sampling: CompiledPassSampling? = nil) {
         self.predictor = predictor
+        self.weightInputs = Self.collectWeightInputs(from: predictor)
         self.sampling = sampling
         self.dtype = dtype
         self.passCount = predictor.numCodeGroups - 1
         self.layerCount = predictor.model.layers.count
+    }
+
+    private static func collectWeightInputs(from predictor: Qwen3TTSCodePredictor) -> [MLXArray] {
+        var result: [MLXArray] = []
+        var seen = Set<ObjectIdentifier>()
+        func append(_ array: MLXArray) {
+            if seen.insert(ObjectIdentifier(array)).inserted {
+                result.append(array)
+            }
+        }
+        for (_, array) in predictor.parameters().flattened().sorted(by: { $0.0 < $1.0 }) {
+            append(array)
+        }
+        for layer in predictor.model.layers {
+            if let fusedQKV = layer.selfAttn.fusedQKV {
+                append(fusedQKV.weight)
+                append(fusedQKV.scales)
+                append(fusedQKV.biases)
+            }
+            if let fusedGateUp = layer.mlp.fusedGateUp {
+                append(fusedGateUp.weight)
+                append(fusedGateUp.scales)
+                append(fusedGateUp.biases)
+            }
+        }
+        return result
     }
 
     private func ensurePerPassBuffers() {
@@ -194,7 +230,7 @@ final class CodePredictorCompiledPlan {
             let predictor = self.predictor
             let passCount = self.passCount
             let dtype = self.dtype
-            let compiled = compile { [predictor, passCount, dtype, sampling] (inputs: [MLXArray]) -> [MLXArray] in
+            let compiled = compile(inputs: [weightInputs]) { [predictor, passCount, dtype, sampling] (inputs: [MLXArray]) -> [MLXArray] in
                 Self.traceFrame(
                     predictor: predictor, passCount: passCount, sampling: sampling, dtype: dtype, inputs: inputs
                 )
@@ -219,7 +255,7 @@ final class CodePredictorCompiledPlan {
         if let cached = compiledPasses[pass] { return cached }
         let predictor = self.predictor
         let layerCount = self.layerCount
-        let compiled = compile { [predictor, layerCount] (inputs: [MLXArray]) -> [MLXArray] in
+        let compiled = compile(inputs: [weightInputs]) { [predictor, layerCount] (inputs: [MLXArray]) -> [MLXArray] in
             Self.tracePass(
                 pass,
                 predictor: predictor,

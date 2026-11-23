@@ -8,6 +8,7 @@
     python3 scripts/qc.py controls build|report
     python3 scripts/qc.py confirm next|record
     python3 scripts/qc.py language-bench takes|evidence
+    python3 scripts/qc.py multimodal prepare|prepare-screen|prepare-q1|prepare-q2|aggregate|qualify|report
 
 Exit codes: 0 success (gate: pass), 1 failure (gate: fail), 2 error or usage,
 3 gate warn, 4 gate not assessed (coverage-v2). See docs/reference/qc.md.
@@ -378,6 +379,56 @@ def cmd_controls(args: argparse.Namespace, layout: Layout) -> int:
     return EXIT_OK
 
 
+def cmd_multimodal(args: argparse.Namespace, layout: Layout) -> int:
+    from qc import multimodal
+
+    try:
+        if args.action == "prepare":
+            result = multimodal.prepare_qc_run(
+                layout, args.run, session=args.session, limit=args.limit,
+                seed=args.seed, include_local_zoom=not args.no_local_zoom,
+            )
+        elif args.action == "prepare-screen":
+            result = multimodal.prepare_screen_ab(
+                layout, args.screen_run, args.a, args.b,
+                session=args.session, limit=args.limit, seed=args.seed,
+            )
+        elif args.action == "prepare-q1":
+            result = multimodal.prepare_q1_controls(layout, session=args.session, seed=args.seed)
+        elif args.action == "prepare-q2":
+            result = multimodal.prepare_q2_calibration(
+                layout, session=args.session,
+                allow_synthetic_confirm_batches=args.allow_synthetic_confirm_batches,
+                clean_per_language=args.clean_per_language, seed=args.seed,
+            )
+        elif args.action == "aggregate":
+            result = multimodal.aggregate_session(layout, args.session, args.verdicts)
+        elif args.action == "qualify":
+            result = multimodal.build_qualification_eval(
+                layout, q1_session=args.q1, q2_session=args.q2,
+                model_name=args.model, output_path=Path(args.output) if args.output else None,
+            )
+        else:
+            report_path = multimodal.session_dir(layout, args.session) / "report.json"
+            if not report_path.is_file():
+                raise multimodal.MultimodalError(f"no report.json for session {args.session!r}")
+            result = store.read_json(report_path)
+    except (multimodal.MultimodalError, FileExistsError, ValueError, OSError, KeyError) as error:
+        print(f"qc multimodal {args.action}: {error}", file=sys.stderr)
+        return EXIT_ERROR
+    if getattr(args, "json", False) or args.action in ("prepare", "prepare-screen", "prepare-q1", "prepare-q2"):
+        _print_json(result)
+    elif args.action == "qualify":
+        axes = ", ".join(f"{k}={v}" for k, v in sorted(result["axisStatus"].items()))
+        print(f"qc multimodal qualify: model={result['targetModel']} {axes}")
+        if args.output:
+            print(f"qc multimodal qualify: wrote {args.output} (aggregates only; report-only advisory)")
+    else:
+        print(f"qc multimodal {args.action}: session={result.get('session')} kind={result.get('kind')} "
+              f"status={result.get('status')}")
+    return EXIT_OK
+
+
 # --- parser ---------------------------------------------------------------------------
 
 def build_parser() -> argparse.ArgumentParser:
@@ -565,6 +616,45 @@ def build_parser() -> argparse.ArgumentParser:
     control_report.add_argument("--limit", type=float, default=0.05, help="mark rates above this share (default 0.05)")
     control_report.add_argument("--output", help="also write the report JSON here")
     controls.set_defaults(handler=cmd_controls)
+
+    mm = commands.add_parser("multimodal", help="offline report-only multimodal audio QC complement (RF-72)")
+    mm_actions = mm.add_subparsers(dest="action", required=True)
+    mm_prep = mm_actions.add_parser("prepare", help="prepare a blinded multimodal review packet from a QC v2 run")
+    mm_prep.add_argument("--run", required=True, help="QC v2 run id under build/private/qc/runs")
+    mm_prep.add_argument("--session", help="session name under build/private/qc/multimodal")
+    mm_prep.add_argument("--limit", type=int, help="maximum takes to stage")
+    mm_prep.add_argument("--seed", type=int, default=0)
+    mm_prep.add_argument("--no-local-zoom", action="store_true", help="skip 2.5 s candidate zoom crops")
+    mm_screen = mm_actions.add_parser("prepare-screen", help="prepare blinded dual-order AB/BA pairs from quality_screen.py")
+    mm_screen.add_argument("--screen-run", required=True, help="quality_screen.py run directory")
+    mm_screen.add_argument("--a", required=True, help="arm A name")
+    mm_screen.add_argument("--b", required=True, help="arm B name")
+    mm_screen.add_argument("--session")
+    mm_screen.add_argument("--limit", type=int, default=24)
+    mm_screen.add_argument("--seed", type=int, default=0)
+    mm_q1 = mm_actions.add_parser("prepare-q1", help="build the 5-control Q1 bias and capability benchmark")
+    mm_q1.add_argument("--session", default="q1-controls-v1")
+    mm_q1.add_argument("--seed", type=int, default=20261122)
+    mm_q2 = mm_actions.add_parser("prepare-q2", help="build the Q2 blind confirmation and human-control packet")
+    mm_q2.add_argument("--session", default="q2-blind-cal-v1")
+    mm_q2.add_argument("--allow-synthetic-confirm-batches", action="store_true",
+                       help="explicitly opt into reading non-clone synthetic confirm-* WAVs")
+    mm_q2.add_argument("--clean-per-language", type=int, default=15)
+    mm_q2.add_argument("--seed", type=int, default=20261122)
+    mm_agg = mm_actions.add_parser("aggregate", help="reconcile worker verdicts and write private report.json")
+    mm_agg.add_argument("--session", required=True)
+    mm_agg.add_argument("--verdicts", required=True, help="path to vocello.qc.multimodal.verdicts/1 JSON")
+    mm_agg.add_argument("--json", action="store_true")
+    mm_qual = mm_actions.add_parser("qualify", help="compute privacy-safe aggregate Q1/Q2 evaluation metrics")
+    mm_qual.add_argument("--q1", required=True, help="Q1 control session name")
+    mm_qual.add_argument("--q2", help="optional Q2 blind calibration session name")
+    mm_qual.add_argument("--model", help="override target model identifier in the eval receipt")
+    mm_qual.add_argument("--output", help="write aggregate-only eval JSON here")
+    mm_qual.add_argument("--json", action="store_true")
+    mm_rep = mm_actions.add_parser("report", help="inspect a completed multimodal session report")
+    mm_rep.add_argument("--session", required=True)
+    mm_rep.add_argument("--json", action="store_true")
+    mm.set_defaults(handler=cmd_multimodal)
     return parser
 
 

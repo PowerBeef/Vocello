@@ -1,0 +1,217 @@
+{
+  "schema": "vocello.qc.multimodal.rubric/1",
+  "version": 1,
+  "targetModel": "gemini-4-neon",
+  "status": "report-only-advisory",
+  "neverGates": true,
+  "recordedDate": "2026-11-22",
+  "audio": {
+    "sampleRateHz": 16000,
+    "channels": 1,
+    "sampleWidthBytes": 2,
+    "markerSilenceSeconds": 0.45,
+    "markerToneSeconds": 0.12,
+    "markerToneHz": 440.0,
+    "markerToneDbfs": -18.0,
+    "markerFadeSeconds": 0.015,
+    "localZoomWindowSeconds": 2.5,
+    "maxLocalZoomWindows": 3,
+    "cloneReferenceMaxSeconds": 15.0,
+    "longformSliceSeconds": 6.0,
+    "longformMinDurationSeconds": 18.0
+  },
+  "defectClasses": [
+    "stutter",
+    "mispronunciation",
+    "wrong-language",
+    "cutoff",
+    "pause",
+    "devoiced",
+    "pitch",
+    "tonal-collapse",
+    "voice-change",
+    "artifact",
+    "unnatural",
+    "other"
+  ],
+  "axes": [
+    "diction",
+    "delivery",
+    "clone",
+    "pairwise"
+  ],
+  "qualificationBars": {
+    "q1": {
+      "c1IdenticalTieRateMin": 0.90,
+      "c2OrderFlipRateMax": 0.15,
+      "c2ClearPerturbationConsistentWinMin": 0.85,
+      "c3AdversarialMismatchDetectionMin": 0.90,
+      "c4SpeakerBalancedAccuracyMin": 0.85,
+      "c5BriefMismatchDetectionMin": 0.80,
+      "c5HarmlessTransformFalseAlarmMax": 0.10
+    },
+    "q2": {
+      "cleanHumanFalseAlarmRateMax": 0.10,
+      "confirmUnusablePrecisionMin": 0.55,
+      "confirmFlaggedMinusUnflaggedMin": 0.15,
+      "historicalQcV2PrecisionBaseline": 0.31
+    }
+  },
+  "prompts": {
+    "blind": "Listen carefully to the audio file with NO prior script or expectations. Transcribe verbatim what is actually spoken, preserving any stutters, partial-word false starts, dropped or whispered syllables, inserted vowels, or abrupt cutoffs — NEVER silently auto-correct what you hear. Report perceived language, accent cues, perceived delivery tone, intra-clip consistency, and any clearly audible defects by coarse region (start/early/middle/late/end). Do not guess milliseconds or invent defects if the speech is clean.",
+    "diction": "You are auditing diction, pronunciation, and local phonation against the intended script and requested language. Use both your Pass 1 blind verbatim hearing and a fresh listen to the full clip (plus any 2.5-second local zoom crops provided). Flag real mispronunciations, whispered/devoiced syllables, partial-word false starts, awkward over-linked liaisons, dropped/added words, or wrong-language shifts. CRITICAL: All legitimate native regional varieties (e.g., Quebec French, Metropolitan French, Belgian/Swiss French, US/UK/Australian English) are ACCEPTABLE unless the brief requests a specific variety — mark them 'legitimate_regional_variety', NOT an error.",
+    "delivery": "You are auditing delivery compliance and tonal/rhythmic consistency against the effective delivery brief (or neutral read speech if brief is neutral). Judge whether the voice matches the requested emotion/energy/pacing and stays steady across the clip (or across stitched opening/middle/final long-form segments separated by soft 440 Hz tone markers). Do not penalize harmless loudness differences or natural sentence-boundary breaths.",
+    "clone": "You are auditing voice-clone fidelity from a SINGLE stitched audio stream: Clip 1 (before the 440 Hz marker tone) is the reference speaker; Clip 2 (after the marker tone) is the candidate speech. Focus strictly on acoustic voice identity — ignore the spoken words. Rate vocal-tract timbre match (1-5), habitual pitch register match (too_low/matched/too_high/uncertain), dynamic rhythm and cadence similarity (1-5), synthesis artifact cleanliness (1-5), and whether Clip 2 sounds like the same speaker.",
+    "pairwise": "You are performing a blinded A/B audio comparison from a SINGLE stitched audio stream separated by soft 440 Hz marker tones. When clipCount is 2, compare Clip 1 vs Clip 2; when clipCount is 3, Clip 1 is the clone reference and you compare candidate Clip 2 ('clip_1') vs candidate Clip 3 ('clip_2') on overall quality, pronunciation fidelity, delivery naturalness, and speaker match to the reference. Choose 'tie' whenever both clips sound effectively identical or differences are negligible. Do NOT favor a clip for being first, last, or louder."
+  },
+  "schemas": {
+    "blind": {
+      "type": "object",
+      "required": [
+        "taskId",
+        "opaqueToken",
+        "verbatimHeard",
+        "detectedLanguage",
+        "perceivedDeliveryTone",
+        "intraClipConsistency",
+        "audibleDefects",
+        "confidence"
+      ],
+      "properties": {
+        "taskId": { "type": "string" },
+        "opaqueToken": { "type": "string" },
+        "verbatimHeard": { "type": "string" },
+        "detectedLanguage": { "type": "string" },
+        "perceivedAccentCues": { "type": "string" },
+        "perceivedDeliveryTone": { "type": "string" },
+        "intraClipConsistency": { "type": "string", "enum": ["consistent", "shifted", "broken", "uncertain"] },
+        "audibleDefects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["class", "severity", "region", "detail"],
+            "properties": {
+              "class": {
+                "type": "string",
+                "enum": ["stutter", "mispronunciation", "wrong-language", "cutoff", "pause", "devoiced", "pitch", "tonal-collapse", "voice-change", "artifact", "unnatural", "other"]
+              },
+              "severity": { "type": "string", "enum": ["mild", "moderate", "severe"] },
+              "region": { "type": "string", "enum": ["start", "early", "middle", "late", "end", "whole"] },
+              "detail": { "type": "string" }
+            }
+          }
+        },
+        "confidence": { "type": "string", "enum": ["low", "medium", "high"] }
+      }
+    },
+    "diction": {
+      "type": "object",
+      "required": [
+        "taskId",
+        "opaqueToken",
+        "pronunciationSeverity",
+        "contentMatch",
+        "devoicedOrWhisperedSyllable",
+        "falseStartOrStutter",
+        "liaisonOrBoundaryError",
+        "accentAssessment",
+        "overallUsability",
+        "confidence"
+      ],
+      "properties": {
+        "taskId": { "type": "string" },
+        "opaqueToken": { "type": "string" },
+        "pronunciationSeverity": { "type": "string", "enum": ["none", "mild", "moderate", "severe"] },
+        "contentMatch": { "type": "string", "enum": ["exact", "minor_deviation", "major_mismatch", "wrong_language"] },
+        "devoicedOrWhisperedSyllable": { "type": "boolean" },
+        "falseStartOrStutter": { "type": "boolean" },
+        "liaisonOrBoundaryError": { "type": "boolean" },
+        "accentAssessment": {
+          "type": "string",
+          "enum": ["native_standard", "legitimate_regional_variety", "mild_foreign_interference", "strong_foreign_interference", "uncertain"]
+        },
+        "defectClasses": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["stutter", "mispronunciation", "wrong-language", "cutoff", "pause", "devoiced", "pitch", "tonal-collapse", "voice-change", "artifact", "unnatural", "other"]
+          }
+        },
+        "overallUsability": { "type": "string", "enum": ["usable", "borderline", "unusable", "uncertain"] },
+        "confidence": { "type": "string", "enum": ["low", "medium", "high"] },
+        "briefNote": { "type": "string" }
+      }
+    },
+    "delivery": {
+      "type": "object",
+      "required": [
+        "taskId",
+        "opaqueToken",
+        "briefCompliance",
+        "consistency",
+        "cadenceNaturalness",
+        "overallUsability",
+        "confidence"
+      ],
+      "properties": {
+        "taskId": { "type": "string" },
+        "opaqueToken": { "type": "string" },
+        "briefCompliance": { "type": "string", "enum": ["matches", "partial", "contradicts", "not_applicable"] },
+        "consistency": { "type": "string", "enum": ["steady", "drifts", "abrupt_shift", "uncertain"] },
+        "cadenceNaturalness": { "type": "string", "enum": ["natural", "slightly_robotic", "choppy_or_rushed", "uncertain"] },
+        "overallUsability": { "type": "string", "enum": ["usable", "borderline", "unusable", "uncertain"] },
+        "confidence": { "type": "string", "enum": ["low", "medium", "high"] },
+        "briefNote": { "type": "string" }
+      }
+    },
+    "clone": {
+      "type": "object",
+      "required": [
+        "taskId",
+        "opaqueToken",
+        "sameSpeaker",
+        "timbreMatch",
+        "registerMatch",
+        "rhythmCadenceMatch",
+        "artifactFree",
+        "overallUsability",
+        "confidence"
+      ],
+      "properties": {
+        "taskId": { "type": "string" },
+        "opaqueToken": { "type": "string" },
+        "sameSpeaker": { "type": "string", "enum": ["yes", "no", "uncertain"] },
+        "timbreMatch": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "registerMatch": { "type": "string", "enum": ["too_low", "matched", "too_high", "uncertain"] },
+        "rhythmCadenceMatch": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "artifactFree": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "overallUsability": { "type": "string", "enum": ["usable", "borderline", "unusable", "uncertain"] },
+        "confidence": { "type": "string", "enum": ["low", "medium", "high"] },
+        "briefNote": { "type": "string" }
+      }
+    },
+    "pairwise": {
+      "type": "object",
+      "required": [
+        "taskId",
+        "orderToken",
+        "winner",
+        "margin",
+        "primaryDimension",
+        "confidence"
+      ],
+      "properties": {
+        "taskId": { "type": "string" },
+        "orderToken": { "type": "string" },
+        "winner": { "type": "string", "enum": ["clip_1", "clip_2", "tie", "uncertain"] },
+        "margin": { "type": "string", "enum": ["none", "slight", "clear", "major"] },
+        "primaryDimension": {
+          "type": "string",
+          "enum": ["pronunciation", "delivery", "clone_identity", "artifacts", "overall", "none"]
+        },
+        "confidence": { "type": "string", "enum": ["low", "medium", "high"] },
+        "briefNote": { "type": "string" }
+      }
+    }
+  }
+}

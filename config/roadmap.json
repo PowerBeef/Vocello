@@ -719,32 +719,10 @@
         "Packages/VocelloQwen3Core/Sources/MLXAudioMark/AudioSealGenerator.swift"
       ],
       "needs": [
-        "mac",
         "iphone"
       ],
       "updated": "2026-11-23",
-      "notes": "Opened 2026-11-21 at the maintainer's request: Pack B moves ahead of the 3.2 release and iOS 3.2.0 submission (no more 3.1 TestFlight). Every finding is verified against pinned mlx-swift 0.32.3 and mlx-swift-lm 3.32.3 source. Takes up A-08 and A-27 from engine-remediation-2026-10; reclaims resident/peak iPhone Clone headroom before RF-70's Bundle B screen and hardens per-layer quantization loading before any new hybrid recipe."
-    },
-    {
-      "id": "RF-69",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Engine Pack B (part 2): sample-preserving runtime, Mac/CLI lease, Fast QC and delivery hardening",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "With zero audio-sample change: close the six Mac/CLI EngineHostLease and MacEngineHostCoordinator edge cases (zombie failure/unload lease, Delete Model TOCTOU, MCP install_model self-blocking reclaim, unlink-before-close inode race, .starting state publication, 8 GB admission TOCTOU) with direct coordinator tests; close remaining MLXTTSEngine stop()/B-05 catches, latestEventDrainTask restart in initialize() and forMemoryRelief: true on OOM/allocation-retry unloads; remove redundant post-watermark AudioQualityGate re-evaluation in IOSLongFormProjectRunner, address spine C-04/C-05, Carbon dskFulErr (-34) storage classification, explicit --language korean caution, GenerationHistoryOutboxStore POSIX rename(2)+fsync, accurate APFS fsync comments, backend-risk-spine G-06/G-07 status and a .hybrid telemetry tier; harden HuggingFaceDownloader (HTTP 416 clean retry, CLI cancellation handler), SharedModelComponentStore (EINTR flock retry, lease-checked retired reclaim, Mac single-row free-space preflight) and iOS versioned staging and installStagedModel scope (E-03/ER-10). Verified by deterministic tests, routed check and vocello-swift-review.",
-      "sourceOfTruth": [
-        "Sources/DesktopShared/EngineHostLease.swift",
-        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
-        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
-        "Sources/QwenVoiceCore/SharedModelComponentStore.swift",
-        "Sources/iOS/Studio/IOSLongFormProject.swift",
-        "config/backend-risk-spine.json"
-      ],
-      "needs": [
-        "mac"
-      ],
-      "updated": "2026-11-23",
-      "notes": "Opened 2026-11-21 at the maintainer's request: moves ahead of the 3.2 release and iOS 3.2.0 submission alongside RF-68. Needs no iPhone window to implement and prove deterministically (iOS compile check + VocelloCoreTests cover iOS paths; device verification rides on 3.2.0 RF-15/RF-17). Takes up the audited parts of ER-06, ER-10, ER-11 and spine C-04/C-05/E-03."
+      "notes": "Mac work done 2026-11-23 (574d58d8..9d572dfb, all Reviewed-by: vocello-swift-review): B1.1-B1.6 + narrow A3 GPU seenMask (3852e8c7; H2 and full speculative A3 deferred per D2) + compile(inputs: [weightInputs]) fixing a caught 180.2 MiB/switch cross-thread MLX CompileCache leak (87d6a4b0). Proven bit-identical 14/14 PCM takes vs pre-pack-b (post-pack-b-final-20261123-181128: host CPU -3.56%, custom/short -2.74% RTF / -9 ms first chunk) and Mac memory qualified (mac-memory-qualification-20261123-180900-4b639d73 PASS: 0 MB cross-model leak, Clone cold MLX peak -16.0 MB to 3749.3 MB / physFoot 3452.3 MB, warm RTF 0.28/0.28/0.30). Remaining gate: physical-iPhone memory and benchmark proof."
     },
     {
       "id": "RF-70",

@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 54/95 (57%) |
+| `release-first-3-0-2026-09` | active | release-qa | 55/95 (58%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 13/17 (76%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (81)
+### Mac, remotely (79)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -119,8 +119,6 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `RF-52` (planned) Quality remediation, stage 2: clone conditioning parity
 - `RF-54` (planned) Quality remediation, stage 4: the decoder's 72-frame attention window
 - `RF-57` (planned) Audit the tooling the quality remediation relies on
-- `RF-68` (in-flight) Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance (also: iPhone)
-- `RF-69` (in-flight) Engine Pack B (part 2): sample-preserving runtime, Mac/CLI lease, Fast QC and delivery hardening
 - `RF-70` (planned) Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B) (also: At the keyboard, iPhone)
 - `RF-71` (planned) Ship Vocello and the vocello CLI 3.2 on the Mac (also: At the keyboard)
 - `UIF-08` (parked) Native acceptance of the iOS-derived screens on current source
@@ -211,7 +209,7 @@ Needs the paired iPhone, in a window the maintainer announces.
 - `RF-59` (planned) One model: the attn hybrid replaces Speed and Quality, and the model selector is retired
 - `RF-65` (planned) Measure the shipped hybrid on an iPhone 15 Pro
 - `RF-66` (planned) Record a demo video of the shipping flow on a physical iPhone
-- `RF-68` (in-flight) Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance (also: Mac, remotely)
+- `RF-68` (in-flight) Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance
 - `RF-70` (planned) Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B) (also: Mac, remotely, At the keyboard)
 - `VLR-07` (parked) Complete physical-device closure and publish the privacy-safe report
 
@@ -263,7 +261,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-65` | planned | Measure the shipped hybrid on an iPhone 15 Pro | — |
 | `RF-66` | planned | Record a demo video of the shipping flow on a physical iPhone | — |
 | `RF-68` | in-flight | Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance | — |
-| `RF-69` | in-flight | Engine Pack B (part 2): sample-preserving runtime, Mac/CLI lease, Fast QC and delivery hardening | — |
 | `RF-70` | planned | Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B) | `RF-68` |
 | `RF-71` | planned | Ship Vocello and the vocello CLI 3.2 on the Mac | `RF-68`, `RF-69`, `RF-70`, `RF-72` |
 
@@ -387,9 +384,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-68`** (in-flight) — Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance.
   gate: With bit-identical fixed-seed PCM digests (scripts/pcm_identity.py) across Custom, Design and Clone: eliminate one-shot MLX Error::check() double-eval consumption in Qwen3TTS and AudioSealGenerator via a single try evalForReadback(...); replace silent try? BaseConfiguration quantization fallback with explicit parse errors, [.noUnusedKeys, .shapeMismatch] weight verification and fused projection logging; fix A-08 Mimi encoder KV retention and super-linear concatenation growth with per-encode local caches; replace A-27's 16.8 MB square decoder causal mask with a rectangular [seqLen, totalLen] mask; hoist and prewarm CodePredictorCompiledPlan across takes (dropping the 10 unused KV buffers), telemetry-gate per-frame introspectionStepScalars, deduplicate back-to-back cache clears and evaluate AudioSeal weight caching (H2) or lazy repetition penalty (A3) only where memory-neutral and bit-identical; land minor package hygiene (streaming tensor rank, control-token-only clone refText, validateChatTemplateTokenCount, mixed-precision sibling check). Verified by VocelloCoreTests, Qwen3RuntimeTests, vocello-swift-review, Mac benchmark/memory lanes and an announced iPhone check.
-
-- **`RF-69`** (in-flight) — Engine Pack B (part 2): sample-preserving runtime, Mac/CLI lease, Fast QC and delivery hardening.
-  gate: With zero audio-sample change: close the six Mac/CLI EngineHostLease and MacEngineHostCoordinator edge cases (zombie failure/unload lease, Delete Model TOCTOU, MCP install_model self-blocking reclaim, unlink-before-close inode race, .starting state publication, 8 GB admission TOCTOU) with direct coordinator tests; close remaining MLXTTSEngine stop()/B-05 catches, latestEventDrainTask restart in initialize() and forMemoryRelief: true on OOM/allocation-retry unloads; remove redundant post-watermark AudioQualityGate re-evaluation in IOSLongFormProjectRunner, address spine C-04/C-05, Carbon dskFulErr (-34) storage classification, explicit --language korean caution, GenerationHistoryOutboxStore POSIX rename(2)+fsync, accurate APFS fsync comments, backend-risk-spine G-06/G-07 status and a .hybrid telemetry tier; harden HuggingFaceDownloader (HTTP 416 clean retry, CLI cancellation handler), SharedModelComponentStore (EINTR flock retry, lease-checked retired reclaim, Mac single-row free-space preflight) and iOS versioned staging and installStagedModel scope (E-03/ER-10). Verified by deterministic tests, routed check and vocello-swift-review.
 
 - **`RF-70`** (planned) — Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B).
   gate: Every sample-changing candidate sits behind a pre-registered RF-57 paired machine screen with a measured self-test noise floor before takes are generated (nobody listens). In order: (1) re-screen zero-weight full-text conditioning (D1, QWENVOICE_FULL_TEXT_CONDITIONING=on) for Korean/CJK long-form under Expressive + attn; (2) screen Bundle A (attn-io, +24.12 MB zero-requantization: 8-bit talker.text_projection, talker.codec_head, code_predictor.small_to_mtp_projection and code_predictor.lm_head[0..14]); (3) screen Bundle B (attn-io-edge, +99.62 MB zero-requantization: Bundle A + 8-bit layers.{0,1,26,27}.mlp) after RF-68's memory savings; screen 8-bit code_predictor.codec_embedding (-58.7 MB) or 6-bit MLPs (Bundle C) only if BF16 requantization is separately authorized. Adopt only winners that clear their recorded rules and iPhone memory headroom (staying clear of the 5,000 MiB floor's 3,662 MiB guarded band); publishing any new model artifacts requires explicit maintainer authorization, followed by exact SHA-256 catalog/receipt updates and 3.1-to-3.2 model update proof.

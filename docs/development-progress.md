@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-21
+reviewed: 2026-11-23
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,6 +17,59 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 `a0597deb` every checkpoint before them.
 
 ## Resume now
+
+### November 23: `RF-72` closed; Pack B (`RF-68` Mac + `RF-69`) verified bit-identical, memory-qualified & committed (local `main`, unpushed); entering Pack C (`RF-70`)
+
+Local `main` is ahead of `origin/main` (`67ebb3f7`; awaiting explicit push authorization) with the
+first two phases of the approved 3.2 execution plan completed and verified:
+
+- **`RF-72` (closed `done`, `611388ac..26bbfeec`):** Landed the offline, report-only Gemini 4 Neon
+  multimodal audio QC complement (`scripts/qc/multimodal.py`, `scripts/qc.py multimodal`,
+  `config/qc/multimodal-rubric-v1.json`, `vocello-audio-qc` skill, Antigravity `run_workflow`
+  emitter) strictly outside QC v2 `SCORING_SOURCES` and Fast QC, blocking personal audio by default.
+  Recorded `benchmarks/qc/multimodal-eval-v1.json` calibration: `diction`, `delivery`, and
+  `pairwise` are `active_advisory` (Q2 strict `unusable` precision `8/9 = 88.9%` vs `31%` QC v2
+  baseline, broad recall `11/11 = 100%`, clean human FA `1/30 = 3.3%`, C1 tie `12/12`, C2 win
+  `8/8`, swap flip `1/16 = 6.25%`); static `clone` speaker verification remains fail-closed at
+  `abstain_uncalibrated` (`75.0%` C4 balanced accuracy).
+- **Pack B (`RF-69` closed `done`; `RF-68` Mac work complete, `needs: iphone` only, `695717be..9d572dfb`, all substantive Swift commits `Reviewed-by: vocello-swift-review`):**
+  - **`RF-68` (engine/package, `574d58d8..9d572dfb`):** single `evalForReadback` error check,
+    fail-closed quantization parse + `[.noUnusedKeys, .shapeMismatch]` + fused-projection summary,
+    `A-08` per-encode Mimi encoder KV cache, `A-27` rectangular `[seqLen, totalLen]` decoder causal
+    mask, hoisted/prewarmed `CodePredictorCompiledPlan` with lazy per-pass KV buffers and
+    deduplicated cache clears, telemetry-gated `captureIntrospection` (keeping chunk timings on),
+    package hygiene, narrow `A3` fixed-shape 3 KiB GPU `seenMask` with prewarm warmup (`3852e8c7`;
+    `H2` AudioSeal weight caching and full speculative `A3` deferred per D2), and
+    `compile(inputs: [weightInputs])` (`87d6a4b0`) fixing a `180.2 MiB/switch` cross-thread MLX
+    `CompileCache` weight leak caught by the Mac memory qualification.
+  - **`RF-69` (runtime, lease, QC & delivery, `052f7fb9..efe6400f`):** closed all 6 Mac/CLI
+    `EngineHostLease` / `MacEngineHostCoordinator` races with direct `VocelloCoreTests` coverage,
+    wired `unloadEpoch`, `.starting` on cold load, `stop()`/`B-05` `forMemoryRelief` unloads,
+    skipped redundant post-watermark Fast QC in `IOSLongFormProjectRunner`, classified Carbon `-34`,
+    wired explicit Korean long-form warnings across CLI/Mac/iOS, hardened outbox writes with
+    `fsync`+`rename(2)`, landed spine `C-04` and `C-05` (`PCM16LeadingSilenceGate.silenceFloor`
+    decoupled, Fast QC kept at `v10` per D1), added `.hybrid` telemetry quantization tier across
+    Swift/`schema-v2`/`schema-v3`/`benchmark_history`, updated `backend-risk-spine.json` (20
+    implemented: `G-06`, `G-07`, `B-05`, `C-04`, `E-03`), and hardened `HuggingFaceDownloader`,
+    `SharedModelComponentStore`, and iOS versioned staging (`E-03`/`ER-10`).
+  - **Verification:** `scripts/macos_test.sh test` PASS (`mac-test-20261123-130512`),
+    `scripts/dev.sh ios` PASS, `scripts/build.sh cli` PASS, contracts & lints (`swiftlint`, `ruff`,
+    `pyright`) 0 new findings, `scripts/pcm_identity.py compare` **14/14 bit-identical PCM takes**
+    vs `pre-pack-b` (`post-pack-b-final-20261123-181128`: host CPU `-3.56%`, `custom/short`
+    `-2.74%` RTF / `-9.0 ms` first chunk, `custom/medium` `-2.33%` RTF / `-9.0 ms` first chunk),
+    and quiet-Mac retained-memory qualification PASS (`mac-memory-qualification-20261123-180900-4b639d73`:
+    `0.0 MB` cross-model retention, Clone cold MLX peak `-16.0 MB` to `3749.3 MB` / `physFoot`
+    `-373.7 MB` to `3452.3 MB`, Clone retained MLX peak `-10.5 MB` to `3084.5 MB`, warm RTF
+    `0.28` / `0.28` / `0.30`).
+- **Next:**
+  1. Execute **Phase 3 — Pack C (`RF-70`)**: pre-register fresh-seed `RF-57` screens in
+     `config/quality-screens.json`, add `.attnIO` / `.attnIOEdge` recipes and fix
+     `scripts/build_hybrid_model.py` `.bias` parity, then run Exp 1 (Korean `D1`), Exp 2 (Bundle A
+     `attn-io`, `+24.12 MB`), and Exp 3 (Bundle B `attn-io-edge`, `+99.62 MB`) paired with
+     calibrated `RF-72` advisory pairwise audits; close `RF-54` and `RF-57` per D5.
+  2. Prepare **Phase 4 (`RF-71` Mac/CLI 3.2.0)** and **Phase 5 (iOS 3.2.0 `v3.2.0-ios.1`, grouped
+     iPhone window covering `RF-68`/`RF-15`/`RF-17`, AWS Device Farm `RF-65` Option A, and `RF-16`)**
+     — coordinating with the maintainer at all push, tag, HF upload, UI window, and ASC boundaries.
 
 ### November 21, late night: `c0750fe7` pushed & native CI green; CI lint/test fix landed; roadmap retargeted to 3.2.0 (`RF-68`..`RF-71`)
 

@@ -6792,6 +6792,34 @@
         "doc:docs/reference/qc.md",
         "file:benchmarks/qc/multimodal-eval-v1.json"
       ]
+    },
+    {
+      "id": "RF-69",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Engine Pack B (part 2): sample-preserving runtime, Mac/CLI lease, Fast QC and delivery hardening",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "With zero audio-sample change: close the six Mac/CLI EngineHostLease and MacEngineHostCoordinator edge cases (zombie failure/unload lease, Delete Model TOCTOU, MCP install_model self-blocking reclaim, unlink-before-close inode race, .starting state publication, 8 GB admission TOCTOU) with direct coordinator tests; close remaining MLXTTSEngine stop()/B-05 catches, latestEventDrainTask restart in initialize() and forMemoryRelief: true on OOM/allocation-retry unloads; remove redundant post-watermark AudioQualityGate re-evaluation in IOSLongFormProjectRunner, address spine C-04/C-05, Carbon dskFulErr (-34) storage classification, explicit --language korean caution, GenerationHistoryOutboxStore POSIX rename(2)+fsync, accurate APFS fsync comments, backend-risk-spine G-06/G-07 status and a .hybrid telemetry tier; harden HuggingFaceDownloader (HTTP 416 clean retry, CLI cancellation handler), SharedModelComponentStore (EINTR flock retry, lease-checked retired reclaim, Mac single-row free-space preflight) and iOS versioned staging and installStagedModel scope (E-03/ER-10). Verified by deterministic tests, routed check and vocello-swift-review.",
+      "sourceOfTruth": [
+        "Sources/DesktopShared/EngineHostLease.swift",
+        "Sources/QwenVoiceCore/MLXTTSEngine.swift",
+        "Sources/QwenVoiceCore/HuggingFaceDownloader.swift",
+        "Sources/QwenVoiceCore/SharedModelComponentStore.swift",
+        "Sources/iOS/Studio/IOSLongFormProject.swift",
+        "config/backend-risk-spine.json"
+      ],
+      "updated": "2026-11-23",
+      "notes": "Opened 2026-11-21 at the maintainer's request: moves ahead of the 3.2 release and iOS 3.2.0 submission alongside RF-68. Needs no iPhone window to implement and prove deterministically (iOS compile check + VocelloCoreTests cover iOS paths; device verification rides on 3.2.0 RF-15/RF-17). Takes up the audited parts of ER-06, ER-10, ER-11 and spine C-04/C-05/E-03. Done 2026-11-23 (bit-identical 14/14 PCM takes vs pre-pack-b; vocello-swift-review approved). Closed all 6 Mac/CLI EngineHostLease and coordinator gaps with direct tests, unloadEpoch/.starting/stop()/B-05 lifecycle, post-watermark Fast QC skip, Carbon -34, explicit Korean cautions, outbox fsync+rename(2), C-04/C-05 (Fast QC v10 per D1), .hybrid telemetry tier, backend-risk-spine (20 implemented), and downloader/staging E-03/ER-10 hardening.",
+      "evidence": [
+        "commit:052f7fb9",
+        "commit:cbe52fc2",
+        "commit:b1a560e2",
+        "commit:3ee599b4",
+        "commit:bb006502",
+        "commit:efe6400f",
+        "run:mac-test-20261123-130512",
+        "run:post-pack-b-final-20261123-181128"
+      ]
     }
   ]
 }

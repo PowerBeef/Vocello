@@ -706,4 +706,147 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
             "repeated encode after longer clips must produce identical codes"
         )
     }
+
+    /// RF-68 (B1.6): `codePredictorSiblingDirectory` strips `-hybrid-*` in
+    /// addition to `-<ownBits>bit`, `codePredictorSibling` rejects non-uniform
+    /// siblings with divergent per-layer overrides, and
+    /// `validateMixedPrecisionTarget` fails closed on already-hybrid checkpoints.
+    func testHybridSiblingLookupStripsHybridSuffixRejectsNonUniformSiblingAndBlocksMixedPrecision() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("hybrid-sibling-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let hybridAttn = root.appendingPathComponent("Qwen3-TTS-12Hz-1.7B-Base-hybrid-attn", isDirectory: true)
+        let hybridAttnIO = root.appendingPathComponent("Qwen3-TTS-12Hz-1.7B-Base-hybrid-attn-io", isDirectory: true)
+        let sibling8Bit = root.appendingPathComponent("Qwen3-TTS-12Hz-1.7B-Base-8bit", isDirectory: true)
+        let uniform4Bit = root.appendingPathComponent("Qwen3-TTS-12Hz-1.7B-Base-4bit", isDirectory: true)
+
+        XCTAssertEqual(
+            try Qwen3TTSModel.codePredictorSiblingDirectory(of: hybridAttn, ownBits: 4, bits: 8).lastPathComponent,
+            sibling8Bit.lastPathComponent
+        )
+        XCTAssertEqual(
+            try Qwen3TTSModel.codePredictorSiblingDirectory(of: hybridAttnIO, ownBits: 4, bits: 8).lastPathComponent,
+            sibling8Bit.lastPathComponent
+        )
+        for invalid in ["-hybrid-attn", "Qwen3-TTS-hybrid-", "-4bit", "unnamed"] {
+            XCTAssertThrowsError(
+                try Qwen3TTSModel.codePredictorSiblingDirectory(
+                    of: root.appendingPathComponent(invalid, isDirectory: true),
+                    ownBits: 4,
+                    bits: 8
+                ),
+                "\(invalid) must be refused"
+            )
+        }
+
+        func writeSiblingConfig(_ json: String) throws {
+            try FileManager.default.createDirectory(at: sibling8Bit, withIntermediateDirectories: true)
+            try Data(json.utf8).write(to: sibling8Bit.appendingPathComponent("config.json"))
+            try Data("{}".utf8).write(to: sibling8Bit.appendingPathComponent(".qwenvoice-model-integrity.json"))
+        }
+
+        let ownHybridConfig = try JSONDecoder().decode(
+            Qwen3TTSModelConfig.self,
+            from: Data(#"""
+            {
+              "tts_model_type": "base",
+              "quantization": {
+                "group_size": 64,
+                "bits": 4,
+                "mode": "affine",
+                "model.text_embedding": {"group_size": 64, "bits": 8, "mode": "affine"},
+                "model.layers.0.self_attn.q_proj": {"group_size": 64, "bits": 8, "mode": "affine"}
+              }
+            }
+            """#.utf8)
+        )
+
+        // Uniform 8-bit sibling (bare) resolves beside -hybrid-attn.
+        try writeSiblingConfig(#"{"tts_model_type": "base", "quantization": {"group_size": 64, "bits": 8, "mode": "affine"}}"#)
+        let resolvedBare = try Qwen3TTSModel.codePredictorSibling(
+            of: hybridAttn, config: ownHybridConfig, ownBits: 4, bits: 8
+        )
+        XCTAssertEqual(resolvedBare.directory.lastPathComponent, sibling8Bit.lastPathComponent)
+        XCTAssertEqual(resolvedBare.quantization.bits, 8)
+
+        // Uniform 8-bit sibling with identical-recipe `model.text_embedding` also resolves.
+        try writeSiblingConfig(#"""
+        {
+          "tts_model_type": "base",
+          "quantization": {
+            "group_size": 64,
+            "bits": 8,
+            "mode": "affine",
+            "model.text_embedding": {"group_size": 64, "bits": 8, "mode": "affine"}
+          }
+        }
+        """#)
+        XCTAssertEqual(
+            try Qwen3TTSModel.codePredictorSibling(
+                of: hybridAttn, config: ownHybridConfig, ownBits: 4, bits: 8
+            ).quantization.bits,
+            8
+        )
+
+        // Non-uniform sibling with per-layer overrides must be rejected.
+        let nonUniformSiblings = [
+            #"{"tts_model_type": "base", "quantization": {"group_size": 64, "bits": 8, "model.layers.0.self_attn.q_proj": {"group_size": 64, "bits": 4}}}"#,
+            #"{"tts_model_type": "base", "quantization": {"group_size": 64, "bits": 8, "code_predictor.lm_head.0": {"group_size": 64, "bits": 4}}}"#,
+            #"{"tts_model_type": "base", "quantization": {"group_size": 64, "bits": 8, "model.layers.0.self_attn.q_proj": false}}"#,
+            #"{"tts_model_type": "base", "quantization": {"group_size": 64, "bits": 8, "model.text_embedding": {"group_size": 64, "bits": 4}}}"#,
+        ]
+        for json in nonUniformSiblings {
+            try writeSiblingConfig(json)
+            XCTAssertThrowsError(
+                try Qwen3TTSModel.codePredictorSibling(
+                    of: hybridAttn, config: ownHybridConfig, ownBits: 4, bits: 8
+                ),
+                "sibling with per-layer override must fail closed: \(json)"
+            )
+        }
+
+        // QWENVOICE_MIXED_PRECISION fails closed on already-hybrid checkpoints (by name or config),
+        // while staying allowed on uniform 4-bit checkpoints (including Stage 2.2 8-bit text_embedding).
+        let uniform4BitConfig = try JSONDecoder().decode(
+            Qwen3TTSModelConfig.self,
+            from: Data(#"""
+            {
+              "tts_model_type": "base",
+              "quantization": {
+                "group_size": 64,
+                "bits": 4,
+                "mode": "affine",
+                "model.text_embedding": {"group_size": 64, "bits": 8, "mode": "affine"}
+              }
+            }
+            """#.utf8)
+        )
+        XCTAssertFalse(Qwen3TTSModel.isHybridCheckpoint(modelDir: uniform4Bit, config: uniform4BitConfig))
+        XCTAssertNoThrow(
+            try Qwen3TTSModel.validateMixedPrecisionTarget(
+                modelDir: uniform4Bit, config: uniform4BitConfig, mixedRecipe: .attn
+            )
+        )
+        XCTAssertTrue(Qwen3TTSModel.isHybridCheckpoint(modelDir: hybridAttn, config: uniform4BitConfig))
+        XCTAssertTrue(Qwen3TTSModel.isHybridCheckpoint(modelDir: uniform4Bit, config: ownHybridConfig))
+        XCTAssertNoThrow(
+            try Qwen3TTSModel.validateMixedPrecisionTarget(
+                modelDir: hybridAttn, config: ownHybridConfig, mixedRecipe: nil
+            ),
+            "nil mixedRecipe (e.g. code-predictor-only sibling lookup) remains allowed on hybrid checkpoints"
+        )
+        XCTAssertThrowsError(
+            try Qwen3TTSModel.validateMixedPrecisionTarget(
+                modelDir: hybridAttn, config: uniform4BitConfig, mixedRecipe: .attn
+            ),
+            "QWENVOICE_MIXED_PRECISION must fail closed on a -hybrid-* directory"
+        )
+        XCTAssertThrowsError(
+            try Qwen3TTSModel.validateMixedPrecisionTarget(
+                modelDir: uniform4Bit, config: ownHybridConfig, mixedRecipe: .down
+            ),
+            "QWENVOICE_MIXED_PRECISION must fail closed when config already has talker per-layer overrides"
+        )
+    }
 }

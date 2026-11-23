@@ -103,12 +103,28 @@ extension Qwen3TTSModel {
         // Reference text and target text tokenization
         let text = Qwen3ChatTemplateText.preparedForTemplate(text)
         let refText = Qwen3ChatTemplateText.preparedForTemplate(refText)
+        guard !refText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw AudioGenerationError.invalidInput(
+                "The clone reference transcript has no speakable text."
+            )
+        }
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw AudioGenerationError.invalidInput(
+                "The script has no text to speak."
+            )
+        }
         let targetTokenCount = tokenizer.encode(text: text).count
         let refChatText = "<|im_start|>assistant\n\(refText)<|im_end|>\n"
         let refIds = MLXArray(tokenizer.encode(text: refChatText).map { Int32($0) }).reshaped(1, -1)
         let refCount = refIds.dim(1)
-        let refStart = min(3, refCount)
-        let refEnd = max(refStart, refCount - 2)
+        guard refCount >= 6 else {
+            throw AudioGenerationError.invalidInput(
+                "The clone reference transcript has no speakable text: it produced \(refCount) chat tokens, " +
+                "and at least 6 are needed."
+            )
+        }
+        let refStart = 3
+        let refEnd = refCount - 2
         let refTextIds = refIds[0..., refStart ..< refEnd]
 
         let boundaryMarkedText = Qwen3ICLTargetText.boundaryMarked(
@@ -118,8 +134,9 @@ extension Qwen3TTSModel {
         let targetChatText = "<|im_start|>assistant\n\(boundaryMarkedText)<|im_end|>\n<|im_start|>assistant\n"
         let targetIds = MLXArray(tokenizer.encode(text: targetChatText).map { Int32($0) }).reshaped(1, -1)
         let targetCount = targetIds.dim(1)
-        let targetStart = min(3, targetCount)
-        let targetEnd = max(targetStart, targetCount - 5)
+        try Self.validateChatTemplateTokenCount(targetCount)
+        let targetStart = 3
+        let targetEnd = targetCount - 5
         let targetTextIds = targetIds[0..., targetStart ..< targetEnd]
 
         // TTS special tokens

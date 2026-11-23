@@ -438,6 +438,11 @@ extension Qwen3TTSModel {
         var usedSibling = false
         let codePredictorBits = loadOptions.diagnosticOverrides.codePredictorBits
         let mixedRecipe = loadOptions.diagnosticOverrides.mixedPrecisionRecipe
+        try Self.validateMixedPrecisionTarget(
+            modelDir: modelDir,
+            config: config,
+            mixedRecipe: mixedRecipe
+        )
         if let bits = codePredictorBits ?? (mixedRecipe == nil ? nil : 8),
            let ownBits = config.quantization?.bits, ownBits != bits {
             let sibling = try Self.codePredictorSibling(of: modelDir, config: config, ownBits: ownBits, bits: bits)
@@ -1155,10 +1160,42 @@ extension Qwen3TTSModel {
         return recipe.selects(String(weightKey[..<dot]))
     }
 
-    /// RF-55: the installed sibling of `modelDir` at `bits` (the `-8bit`
-    /// directory beside a `-4bit` one), only when it is an installed artifact
-    /// (its integrity record present) of the same model type quantized at
-    /// exactly `bits`; anything else refuses the load.
+    /// RF-68 (B1.6): returns whether `modelDir` / `config` represents an
+    /// already-hybrid checkpoint (either named `…-hybrid-<recipe>` or carrying
+    /// per-layer quantization overrides beyond `model.text_embedding`).
+    static func isHybridCheckpoint(modelDir: URL, config: Qwen3TTSModelConfig) -> Bool {
+        let installedName = installedDirectory(of: modelDir).lastPathComponent
+        if let hybridRange = installedName.range(of: "-hybrid-", options: .backwards),
+           hybridRange.lowerBound > installedName.startIndex,
+           hybridRange.upperBound < installedName.endIndex {
+            return true
+        }
+        guard let overrides = config.perLayerQuantization?.perLayerQuantization else {
+            return false
+        }
+        return overrides.keys.contains { $0 != Self.textEmbeddingModuleKey }
+    }
+
+    /// RF-68 (B1.6): fail closed if `QWENVOICE_MIXED_PRECISION` is requested
+    /// against an already-hybrid checkpoint rather than a uniform base model.
+    static func validateMixedPrecisionTarget(
+        modelDir: URL,
+        config: Qwen3TTSModelConfig,
+        mixedRecipe: Qwen3MixedPrecisionRecipe?
+    ) throws {
+        guard mixedRecipe != nil else { return }
+        guard !isHybridCheckpoint(modelDir: modelDir, config: config) else {
+            throw AudioGenerationError.modelNotInitialized(
+                "QWENVOICE_MIXED_PRECISION cannot be applied to an already-hybrid checkpoint"
+            )
+        }
+    }
+
+    /// RF-55 / RF-68: the installed sibling of `modelDir` at `bits` (the `-8bit`
+    /// directory beside a `-4bit` or `-hybrid-<recipe>` one), only when it is an
+    /// installed artifact (its integrity record present) of the same model type
+    /// uniformly quantized at `bits` with no divergent per-layer overrides;
+    /// anything else refuses the load.
     static func codePredictorSibling(
         of modelDir: URL, config: Qwen3TTSModelConfig, ownBits: Int, bits: Int
     ) throws -> (directory: URL, quantization: BaseConfiguration.Quantization) {
@@ -1174,6 +1211,20 @@ extension Qwen3TTSModel {
               let quantization = siblingConfig.quantization, quantization.bits == bits else {
             throw AudioGenerationError.modelNotInitialized("The \(bits)-bit sibling is another model")
         }
+        if let overrides = siblingConfig.perLayerQuantization?.perLayerQuantization {
+            for (layer, option) in overrides {
+                if layer == Self.textEmbeddingModuleKey,
+                   case .quantize(let layerQuant) = option,
+                   layerQuant.bits == quantization.bits,
+                   layerQuant.groupSize == quantization.groupSize,
+                   layerQuant.mode == quantization.mode {
+                    continue
+                }
+                throw AudioGenerationError.modelNotInitialized(
+                    "The \(bits)-bit sibling must be uniformly quantized without per-layer overrides"
+                )
+            }
+        }
         return (directory, quantization)
     }
 
@@ -1185,16 +1236,23 @@ extension Qwen3TTSModel {
         modelDir.appendingPathComponent("model.safetensors").resolvingSymlinksInPath().deletingLastPathComponent()
     }
 
-    /// The sibling's directory: this one's name with its precision suffix
-    /// swapped (`…-4bit` to `…-8bit`), beside it.
+    /// The sibling's directory: this one's name with its precision or hybrid
+    /// suffix swapped (`…-4bit` or `…-hybrid-<recipe>` to `…-8bit`), beside it.
     static func codePredictorSiblingDirectory(of modelDir: URL, ownBits: Int, bits: Int) throws -> URL {
         let name = modelDir.lastPathComponent
         let suffix = "-\(ownBits)bit"
-        guard name.hasSuffix(suffix) else {
+        let baseName: String
+        if name.hasSuffix(suffix), name.count > suffix.count {
+            baseName = String(name.dropLast(suffix.count))
+        } else if let hybridRange = name.range(of: "-hybrid-", options: .backwards),
+                  hybridRange.lowerBound > name.startIndex,
+                  hybridRange.upperBound < name.endIndex {
+            baseName = String(name[..<hybridRange.lowerBound])
+        } else {
             throw AudioGenerationError.modelNotInitialized("The model directory names no precision")
         }
         return modelDir.deletingLastPathComponent()
-            .appendingPathComponent(String(name.dropLast(suffix.count)) + "-\(bits)bit", isDirectory: true)
+            .appendingPathComponent(baseName + "-\(bits)bit", isDirectory: true)
     }
 
     private static func loadWeights(

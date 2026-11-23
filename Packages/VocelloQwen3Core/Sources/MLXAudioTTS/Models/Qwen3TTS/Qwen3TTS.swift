@@ -1132,8 +1132,12 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         }
 
         let normalizedRefText = refText?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let preparedRefText = normalizedRefText.map {
+            Qwen3ChatTemplateText.preparedForTemplate($0)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         let iclMode = !xVectorOnlyMode
-        if iclMode, normalizedRefText?.isEmpty ?? true {
+        if iclMode, preparedRefText?.isEmpty ?? true {
             throw AudioGenerationError.modelNotInitialized(
                 "Qwen3 clone prompt creation requires a transcript when x_vector_only_mode is false."
             )
@@ -1809,6 +1813,20 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             try Task.checkCancellation()
             return finishReason
         }
+    }
+
+    /// RF-68 (B1.6): decodes one streaming codec chunk and always returns a 1D
+    /// `[N]` audio chunk regardless of whether Mimi substage timings are captured.
+    static func decodeStreamingStepChunk(
+        _ decoder: Qwen3TTSSpeechTokenizerDecoder,
+        codesForDecoder: MLXArray,
+        captureTimings: Bool
+    ) -> (audioChunk: MLXArray, timings: MimiDecoderStepTimings?) {
+        if captureTimings {
+            let decodedWithTimings = decoder.streamingStepWithTimings(codesForDecoder)
+            return (decodedWithTimings.audio.squeezed(axis: 1)[0], decodedWithTimings.timings)
+        }
+        return (decoder.streamingStep(codesForDecoder).squeezed(axis: 1)[0], nil)
     }
 
     // MARK: - Decode chunk helper
@@ -3090,18 +3108,18 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     // than overlapping a ~5 ms decode buys on this
                     // launch-bound loop. Record `stage1-p5b-codec-stream`
                     // (macos-engine-20260726-070148-150cc5e8).
-                    let decoded: MLXArray
-                    if onAudioChunkTimings != nil || emitMaterializedChunkTimings {
-                        let decodedWithTimings = speechTokenizer.decoder.streamingStepWithTimings(codesForDecoder)
-                        decoded = decodedWithTimings.audio.squeezed(axis: 1)
-                        mimiDecoderBreakdownTotal = mimiDecoderBreakdownTotal.adding(decodedWithTimings.timings)
-                    } else {
-                        decoded = speechTokenizer.decoder.streamingStep(codesForDecoder)
+                    let decodedStep = Self.decodeStreamingStepChunk(
+                        speechTokenizer.decoder,
+                        codesForDecoder: codesForDecoder,
+                        captureTimings: onAudioChunkTimings != nil || emitMaterializedChunkTimings
+                    )
+                    if let stepTimings = decodedStep.timings {
+                        mimiDecoderBreakdownTotal = mimiDecoderBreakdownTotal.adding(stepTimings)
                     }
                     os_signpost(.end, log: stepSignpostLog, name: "Audio Decoder")
                     streamingDecoderTotal += streamDecoderStartedAt.elapsed
                     streamingDecoderCallCount += 1
-                    let audioChunk = decoded[0]
+                    let audioChunk = decodedStep.audioChunk
                     let audioChunkEvalStartedAt = ContinuousClock.now
                     os_signpost(.begin, log: stepSignpostLog, name: "Audio Chunk Eval")
                     // STREAM-001: non-final chunks evaluate asynchronously so decoding can
@@ -3289,18 +3307,18 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 // the in-loop chunks, so a trace's `Audio Decoder` count
                 // equals `qwen_stream_decoder_calls`.
                 os_signpost(.begin, log: stepSignpostLog, name: "Audio Decoder")
-                let decoded: MLXArray
-                if onAudioChunkTimings != nil || emitMaterializedChunkTimings {
-                    let decodedWithTimings = speechTokenizer.decoder.streamingStepWithTimings(codesForDecoder)
-                    decoded = decodedWithTimings.audio.squeezed(axis: 1)
-                    mimiDecoderBreakdownTotal = mimiDecoderBreakdownTotal.adding(decodedWithTimings.timings)
-                } else {
-                    decoded = speechTokenizer.decoder.streamingStep(codesForDecoder)
+                let decodedStep = Self.decodeStreamingStepChunk(
+                    speechTokenizer.decoder,
+                    codesForDecoder: codesForDecoder,
+                    captureTimings: onAudioChunkTimings != nil || emitMaterializedChunkTimings
+                )
+                if let stepTimings = decodedStep.timings {
+                    mimiDecoderBreakdownTotal = mimiDecoderBreakdownTotal.adding(stepTimings)
                 }
                 os_signpost(.end, log: stepSignpostLog, name: "Audio Decoder")
                 streamingDecoderTotal += streamDecoderStartedAt.elapsed
                 streamingDecoderCallCount += 1
-                let audioChunk = decoded[0]
+                let audioChunk = decodedStep.audioChunk
                 if isPureVoiceDesign, designGenerationStepsBeforeFirstChunk == nil {
                     designGenerationStepsBeforeFirstChunk = generatedCodeCount
                     designFirstChunkDecoderTokens = codesForDecoder.dim(2)

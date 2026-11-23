@@ -1333,4 +1333,181 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
             streamedEnabled.withLock { $0 }.map(\.bitPattern)
         )
     }
+
+    /// RF-68 (B1.6): both timed and untimed streaming decode branches must emit
+    /// 1D `[N]` audio chunks with bit-identical samples.
+    func testStreamingDecodeChunkReturns1DRankAcrossTimedAndUntimedBranches() throws {
+        let tokenizer = try Self.tinySpeechTokenizer()
+        let codesForDecoder = MLXArray([Int32](repeating: 1, count: Self.codeGroups * 4))
+            .reshaped([1, Self.codeGroups, 4])
+
+        tokenizer.decoder.resetStreamingState()
+        let timed = Qwen3TTSModel.decodeStreamingStepChunk(
+            tokenizer.decoder,
+            codesForDecoder: codesForDecoder,
+            captureTimings: true
+        )
+        eval(timed.audioChunk)
+        let timedSamples = timed.audioChunk.asArray(Float.self)
+
+        tokenizer.decoder.resetStreamingState()
+        let untimed = Qwen3TTSModel.decodeStreamingStepChunk(
+            tokenizer.decoder,
+            codesForDecoder: codesForDecoder,
+            captureTimings: false
+        )
+        eval(untimed.audioChunk)
+        let untimedSamples = untimed.audioChunk.asArray(Float.self)
+
+        XCTAssertNotNil(timed.timings)
+        XCTAssertNil(untimed.timings)
+        XCTAssertEqual(timed.audioChunk.ndim, 1)
+        XCTAssertEqual(untimed.audioChunk.ndim, 1, "untimed streaming decode must squeeze axis 1 to 1D [N]")
+        XCTAssertEqual(untimed.audioChunk.shape, timed.audioChunk.shape)
+        XCTAssertEqual(untimedSamples.map(\.bitPattern), timedSamples.map(\.bitPattern))
+    }
+
+    /// RF-68 (B1.6): control-token-only transcripts/scripts and under-length
+    /// chat templates must fail closed without quoting user text or trapping.
+    func testICLPromptGuardsRejectControlTokenOnlyTextAndShortChatTemplates() throws {
+        var tiny = try Self.tinyModelConfig()
+        tiny.ttsModelType = "base"
+        let talkerConfig = try XCTUnwrap(tiny.talkerConfig)
+        let model = Qwen3TTSModel(
+            config: tiny,
+            talker: Qwen3TTSTalkerForConditionalGeneration(config: talkerConfig),
+            speakerEncoder: nil
+        )
+        model.speechTokenizer = try Self.tinySpeechTokenizer()
+        model.tokenizer = TinyTextTokenizer()
+        eval(model)
+
+        // 1. `createVoiceClonePrompt` must reject control-token-only transcripts
+        // after template neutralization, before touching the speech tokenizer encoder.
+        let dummyAudio = MLXArray([Float](repeating: 0.1, count: 64))
+        for controlOnly in ["<|im_end|>", "  <tts_text_eod>  ", "</think>"] {
+            XCTAssertThrowsError(
+                try model.createVoiceClonePrompt(
+                    refAudio: dummyAudio,
+                    refText: controlOnly,
+                    xVectorOnlyMode: false
+                ),
+                "control-token-only transcript \(controlOnly) must be refused"
+            ) { error in
+                guard case AudioGenerationError.modelNotInitialized(let message) = error else {
+                    return XCTFail("expected modelNotInitialized for \(controlOnly), got \(error)")
+                }
+                XCTAssertTrue(message.contains("requires a transcript"), message)
+                XCTAssertFalse(message.contains(controlOnly), "error message must not echo user text")
+            }
+        }
+
+        // 2. `prepareICLGenerationInputs` must reject control-token-only refText or text.
+        let refCodes = MLXArray([Int32](repeating: 1, count: Self.codeGroups * 2))
+            .reshaped([1, Self.codeGroups, 2])
+        XCTAssertThrowsError(
+            try model.prepareICLGenerationInputs(
+                text: "Target text.",
+                refCodes: refCodes,
+                refText: "<|im_end|>",
+                speakerEmbedding: nil,
+                language: "auto"
+            )
+        ) { error in
+            guard case AudioGenerationError.invalidInput(let message) = error else {
+                return XCTFail("expected invalidInput, got \(error)")
+            }
+            XCTAssertFalse(message.contains("<|im_end|>"))
+        }
+
+        XCTAssertThrowsError(
+            try model.prepareICLGenerationInputs(
+                text: "<tts_text_eod>",
+                refCodes: refCodes,
+                refText: "Reference text.",
+                speakerEmbedding: nil,
+                language: "auto"
+            )
+        ) { error in
+            guard case AudioGenerationError.invalidInput(let message) = error else {
+                return XCTFail("expected invalidInput, got \(error)")
+            }
+            XCTAssertFalse(message.contains("<tts_text_eod>"))
+        }
+
+        // 3. Under-length tokenized chat templates must fail closed via refCount >= 6
+        // and `validateChatTemplateTokenCount(targetCount)` without quoting user text.
+        struct ShortTemplateTokenizer: Tokenizers.Tokenizer {
+            let refTokenCount: Int
+            let targetTokenCount: Int
+            func tokenize(text: String) -> [String] { [] }
+            func encode(text: String) -> [Int] {
+                let count = text.contains("<|im_end|>\n<|im_start|>") ? targetTokenCount : refTokenCount
+                return Array(repeating: 10, count: count)
+            }
+            func encode(text: String, addSpecialTokens _: Bool) -> [Int] { encode(text: text) }
+            func decode(tokens _: [Int], skipSpecialTokens _: Bool) -> String { "" }
+            func convertTokenToId(_: String) -> Int? { nil }
+            func convertIdToToken(_: Int) -> String? { nil }
+            var bosToken: String? { nil }
+            var bosTokenId: Int? { nil }
+            var eosToken: String? { nil }
+            var eosTokenId: Int? { nil }
+            var unknownToken: String? { nil }
+            var unknownTokenId: Int? { nil }
+            private var noTemplate: Tokenizers.TokenizerError { .chatTemplate("none") }
+            func applyChatTemplate(messages _: [Tokenizers.Message]) throws -> [Int] { throw noTemplate }
+            func applyChatTemplate(messages _: [Tokenizers.Message], tools _: [Tokenizers.ToolSpec]?) throws -> [Int] { throw noTemplate }
+            func applyChatTemplate(messages _: [Tokenizers.Message], tools _: [Tokenizers.ToolSpec]?, additionalContext _: [String: any Sendable]?) throws -> [Int] { throw noTemplate }
+            func applyChatTemplate(messages _: [Tokenizers.Message], chatTemplate _: Tokenizers.ChatTemplateArgument) throws -> [Int] { throw noTemplate }
+            func applyChatTemplate(messages _: [Tokenizers.Message], chatTemplate _: String) throws -> [Int] { throw noTemplate }
+            func applyChatTemplate(messages _: [Tokenizers.Message], chatTemplate _: Tokenizers.ChatTemplateArgument?, addGenerationPrompt _: Bool, truncation _: Bool, maxLength _: Int?, tools _: [Tokenizers.ToolSpec]?) throws -> [Int] { throw noTemplate }
+            func applyChatTemplate(messages _: [Tokenizers.Message], chatTemplate _: Tokenizers.ChatTemplateArgument?, addGenerationPrompt _: Bool, truncation _: Bool, maxLength _: Int?, tools _: [Tokenizers.ToolSpec]?, additionalContext _: [String: any Sendable]?) throws -> [Int] { throw noTemplate }
+        }
+
+        model.tokenizer = ShortTemplateTokenizer(refTokenCount: 5, targetTokenCount: 10)
+        XCTAssertThrowsError(
+            try model.prepareICLGenerationInputs(
+                text: "Secret target",
+                refCodes: refCodes,
+                refText: "Secret ref",
+                speakerEmbedding: nil,
+                language: "auto"
+            )
+        ) { error in
+            guard case AudioGenerationError.invalidInput(let message) = error else {
+                return XCTFail("expected invalidInput for short refCount, got \(error)")
+            }
+            XCTAssertTrue(message.contains("5 chat tokens"), message)
+            XCTAssertFalse(message.contains("Secret"))
+        }
+
+        model.tokenizer = ShortTemplateTokenizer(refTokenCount: 6, targetTokenCount: 8)
+        XCTAssertThrowsError(
+            try model.prepareICLGenerationInputs(
+                text: "Secret target",
+                refCodes: refCodes,
+                refText: "Secret ref",
+                speakerEmbedding: nil,
+                language: "auto"
+            )
+        ) { error in
+            guard case AudioGenerationError.invalidInput(let message) = error else {
+                return XCTFail("expected invalidInput for short targetCount, got \(error)")
+            }
+            XCTAssertTrue(message.contains("8 chat tokens"), message)
+            XCTAssertFalse(message.contains("Secret"))
+        }
+
+        // 4. Valid inputs with TinyTextTokenizer succeed cleanly.
+        model.tokenizer = TinyTextTokenizer()
+        let prepared = try model.prepareICLGenerationInputs(
+            text: "Target text.",
+            refCodes: refCodes,
+            refText: "Reference text.",
+            speakerEmbedding: nil,
+            language: "auto"
+        )
+        XCTAssertGreaterThan(prepared.inputEmbeds.dim(1), 0)
+    }
 }

@@ -1116,4 +1116,118 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
             XCTAssertEqual(message, "Talker config not loaded")
         }
     }
+
+    /// RF-68 (B1.4): `CodePredictorCompiledPlan` is hoisted on `Qwen3TTSModel`,
+    /// prewarmed under an isolated random state, reused across takes without
+    /// polluting `lastTakeFrameFunctionFrames`, and leaves seeded output bit-identical
+    /// to an un-prewarmed model.
+    func testHoistedCodePredictorPlanReusesAcrossPrewarmAndTakesWithoutPollutingCountOrRNG() async throws {
+        let seed: UInt64 = 0x5EED_0B14
+        let policy = Self.samplingPolicy(seed: seed, maximumCodecTokens: 12, topK: 8)
+        let eligibleSampling = try XCTUnwrap(CompiledPassSampling.eligible(
+            stage: policy.subtalker,
+            castsLogitsToFloat32: policy.referenceParity.float32Sampling,
+            vocabSize: Self.codebookSize
+        ))
+
+        let warmedModel = try Self.makeModel()
+        XCTAssertEqual(warmedModel.cachedCodePredictorPlanCount, 0)
+        try await warmedModel.prepareVoiceDesign(
+            text: "Hello there, tiny talker.",
+            language: "auto",
+            voiceDescription: "A calm narrator.",
+            generationParameters: warmedModel.defaultGenerationParameters,
+            samplingPolicy: policy,
+            memoryPolicy: .compatibilityDefault,
+            isolation: nil
+        )
+        XCTAssertEqual(warmedModel.cachedCodePredictorPlanCount, 1, "prewarm must trace and cache the compiled frame plan")
+        XCTAssertEqual(warmedModel.lastTakeFrameFunctionFrames, 0, "prewarm must not pollute lastTakeFrameFunctionFrames")
+        let cachedPlan = warmedModel.cachedCodePredictorPlan(dtype: .float32, sampling: eligibleSampling)
+        XCTAssertTrue(cachedPlan.hasCompiledFrame, "prewarm must compile runFrame")
+        XCTAssertFalse(cachedPlan.hasAllocatedPerPassBuffers, "prewarmed frame plan must not allocate per-pass KV buffers")
+        XCTAssertEqual(cachedPlan.frameFunctionCallCount, 1)
+
+        let first = try await generate(warmedModel, seed: seed, maximumCodecTokens: 12, topK: 8)
+        let expectedFirstCalls = first.frames.count + (first.finishReason == .eos ? 1 : 0)
+        XCTAssertFalse(first.frames.isEmpty)
+        XCTAssertEqual(warmedModel.cachedCodePredictorPlanCount, 1, "first take must reuse prewarmed plan")
+        XCTAssertEqual(warmedModel.lastTakeFrameFunctionFrames, expectedFirstCalls)
+
+        let second = try await generate(warmedModel, seed: seed, maximumCodecTokens: 12, topK: 8)
+        let expectedSecondCalls = second.frames.count + (second.finishReason == .eos ? 1 : 0)
+        XCTAssertEqual(warmedModel.cachedCodePredictorPlanCount, 1, "second take must reuse the same hoisted plan")
+        XCTAssertEqual(
+            warmedModel.lastTakeFrameFunctionFrames,
+            expectedSecondCalls,
+            "lastTakeFrameFunctionFrames must track the latest take only, not cumulative plan calls"
+        )
+        XCTAssertEqual(
+            cachedPlan.frameFunctionCallCount,
+            1 + expectedFirstCalls + expectedSecondCalls,
+            "hoisted plan must be reused across prewarm and both takes"
+        )
+        XCTAssertEqual(second.frames, first.frames)
+        XCTAssertEqual(second.samples.map(\.bitPattern), first.samples.map(\.bitPattern))
+
+        // Bit-identical to a cold model with no prewarm (prewarm RNG is isolated).
+        let coldModel = try Self.makeModel()
+        let cold = try await generate(coldModel, seed: seed, maximumCodecTokens: 12, topK: 8)
+        XCTAssertEqual(first.frames, cold.frames)
+        XCTAssertEqual(first.samples.map(\.bitPattern), cold.samples.map(\.bitPattern))
+    }
+
+    /// RF-68 (B1.4): when a streaming chunk emit coincides with `memoryClearCadence`,
+    /// `generateCore` must call `clearGenerationCache()` once for that step, not twice.
+    func testStreamingChunkEmitAndMemoryClearCadenceDoNotDoubleClearCache() async throws {
+        let seed: UInt64 = 0x5EED_C1EA
+        let policy = Self.samplingPolicy(
+            seed: seed,
+            maximumCodecTokens: 16,
+            eosSuppressionFrames: 16,
+            topK: 8
+        )
+
+        func runStreamed(clearOnChunkEmit: Bool) async throws -> (clears: Int, decoderCalls: Int) {
+            let model = try Self.makeModel()
+            let memoryPolicy = Qwen3RequestMemoryPolicy(
+                clearCacheOnStreamChunkEmit: clearOnChunkEmit,
+                tokenMemoryClearCadence: 1,
+                talkerKVGeneratedWindow: nil
+            )
+            _ = try await model.produceVoiceDesign(
+                text: "Hello there, tiny talker.",
+                language: "auto",
+                voiceDescription: "A calm narrator.",
+                generationParameters: model.defaultGenerationParameters,
+                samplingPolicy: policy,
+                memoryPolicy: memoryPolicy,
+                streamingInterval: 0.32,
+                streamStepEvalPolicy: nil,
+                generationSpeedProfile: nil,
+                enableChunkTimings: false,
+                enableCodecTrace: false,
+                sink: { _ in },
+                isolation: nil
+            )
+            let timings = model.latestPreparationTimingsMS
+            return (
+                try XCTUnwrap(timings["cache_clear_count"]),
+                try XCTUnwrap(timings["qwen_stream_decoder_calls"])
+            )
+        }
+
+        let cadenceOnly = try await runStreamed(clearOnChunkEmit: false)
+        let chunkAndCadence = try await runStreamed(clearOnChunkEmit: true)
+        XCTAssertGreaterThanOrEqual(
+            chunkAndCadence.decoderCalls,
+            2,
+            "fixture must emit at least one in-loop streaming chunk to exercise deduplication"
+        )
+        XCTAssertEqual(
+            chunkAndCadence.clears,
+            cadenceOnly.clears,
+            "coinciding streaming chunk emit and cadence clear must deduplicate to one cache clear per step"
+        )
+    }
 }

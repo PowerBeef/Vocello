@@ -482,6 +482,7 @@ public protocol Qwen3OptimizedSpeechGenerationModel: AnyObject {
         speaker: String,
         instruct: String?,
         generationParameters: GenerateParameters,
+        samplingPolicy: Qwen3RequestSamplingPolicy?,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         isolation: isolated (any Actor)?
     ) async throws
@@ -501,6 +502,7 @@ public protocol Qwen3OptimizedSpeechGenerationModel: AnyObject {
         language: String,
         voiceDescription: String,
         generationParameters: GenerateParameters,
+        samplingPolicy: Qwen3RequestSamplingPolicy?,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         isolation: isolated (any Actor)?
     ) async throws
@@ -525,6 +527,7 @@ public protocol Qwen3OptimizedSpeechGenerationModel: AnyObject {
         language: String,
         voiceClonePrompt: Qwen3TTSVoiceClonePrompt,
         generationParameters: GenerateParameters,
+        samplingPolicy: Qwen3RequestSamplingPolicy?,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         isolation: isolated (any Actor)?
     ) async throws
@@ -590,6 +593,7 @@ public protocol Qwen3CustomVoicePrewarmDepthControlling: AnyObject {
         speaker: String,
         instruct: String?,
         generationParameters: GenerateParameters,
+        samplingPolicy: Qwen3RequestSamplingPolicy?,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         customPrewarmDepth: String?,
         isolation: isolated (any Actor)?

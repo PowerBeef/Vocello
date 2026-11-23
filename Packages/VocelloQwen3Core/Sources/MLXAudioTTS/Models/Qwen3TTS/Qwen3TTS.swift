@@ -247,6 +247,60 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
     var storedGenerationIntrospection: Qwen3GenerationIntrospectionSummary?
     private let generationGate = Qwen3TTSGenerationGate()
 
+    private struct CodePredictorPlanKey: Hashable {
+        let dtype: DType
+        let sampling: CompiledPassSampling?
+        let fusionGeneration: Int
+    }
+
+    /// RF-68 (B1.4): hoisted compiled code-predictor plans keyed by
+    /// `(dtype, sampling, fusionGeneration)`. Accessed exclusively inside
+    /// `withGenerationGate` (single owner; no new `@unchecked Sendable` type).
+    private var compiledCodePredictorPlans: [CodePredictorPlanKey: CodePredictorCompiledPlan] = [:]
+    private var compiledCodePredictorPlanOrder: [CodePredictorPlanKey] = []
+    private static let maxCompiledCodePredictorPlans = 8
+
+    deinit {
+        compiledCodePredictorPlans.removeAll(keepingCapacity: false)
+        compiledCodePredictorPlanOrder.removeAll(keepingCapacity: false)
+    }
+
+    var cachedCodePredictorPlanCount: Int {
+        compiledCodePredictorPlans.count
+    }
+
+    func cachedCodePredictorPlan(
+        dtype: DType,
+        sampling: CompiledPassSampling?
+    ) -> CodePredictorCompiledPlan {
+        let fusionGeneration = talker.codePredictor.projectionFusionGeneration
+        if let firstKey = compiledCodePredictorPlanOrder.first,
+           firstKey.fusionGeneration != fusionGeneration {
+            compiledCodePredictorPlans.removeAll(keepingCapacity: false)
+            compiledCodePredictorPlanOrder.removeAll(keepingCapacity: false)
+        }
+        let key = CodePredictorPlanKey(
+            dtype: dtype,
+            sampling: sampling,
+            fusionGeneration: fusionGeneration
+        )
+        if let existing = compiledCodePredictorPlans[key] {
+            return existing
+        }
+        if compiledCodePredictorPlanOrder.count >= Self.maxCompiledCodePredictorPlans {
+            let evicted = compiledCodePredictorPlanOrder.removeFirst()
+            compiledCodePredictorPlans.removeValue(forKey: evicted)
+        }
+        let fresh = CodePredictorCompiledPlan(
+            predictor: talker.codePredictor,
+            dtype: dtype,
+            sampling: sampling
+        )
+        compiledCodePredictorPlans[key] = fresh
+        compiledCodePredictorPlanOrder.append(key)
+        return fresh
+    }
+
     public var sampleRate: Int { config.sampleRate }
     public var loadTimingsMS: [String: Int] {
         diagnosticsLock.lock()
@@ -739,6 +793,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         streamStepEvalTimingKey: String? = nil,
         streamStepWarmBooleanFlag: String? = nil,
         precompileDecoderBuckets: Bool = true,
+        samplingPolicy: Qwen3RequestSamplingPolicy? = nil,
         memoryPolicy: Qwen3RequestMemoryPolicy = .compatibilityDefault,
         isolation: isolated (any Actor)? = #isolation
     ) async throws {
@@ -766,7 +821,6 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         } else {
             cache = talker.makeCache(kvQuantBits: talkerKVQuantBits)
         }
-        let codeCache = talker.codePredictor.makeCache()
         let (logits, hidden) = talker(inputEmbedsInit, cache: cache)
         let nextToken = argMax(
             logits[0..., (-1)..., 0...].squeezed(axis: 1),
@@ -779,33 +833,59 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         let codeHidden = hidden[0..., (-1)..., 0...]
         var codeTokens = [nextToken]
         var lastCodeLogits: MLXArray?
-
-        for layerCache in codeCache {
-            _ = layerCache.trim(layerCache.offset)
-        }
+        var warmedFrameEmbeddingSum: MLXArray?
 
         if talkerConfig.numCodeGroups > 1 {
-            for codeIdx in 0 ..< talkerConfig.numCodeGroups - 1 {
-                let codeInput: MLXArray
-                if codeIdx == 0 {
-                    let code0Embed = talker.getInputEmbeddings()(nextToken)
-                    codeInput = concatenated([codeHidden, code0Embed], axis: 1)
-                } else {
-                    codeInput = talker.codePredictor.codecEmbedding[codeIdx - 1](codeTokens.last!)
+            if let samplingPolicy,
+               let compiledSampling = CompiledPassSampling.eligible(
+                   stage: samplingPolicy.subtalker,
+                   castsLogitsToFloat32: samplingPolicy.referenceParity.float32Sampling,
+                   vocabSize: talker.codePredictor.config.vocabSize
+               ) {
+                // RF-68 (B1.4): trace and warm the hoisted compiled frame plan
+                // under an isolated random state so frame 0 of the first real
+                // take replays a compiled graph without leaking RNG state or
+                // incrementing `lastTakeFrameFunctionFrames`.
+                let plan = cachedCodePredictorPlan(dtype: codeHidden.dtype, sampling: compiledSampling)
+                let passCount = talkerConfig.numCodeGroups - 1
+                let code0Embed = talker.getInputEmbeddings()(nextToken)
+                let frame = withRandomState(MLXRandom.RandomState(seed: 0)) {
+                    let keys = (0 ..< passCount).map { _ in resolve(key: MLXArray?.none) }
+                    return plan.runFrame(
+                        codeHidden: codeHidden,
+                        code0Embed: code0Embed,
+                        keys: keys
+                    )
                 }
+                codeTokens.append(contentsOf: frame.codes)
+                warmedFrameEmbeddingSum = frame.embeddingSum
+            } else {
+                let codeCache = talker.codePredictor.makeCache()
+                for layerCache in codeCache {
+                    _ = layerCache.trim(layerCache.offset)
+                }
+                for codeIdx in 0 ..< talkerConfig.numCodeGroups - 1 {
+                    let codeInput: MLXArray
+                    if codeIdx == 0 {
+                        let code0Embed = talker.getInputEmbeddings()(nextToken)
+                        codeInput = concatenated([codeHidden, code0Embed], axis: 1)
+                    } else {
+                        codeInput = talker.codePredictor.codecEmbedding[codeIdx - 1](codeTokens.last!)
+                    }
 
-                let (codeLogits, _, _) = talker.codePredictor(
-                    codeInput,
-                    cache: codeCache,
-                    generationStep: codeIdx
-                )
-                let nextCode = argMax(
-                    codeLogits[0..., (-1)..., 0...].squeezed(axis: 1),
-                    axis: -1,
-                    keepDims: true
-                )
-                codeTokens.append(nextCode)
-                lastCodeLogits = codeLogits
+                    let (codeLogits, _, _) = talker.codePredictor(
+                        codeInput,
+                        cache: codeCache,
+                        generationStep: codeIdx
+                    )
+                    let nextCode = argMax(
+                        codeLogits[0..., (-1)..., 0...].squeezed(axis: 1),
+                        axis: -1,
+                        keepDims: true
+                    )
+                    codeTokens.append(nextCode)
+                    lastCodeLogits = codeLogits
+                }
             }
         }
         let samplerWarmDraws = Self.productionSamplerWarmDraws(
@@ -837,7 +917,11 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         preparationBooleanFlags["decoder_bucket_cache_hit"] = decoderBucketCacheHit
         speechTokenizer.decoder.resetStreamingState()
         let preparationEvalStartedAt = ContinuousClock.now
-        eval([logits, hidden, allCodes, codesForDecoder, decoded] + samplerWarmDraws)
+        var evalTargets = [logits, hidden, allCodes, codesForDecoder, decoded] + samplerWarmDraws
+        if let warmedFrameEmbeddingSum {
+            evalTargets.append(warmedFrameEmbeddingSum)
+        }
+        eval(evalTargets)
         var timingsMS = [
             "prepare_inputs": inputPreparationMS,
             "first_decoder_step": firstDecoderStepMS,
@@ -857,9 +941,14 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 nextTextEmbed = ttsPadEmbed
             }
 
-            var codecEmbed = talker.getInputEmbeddings()(nextToken)
-            for (index, code) in codeTokens.dropFirst().enumerated() {
-                codecEmbed = codecEmbed + talker.codePredictor.codecEmbedding[index](code)
+            var codecEmbed: MLXArray
+            if let warmedFrameEmbeddingSum {
+                codecEmbed = warmedFrameEmbeddingSum
+            } else {
+                codecEmbed = talker.getInputEmbeddings()(nextToken)
+                for (index, code) in codeTokens.dropFirst().enumerated() {
+                    codecEmbed = codecEmbed + talker.codePredictor.codecEmbedding[index](code)
+                }
             }
 
             let nextInputEmbeds = nextTextEmbed + codecEmbed
@@ -908,6 +997,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         speaker: String,
         instruct: String?,
         generationParameters: GenerateParameters,
+        samplingPolicy: Qwen3RequestSamplingPolicy? = nil,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         isolation: isolated (any Actor)? = #isolation
     ) async throws {
@@ -917,6 +1007,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             speaker: speaker,
             instruct: instruct,
             generationParameters: generationParameters,
+            samplingPolicy: samplingPolicy,
             memoryPolicy: memoryPolicy,
             customPrewarmDepth: nil,
             isolation: isolation
@@ -929,6 +1020,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         speaker: String,
         instruct: String?,
         generationParameters: GenerateParameters,
+        samplingPolicy: Qwen3RequestSamplingPolicy? = nil,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         customPrewarmDepth: String?,
         isolation: isolated (any Actor)? = #isolation
@@ -964,6 +1056,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             streamStepEvalTimingKey: prewarmDepth.warmsStreamStep ? "custom_stream_step_warm_ms" : nil,
             streamStepWarmBooleanFlag: "custom_stream_step_prewarmed",
             precompileDecoderBuckets: prewarmDepth.precompileDecoderBuckets,
+            samplingPolicy: samplingPolicy,
             memoryPolicy: memoryPolicy,
             isolation: isolation
         )
@@ -975,6 +1068,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         language: String,
         voiceDescription: String,
         generationParameters _: GenerateParameters,
+        samplingPolicy: Qwen3RequestSamplingPolicy? = nil,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         isolation: isolated (any Actor)? = #isolation
     ) async throws {
@@ -1005,6 +1099,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             preparationEvalTimingKey: "design_prewarm_eval_ms",
             streamStepEvalTimingKey: "design_stream_step_warm_ms",
             streamStepWarmBooleanFlag: "design_stream_step_prewarmed",
+            samplingPolicy: samplingPolicy,
             memoryPolicy: memoryPolicy,
             isolation: isolation
         )
@@ -1084,6 +1179,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         language: String,
         voiceClonePrompt: Qwen3TTSVoiceClonePrompt,
         generationParameters _: GenerateParameters,
+        samplingPolicy: Qwen3RequestSamplingPolicy? = nil,
         memoryPolicy: Qwen3RequestMemoryPolicy,
         isolation: isolated (any Actor)? = #isolation
     ) async throws {
@@ -1112,6 +1208,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             booleanFlags: [
                 "clone_prompt_used": true,
             ],
+            samplingPolicy: samplingPolicy,
             memoryPolicy: memoryPolicy,
             isolation: isolation
         )
@@ -2471,11 +2568,13 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         var trailingIdx = 0
         var inputEmbeds = inputEmbedsInit
         let eosTokenArray = MLXArray([Int32(eosTokenId)]).reshaped(1, 1)
-        // Per-generation CP execution state: the compiled per-pass plan and
-        // its baked pass-0 mask replace the eager per-frame graph rebuild
-        // (Stage 1 P3); the plan owns its K/V buffers, so no KVCacheSimple is
-        // allocated for the streaming CP.
-        let codePredictorStepConstants = CodePredictorStepConstants()
+        // RF-68 (B1.4): hoisted compiled code-predictor plan cached on the
+        // model across takes; release any lazily-allocated per-pass buffers on
+        // exit so idle plans retain zero transient K/V arrays.
+        var takeCodePredictorPlan: CodePredictorCompiledPlan?
+        defer {
+            takeCodePredictorPlan?.releasePerPassBuffers()
+        }
         // Every per-step, per-chunk and tail interval goes through this log's
         // allocation-free entry point: no per-token allocation, lock or string
         // formatting.
@@ -2693,21 +2792,28 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             // the eager codeCache is neither written nor trimmed here.
             var codeTokens = [nextToken]
             let codeHidden = hidden[0..., (-1)..., 0...]
-            // RF-46: when the subtalker stage is the plain temperature and
-            // top-k sampler, the frame's passes sample inside one compiled
-            // function (`runFrame` below). A sampler observer needs the
-            // logits, so it keeps the per-pass plan and the eager sampler.
-            let codePredictorPlan = codePredictorStepConstants.compiledPlan(
-                for: talker.codePredictor,
-                dtype: codeHidden.dtype,
-                sampling: samplerObserver == nil
-                    ? CompiledPassSampling.eligible(
-                        stage: subtalkerSampling,
-                        castsLogitsToFloat32: referenceParity.float32Sampling,
-                        vocabSize: talker.codePredictor.config.vocabSize
-                    )
-                    : nil
-            )
+            // RF-46 / RF-68: when the subtalker stage is the plain temperature
+            // and top-k sampler, the frame's passes sample inside one compiled
+            // function (`runFrame` below), hoisted on the model across takes.
+            // A sampler observer needs the logits, so it keeps the per-pass
+            // plan and the eager sampler.
+            let codePredictorPlan: CodePredictorCompiledPlan
+            if let existingPlan = takeCodePredictorPlan {
+                codePredictorPlan = existingPlan
+            } else {
+                let resolvedPlan = cachedCodePredictorPlan(
+                    dtype: codeHidden.dtype,
+                    sampling: samplerObserver == nil
+                        ? CompiledPassSampling.eligible(
+                            stage: subtalkerSampling,
+                            castsLogitsToFloat32: referenceParity.float32Sampling,
+                            vocabSize: talker.codePredictor.config.vocabSize
+                        )
+                        : nil
+                )
+                takeCodePredictorPlan = resolvedPlan
+                codePredictorPlan = resolvedPlan
+            }
 
             let codePredictorStartedAt = ContinuousClock.now
             os_signpost(.begin, log: stepSignpostLog, name: "Code Predictor Loop")
@@ -2727,7 +2833,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 )
                 codeTokens.append(contentsOf: frame.codes)
                 frameEmbeddingSum = frame.embeddingSum
-                lastTakeFrameFunctionFrames = codePredictorPlan.frameFunctionCallCount
+                lastTakeFrameFunctionFrames += 1
                 // The per-pass intervals are still emitted, empty: the profile
                 // lane counts fifteen of each per step (`trace_intervals.py`),
                 // and their host time is the loop interval's.
@@ -2940,6 +3046,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             }
 
             // Streaming: decode and yield audio chunks during generation
+            var clearedCacheThisStep = false
             if isStreaming {
                 let requiredStreamChunkSize = streamChunkSchedule.requiredChunkSize
                 if pendingStreamCodes.count >= requiredStreamChunkSize {
@@ -3071,11 +3178,13 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     }
                     if memoryPolicy.clearCacheOnStreamChunkEmit {
                         clearGenerationCache()
+                        clearedCacheThisStep = true
                     }
                 }
             }
 
-            if memoryClearCadence > 0,
+            if !clearedCacheThisStep,
+               memoryClearCadence > 0,
                generatedCodeCount > 0,
                generatedCodeCount.isMultiple(of: memoryClearCadence) {
                 clearGenerationCache()

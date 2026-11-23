@@ -813,6 +813,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
         isolation: isolated (any Actor)? = #isolation
     ) async throws {
         let parameters = try parameters(sampling)
+        let samplingPolicy = try requestSamplingPolicy(sampling)
         if let configurable = box.optimized as? any Qwen3CustomVoicePrewarmDepthControlling {
             try await configurable.prepareCustomVoice(
                 text: text,
@@ -820,6 +821,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 speaker: speaker,
                 instruct: instruction,
                 generationParameters: parameters,
+                samplingPolicy: samplingPolicy,
                 memoryPolicy: try requestMemoryPolicy(memory),
                 customPrewarmDepth: depth,
                 isolation: isolation
@@ -831,6 +833,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 speaker: speaker,
                 instruct: instruction,
                 generationParameters: parameters,
+                samplingPolicy: samplingPolicy,
                 memoryPolicy: try requestMemoryPolicy(memory),
                 isolation: isolation
             )
@@ -870,6 +873,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
             language: language,
             voiceDescription: description,
             generationParameters: try parameters(sampling),
+            samplingPolicy: try requestSamplingPolicy(sampling),
             memoryPolicy: try requestMemoryPolicy(memory),
             isolation: isolation
         )
@@ -918,6 +922,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
             language: language,
             voiceClonePrompt: prompt.compatibilityValue,
             generationParameters: try parameters(sampling),
+            samplingPolicy: try requestSamplingPolicy(sampling),
             memoryPolicy: try requestMemoryPolicy(memory),
             isolation: isolation
         )

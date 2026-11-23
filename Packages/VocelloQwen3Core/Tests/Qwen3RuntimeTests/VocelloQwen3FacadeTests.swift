@@ -2682,6 +2682,7 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         speaker _: String,
         instruct _: String?,
         generationParameters _: GenerateParameters,
+        samplingPolicy _: Qwen3RequestSamplingPolicy?,
         memoryPolicy _: Qwen3RequestMemoryPolicy,
         isolation: isolated (any Actor)?
     ) async throws {
@@ -2790,6 +2791,7 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         language _: String,
         voiceDescription _: String,
         generationParameters _: GenerateParameters,
+        samplingPolicy _: Qwen3RequestSamplingPolicy?,
         memoryPolicy _: Qwen3RequestMemoryPolicy,
         isolation: isolated (any Actor)?
     ) async throws {
@@ -2880,6 +2882,7 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         language _: String,
         voiceClonePrompt _: Qwen3TTSVoiceClonePrompt,
         generationParameters _: GenerateParameters,
+        samplingPolicy _: Qwen3RequestSamplingPolicy?,
         memoryPolicy _: Qwen3RequestMemoryPolicy,
         isolation: isolated (any Actor)?
     ) async throws {

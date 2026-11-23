@@ -280,6 +280,11 @@ final class Qwen3TTSCodePredictor: Module {
 
     var codecEmbedding: [Embedding] { model.codecEmbedding }
 
+    /// Monotonically incremented whenever `fuseProjections()` fuses at least
+    /// one quantized group, so hoisted compiled plans re-trace against fused
+    /// projections rather than replaying a pre-fusion trace (RF-68).
+    private(set) var projectionFusionGeneration = 0
+
     /// Fuses each layer's projections that share an input (RF-46). Call once
     /// the parameters are loaded and evaluated, before the first compiled
     /// plan is traced: a plan bakes in the projections it was traced with.
@@ -289,6 +294,9 @@ final class Qwen3TTSCodePredictor: Module {
         for layer in model.layers {
             summary.formUnion(layer.selfAttn.fuseProjections())
             summary.formUnion(layer.mlp.fuseProjections())
+        }
+        if summary.fusedGroupCount > 0 {
+            projectionFusionGeneration += 1
         }
         return summary
     }

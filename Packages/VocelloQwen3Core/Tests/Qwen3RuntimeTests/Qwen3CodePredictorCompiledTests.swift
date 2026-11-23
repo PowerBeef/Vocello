@@ -290,4 +290,53 @@ final class Qwen3CodePredictorCompiledTests: XCTestCase {
             }
         }
     }
+
+    /// RF-68 (B1.4): `CompiledPassSampling` must be `Hashable` for plan cache
+    /// keys, `CodePredictorCompiledPlan` must not eagerly allocate unused
+    /// per-pass KV buffers on `init` or `runFrame`, and `releasePerPassBuffers`
+    /// must drop lazy buffers cleanly while allowing subsequent `run` calls.
+    func testCompiledPassSamplingHashableAndLazyPerPassBuffers() throws {
+        let firstSampling = CompiledPassSampling(temperature: 0.9, topK: 50, castsLogitsToFloat32: true)
+        let equalSampling = CompiledPassSampling(temperature: 0.9, topK: 50, castsLogitsToFloat32: true)
+        let otherSampling = CompiledPassSampling(temperature: 0.7, topK: 20, castsLogitsToFloat32: true)
+        let samplingSet: Set<CompiledPassSampling> = [firstSampling, equalSampling, otherSampling]
+        XCTAssertEqual(samplingSet.count, 2)
+
+        let config = try makeConfig(numCodeGroups: 4, hidden: 16)
+        let predictor = Qwen3TTSCodePredictor(config: config, talkerHiddenSize: 16)
+        eval(predictor)
+        let passCount = config.numCodeGroups - 1
+
+        let framePlan = CodePredictorCompiledPlan(
+            predictor: predictor, dtype: .float32, sampling: firstSampling
+        )
+        XCTAssertFalse(framePlan.hasAllocatedPerPassBuffers, "init must not eagerly allocate per-pass KV buffers")
+        XCTAssertFalse(framePlan.hasCompiledFrame)
+
+        let hidden = MLXRandom.normal([1, 1, 16], key: MLXRandom.key(1))
+        let embed = MLXRandom.normal([1, 1, 16], key: MLXRandom.key(2))
+        let keys = (0 ..< passCount).map { MLXRandom.key(UInt64(10 + $0)) }
+        let frame = framePlan.runFrame(codeHidden: hidden, code0Embed: embed, keys: keys)
+        eval(frame.codes + [frame.embeddingSum])
+        XCTAssertTrue(framePlan.hasCompiledFrame)
+        XCTAssertFalse(framePlan.hasAllocatedPerPassBuffers, "runFrame must never allocate per-pass KV buffers")
+
+        let perPassPlan = CodePredictorCompiledPlan(predictor: predictor, dtype: .float32)
+        XCTAssertFalse(perPassPlan.hasAllocatedPerPassBuffers, "per-pass KV buffers must allocate lazily")
+        let firstLogits = perPassPlan.run(pass: 0, codeHidden: hidden, code0Embed: embed, token: nil)
+        eval(firstLogits)
+        XCTAssertTrue(perPassPlan.hasAllocatedPerPassBuffers)
+
+        perPassPlan.releasePerPassBuffers()
+        XCTAssertFalse(perPassPlan.hasAllocatedPerPassBuffers, "releasePerPassBuffers must drop transient KV arrays")
+
+        let replayLogits = perPassPlan.run(pass: 0, codeHidden: hidden, code0Embed: embed, token: nil)
+        eval(replayLogits)
+        XCTAssertTrue(perPassPlan.hasAllocatedPerPassBuffers)
+        XCTAssertEqual(
+            firstLogits.asArray(Float.self).map(\.bitPattern),
+            replayLogits.asArray(Float.self).map(\.bitPattern),
+            "re-allocating lazy per-pass buffers must reproduce identical pass-0 logits"
+        )
+    }
 }

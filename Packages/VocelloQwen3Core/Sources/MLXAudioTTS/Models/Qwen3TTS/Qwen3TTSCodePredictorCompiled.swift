@@ -41,7 +41,7 @@ import MLXNN
 /// random keys are inputs, resolved by the caller from the request's random
 /// state exactly as the eager sampler resolves them, so the request draws
 /// the same keys in the same order.
-struct CompiledPassSampling: Equatable {
+struct CompiledPassSampling: Equatable, Hashable, Sendable {
     let temperature: Float
     let topK: Int
     let castsLogitsToFloat32: Bool
@@ -84,17 +84,20 @@ struct CompiledPassSampling: Equatable {
     }
 }
 
-/// Per-generation compiled plan. Built lazily on the first frame; the 15
-/// compiled functions and the K/V buffers live for exactly one generation
-/// (request-local, like the sampler scratch).
+/// Compiled code-predictor execution plan. Hoisted on `Qwen3TTSModel` and
+/// keyed by `(dtype, sampling, fusionGeneration)` so compiled frame traces
+/// warm during prewarm and reuse across takes (RF-68). Per-pass K/V buffers
+/// are allocated lazily only when the per-pass `run(pass:...)` fallback runs
+/// and released at the end of a take.
 final class CodePredictorCompiledPlan {
     private let predictor: Qwen3TTSCodePredictor
     private let passCount: Int
     private let layerCount: Int
-    /// One K and one V buffer per layer, sized to the exact per-frame token
-    /// budget (2 positions from pass 0 + one per remaining pass).
-    private var keyBuffers: [MLXArray]
-    private var valueBuffers: [MLXArray]
+    /// One K and one V buffer per layer, allocated lazily only for per-pass
+    /// `run(pass:...)` (the whole-frame `runFrame` path creates zero buffers
+    /// inside its compiled trace and never uses these).
+    private var keyBuffers: [MLXArray] = []
+    private var valueBuffers: [MLXArray] = []
     private var compiledPasses: [Int: @Sendable ([MLXArray]) -> [MLXArray]] = [:]
     /// The sampler `runFrame` runs after each pass, when the request's
     /// subtalker stage is one it reproduces; nil leaves only the per-pass
@@ -102,31 +105,43 @@ final class CodePredictorCompiledPlan {
     let sampling: CompiledPassSampling?
     private let dtype: DType
     private var compiledFrame: (@Sendable ([MLXArray]) -> [MLXArray])?
-    /// Frames this plan ran through `runFrame`; the generate loop publishes
-    /// it per take so a test can tell which path a take took.
+    /// Cumulative frames this plan ran through `runFrame` across its lifetime.
     private(set) var frameFunctionCallCount = 0
+
+    var hasAllocatedPerPassBuffers: Bool {
+        !keyBuffers.isEmpty || !valueBuffers.isEmpty
+    }
+
+    var hasCompiledFrame: Bool {
+        compiledFrame != nil
+    }
 
     init(predictor: Qwen3TTSCodePredictor, dtype: DType, sampling: CompiledPassSampling? = nil) {
         self.predictor = predictor
         self.sampling = sampling
         self.dtype = dtype
         self.passCount = predictor.numCodeGroups - 1
-        let layers = predictor.model.layers
-        self.layerCount = layers.count
+        self.layerCount = predictor.model.layers.count
+    }
+
+    private func ensurePerPassBuffers() {
+        guard keyBuffers.isEmpty, layerCount > 0 else { return }
         let config = predictor.config
         let totalPositions = passCount + 1
-        self.keyBuffers = layers.map { _ in
-            MLXArray.zeros(
-                [1, config.numKeyValueHeads, totalPositions, config.headDim],
-                dtype: dtype
-            )
+        let shape = [1, config.numKeyValueHeads, totalPositions, config.headDim]
+        keyBuffers = (0 ..< layerCount).map { _ in
+            MLXArray.zeros(shape, dtype: dtype)
         }
-        self.valueBuffers = layers.map { _ in
-            MLXArray.zeros(
-                [1, config.numKeyValueHeads, totalPositions, config.headDim],
-                dtype: dtype
-            )
+        valueBuffers = (0 ..< layerCount).map { _ in
+            MLXArray.zeros(shape, dtype: dtype)
         }
+    }
+
+    /// Releases lazily-allocated per-pass K/V buffers when a per-pass take
+    /// finishes so hoisted plans retain zero transient per-pass arrays while idle.
+    func releasePerPassBuffers() {
+        keyBuffers.removeAll(keepingCapacity: false)
+        valueBuffers.removeAll(keepingCapacity: false)
     }
 
     /// Pass 0 consumes the talker hidden state plus the already-embedded
@@ -135,6 +150,7 @@ final class CodePredictorCompiledPlan {
     /// inside the compiled function through `codecEmbedding[pass - 1]`.
     /// Returns the pass logits. Buffer state advances internally.
     func run(pass: Int, codeHidden: MLXArray?, code0Embed: MLXArray?, token: MLXArray?) -> MLXArray {
+        ensurePerPassBuffers()
         let function = compiledPass(pass)
         var inputs: [MLXArray] = []
         if pass == 0 {
@@ -151,7 +167,7 @@ final class CodePredictorCompiledPlan {
         // shape, so the step reaches its typed failure at the next error
         // check instead of trapping on the index.
         guard outputs.count == 1 + 2 * layerCount else {
-            return MLXArray.zeros([1, 1, predictor.config.vocabSize], dtype: keyBuffers[0].dtype)
+            return MLXArray.zeros([1, 1, predictor.config.vocabSize], dtype: self.dtype)
         }
         keyBuffers = Array(outputs[1 ..< (1 + layerCount)])
         valueBuffers = Array(outputs[(1 + layerCount) ..< (1 + 2 * layerCount)])

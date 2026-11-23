@@ -1603,6 +1603,7 @@ final class GenerationHistoryOutboxTests: XCTestCase {
             deleteAudio: true,
             audioPaths: [fixture.audioURL.path],
             pendingEntryIDs: [],
+            createdAt: Date(timeIntervalSince1970: 1_763_900_000),
             maxRowID: 1
         )
         let second = first.markingRowsDeleted()

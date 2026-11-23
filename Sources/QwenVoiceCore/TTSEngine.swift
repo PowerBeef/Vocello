@@ -8,6 +8,7 @@ public struct TTSEngineFrontendState: Equatable, Sendable {
     public let clonePreparationState: ClonePreparationState
     public let latestEvent: GenerationEvent?
     public let visibleErrorMessage: String?
+    public let unloadEpoch: UInt64
 
     public init(
         isReady: Bool,
@@ -15,7 +16,8 @@ public struct TTSEngineFrontendState: Equatable, Sendable {
         loadState: EngineLoadState,
         clonePreparationState: ClonePreparationState,
         latestEvent: GenerationEvent?,
-        visibleErrorMessage: String?
+        visibleErrorMessage: String?,
+        unloadEpoch: UInt64 = 0
     ) {
         self.isReady = isReady
         self.lifecycleState = lifecycleState
@@ -23,12 +25,14 @@ public struct TTSEngineFrontendState: Equatable, Sendable {
         self.clonePreparationState = clonePreparationState
         self.latestEvent = latestEvent
         self.visibleErrorMessage = visibleErrorMessage
+        self.unloadEpoch = unloadEpoch
     }
 
     public init(
         snapshot: TTSEngineSnapshot,
         latestEvent: GenerationEvent? = nil,
-        lifecycleState: EngineLifecycleState? = nil
+        lifecycleState: EngineLifecycleState? = nil,
+        unloadEpoch: UInt64 = 0
     ) {
         let resolvedLifecycleState = lifecycleState
             ?? Self.defaultLifecycleState(
@@ -42,7 +46,8 @@ public struct TTSEngineFrontendState: Equatable, Sendable {
             loadState: snapshot.loadState,
             clonePreparationState: snapshot.clonePreparationState,
             latestEvent: latestEvent,
-            visibleErrorMessage: snapshot.visibleErrorMessage
+            visibleErrorMessage: snapshot.visibleErrorMessage,
+            unloadEpoch: unloadEpoch
         )
     }
 
@@ -56,7 +61,8 @@ public struct TTSEngineFrontendState: Equatable, Sendable {
             loadState: loadState,
             clonePreparationState: clonePreparationState,
             latestEvent: latestEvent ?? self.latestEvent,
-            visibleErrorMessage: visibleErrorMessage
+            visibleErrorMessage: visibleErrorMessage,
+            unloadEpoch: unloadEpoch
         )
     }
 
@@ -67,7 +73,8 @@ public struct TTSEngineFrontendState: Equatable, Sendable {
             loadState: loadState,
             clonePreparationState: clonePreparationState,
             latestEvent: latestEvent?.withoutPreviewAudioPayload(),
-            visibleErrorMessage: visibleErrorMessage
+            visibleErrorMessage: visibleErrorMessage,
+            unloadEpoch: unloadEpoch
         )
     }
 
@@ -102,6 +109,7 @@ public protocol TTSEngine: ObservableObject {
     var latestEvent: GenerationEvent? { get }
     var isReady: Bool { get }
     var visibleErrorMessage: String? { get }
+    var unloadEpoch: UInt64 { get }
 
     func supportDecision(for request: GenerationRequest) -> GenerationSupportDecision
     func start()
@@ -160,6 +168,12 @@ public protocol TTSEngineEventStreaming: AnyObject {
 }
 
 public extension TTSEngine {
+    /// Monotonic counter incremented when the engine actually unloads resident
+    /// weights (`unloadModel()`, `trimMemory(.fullUnload)`, `stop()`, or an
+    /// internal failure/idle unload). `clearVisibleError()` does not increment
+    /// it because weights may remain resident.
+    var unloadEpoch: UInt64 { 0 }
+
     /// Engines without a store that remembers discards drop the failure.
     func discardAbandonedPreparedVoiceCandidate(id: UUID) async {
         try? await discardPreparedVoiceCandidate(id: id)

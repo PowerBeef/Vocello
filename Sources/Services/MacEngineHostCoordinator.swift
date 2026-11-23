@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 import QwenVoiceCore
-#if canImport(VocelloDesktopCore)
+#if VOCELLO_CORE_TESTS
 import VocelloDesktopCore
 #endif
 
@@ -96,13 +96,17 @@ final class MacEngineHostCoordinator {
     /// store built again after a failed start replaces the one followed.
     func attach(_ store: TTSEngineStore) {
         engineStates = store.snapshotUpdates.sink { [weak self] state in
-            // RF-69: once `TTSEngineFrontendState` publishes an explicit
-            // `unloadEpoch` (wired in B2.1b), pass `unloadEpoch:` here so
-            // `unloadModel()`, `trimMemory(.fullUnload)`, and `stop()` cancel
-            // any pending failure timer immediately.
-            self?.engineChanged(loadState: state.loadState, clonePreparation: state.clonePreparationState.phase)
+            self?.engineChanged(
+                loadState: state.loadState,
+                clonePreparation: state.clonePreparationState.phase,
+                unloadEpoch: state.unloadEpoch
+            )
         }
-        engineChanged(loadState: store.loadState, clonePreparation: store.clonePreparationState.phase)
+        engineChanged(
+            loadState: store.loadState,
+            clonePreparation: store.clonePreparationState.phase,
+            unloadEpoch: store.frontendState.unloadEpoch
+        )
     }
 
     /// What the engine publishes about its model, as the attached store reports it.
@@ -173,7 +177,7 @@ final class MacEngineHostCoordinator {
     @discardableResult
     func admitEngineWork() -> EngineWorkAdmission? {
         guard let decision = acquireAndCheckProvisionalLease() else { return nil }
-        if decision.lease == nil, !keeper.holdsLease {
+        if decision.lease == nil, !keeper.holdsLease || keeper.presence == .present {
             return EngineWorkAdmission(keeper: keeper, provisionalHoldID: nil, countsAsRequest: false)
         }
         let holdID = keeper.beginProvisionalHold(adopting: decision.lease, timeout: provisionalHoldDuration)

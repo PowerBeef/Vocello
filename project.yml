@@ -823,6 +823,8 @@ targets:
       - path: Sources/DesktopShared/SharedStoreChange.swift
       - path: Sources/Services/MacSharedStoreChangeObserver.swift
       - path: Sources/Services/MacWarmupAdmissionPolicy.swift
+      # RF-69: direct coordinator tests for lease handoff, 8 GB admission, and unloadEpoch.
+      - path: Sources/Services/MacEngineHostCoordinator.swift
       # Audit #11: the Mac footprint bands, unit-tested under the emulated 8 GB floor.
       - path: Sources/Services/MacMemoryBudgetPolicy.swift
       - path: Sources/iOSSupport/Services/DatabaseService.swift
@@ -869,6 +871,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.qwenvoice.core.tests
         PRODUCT_NAME: VocelloCoreTests
         PRODUCT_MODULE_NAME: VocelloCoreTests
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: VOCELLO_CORE_TESTS
         SWIFT_VERSION: "6"
         MACOSX_DEPLOYMENT_TARGET: "26.0"
         CODE_SIGN_IDENTITY: "-"

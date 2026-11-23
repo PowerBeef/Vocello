@@ -148,6 +148,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
 
     @Published public private(set) var loadState: EngineLoadState = .idle
     @Published public private(set) var clonePreparationState: ClonePreparationState = .idle
+    @Published public private(set) var unloadEpoch: UInt64 = 0
     /// Most-recent event seen by the engine. Retained for snapshot
     /// consumers (UI bindings via the `TTSEngine` protocol —
     /// `TTSEngineStore` (macOS + iOS), the
@@ -310,6 +311,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         idleUnloadTask = nil
         closeAdmissionForCriticalMemoryRelief()
         await runtime.unloadModel()
+        unloadEpoch &+= 1
         if retainsFailure {
             // The failed load state, its message and a failed clone
             // preparation stay until the user's next action. The unload
@@ -820,6 +822,11 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         )
         self.streamingSessionFactory = streamingSessionFactory
         self.memoryPressureMonitor = NativeMemoryPressureMonitor()
+        startLatestEventDrainTaskIfNeeded()
+    }
+
+    private func startLatestEventDrainTaskIfNeeded() {
+        guard latestEventDrainTask == nil else { return }
         let coalescer = latestEventCoalescer
         latestEventDrainTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
@@ -870,6 +877,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         }
         isInitialized = false
         stopGeneration &+= 1
+        unloadEpoch &+= 1
         appSupportDirectoryURL = nil
         diagnosticAppSupportBox.url = nil
         voicesDirectory = nil
@@ -992,6 +1000,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             normalizedCloneReferenceDirectory: normalizedCloneReferenceDirectory,
             outputsDirectory: appSupportDirectory.appendingPathComponent("outputs", isDirectory: true)
         )
+        startLatestEventDrainTaskIfNeeded()
         startMemoryPressureMonitorIfNeeded()
         isInitialized = true
         loadState = .idle
@@ -1120,6 +1129,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         defer { finishModelOperation(id: operationID) }
         cancelIdleUnload()
         await runtime.unloadModel()
+        unloadEpoch &+= 1
         loadState = .idle
         clonePreparationState = .idle
         visibleErrorMessage = nil
@@ -1138,6 +1148,10 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         cancelIdleUnload()
         let startedIn = stopGeneration
         do {
+            let shouldPublishStarting = loadState.currentModelID != id
+            if shouldPublishStarting {
+                loadState = .starting
+            }
             applyMemoryPolicyIfKnown(modelID: id, isBatch: false)
             _ = try await runtime.loadModel(
                 id: id,
@@ -1331,6 +1345,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 audioPublished: false
             )
             await unloadAfterCapturedRuntimeFailureIfNeeded(error)
+            guard !wasStopped(since: startedIn) else { throw surfacedError }
             clonePreparationState = ClonePreparationState(
                 phase: .failed,
                 identityKey: uiIdentityKey,
@@ -1572,11 +1587,13 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 operationGeneration: operationGeneration,
                 samplingConfiguration: samplingConfiguration
             )
+            guard !wasStopped(since: startedIn) else { throw CancellationError() }
             loadState = .loaded(modelID: request.modelID)
             visibleErrorMessage = nil
             // A take that loaded its model dropped a reference primed for
             // another one (U18).
             await reconcilePrimedClonePreparationWithRuntime()
+            guard !wasStopped(since: startedIn) else { throw CancellationError() }
             let delivery = eventRouter.snapshot(for: deliveryGenerationID)
             await recordEventDeliveryLossIfNeeded(delivery, request: request)
             let deliveryAnnotated = Self.annotatingEventDelivery(result, delivery: delivery)
@@ -1635,9 +1652,30 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                     ),
                     appSupportDirectory: diagnosticAppSupportBox.url
                 )
+                if wasStopped(since: startedIn) {
+                    await settleCancelledGeneration(
+                        error: CancellationError(),
+                        request: request,
+                        cancellationIngress: cancellationIngress,
+                        deliveryGenerationID: deliveryGenerationID,
+                        startedIn: startedIn
+                    )
+                    throw CancellationError()
+                }
                 let cleanupStartedAt = ContinuousClock.now
                 allocatorControl.clearCache()
-                await runtime.unloadModel()
+                await runtime.unloadModel(forMemoryRelief: true)
+                unloadEpoch &+= 1
+                if wasStopped(since: startedIn) {
+                    await settleCancelledGeneration(
+                        error: CancellationError(),
+                        request: request,
+                        cancellationIngress: cancellationIngress,
+                        deliveryGenerationID: deliveryGenerationID,
+                        startedIn: startedIn
+                    )
+                    throw CancellationError()
+                }
                 let cleanupMS = cleanupStartedAt.elapsedMilliseconds
                 do {
                     let retryResult = try await runGenerationAttempt(
@@ -1648,10 +1686,12 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                         operationGeneration: operationGeneration,
                         samplingConfiguration: samplingConfiguration
                     )
+                    guard !wasStopped(since: startedIn) else { throw CancellationError() }
                     loadState = .loaded(modelID: request.modelID)
                     visibleErrorMessage = nil
                     // The retry's cleanup unloaded, which dropped any prime (U18).
                     await reconcilePrimedClonePreparationWithRuntime()
+                    guard !wasStopped(since: startedIn) else { throw CancellationError() }
                     let delivery = eventRouter.snapshot(for: deliveryGenerationID)
                     await recordEventDeliveryLossIfNeeded(delivery, request: request)
                     let deliveryAnnotated = Self.annotatingEventDelivery(retryResult, delivery: delivery)
@@ -1711,10 +1751,14 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                     )
                     let failureEvent = GenerationEvent.failed(surfacedError.localizedDescription)
                     await yieldEvent(failureEvent, generationID: deliveryGenerationID)
-                    latestEvent = failureEvent
+                    if !wasStopped(since: startedIn) {
+                        latestEvent = failureEvent
+                    }
                     let delivery = eventRouter.snapshot(for: deliveryGenerationID)
                     await recordEventDeliveryLossIfNeeded(delivery, request: request)
-                    await scheduleIdleUnloadAfterFailure()
+                    if !wasStopped(since: startedIn) {
+                        await scheduleIdleUnloadAfterFailure()
+                    }
                     throw surfacedError
                 }
             }
@@ -1746,10 +1790,14 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             )
             let failureEvent = GenerationEvent.failed(surfacedError.localizedDescription)
             await yieldEvent(failureEvent, generationID: deliveryGenerationID)
-            latestEvent = failureEvent
+            if !wasStopped(since: startedIn) {
+                latestEvent = failureEvent
+            }
             let delivery = eventRouter.snapshot(for: deliveryGenerationID)
             await recordEventDeliveryLossIfNeeded(delivery, request: request)
-            await scheduleIdleUnloadAfterFailure()
+            if !wasStopped(since: startedIn) {
+                await scheduleIdleUnloadAfterFailure()
+            }
             throw surfacedError
         }
     }
@@ -1955,11 +2003,23 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     /// consulted as well.
     @discardableResult
     private func unloadAfterCapturedRuntimeFailureIfNeeded(_ error: Error) async -> Bool {
-        if !Self.requiresUnloadAfterFailure(error) {
+        let runtimeObservedFailure: Bool
+        if Self.requiresUnloadAfterFailure(error) {
+            runtimeObservedFailure = false
+        } else {
             guard await runtime.requiresUnloadAfterRuntimeFailure() else { return false }
+            runtimeObservedFailure = true
         }
         allocatorControl.clearCache()
-        await runtime.unloadModel()
+        // Drop Mac Qwen3 runtime caches on any allocation failure (retryable or
+        // post-publication non-retryable), and also when cancellation won over a
+        // runtime failure recorded on the model actor (where `error` is
+        // CancellationError and may mask an allocation failure).
+        let forMemoryRelief = NativeGenerationTerminalClassifier.capturedRuntimeFailure(in: error) == .allocation
+            || NativeGenerationTerminalClassifier.isRetryableAllocationFailure(error)
+            || runtimeObservedFailure
+        await runtime.unloadModel(forMemoryRelief: forMemoryRelief)
+        unloadEpoch &+= 1
         clonePreparationState = .idle
         return true
     }
@@ -2569,6 +2629,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         case .hardTrim:
             clonePreparationState = .idle
         case .fullUnload:
+            unloadEpoch &+= 1
             loadState = .idle
             clonePreparationState = .idle
             visibleErrorMessage = nil

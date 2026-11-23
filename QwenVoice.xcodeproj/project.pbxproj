@@ -922,6 +922,7 @@
 		FEB4FFA004F8907A7AE5E85A /* VoicesCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A63231995FCF8B308715458 /* VoicesCommand.swift */; };
 		FEE48FDAB1C23A895B285EAF /* ModelDownloadChunkSchedulingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8870CD529A5887716706CF7C /* ModelDownloadChunkSchedulingTests.swift */; };
 		FEE664E53E73B9655FE5E2D6 /* DesktopLineBatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CF499E387C91153815C6D1F /* DesktopLineBatch.swift */; };
+		FF108956BD1001645A4D7BD2 /* MacEngineHostCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0186BA8C4986BA855A7AF9B /* MacEngineHostCoordinator.swift */; };
 		FF11C48A36818C3E0473A093 /* RuntimeDebugGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 918E1607289BEDCCB10D1C22 /* RuntimeDebugGateTests.swift */; };
 		FF379FE751C8A5C21793F13F /* MacStudioGenerationRequestFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B992E1A6D01B95314004B09 /* MacStudioGenerationRequestFactory.swift */; };
 		FF5DC81CB0A89081EC920BB8 /* VocelloQwen3FacadeAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02BE8778F06781683AB83663 /* VocelloQwen3FacadeAdapter.swift */; };
@@ -3945,6 +3946,7 @@
 				C2FDD8A11D33B88A2E949589 /* MacChipFlowTests.swift in Sources */,
 				B6E404A585D6460A8CCDDD41 /* MacChipRowBudget.swift in Sources */,
 				C14C50C6AC3650CF1C2D06CA /* MacControlMetrics.swift in Sources */,
+				FF108956BD1001645A4D7BD2 /* MacEngineHostCoordinator.swift in Sources */,
 				A3CC0C656C00705B7909D968 /* MacFileSaveCopy.swift in Sources */,
 				B30EB265F484F4FED6A5E082 /* MacFileSaveCopyTests.swift in Sources */,
 				860204810DB69C180961C951 /* MacGenerationWarmupCoordinator.swift in Sources */,
@@ -4913,6 +4915,7 @@
 				PRODUCT_MODULE_NAME = VocelloCoreTests;
 				PRODUCT_NAME = VocelloCoreTests;
 				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = VOCELLO_CORE_TESTS;
 				SWIFT_VERSION = 6;
 			};
 			name = Release;

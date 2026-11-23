@@ -110,7 +110,8 @@ public final class AnyTTSEngineBackend {
                 loadState: engine.loadState,
                 clonePreparationState: engine.clonePreparationState,
                 latestEvent: engine.latestEvent,
-                visibleErrorMessage: engine.visibleErrorMessage
+                visibleErrorMessage: engine.visibleErrorMessage,
+                unloadEpoch: engine.unloadEpoch
             )
         }
         self.supportDecisionBlock = { engine.supportDecision(for: $0) }
@@ -232,7 +233,8 @@ public final class AnyTTSEngineBackend {
             loadState: snapshot.loadState,
             clonePreparationState: snapshot.clonePreparationState,
             latestEvent: snapshot.latestEvent,
-            visibleErrorMessage: snapshot.visibleErrorMessage
+            visibleErrorMessage: snapshot.visibleErrorMessage,
+            unloadEpoch: snapshot.unloadEpoch
         )
     }
     public func supportDecision(for request: GenerationRequest) -> GenerationSupportDecision { supportDecisionBlock(request) }

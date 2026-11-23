@@ -286,6 +286,7 @@ struct MacBatchGenerationSheet: View {
             MacKoreanLongFormCaution(
                 script: batchText,
                 isLongForm: isLongForm,
+                language: configuration.language,
                 accessibilityIdentifier: "batch_koreanLongFormCaution"
             )
         }

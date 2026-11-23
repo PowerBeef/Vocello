@@ -54,9 +54,18 @@ public final class DesktopEngineHost {
     public func observeEngineState(
         _ handler: @escaping @MainActor (EngineLoadState, ClonePreparationPhase) -> Void
     ) {
-        engineStateObserver = store.snapshotUpdates.sink { state in
-            handler(state.loadState, state.clonePreparationState.phase)
+        observeEngineState { loadState, clonePreparation, _ in
+            handler(loadState, clonePreparation)
         }
+    }
+
+    public func observeEngineState(
+        _ handler: @escaping @MainActor (EngineLoadState, ClonePreparationPhase, UInt64) -> Void
+    ) {
+        engineStateObserver = store.snapshotUpdates.sink { state in
+            handler(state.loadState, state.clonePreparationState.phase, state.unloadEpoch)
+        }
+        handler(store.loadState, store.clonePreparationState.phase, store.frontendState.unloadEpoch)
     }
 
     public func loadModel(id: String) async throws {

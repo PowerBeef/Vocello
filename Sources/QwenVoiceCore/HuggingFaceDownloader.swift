@@ -3586,7 +3586,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
     }
 
-    private func installStagedRepository(
+    func installStagedRepository(
         filesRoot: URL,
         targetDir: URL,
         allowedRelativePaths: Set<String>
@@ -3613,10 +3613,25 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             // integrity manifest written into `filesRoot`) so stray staged files
             // can never enter the installed model directory.
             for relativePath in allowedRelativePaths.sorted() {
+                // Reject any symlink component along `relativePath` (both intermediate
+                // directories and leaf) BEFORE `validatedDestinationURL` resolves symlinks,
+                // matching `SharedModelComponentStore.isRegularFileWithoutSymlink`.
+                var walked = filesRoot
+                for component in relativePath.split(separator: "/") where !component.isEmpty {
+                    walked = walked.appendingPathComponent(String(component), isDirectory: false)
+                    if let walkedValues = try? walked.resourceValues(forKeys: [.isSymbolicLinkKey]),
+                       walkedValues.isSymbolicLink == true {
+                        throw DownloadError.integrityCheckFailed(
+                            path: relativePath,
+                            reason: "staged file is a symbolic link"
+                        )
+                    }
+                }
+                let unresolvedSource = filesRoot.appendingPathComponent(relativePath, isDirectory: false)
                 let source: URL
                 let destination: URL
                 if relativePath == ModelAssetIntegrityManifest.filename {
-                    source = filesRoot.appendingPathComponent(relativePath, isDirectory: false)
+                    source = unresolvedSource
                     destination = installingURL.appendingPathComponent(relativePath, isDirectory: false)
                 } else {
                     source = try Self.validatedDestinationURL(for: relativePath, in: filesRoot)

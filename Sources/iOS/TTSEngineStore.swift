@@ -769,7 +769,8 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
             loadState: snapshot.loadState,
             clonePreparationState: snapshot.clonePreparationState,
             latestEvent: retainedLatestEvent,
-            visibleErrorMessage: snapshot.visibleErrorMessage
+            visibleErrorMessage: snapshot.visibleErrorMessage,
+            unloadEpoch: snapshot.unloadEpoch
         )
 
         let frontendStateChanged = frontendState != retainedSnapshot

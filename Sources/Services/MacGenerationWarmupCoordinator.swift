@@ -189,6 +189,11 @@ final class MacGenerationWarmupCoordinator {
     /// DispatchSource pressure events don't replay the in-progress level to
     /// a late starter. (With gate=off it starts no monitor.)
     private let admissionPolicy: MacWarmupAdmissionPolicy
+    /// Optional host-level acquire-then-check admission invoked only after
+    /// `admissionPolicy.admit` succeeds (RF-69). Returns a release closure on
+    /// admission (called on exit so deferred/cancelled/skipped warms never
+    /// leak a provisional lease) or `nil` when another host blocks the warm.
+    private let admitWarmHost: (@MainActor () -> (@MainActor () -> Void)?)?
 
     init(
         debounce: Duration = .milliseconds(300),
@@ -196,7 +201,8 @@ final class MacGenerationWarmupCoordinator {
         designDebounce: Duration = .milliseconds(800),
         cloneDebounce: Duration = .milliseconds(500),
         modeTransitionDebounce: Duration = .milliseconds(900),
-        admissionPolicy: MacWarmupAdmissionPolicy = MacWarmupAdmissionPolicy()
+        admissionPolicy: MacWarmupAdmissionPolicy = MacWarmupAdmissionPolicy(),
+        admitWarmHost: (@MainActor () -> (@MainActor () -> Void)?)? = nil
     ) {
         self.debounce = debounce
         self.customVoiceDebounce = customVoiceDebounce
@@ -204,6 +210,7 @@ final class MacGenerationWarmupCoordinator {
         self.cloneDebounce = cloneDebounce
         self.modeTransitionDebounce = modeTransitionDebounce
         self.admissionPolicy = admissionPolicy
+        self.admitWarmHost = admitWarmHost
     }
 
     func scheduleWarmupIfNeeded(
@@ -309,6 +316,18 @@ final class MacGenerationWarmupCoordinator {
                 return
             }
 
+            let releaseWarmHostAdmission: (@MainActor () -> Void)?
+            if let admitWarmHost = self.admitWarmHost {
+                guard let release = admitWarmHost() else {
+                    self.pendingPlan = nil
+                    self.pendingTask = nil
+                    return
+                }
+                releaseWarmHostAdmission = release
+            } else {
+                releaseWarmHostAdmission = nil
+            }
+
             self.pendingPlan = nil
             self.dispatchedContext = plan.context
             // From here this task is the dispatched warm, which only a change
@@ -325,6 +344,7 @@ final class MacGenerationWarmupCoordinator {
             var warmPerformed = false
             var warmCompleted = false
             defer {
+                releaseWarmHostAdmission?()
                 if self.dispatchedContext == plan.context {
                     self.dispatchedContext = nil
                     self.dispatchedTask = nil

@@ -133,7 +133,7 @@ public final class EngineHostLease: Sendable {
         }
     }
 
-    private static func readHostData(from descriptor: FileDescriptor) -> Data? {
+    public static func readHostData(from descriptor: FileDescriptor) -> Data? {
         let handle = FileHandle(fileDescriptor: descriptor.rawValue, closeOnDealloc: false)
         var data = Data()
         let maxBytes = 65_536

@@ -12,13 +12,19 @@ struct QwenVoiceApp: App {
     /// The shell's flip-scoped generation gate, created once with the store.
     @State private var gateModel: GenerationPerformanceGateModel?
     /// Studio warmups; its admission policy runs a memory-pressure monitor, so one per app.
-    /// RF-61 / RF-69: on an 8 GB Mac a warm acquires a provisional lease before
-    /// checking other hosts (`admitEngineWork()`) and defers while another Vocello
-    /// engine holds the Mac.
+    /// RF-61 / RF-69: the policy check stays side-effect-free so memory-pressure-deferred
+    /// warms never write a lease; `admitWarmHost` acquires the 8 GB provisional lease only
+    /// once pressure admission passes, and releases it on any early exit.
     @State private var generationWarmupCoordinator = MacGenerationWarmupCoordinator(
         admissionPolicy: MacWarmupAdmissionPolicy(
-            anotherEngineBlocksWarm: { MacEngineHostCoordinator.shared.admitEngineWork() == nil }
-        )
+            anotherEngineBlocksWarm: { MacEngineHostCoordinator.shared.refusesEngineWork }
+        ),
+        admitWarmHost: {
+            guard let admission = MacEngineHostCoordinator.shared.admitEngineWork() else {
+                return nil
+            }
+            return { admission.end() }
+        }
     )
     @State private var engineBootstrapDiagnostics: AppLaunchDiagnosticsSnapshot?
     @State private var didInitializeSelectedTTSEngine = false

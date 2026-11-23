@@ -2208,6 +2208,26 @@ final class ModelDownloadLifecycleTests: XCTestCase {
             ),
             "stray staged directory must never be installed"
         )
+
+        // An intra-root symlink at an allowed relative path must fail closed in non-shared install too.
+        let symlinkStageRoot = delivery.root.appendingPathComponent("symlink-stage", isDirectory: true)
+        let symlinkFiles = symlinkStageRoot.appendingPathComponent("files", isDirectory: true)
+        try FileManager.default.createDirectory(at: symlinkFiles, withIntermediateDirectories: true)
+        let realTarget = symlinkFiles.appendingPathComponent("other.bin")
+        try Data("payload".utf8).write(to: realTarget)
+        try FileManager.default.createSymbolicLink(
+            at: symlinkFiles.appendingPathComponent("weights.bin"),
+            withDestinationURL: realTarget
+        )
+        let symlinkTarget = delivery.root.appendingPathComponent("symlink-installed", isDirectory: true)
+        XCTAssertThrowsError(
+            try HuggingFaceDownloader().installStagedRepository(
+                filesRoot: symlinkFiles,
+                targetDir: symlinkTarget,
+                allowedRelativePaths: ["weights.bin"]
+            ),
+            "intra-root symlink at an allowed staged path must fail closed"
+        )
     }
 
     /// RF-69: cancelling the Swift task running a single-stream `downloadTemporaryFile`

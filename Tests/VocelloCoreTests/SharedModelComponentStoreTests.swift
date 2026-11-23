@@ -1153,7 +1153,7 @@ final class SharedModelComponentStoreTests: XCTestCase {
             contentIdentity: content,
             compatibilityIdentity: compatibility(content: content, capability: .decoderOnly)
         )
-        let plan = SharedComponentMigrationPlan(modelFolder: "model-e03", manifest: manifest)
+        let plan = try SharedComponentMigrationPlan(modelFolder: "model-e03", manifest: manifest)
         let store = SharedModelComponentStore(modelsRoot: models)
 
         // Unsafe allowedRelativePaths fail closed before installing anything.
@@ -1188,6 +1188,29 @@ final class SharedModelComponentStoreTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: installed.appendingPathComponent("stray-old.bin").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: installed.appendingPathComponent("stale_dir").path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: installed.appendingPathComponent("stray-link").path))
+
+        // An intra-root symlink placed directly at an allowed relative path must fail closed.
+        let symlinkStage = root.appendingPathComponent("stage-symlink-allowed", isDirectory: true)
+        try FileManager.default.createDirectory(at: symlinkStage, withIntermediateDirectories: true)
+        try Data("target".utf8).write(to: symlinkStage.appendingPathComponent("real.bin"))
+        try FileManager.default.createSymbolicLink(
+            at: symlinkStage.appendingPathComponent("unique.bin"),
+            withDestinationURL: symlinkStage.appendingPathComponent("real.bin")
+        )
+        try FileManager.default.createDirectory(
+            at: symlinkStage.appendingPathComponent("codec", isDirectory: true),
+            withIntermediateDirectories: true
+        )
+        try write(sharedBytes, to: symlinkStage.appendingPathComponent("codec/shared.bin"))
+        XCTAssertThrowsError(
+            try store.installStagedModel(
+                try SharedComponentMigrationPlan(modelFolder: "model-e03-link", manifest: manifest),
+                stagedModelURL: symlinkStage,
+                allowedRelativePaths: ["unique.bin", "codec/shared.bin"]
+            ) { _ in }
+        ) { error in
+            XCTAssertEqual(error as? SharedModelComponentStoreError, .nonRegularFile(relativePath: "unique.bin"))
+        }
     }
 
     /// RF-69: `withPublicationLock` retries `flock(LOCK_EX)` while interrupted by `EINTR`

@@ -1573,11 +1573,23 @@ final class TTSEngineStoreTests: XCTestCase {
         }
         await fulfillment(of: [held], timeout: 10)
 
-        XCTAssertEqual(store.loadState, .idle, "cold ensureModelLoadedIfNeeded leaves loadState .idle while loading")
+        XCTAssertEqual(
+            store.loadState,
+            .starting,
+            "RF-69: cold ensureModelLoadedIfNeeded publishes .starting while loading so lease keepers and UI observe the transition"
+        )
         XCTAssertEqual(store.clonePreparationState, .idle)
         XCTAssertTrue(
             store.hasInFlightPreparationOrLoadedModel,
             "cold proactive load in flight must request background release time on foreground exit"
+        )
+        XCTAssertTrue(
+            IOSBackgroundGenerationPolicy.requiresBackgroundReleaseTime(
+                loadState: .idle,
+                clonePreparationState: .idle,
+                hasInFlightPreparation: true
+            ),
+            "background policy still protects in-flight preparation even when loadState is .idle"
         )
 
         await coordinator.releaseFirstLoad()
@@ -1625,6 +1637,295 @@ final class TTSEngineStoreTests: XCTestCase {
             "The store never reported a failure",
             file: file,
             line: line
+        )
+    }
+
+    /// RF-69 (B2.1b/B2.2): `unloadEpoch` advances on real weight unloads
+    /// (`unloadModel`, `trimMemory(.fullUnload)`, `stop`) and never on
+    /// `clearVisibleError`, and `stop()` followed by `initialize()` restarts
+    /// `latestEventDrainTask` so coalesced `chunkSink` progress events traverse
+    /// `latestEventCoalescer` → `latestEventDrainTask` → `engine.latestEvent`.
+    @MainActor
+    func testUnloadEpochTracksRealUnloadsAndStopReinitializeRestartsEventDrain() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-rf69-lifecycle-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let coordinator = PrewarmedSessionStubCoordinator()
+        let drainGate = AsyncTestGate()
+        let outputPath = root.appendingPathComponent("reinit.wav").path
+        let engine = MLXTTSEngine(
+            modelRegistry: try ContractBackedModelRegistry(manifestURL: contractURL),
+            modelAssetStore: LocalModelAssetStore(
+                rootDirectory: root.appendingPathComponent("models", isDirectory: true),
+                descriptors: []
+            ),
+            audioPreparationService: NativeAudioPreparationService(),
+            documentIO: LocalDocumentIO(
+                importedReferenceDirectory: root.appendingPathComponent("imported", isDirectory: true)
+            ),
+            streamSessionsDirectory: root.appendingPathComponent("streams", isDirectory: true),
+            loadCoordinator: coordinator,
+            streamingSessionFactory: { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in
+                ClosureGenerationOutputAdapter { chunkSink in
+                    let result = GenerationResult(
+                        audioPath: outputPath,
+                        durationSeconds: 1.0,
+                        streamSessionDirectory: nil,
+                        usedStreaming: false
+                    )
+                    await chunkSink(.progress(GenerationProgress(percent: 42, message: "reinit-drained")))
+                    await drainGate.enterAndWait()
+                    await chunkSink(.completed(result))
+                    return result
+                }
+            },
+            idleUnloadDelayOverride: Self.residentIdleWindow,
+            allocatorControl: .inert
+        )
+        defer { engine.stop() }
+
+        let store = makeStore(engine: engine, dial: MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy))
+        try await store.initialize(appSupportDirectory: root)
+        let epoch0 = store.frontendState.unloadEpoch
+
+        try await store.loadModel(id: "pro_custom")
+        XCTAssertEqual(store.frontendState.unloadEpoch, epoch0)
+
+        engine.setVisibleError("Transient failure")
+        engine.clearVisibleError()
+        await Task.yield()
+        XCTAssertEqual(
+            engine.unloadEpoch,
+            epoch0,
+            "clearVisibleError must not advance unloadEpoch because weights may stay resident"
+        )
+
+        try await store.unloadModel()
+        let epochAfterUnload = engine.unloadEpoch
+        XCTAssertGreaterThan(epochAfterUnload, epoch0, "explicit unloadModel must advance unloadEpoch")
+        await waitUntil("store publishes unloadEpoch after unloadModel") {
+            store.frontendState.unloadEpoch == epochAfterUnload
+        }
+
+        await engine.trimMemory(level: .fullUnload, reason: "test_full_unload")
+        let epochAfterFullUnload = engine.unloadEpoch
+        XCTAssertGreaterThan(epochAfterFullUnload, epochAfterUnload, "fullUnload trim must advance unloadEpoch")
+
+        engine.stop()
+        let epochAfterStop = engine.unloadEpoch
+        XCTAssertGreaterThan(epochAfterStop, epochAfterFullUnload, "stop() must advance unloadEpoch")
+
+        // Re-initialize after stop(): latestEventDrainTask must restart so a
+        // coalesced `.progress` event emitted via `chunkSink` (which is ONLY
+        // delivered through `latestEventCoalescer` -> `latestEventDrainTask`,
+        // never assigned directly on MainActor) reaches `engine.latestEvent`.
+        try await store.initialize(appSupportDirectory: root)
+        let request = GenerationRequest(
+            mode: .custom,
+            modelID: "pro_custom",
+            text: "Hello from reinitialized Vocello.",
+            outputPath: outputPath,
+            shouldStream: false,
+            payload: .custom(speakerID: "aiden", deliveryStyle: nil)
+        )
+        let generateTask = Task { @MainActor in
+            try await store.generate(request)
+        }
+        await drainGate.waitUntilEntered()
+        await waitUntil("re-initialized engine drains coalesced progress event via latestEventDrainTask") {
+            if case .progress(let progress) = engine.latestEvent {
+                return progress.percent == 42 && progress.message == "reinit-drained"
+            }
+            return false
+        }
+        await drainGate.release()
+        _ = try await generateTask.value
+    }
+
+    /// RF-69 (B2.2): calling `stop()` while a generation session is suspended
+    /// prevents post-return state publication (`loadState` stays `.idle`,
+    /// `latestEvent` stays `nil`) while still closing the subscribed event stream
+    /// with `.cancelled`.
+    @MainActor
+    func testStopMidGenerationPublishesNothingAndClosesEventStream() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-rf69-stop-mid-gen-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let gate = AsyncTestGate()
+        let outputPath = root.appendingPathComponent("stopped.wav").path
+        let engine = MLXTTSEngine(
+            modelRegistry: try ContractBackedModelRegistry(manifestURL: contractURL),
+            modelAssetStore: LocalModelAssetStore(
+                rootDirectory: root.appendingPathComponent("models", isDirectory: true),
+                descriptors: []
+            ),
+            audioPreparationService: NativeAudioPreparationService(),
+            documentIO: LocalDocumentIO(
+                importedReferenceDirectory: root.appendingPathComponent("imported", isDirectory: true)
+            ),
+            streamSessionsDirectory: root.appendingPathComponent("streams", isDirectory: true),
+            loadCoordinator: PrewarmedSessionStubCoordinator(),
+            streamingSessionFactory: { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in
+                ClosureGenerationOutputAdapter { _ in
+                    await gate.enterAndWait()
+                    return GenerationResult(
+                        audioPath: outputPath,
+                        durationSeconds: 1.0,
+                        streamSessionDirectory: nil,
+                        usedStreaming: false
+                    )
+                }
+            },
+            idleUnloadDelayOverride: Self.residentIdleWindow,
+            allocatorControl: .inert
+        )
+        defer { engine.stop() }
+        try await engine.initialize(appSupportDirectory: root)
+
+        let generationID = UUID()
+        let request = GenerationRequest(
+            mode: .custom,
+            modelID: "pro_custom",
+            text: "Hello.",
+            outputPath: outputPath,
+            shouldStream: false,
+            payload: .custom(speakerID: "aiden", deliveryStyle: nil),
+            generationID: generationID
+        )
+        let eventsStream = engine.events(for: generationID)
+        let collector = Task { @concurrent () async -> [GenerationEvent] in
+            var collected: [GenerationEvent] = []
+            for await event in eventsStream {
+                collected.append(event)
+            }
+            return collected
+        }
+
+        let generateTask = Task { @MainActor () -> Result<GenerationResult, any Error> in
+            do {
+                return .success(try await engine.generate(request))
+            } catch {
+                return .failure(error)
+            }
+        }
+        await gate.waitUntilEntered()
+        engine.stop()
+        await gate.release()
+
+        let result = await generateTask.value
+        switch result {
+        case .success:
+            XCTFail("generation that outlived stop() must throw CancellationError")
+        case .failure(let error):
+            XCTAssertTrue(error is CancellationError, "unexpected error: \(error)")
+        }
+        XCTAssertEqual(engine.loadState, .idle, "stopped engine must never flip back to .loaded")
+        XCTAssertNil(engine.latestEvent, "stopped engine must not publish a late latestEvent")
+        let delivered = await collector.value
+        XCTAssertTrue(
+            delivered.contains { event in
+                if case .cancelled = event { return true }
+                return false
+            },
+            "event stream must close with .cancelled even when stop() raced generation completion"
+        )
+    }
+
+    /// RF-69 (B-05): an allocation retry inside `MLXTTSEngine.generate` clears
+    /// Mac Qwen3 runtime caches (`forMemoryRelief: true`) before retrying.
+    @MainActor
+    func testAllocationRetryUnloadClearsMacRuntimeCachesForMemoryRelief() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-rf69-b05-retry-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let runtimeCacheClears = OSAllocatedUnfairLock(initialState: 0)
+        let attemptCounter = OSAllocatedUnfairLock(initialState: 0)
+        let outputPath = root.appendingPathComponent("retry.wav").path
+        let engine = MLXTTSEngine(
+            modelRegistry: try ContractBackedModelRegistry(manifestURL: contractURL),
+            modelAssetStore: LocalModelAssetStore(
+                rootDirectory: root.appendingPathComponent("models", isDirectory: true),
+                descriptors: []
+            ),
+            audioPreparationService: NativeAudioPreparationService(),
+            documentIO: LocalDocumentIO(
+                importedReferenceDirectory: root.appendingPathComponent("imported", isDirectory: true)
+            ),
+            streamSessionsDirectory: root.appendingPathComponent("streams", isDirectory: true),
+            loadCoordinator: PrewarmedSessionStubCoordinator(),
+            streamingSessionFactory: { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in
+                ClosureGenerationOutputAdapter { chunkSink in
+                    let attempt = attemptCounter.withLock { value -> Int in
+                        value += 1
+                        return value
+                    }
+                    if attempt == 1 {
+                        throw VocelloQwen3RuntimeFailure.allocation
+                    }
+                    if attempt == 3 {
+                        throw NativeRuntimeError.capturedRuntimeFailure(
+                            .allocation,
+                            stage: .streamGenerationEnded,
+                            audioPublished: true
+                        )
+                    }
+                    let result = GenerationResult(
+                        audioPath: outputPath,
+                        durationSeconds: 1.0,
+                        streamSessionDirectory: nil,
+                        usedStreaming: false
+                    )
+                    await chunkSink(.completed(result))
+                    return result
+                }
+            },
+            idleUnloadDelayOverride: Self.residentIdleWindow,
+            allocatorControl: NativeMLXAllocatorControl(
+                applyPolicy: { _ in },
+                clearCache: {},
+                runtimeCacheClear: .recording {
+                    runtimeCacheClears.withLock { $0 += 1 }
+                }
+            )
+        )
+        defer { engine.stop() }
+        try await engine.initialize(appSupportDirectory: root)
+
+        let request = GenerationRequest(
+            mode: .custom,
+            modelID: "pro_custom",
+            text: "Hello.",
+            outputPath: outputPath,
+            shouldStream: false,
+            payload: .custom(speakerID: "aiden", deliveryStyle: nil)
+        )
+        let result = try await engine.generate(request)
+        XCTAssertEqual(result.diagnosticBooleanFlags["allocationRetryAttempted"], true)
+        XCTAssertEqual(result.diagnosticBooleanFlags["allocationRetrySucceeded"], true)
+        XCTAssertEqual(
+            runtimeCacheClears.withLock { $0 },
+            1,
+            "allocation-retry unload must pass forMemoryRelief: true and clear Mac Qwen3 runtime caches (B-05)"
+        )
+
+        // Post-publication mid-stream OOM is non-retryable (underlyingDisposition == .failure),
+        // yet unloadAfterCapturedRuntimeFailureIfNeeded must still clear Mac runtime caches.
+        do {
+            _ = try await engine.generate(request)
+            XCTFail("Expected non-retryable post-publication allocation failure")
+        } catch {
+            // Expected.
+        }
+        XCTAssertEqual(
+            runtimeCacheClears.withLock { $0 },
+            2,
+            "post-publication non-retryable OOM must also clear Mac Qwen3 runtime caches (B-05)"
         )
     }
 
@@ -1725,6 +2026,114 @@ private actor ColdHoldingLoadCoordinator: MLXModelCoordinating {
         supportsVoiceClone: true,
         supportsXVectorOnlyClone: true,
         requiresSpeakerEncoder: true,
+        tokenizerProfile: Qwen3TTSTokenizerProfile(
+            name: "qwen3",
+            sampleRateHz: 24_000,
+            frameRateHz: 12.5,
+            decoderQuantizers: 16,
+            encoderValidQuantizers: 8,
+            encoderConfiguredQuantizers: 8,
+            codebookSize: 2_048,
+            semanticCodebookSize: 4_096
+        ),
+        generationDefaults: Qwen3TTSGenerationDefaultsProfile(
+            checkpointMaxNewTokens: nil,
+            wrapperFallbackMaxNewTokens: 2_048,
+            appPolicyMaxNewTokens: 2_048,
+            temperature: 0.9,
+            topP: 1,
+            topK: 50,
+            doSample: true,
+            repetitionPenalty: 1.05,
+            source: .appPolicy
+        ),
+        artifactAvailability: .publicArtifact
+    )
+}
+
+private struct ClosureGenerationOutputAdapter: GenerationOutputAdapting, Sendable {
+    let body: @Sendable @concurrent (
+        @escaping @Sendable @concurrent (GenerationEvent) async -> Void
+    ) async throws -> GenerationResult
+
+    @concurrent func run(
+        chunkSink: @escaping @Sendable @concurrent (GenerationEvent) async -> Void
+    ) async throws -> GenerationResult {
+        try await body(chunkSink)
+    }
+}
+
+private actor AsyncTestGate {
+    private var entered = false
+    private var released = false
+    private var enterWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseWaiters: [CheckedContinuation<Void, Never>] = []
+
+    func enterAndWait() async {
+        entered = true
+        let waiters = enterWaiters
+        enterWaiters.removeAll()
+        for waiter in waiters { waiter.resume() }
+        if !released {
+            await withCheckedContinuation { releaseWaiters.append($0) }
+        }
+    }
+
+    func waitUntilEntered() async {
+        if !entered {
+            await withCheckedContinuation { enterWaiters.append($0) }
+        }
+    }
+
+    func release() {
+        released = true
+        let waiters = releaseWaiters
+        releaseWaiters.removeAll()
+        for waiter in waiters { waiter.resume() }
+    }
+}
+
+private actor PrewarmedSessionStubCoordinator: MLXModelCoordinating {
+    func qwen3Capabilities(for id: String) async throws -> Qwen3TTSModelCapabilities { Self.capabilities }
+
+    func loadModel(
+        id: String,
+        capabilityProfile: NativeLoadCapabilityProfile
+    ) async throws -> NativeModelLoadResult {
+        let facts = VocelloQwen3LoadedModelFacts(
+            identity: VocelloQwen3ModelIdentity(
+                modelID: id, repositoryID: "fixture/repo", revision: "fixture", artifactVersion: "fixture"
+            ),
+            sampleRate: 24_000,
+            capabilities: VocelloQwen3CapabilitySet([VocelloQwen3Capability]()),
+            loadDiagnostics: VocelloQwen3RuntimeDiagnosticsSnapshot()
+        )
+        return NativeModelLoadResult(
+            model: UnsafeSpeechGenerationModel(engine: VocelloQwen3Engine(), facts: facts),
+            modelRuntimeIdentity: ModelRuntimeIdentity(resolvedModelID: id),
+            didLoad: true,
+            capabilityProfile: capabilityProfile,
+            qwen3Capabilities: Self.capabilities,
+            timingsMS: [:],
+            booleanFlags: [:],
+            stringFlags: [:]
+        )
+    }
+
+    func unloadModel() async {}
+    func isPrewarmed(identityKey: String) async -> Bool { true }
+    func markPrewarmed(identityKey: String) async {}
+    func clearPrewarmState() async {}
+    func setTelemetryRecorder(_ recorder: NativeTelemetryRecorder?) async {}
+    func requiresUnloadAfterRuntimeFailure() async -> Bool { false }
+
+    private static let capabilities = Qwen3TTSModelCapabilities(
+        modelSize: .pro1b7,
+        familyType: .customVoice,
+        supportsInstructionControl: true,
+        supportsVoiceClone: false,
+        supportsXVectorOnlyClone: false,
+        requiresSpeakerEncoder: false,
         tokenizerProfile: Qwen3TTSTokenizerProfile(
             name: "qwen3",
             sampleRateHz: 24_000,

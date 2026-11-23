@@ -1,6 +1,9 @@
+import Darwin
 import Foundation
-import QwenVoiceCore
+@testable import QwenVoiceCore
+import System
 import VocelloDesktopCore
+import VocelloQwen3Core
 import XCTest
 @testable import VocelloCLICore
 
@@ -1131,6 +1134,332 @@ final class DesktopAppPresenceTests: XCTestCase {
                       "the kernel lists the test host among \(paths.count) processes")
         XCTAssertTrue(paths.allSatisfy { $0.hasPrefix("/") }, "each entry is a whole path")
     }
+}
+
+/// RF-69 (B2.1b): direct unit tests against `MacEngineHostCoordinator` now
+/// compiled into `VocelloCoreTests`. Covers attach + `unloadEpoch` failure
+/// window cancellation, 8 GB acquire-then-check provisional admission, and
+/// `refusesModelDeletion` excluding `ownLease`.
+@MainActor
+final class MacEngineHostCoordinatorTests: XCTestCase {
+    private func makeFolder() throws -> URL {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MacHostCoordinator-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
+        return folder
+    }
+
+    func testEightGBAdmissionAcquiresProvisionalLeaseAndRefusesWhenOtherHostActive() throws {
+        let folder = try makeFolder()
+        let coordinator = MacEngineHostCoordinator(
+            folder: folder,
+            deviceClass: .floor8GBMac,
+            tierIsDiagnostic: false,
+            failureWindow: .seconds(10),
+            provisionalHoldDuration: .seconds(5)
+        )
+        defer { coordinator.releaseLease() }
+
+        // With no external host, admitGeneration acquires a provisional app lease on disk.
+        let admitted = coordinator.admitGeneration()
+        XCTAssertNil(admitted.refusalMessage)
+        XCTAssertNotNil(admitted.admission)
+        XCTAssertTrue(coordinator.holdsLease)
+        XCTAssertFalse(coordinator.refusesModelDeletion, "own provisional lease must not block self deletion")
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder).map(\.kind), ["app"])
+
+        // Releasing an unused admission drops the provisional lease cleanly.
+        admitted.admission?.end()
+        XCTAssertFalse(coordinator.holdsLease)
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [])
+
+        // With an external CLI host holding a lease, 8 GB admission refuses and drops its provisional lease.
+        let cliLease = try EngineHostLease.acquire(in: folder, kind: "cli")
+        defer { cliLease.release() }
+        XCTAssertTrue(coordinator.refusesModelDeletion)
+        let refused = coordinator.admitGeneration()
+        XCTAssertNil(refused.admission)
+        XCTAssertEqual(refused.refusalMessage, MacInterfaceText.engineHostBusy)
+        XCTAssertFalse(coordinator.holdsLease)
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder).map(\.kind), ["cli"])
+
+        // Scoped admission also refuses cleanly while external host is active.
+        XCTAssertNil(coordinator.beginScopedEngineWork())
+        XCTAssertFalse(coordinator.holdsLease)
+    }
+
+    func testAttachCancelsFailureReleaseWindowOnUnloadEpochWhileClearVisibleErrorPreservesIt() async throws {
+        let folder = try makeFolder()
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MacHostAttach-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let contract = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+        let engine = MLXTTSEngine(
+            modelRegistry: try ContractBackedModelRegistry(manifestURL: contract),
+            modelAssetStore: LocalModelAssetStore(
+                rootDirectory: root.appendingPathComponent("models", isDirectory: true),
+                descriptors: []
+            ),
+            audioPreparationService: NativeAudioPreparationService(),
+            documentIO: LocalDocumentIO(
+                importedReferenceDirectory: root.appendingPathComponent("imported", isDirectory: true)
+            ),
+            streamSessionsDirectory: root.appendingPathComponent("streams", isDirectory: true),
+            loadCoordinator: CoordinatorAttachStubLoader(),
+            streamingSessionFactory: { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in
+                fatalError("Not used in attach test.")
+            },
+            idleUnloadDelayOverride: 60,
+            allocatorControl: .inert
+        )
+        defer { engine.stop() }
+        let dial = MemoryHeadroomDial(megabytes: MemoryHeadroomDial.healthy)
+        let store = TTSEngineStore(
+            backend: AnyTTSEngineBackend(
+                engine: engine,
+                supportsSavedVoiceMutation: true,
+                supportsModelManagementMutation: true,
+                supportedModes: [.custom, .design, .clone],
+                voiceCloningConsent: { VoiceCloningConsentPolicy(isConsentRecorded: true) }
+            ),
+            memoryBudgetPolicy: .iPhoneShippingDefault,
+            memorySnapshotProvider: { dial.snapshot() }
+        )
+        try await store.initialize(appSupportDirectory: root)
+
+        let coordinator = MacEngineHostCoordinator(
+            folder: folder,
+            deviceClass: .highMemoryMac,
+            tierIsDiagnostic: false,
+            failureWindow: .seconds(60),
+            provisionalHoldDuration: .seconds(2)
+        )
+        defer { coordinator.releaseLease() }
+        // Exercise the real `attach(_:)` Combine bridge rather than calling `engineChanged` directly.
+        coordinator.attach(store)
+
+        func waitUntil(_ condition: @MainActor () -> Bool) async -> Bool {
+            let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+            while !condition(), ContinuousClock.now < deadline {
+                try? await Task.sleep(for: .milliseconds(5))
+            }
+            return condition()
+        }
+
+        try await store.loadModel(id: "pro_custom")
+        let acquired = await waitUntil { coordinator.holdsLease }
+        XCTAssertTrue(acquired, "attached coordinator must acquire lease when store loads a model")
+
+        engine.setVisibleError("Transient failure")
+        let failedObserved = await waitUntil {
+            if case .failed = store.loadState { return true }
+            return false
+        }
+        XCTAssertTrue(failedObserved)
+        XCTAssertTrue(coordinator.holdsLease, "failure keeps lease during failureWindow")
+
+        engine.clearVisibleError()
+        let idleObserved = await waitUntil { store.loadState == .idle }
+        XCTAssertTrue(idleObserved)
+        XCTAssertTrue(
+            coordinator.holdsLease,
+            "clearVisibleError (same unloadEpoch) must preserve the failure release window via attach(_:)"
+        )
+
+        try await store.unloadModel()
+        let released = await waitUntil { !coordinator.holdsLease }
+        XCTAssertTrue(
+            released,
+            "unloadModel advancing unloadEpoch must cancel the failure release window immediately via attach(_:)"
+        )
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [])
+    }
+
+    func testDeferredOrEarlyExitingProactiveWarmLeavesNoProvisionalLeaseOnDisk() async throws {
+        let folder = try makeFolder()
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MacHostWarmDefer-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let contract = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+        let engine = MLXTTSEngine(
+            modelRegistry: try ContractBackedModelRegistry(manifestURL: contract),
+            modelAssetStore: LocalModelAssetStore(
+                rootDirectory: root.appendingPathComponent("models", isDirectory: true),
+                descriptors: []
+            ),
+            audioPreparationService: NativeAudioPreparationService(),
+            documentIO: LocalDocumentIO(
+                importedReferenceDirectory: root.appendingPathComponent("imported", isDirectory: true)
+            ),
+            streamSessionsDirectory: root.appendingPathComponent("streams", isDirectory: true),
+            loadCoordinator: CoordinatorAttachStubLoader(),
+            streamingSessionFactory: { _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in
+                fatalError("Not used in deferred-warm test.")
+            },
+            idleUnloadDelayOverride: 60,
+            allocatorControl: .inert
+        )
+        defer { engine.stop() }
+        let criticalDial = MemoryHeadroomDial(megabytes: MemoryHeadroomDial.critical)
+        let store = TTSEngineStore(
+            backend: AnyTTSEngineBackend(
+                engine: engine,
+                supportsSavedVoiceMutation: true,
+                supportsModelManagementMutation: true,
+                supportedModes: [.custom, .design, .clone],
+                voiceCloningConsent: { VoiceCloningConsentPolicy(isConsentRecorded: true) }
+            ),
+            memoryBudgetPolicy: .iPhoneShippingDefault,
+            memorySnapshotProvider: { criticalDial.snapshot() }
+        )
+        try await store.initialize(appSupportDirectory: root)
+
+        let hostCoordinator = MacEngineHostCoordinator(
+            folder: folder,
+            deviceClass: .floor8GBMac,
+            tierIsDiagnostic: false,
+            failureWindow: .seconds(10),
+            provisionalHoldDuration: .seconds(5)
+        )
+        defer { hostCoordinator.releaseLease() }
+
+        // 1) When MacWarmupAdmissionPolicy defers (side-effect-free check), admitWarmHost
+        //    is never invoked and zero lease is written to disk.
+        let deferredPolicy = MacWarmupAdmissionPolicy(
+            mode: .off,
+            deviceClass: .floor8GBMac,
+            anotherEngineBlocksWarm: { true }
+        )
+        let deferredWarmup = MacGenerationWarmupCoordinator(
+            debounce: .milliseconds(1),
+            customVoiceDebounce: .milliseconds(1),
+            designDebounce: .milliseconds(1),
+            cloneDebounce: .milliseconds(1),
+            modeTransitionDebounce: .milliseconds(1),
+            admissionPolicy: deferredPolicy,
+            admitWarmHost: {
+                XCTFail("deferred warm must not invoke admitWarmHost")
+                return nil
+            }
+        )
+        let context = MacGenerationWarmupCoordinator.WarmupContext(
+            mode: .custom,
+            modelID: "pro_custom",
+            isModelAvailable: true,
+            identity: .modelOnly,
+            deviceClass: .floor8GBMac
+        )
+        deferredWarmup.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
+        await deferredWarmup.waitForScheduledWarmupCompletion()
+        XCTAssertFalse(hostCoordinator.holdsLease)
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [])
+
+        // 2) When pressure admission passes and admitWarmHost acquires a provisional lease,
+        //    an early exit (store refuses proactive warm at critical band) must release the
+        //    provisional lease immediately in defer instead of leaking for 5 seconds.
+        var admitCalls = 0
+        var sawLeaseHeldDuringWarm = false
+        let allowedWarmup = MacGenerationWarmupCoordinator(
+            debounce: .milliseconds(1),
+            customVoiceDebounce: .milliseconds(1),
+            designDebounce: .milliseconds(1),
+            cloneDebounce: .milliseconds(1),
+            modeTransitionDebounce: .milliseconds(1),
+            admissionPolicy: MacWarmupAdmissionPolicy(
+                mode: .off,
+                deviceClass: .floor8GBMac,
+                anotherEngineBlocksWarm: { hostCoordinator.refusesEngineWork }
+            ),
+            admitWarmHost: {
+                admitCalls += 1
+                guard let admission = hostCoordinator.admitEngineWork() else { return nil }
+                sawLeaseHeldDuringWarm = hostCoordinator.holdsLease
+                return { admission.end() }
+            }
+        )
+        allowedWarmup.scheduleWarmupIfNeeded(context: context, snapshot: store.snapshot, ttsEngineStore: store)
+        await allowedWarmup.waitForScheduledWarmupCompletion()
+        XCTAssertEqual(admitCalls, 1, "admitWarmHost must actually execute on the admitted warm path")
+        XCTAssertTrue(sawLeaseHeldDuringWarm, "provisional lease must be live while warm dispatch runs")
+        XCTAssertFalse(hostCoordinator.holdsLease, "early-exiting warm must release its provisional lease immediately")
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [])
+    }
+
+    func testReadingOpenDescriptorDecodesHostAfterReleaseUnlinksPath() throws {
+        let folder = try makeFolder()
+        let lease = try EngineHostLease.acquire(in: folder, kind: "cli")
+        let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+        let leaseURL = try XCTUnwrap(files.first { $0.pathExtension == "lease" })
+        let descriptor = try FileDescriptor.open(FilePath(leaseURL.path), .readOnly)
+        defer { try? descriptor.close() }
+
+        // Release closes its fd and unlinks the path; reading from the already-open
+        // descriptor must still decode the exact Host JSON while path-based open fails.
+        lease.release()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: leaseURL.path))
+        let data = try XCTUnwrap(EngineHostLease.readHostData(from: descriptor))
+        let host = try JSONDecoder().decode(EngineHostLease.Host.self, from: data)
+        XCTAssertEqual(host.kind, "cli")
+        XCTAssertEqual(host.pid, getpid())
+    }
+}
+
+private actor CoordinatorAttachStubLoader: MLXModelCoordinating {
+    func qwen3Capabilities(for id: String) async throws -> Qwen3TTSModelCapabilities { Self.capabilities }
+    func loadModel(id: String, capabilityProfile: NativeLoadCapabilityProfile) async throws -> NativeModelLoadResult {
+        let facts = VocelloQwen3LoadedModelFacts(
+            identity: VocelloQwen3ModelIdentity(
+                modelID: id, repositoryID: "fixture/repo", revision: "fixture", artifactVersion: "fixture"
+            ),
+            sampleRate: 24_000,
+            capabilities: VocelloQwen3CapabilitySet([VocelloQwen3Capability]()),
+            loadDiagnostics: VocelloQwen3RuntimeDiagnosticsSnapshot()
+        )
+        return NativeModelLoadResult(
+            model: UnsafeSpeechGenerationModel(engine: VocelloQwen3Engine(), facts: facts),
+            modelRuntimeIdentity: ModelRuntimeIdentity(resolvedModelID: id),
+            didLoad: true,
+            capabilityProfile: capabilityProfile,
+            qwen3Capabilities: Self.capabilities,
+            timingsMS: [:],
+            booleanFlags: [:],
+            stringFlags: [:]
+        )
+    }
+    func unloadModel() async {}
+    func isPrewarmed(identityKey: String) async -> Bool { true }
+    func markPrewarmed(identityKey: String) async {}
+    func clearPrewarmState() async {}
+    func setTelemetryRecorder(_ recorder: NativeTelemetryRecorder?) async {}
+    func requiresUnloadAfterRuntimeFailure() async -> Bool { false }
+
+    private static let capabilities = Qwen3TTSModelCapabilities(
+        modelSize: .pro1b7,
+        familyType: .customVoice,
+        supportsInstructionControl: true,
+        supportsVoiceClone: false,
+        supportsXVectorOnlyClone: false,
+        requiresSpeakerEncoder: false,
+        tokenizerProfile: Qwen3TTSTokenizerProfile(
+            name: "qwen3", sampleRateHz: 24_000, frameRateHz: 12.5,
+            decoderQuantizers: 16, encoderValidQuantizers: 8, encoderConfiguredQuantizers: 8,
+            codebookSize: 2_048, semanticCodebookSize: 4_096
+        ),
+        generationDefaults: Qwen3TTSGenerationDefaultsProfile(
+            checkpointMaxNewTokens: nil, wrapperFallbackMaxNewTokens: 2_048, appPolicyMaxNewTokens: 2_048,
+            temperature: 0.9, topP: 1, topK: 50, doSample: true, repetitionPenalty: 1.05, source: .appPolicy
+        ),
+        artifactAvailability: .publicArtifact
+    )
 }
 
 @MainActor

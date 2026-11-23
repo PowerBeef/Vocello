@@ -246,6 +246,7 @@ struct MacVoiceCloningScreen: View {
                 lineByLine: $lineByLine,
                 modelInstalled: isModelAvailable,
                 modelUpdate: modelManager.studioModelUpdate(for: .clone),
+                selectedLanguage: draft.selectedLanguage,
                 setupChips: { setupChips },
                 footer: { chipFooter },
                 onGenerate: generate,

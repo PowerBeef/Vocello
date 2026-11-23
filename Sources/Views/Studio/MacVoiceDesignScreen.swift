@@ -172,6 +172,7 @@ struct MacVoiceDesignScreen: View {
                 lineByLine: $lineByLine,
                 modelInstalled: isModelAvailable,
                 modelUpdate: modelManager.studioModelUpdate(for: .design),
+                selectedLanguage: draft.selectedLanguage,
                 setupChips: { setupChips },
                 footer: { chipFooter },
                 onGenerate: generate,

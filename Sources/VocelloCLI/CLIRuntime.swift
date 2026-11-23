@@ -510,13 +510,15 @@ public final class CLIWarmEngine {
         if booting == boot { booting = nil }
         if runtime == nil {
             let started = try outcome.get()
-            // From here the lease follows what the engine publishes about its model.
-            // RF-69: once `DesktopEngineHost.observeEngineState` forwards the
-            // engine's explicit `unloadEpoch` (wired in B2.1b), pass it here so
-            // `unloadModel()`, `trimMemory(.fullUnload)`, and `stop()` cancel
-            // any pending failure timer immediately.
-            started.host?.observeEngineState { [leaseKeeper] loadState, clonePreparation in
-                leaseKeeper.engineChanged(loadState: loadState, clonePreparation: clonePreparation)
+            // From here the lease follows what the engine publishes about its model,
+            // including explicit `unloadEpoch` transitions from `unloadModel()`,
+            // `trimMemory(.fullUnload)`, and `stop()`.
+            started.host?.observeEngineState { [leaseKeeper] loadState, clonePreparation, unloadEpoch in
+                leaseKeeper.engineChanged(
+                    loadState: loadState,
+                    clonePreparation: clonePreparation,
+                    unloadEpoch: unloadEpoch
+                )
             }
             runtime = started
         }

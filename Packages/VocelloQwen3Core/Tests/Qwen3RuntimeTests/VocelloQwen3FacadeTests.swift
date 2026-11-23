@@ -2345,6 +2345,90 @@ final class VocelloQwen3FacadeTests: XCTestCase {
         XCTAssertNil(failedSnapshot.activeOperation)
     }
 
+    /// RF-68 (B1.5a): `VocelloQwen3SynthesisRequest.captureIntrospection` defaults
+    /// to `false`, decodes missing keys as `false`, round-trips `true`, threads
+    /// `enableStepIntrospection` to both streaming and quality-first model paths,
+    /// and leaves `enableChunkTimings` unconditionally `true`.
+    func testCaptureIntrospectionDefaultsFalseRoundTripsAndThreadsWhileKeepingChunkTimingsOn() async throws {
+        let defaultRequest = makeRequest(
+            generationID: UUID(),
+            input: .customVoice(speakerID: "fixture-speaker", deliveryInstruction: nil)
+        )
+        XCTAssertFalse(defaultRequest.captureIntrospection)
+
+        // Legacy JSON omitting `captureIntrospection` decodes as `false`.
+        let encodedDefault = try JSONEncoder().encode(defaultRequest)
+        var jsonObject = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encodedDefault) as? [String: Any]
+        )
+        jsonObject.removeValue(forKey: "captureIntrospection")
+        let legacyData = try JSONSerialization.data(withJSONObject: jsonObject)
+        let decodedLegacy = try JSONDecoder().decode(VocelloQwen3SynthesisRequest.self, from: legacyData)
+        XCTAssertFalse(decodedLegacy.captureIntrospection)
+
+        // Explicit `captureIntrospection: true` round-trips cleanly.
+        let enabledRequest = makeRequest(
+            generationID: UUID(),
+            input: .customVoice(speakerID: "fixture-speaker", deliveryInstruction: nil),
+            captureIntrospection: true
+        )
+        XCTAssertTrue(enabledRequest.captureIntrospection)
+        let roundTripped = try JSONDecoder().decode(
+            VocelloQwen3SynthesisRequest.self,
+            from: try JSONEncoder().encode(enabledRequest)
+        )
+        XCTAssertTrue(roundTripped.captureIntrospection)
+
+        // Threading through LoadedModel for both streaming and quality-first paths.
+        let compatibilityModel = FacadeCompatibilityModel(emitsInfo: true)
+        let loaded = try makeLoadedFixture(
+            compatibilityModel: compatibilityModel,
+            capabilities: VocelloQwen3CapabilitySet([.streaming, .customVoice, .voiceDesign, .voiceClone])
+        )
+        let clonePrompt = try loaded.makeClonePrompt(
+            referenceSamples: [0.1, 0.2],
+            referenceText: "ref",
+            xVectorOnlyMode: false
+        )
+
+        for (style, captureIntrospection) in [
+            (VocelloQwen3ExecutionStyle.streaming, false),
+            (.streaming, true),
+            (.qualityFirst, false),
+            (.qualityFirst, true),
+        ] {
+            let request = makeRequest(
+                generationID: UUID(),
+                input: .voiceClone(referenceID: "fixture-reference"),
+                executionStyle: style,
+                captureIntrospection: captureIntrospection
+            )
+            switch style {
+            case .streaming:
+                _ = try await loaded.produce(
+                    request: request,
+                    clonePrompt: clonePrompt,
+                    sink: { _ in },
+                    isolation: nil
+                )
+            case .qualityFirst:
+                _ = try await loaded.produceQualityFirst(
+                    request: request,
+                    clonePrompt: clonePrompt,
+                    sink: { _ in },
+                    isolation: nil
+                )
+            }
+        }
+
+        XCTAssertEqual(compatibilityModel.capturedStepIntrospection, [false, true, false, true])
+        XCTAssertEqual(
+            compatibilityModel.capturedEnableChunkTimings,
+            [true, true],
+            "enableChunkTimings must remain ON on streaming requests even when captureIntrospection is false"
+        )
+    }
+
     private func makeLoadedFixture(
         compatibilityModel: FacadeCompatibilityModel,
         capabilities: VocelloQwen3CapabilitySet = VocelloQwen3CapabilitySet([
@@ -2368,7 +2452,8 @@ final class VocelloQwen3FacadeTests: XCTestCase {
         generationID: UUID,
         input: VocelloQwen3SynthesisInput,
         executionStyle: VocelloQwen3ExecutionStyle = .streaming,
-        captureCodecTrace: Bool = false
+        captureCodecTrace: Bool = false,
+        captureIntrospection: Bool = false
     ) -> VocelloQwen3SynthesisRequest {
         VocelloQwen3SynthesisRequest(
             generationID: generationID,
@@ -2387,7 +2472,8 @@ final class VocelloQwen3FacadeTests: XCTestCase {
                 tokenMemoryClearCadence: 16
             ),
             executionStyle: executionStyle,
-            captureCodecTrace: captureCodecTrace
+            captureCodecTrace: captureCodecTrace,
+            captureIntrospection: captureIntrospection
         )
     }
 
@@ -2562,6 +2648,8 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
     private var _capturedSamplingPolicy: Qwen3RequestSamplingPolicy?
     private var _capturedMemoryPolicies: [Qwen3RequestMemoryPolicy] = []
     private var _capturedStreamingIntervals: [Double] = []
+    private var _capturedStepIntrospection: [Bool] = []
+    private var _capturedEnableChunkTimings: [Bool] = []
 
     init(
         eventCount: Int = 1,
@@ -2625,6 +2713,18 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         captureLock.lock()
         defer { captureLock.unlock() }
         return _capturedStreamingIntervals
+    }
+
+    var capturedStepIntrospection: [Bool] {
+        captureLock.lock()
+        defer { captureLock.unlock() }
+        return _capturedStepIntrospection
+    }
+
+    var capturedEnableChunkTimings: [Bool] {
+        captureLock.lock()
+        defer { captureLock.unlock() }
+        return _capturedEnableChunkTimings
     }
 
     let loadTimingsMS: [String: Int] = [:]
@@ -2728,13 +2828,15 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
         codecTraceSink: Qwen3CodecTraceSink?,
+        enableStepIntrospection: Bool,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion {
         _ = isolation
         capture(
             generationParameters,
             samplingPolicy: samplingPolicy,
-            memoryPolicy: memoryPolicy
+            memoryPolicy: memoryPolicy,
+            enableStepIntrospection: enableStepIntrospection
         )
         try await onPrepared()
         try await codecTraceSink?([1, 2])
@@ -2753,8 +2855,9 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         customVoiceProfile _: String?,
         streamStepEvalPolicy _: String?,
         generationSpeedProfile _: String?,
-        enableChunkTimings _: Bool,
+        enableChunkTimings: Bool,
         enableCodecTrace _: Bool,
+        enableStepIntrospection: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationFinishReason {
@@ -2763,7 +2866,9 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
             generationParameters,
             samplingPolicy: samplingPolicy,
             memoryPolicy: memoryPolicy,
-            streamingInterval: streamingInterval
+            streamingInterval: streamingInterval,
+            enableChunkTimings: enableChunkTimings,
+            enableStepIntrospection: enableStepIntrospection
         )
         // The MLX error is recorded before the gate so a test can cancel the
         // take while the failure is already pending.
@@ -2823,13 +2928,15 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
         codecTraceSink: Qwen3CodecTraceSink?,
+        enableStepIntrospection: Bool,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion {
         _ = isolation
         capture(
             generationParameters,
             samplingPolicy: samplingPolicy,
-            memoryPolicy: memoryPolicy
+            memoryPolicy: memoryPolicy,
+            enableStepIntrospection: enableStepIntrospection
         )
         try await onPrepared()
         try await codecTraceSink?([1, 2])
@@ -2846,8 +2953,9 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         streamingInterval: Double,
         streamStepEvalPolicy _: String?,
         generationSpeedProfile _: String?,
-        enableChunkTimings _: Bool,
+        enableChunkTimings: Bool,
         enableCodecTrace _: Bool,
+        enableStepIntrospection: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationFinishReason {
@@ -2856,7 +2964,9 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
             generationParameters,
             samplingPolicy: samplingPolicy,
             memoryPolicy: memoryPolicy,
-            streamingInterval: streamingInterval
+            streamingInterval: streamingInterval,
+            enableChunkTimings: enableChunkTimings,
+            enableStepIntrospection: enableStepIntrospection
         )
         try await sink(.prepared)
         try await emitFixtureEvents(to: sink)
@@ -2914,13 +3024,15 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
         codecTraceSink: Qwen3CodecTraceSink?,
+        enableStepIntrospection: Bool,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion {
         _ = isolation
         capture(
             generationParameters,
             samplingPolicy: samplingPolicy,
-            memoryPolicy: memoryPolicy
+            memoryPolicy: memoryPolicy,
+            enableStepIntrospection: enableStepIntrospection
         )
         try await onPrepared()
         try await codecTraceSink?([1, 2])
@@ -2937,8 +3049,9 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         streamingInterval: Double,
         streamStepEvalPolicy _: String?,
         generationSpeedProfile _: String?,
-        enableChunkTimings _: Bool,
+        enableChunkTimings: Bool,
         enableCodecTrace _: Bool,
+        enableStepIntrospection: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationFinishReason {
@@ -2947,7 +3060,9 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
             generationParameters,
             samplingPolicy: samplingPolicy,
             memoryPolicy: memoryPolicy,
-            streamingInterval: streamingInterval
+            streamingInterval: streamingInterval,
+            enableChunkTimings: enableChunkTimings,
+            enableStepIntrospection: enableStepIntrospection
         )
         try await sink(.prepared)
         try await emitFixtureEvents(to: sink)
@@ -3031,7 +3146,9 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         _ generationParameters: GenerateParameters,
         samplingPolicy: Qwen3RequestSamplingPolicy? = nil,
         memoryPolicy: Qwen3RequestMemoryPolicy? = nil,
-        streamingInterval: Double? = nil
+        streamingInterval: Double? = nil,
+        enableChunkTimings: Bool? = nil,
+        enableStepIntrospection: Bool? = nil
     ) {
         captureLock.lock()
         _capturedGenerationParameters = generationParameters
@@ -3043,6 +3160,12 @@ private final class FacadeCompatibilityModel: SpeechGenerationModel, Qwen3Optimi
         }
         if let streamingInterval {
             _capturedStreamingIntervals.append(streamingInterval)
+        }
+        if let enableChunkTimings {
+            _capturedEnableChunkTimings.append(enableChunkTimings)
+        }
+        if let enableStepIntrospection {
+            _capturedStepIntrospection.append(enableStepIntrospection)
         }
         captureLock.unlock()
     }

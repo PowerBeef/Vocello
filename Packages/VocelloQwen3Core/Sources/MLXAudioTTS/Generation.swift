@@ -438,6 +438,7 @@ public protocol Qwen3SuspendingSpeechGenerationModel: AnyObject {
         generationSpeedProfile: String?,
         enableChunkTimings: Bool,
         enableCodecTrace: Bool,
+        enableStepIntrospection: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationFinishReason
@@ -454,6 +455,7 @@ public protocol Qwen3SuspendingSpeechGenerationModel: AnyObject {
         generationSpeedProfile: String?,
         enableChunkTimings: Bool,
         enableCodecTrace: Bool,
+        enableStepIntrospection: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationFinishReason
@@ -470,6 +472,7 @@ public protocol Qwen3SuspendingSpeechGenerationModel: AnyObject {
         generationSpeedProfile: String?,
         enableChunkTimings: Bool,
         enableCodecTrace: Bool,
+        enableStepIntrospection: Bool,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationFinishReason
@@ -558,6 +561,7 @@ public protocol Qwen3PreparedQualityGenerationModel: AnyObject {
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
         codecTraceSink: Qwen3CodecTraceSink?,
+        enableStepIntrospection: Bool,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion
 
@@ -570,6 +574,7 @@ public protocol Qwen3PreparedQualityGenerationModel: AnyObject {
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
         codecTraceSink: Qwen3CodecTraceSink?,
+        enableStepIntrospection: Bool,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion
 
@@ -582,6 +587,7 @@ public protocol Qwen3PreparedQualityGenerationModel: AnyObject {
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
         codecTraceSink: Qwen3CodecTraceSink?,
+        enableStepIntrospection: Bool,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion
 }

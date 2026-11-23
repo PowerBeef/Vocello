@@ -1230,4 +1230,107 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
             "coinciding streaming chunk emit and cadence clear must deduplicate to one cache clear per step"
         )
     }
+
+    /// RF-68 (B1.5a): disabling `enableStepIntrospection` skips per-step GPU
+    /// entropy and EOS-probability scalars while preserving zero-GPU codec-token
+    /// bookkeeping and producing bit-identical frames and PCM samples.
+    func testGatingStepIntrospectionSkipsPerStepScalarsWhileKeepingSamplesBitIdentical() async throws {
+        let seed: UInt64 = 0x5EED_B15A
+        let policy = Self.samplingPolicy(seed: seed, maximumCodecTokens: 12, topK: 8)
+        let model = try Self.makeModel()
+
+        // Quality-first arm: enabled vs disabled.
+        let enabledFrames = OSAllocatedUnfairLock<[[Int32]]>(initialState: [])
+        let enabledCompletion = try await model.generateVoiceDesignQualityFirst(
+            text: "Hello there, tiny talker.",
+            language: "auto",
+            voiceDescription: "A calm narrator.",
+            generationParameters: model.defaultGenerationParameters,
+            samplingPolicy: policy,
+            memoryPolicy: .compatibilityDefault,
+            onPrepared: {},
+            codecTraceSink: { frame in enabledFrames.withLock { $0.append(frame) } },
+            enableStepIntrospection: true,
+            isolation: nil
+        )
+        let enabledSummary = try XCTUnwrap(model.latestGenerationIntrospection)
+        XCTAssertNotNil(enabledSummary.entropyMeanNats, "enabled introspection must capture entropy")
+        XCTAssertNotNil(enabledSummary.eosProbabilityMax, "enabled introspection must capture EOS probability")
+
+        let disabledFrames = OSAllocatedUnfairLock<[[Int32]]>(initialState: [])
+        let disabledCompletion = try await model.generateVoiceDesignQualityFirst(
+            text: "Hello there, tiny talker.",
+            language: "auto",
+            voiceDescription: "A calm narrator.",
+            generationParameters: model.defaultGenerationParameters,
+            samplingPolicy: policy,
+            memoryPolicy: .compatibilityDefault,
+            onPrepared: {},
+            codecTraceSink: { frame in disabledFrames.withLock { $0.append(frame) } },
+            enableStepIntrospection: false,
+            isolation: nil
+        )
+        let disabledSummary = try XCTUnwrap(model.latestGenerationIntrospection)
+        XCTAssertNil(disabledSummary.entropyMeanNats, "disabled introspection must skip per-step entropy scalars")
+        XCTAssertNil(disabledSummary.eosProbabilityMax, "disabled introspection must skip per-step EOS probability scalars")
+        XCTAssertEqual(disabledSummary.codecFrameCount, enabledSummary.codecFrameCount)
+        XCTAssertEqual(disabledFrames.withLock { $0 }, enabledFrames.withLock { $0 })
+        XCTAssertEqual(
+            disabledCompletion.audio.asArray(Float.self).map(\.bitPattern),
+            enabledCompletion.audio.asArray(Float.self).map(\.bitPattern)
+        )
+
+        // Streaming arm: disabled introspection omits step scalars and preserves audio bits.
+        let streamedEnabled = OSAllocatedUnfairLock<[Float]>(initialState: [])
+        _ = try await model.produceVoiceDesign(
+            text: "Hello there, tiny talker.",
+            language: "auto",
+            voiceDescription: "A calm narrator.",
+            generationParameters: model.defaultGenerationParameters,
+            samplingPolicy: policy,
+            memoryPolicy: .compatibilityDefault,
+            streamingInterval: 0.32,
+            streamStepEvalPolicy: nil,
+            generationSpeedProfile: nil,
+            enableChunkTimings: true,
+            enableCodecTrace: false,
+            enableStepIntrospection: true,
+            sink: { event in
+                if case .audio(let samples) = event {
+                    streamedEnabled.withLock { $0.append(contentsOf: samples) }
+                }
+            },
+            isolation: nil
+        )
+        XCTAssertNotNil(model.latestGenerationIntrospection?.entropyMeanNats)
+
+        let streamedDisabled = OSAllocatedUnfairLock<[Float]>(initialState: [])
+        _ = try await model.produceVoiceDesign(
+            text: "Hello there, tiny talker.",
+            language: "auto",
+            voiceDescription: "A calm narrator.",
+            generationParameters: model.defaultGenerationParameters,
+            samplingPolicy: policy,
+            memoryPolicy: .compatibilityDefault,
+            streamingInterval: 0.32,
+            streamStepEvalPolicy: nil,
+            generationSpeedProfile: nil,
+            enableChunkTimings: true,
+            enableCodecTrace: false,
+            enableStepIntrospection: false,
+            sink: { event in
+                if case .audio(let samples) = event {
+                    streamedDisabled.withLock { $0.append(contentsOf: samples) }
+                }
+            },
+            isolation: nil
+        )
+        let streamedDisabledSummary = try XCTUnwrap(model.latestGenerationIntrospection)
+        XCTAssertNil(streamedDisabledSummary.entropyMeanNats)
+        XCTAssertNil(streamedDisabledSummary.eosProbabilityMax)
+        XCTAssertEqual(
+            streamedDisabled.withLock { $0 }.map(\.bitPattern),
+            streamedEnabled.withLock { $0 }.map(\.bitPattern)
+        )
+    }
 }

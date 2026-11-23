@@ -1495,6 +1495,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
         codecTraceSink: Qwen3CodecTraceSink?,
+        enableStepIntrospection: Bool = true,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion {
         try await withGenerationGate(isolation: isolation) {
@@ -1515,6 +1516,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 generationSpeedProfile: nil,
                 onInfo: { info in generationInfo.withLock { $0 = info } },
                 codecTraceSink: codecTraceSink,
+                enableStepIntrospection: enableStepIntrospection,
                 onPrepared: onPrepared,
                 isolation: isolation
             )
@@ -1557,6 +1559,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
         codecTraceSink: Qwen3CodecTraceSink?,
+        enableStepIntrospection: Bool = true,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion {
         try await withGenerationGate(isolation: isolation) {
@@ -1576,6 +1579,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 generationSpeedProfile: nil,
                 onInfo: { info in generationInfo.withLock { $0 = info } },
                 codecTraceSink: codecTraceSink,
+                enableStepIntrospection: enableStepIntrospection,
                 onPrepared: onPrepared,
                 isolation: isolation
             )
@@ -1618,6 +1622,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         memoryPolicy: Qwen3RequestMemoryPolicy,
         onPrepared: @escaping @Sendable () async throws -> Void,
         codecTraceSink: Qwen3CodecTraceSink?,
+        enableStepIntrospection: Bool = true,
         isolation: isolated (any Actor)?
     ) async throws -> AudioGenerationCompletion {
         try await withGenerationGate(isolation: isolation) {
@@ -1639,6 +1644,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 generationSpeedProfile: nil,
                 onInfo: { info in generationInfo.withLock { $0 = info } },
                 codecTraceSink: codecTraceSink,
+                enableStepIntrospection: enableStepIntrospection,
                 onPrepared: onPrepared,
                 isolation: isolation
             )
@@ -1684,6 +1690,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         generationSpeedProfile: String?,
         enableChunkTimings: Bool,
         enableCodecTrace: Bool,
+        enableStepIntrospection: Bool = true,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)? = #isolation
     ) async throws -> AudioGenerationFinishReason {
@@ -1706,6 +1713,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     materializedEventSink: sink,
                     emitMaterializedChunkTimings: enableChunkTimings,
                     emitMaterializedCodecTrace: enableCodecTrace,
+                    enableStepIntrospection: enableStepIntrospection,
                     isolation: isolation
                 )
                 return latestAudioGenerationFinishReason()
@@ -1727,6 +1735,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         generationSpeedProfile: String?,
         enableChunkTimings: Bool,
         enableCodecTrace: Bool,
+        enableStepIntrospection: Bool = true,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)? = #isolation
     ) async throws -> AudioGenerationFinishReason {
@@ -1747,6 +1756,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     materializedEventSink: sink,
                     emitMaterializedChunkTimings: enableChunkTimings,
                     emitMaterializedCodecTrace: enableCodecTrace,
+                    enableStepIntrospection: enableStepIntrospection,
                     isolation: isolation
                 )
                 return latestAudioGenerationFinishReason()
@@ -1768,6 +1778,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         generationSpeedProfile: String?,
         enableChunkTimings: Bool,
         enableCodecTrace: Bool,
+        enableStepIntrospection: Bool = true,
         sink: @escaping Qwen3MaterializedGenerationSink,
         isolation: isolated (any Actor)? = #isolation
     ) async throws -> AudioGenerationFinishReason {
@@ -1790,6 +1801,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     materializedEventSink: sink,
                     emitMaterializedChunkTimings: enableChunkTimings,
                     emitMaterializedCodecTrace: enableCodecTrace,
+                    enableStepIntrospection: enableStepIntrospection,
                     isolation: isolation
                 )
                 return latestAudioGenerationFinishReason()
@@ -2128,6 +2140,7 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         emitMaterializedChunkTimings: Bool = false,
         emitMaterializedCodecTrace: Bool = false,
         codecTraceSink: Qwen3CodecTraceSink? = nil,
+        enableStepIntrospection: Bool = true,
         onPrepared: (@Sendable () async throws -> Void)? = nil,
         isolation: isolated (any Actor)? = #isolation
     ) async throws -> MLXArray {
@@ -2591,8 +2604,13 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         // the step, so the scalars would add their own syncs there: skipped.
         // The scalar graph is compiled once per generation, so each step adds
         // a few fused kernels to its own evaluation, not a dozen ops.
+        // RF-68 (B1.5): gate per-step GPU introspection scalars behind active
+        // telemetry (`enableStepIntrospection`) so normal product takes skip
+        // the per-frame 2,049-vocab softmax and scalar `.item(Float.self)`
+        // syncs while keeping zero-GPU host token/seam bookkeeping intact.
         let introspectionStepScalars: (@Sendable ([MLXArray]) -> [MLXArray])? =
-            introspectionCodecVocabularySize > 0
+            enableStepIntrospection
+                && introspectionCodecVocabularySize > 0
                 && eosTokenId >= introspectionCodecVocabularySize
                 && eosTokenId < talkerConfig.vocabSize
                 && streamStepEvalPolicy != .deferred

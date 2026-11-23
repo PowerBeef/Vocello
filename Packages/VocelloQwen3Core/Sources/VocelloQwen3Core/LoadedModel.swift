@@ -673,6 +673,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 generationSpeedProfile: nil,
                 enableChunkTimings: true,
                 enableCodecTrace: request.captureCodecTrace,
+                enableStepIntrospection: request.captureIntrospection,
                 sink: eventSink,
                 isolation: isolation
             )
@@ -689,6 +690,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 generationSpeedProfile: nil,
                 enableChunkTimings: true,
                 enableCodecTrace: request.captureCodecTrace,
+                enableStepIntrospection: request.captureIntrospection,
                 sink: eventSink,
                 isolation: isolation
             )
@@ -708,6 +710,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 generationSpeedProfile: nil,
                 enableChunkTimings: true,
                 enableCodecTrace: request.captureCodecTrace,
+                enableStepIntrospection: request.captureIntrospection,
                 sink: eventSink,
                 isolation: isolation
             )
@@ -761,6 +764,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 memoryPolicy: memoryPolicy,
                 onPrepared: onPrepared,
                 codecTraceSink: codecTraceSink,
+                enableStepIntrospection: request.captureIntrospection,
                 isolation: isolation
             )
         case .voiceDesign(let description):
@@ -773,6 +777,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 memoryPolicy: memoryPolicy,
                 onPrepared: onPrepared,
                 codecTraceSink: codecTraceSink,
+                enableStepIntrospection: request.captureIntrospection,
                 isolation: isolation
             )
         case .voiceClone:
@@ -788,6 +793,7 @@ final class VocelloQwen3LoadedModel: @unchecked Sendable {
                 memoryPolicy: memoryPolicy,
                 onPrepared: onPrepared,
                 codecTraceSink: codecTraceSink,
+                enableStepIntrospection: request.captureIntrospection,
                 isolation: isolation
             )
         }

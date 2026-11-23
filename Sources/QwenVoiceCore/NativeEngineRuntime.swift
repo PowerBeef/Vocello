@@ -457,6 +457,8 @@ actor NativeEngineRuntime {
     private let prewarmSlot = PrewarmSlotGate()
     /// MLX allocator side effects of caller trims; `.live` outside lifecycle tests.
     private let allocatorControl: NativeMLXAllocatorControl
+    /// Optional factory overriding per-generation `NativeTelemetryRecorder` creation in seam tests.
+    private let telemetryRecorderFactory: (@Sendable () -> NativeTelemetryRecorder?)?
 
     init(
         loadCoordinator: any MLXModelCoordinating,
@@ -464,6 +466,7 @@ actor NativeEngineRuntime {
         preparedCloneConditioningCache: NativePreparedCloneConditioningCache? = nil,
         lightweightWarmupText: String,
         telemetryRecorder: NativeTelemetryRecorder? = nil,
+        telemetryRecorderFactory: (@Sendable () -> NativeTelemetryRecorder?)? = nil,
         customPrewarmPolicy: NativeCustomPrewarmPolicy = .eager,
         speakerNativeLanguages: [String: String] = [:],
         diagnosticAppSupportBox: DiagnosticAppSupportBox? = nil,
@@ -477,6 +480,7 @@ actor NativeEngineRuntime {
             ?? NativePreparedCloneConditioningCache(allocatorControl: allocatorControl)
         self.lightweightWarmupText = lightweightWarmupText
         self.telemetryRecorder = telemetryRecorder
+        self.telemetryRecorderFactory = telemetryRecorderFactory
         self.customPrewarmPolicy = customPrewarmPolicy
         self.speakerNativeLanguages = speakerNativeLanguages
         self.diagnosticAppSupportBox = diagnosticAppSupportBox
@@ -839,12 +843,16 @@ actor NativeEngineRuntime {
         // share this recorder, and carry it to the session (same start clock as its
         // memory sampler). Nil — and therefore zero overhead — when telemetry is off;
         // the work plan's `writesSink` needs this recorder, so no engine row follows.
-        let telemetryRecorder: NativeTelemetryRecorder? = NativeTelemetryWorkPlan.buildsRecorder(
+        let telemetryRecorder: NativeTelemetryRecorder? = if let telemetryRecorderFactory {
+            telemetryRecorderFactory()
+        } else if NativeTelemetryWorkPlan.buildsRecorder(
             telemetryEnabled: TelemetryGate.resolvedEnabled,
             mode: NativeTelemetryMode.current()
-        )
-            ? NativeTelemetryRecorder(clock: NativeTelemetryClock())
-            : nil
+        ) {
+            NativeTelemetryRecorder(clock: NativeTelemetryClock())
+        } else {
+            nil
+        }
         self.telemetryRecorder = telemetryRecorder
         await loadCoordinator.setTelemetryRecorder(telemetryRecorder)
         await telemetryRecorder?.mark(stage: GenerationStartupBoundary.requestValidated.telemetryStage)
@@ -1172,7 +1180,8 @@ actor NativeEngineRuntime {
             samplingConfiguration: samplingConfiguration,
             requestMemory: requestMemory,
             cloneConditioning: cloneConditioning,
-            speakerNativeLanguage: speakerNativeLanguage(for: request)
+            speakerNativeLanguage: speakerNativeLanguage(for: request),
+            captureIntrospection: telemetryRecorder != nil
         )
         let cloneHandle: VocelloQwen3CloneHandle?
         if case .voiceClone = actorRequest.input {
@@ -1380,7 +1389,7 @@ actor NativeEngineRuntime {
         }
     }
 
-    private static func makeActorRequest(
+    static func makeActorRequest(
         request: GenerationRequest,
         generationID: UUID,
         capabilities: Qwen3TTSModelCapabilities,
@@ -1388,7 +1397,11 @@ actor NativeEngineRuntime {
         samplingConfiguration: VocelloQwen3SamplingConfiguration,
         requestMemory: VocelloQwen3MemoryConfiguration,
         cloneConditioning: ResolvedCloneConditioning?,
-        speakerNativeLanguage: String?
+        speakerNativeLanguage: String?,
+        captureIntrospection: Bool = NativeTelemetryWorkPlan.buildsRecorder(
+            telemetryEnabled: TelemetryGate.resolvedEnabled,
+            mode: NativeTelemetryMode.current()
+        )
     ) throws -> VocelloQwen3SynthesisRequest {
         let effectiveInterval = NativeMemoryPolicyResolver.effectiveStreamingInterval(
             requested: request.streamingInterval,
@@ -1450,7 +1463,8 @@ actor NativeEngineRuntime {
                 materializationLeadSteps: chunkPolicy.materializationLeadSteps
             ),
             executionStyle: request.shouldStream ? .streaming : .qualityFirst,
-            captureCodecTrace: request.captureCodecTrace == true
+            captureCodecTrace: request.captureCodecTrace == true,
+            captureIntrospection: captureIntrospection
         )
     }
 
@@ -1689,7 +1703,9 @@ actor NativeEngineRuntime {
             await loadCoordinator.unloadModel()
             activeModelID = nil
             await clearCloneState(preserveActiveClonePrimeToken: preserveActiveClonePrimeToken)
-            await clearQwen3MemoryCachesIfNeeded()
+            await clearQwen3MemoryCachesIfNeeded(
+                forMemoryRelief: NativeGenerationTerminalClassifier.isRetryableAllocationFailure(error)
+            )
             throw NativeRuntimeError.wrapping(
                 error,
                 stage: .upstreamModelLoad,
@@ -1889,18 +1905,23 @@ actor NativeEngineRuntime {
             timings["native_explicit_prewarm_ms"] = explicitPrewarmStartedAt.elapsedMilliseconds
             return timings
         } catch {
-            if await warmFailureReleasesModel(error) {
-                await loadCoordinator.unloadModel()
-                activeModelID = nil
-                await clearCloneState()
-                await clearQwen3MemoryCachesIfNeeded()
-            }
+            await releaseModelAfterWarmFailure(error)
             throw NativeRuntimeError.wrapping(
                 error,
                 stage: .prewarm,
                 message: "The native runtime could not warm model '\(request.modelID)'"
             )
         }
+    }
+
+    private func releaseModelAfterWarmFailure(_ error: any Error) async {
+        guard await warmFailureReleasesModel(error) else { return }
+        await loadCoordinator.unloadModel()
+        activeModelID = nil
+        await clearCloneState()
+        let forMemoryRelief = NativeGenerationTerminalClassifier.capturedRuntimeFailure(in: error) == .allocation
+            || NativeGenerationTerminalClassifier.isRetryableAllocationFailure(error)
+        await clearQwen3MemoryCachesIfNeeded(forMemoryRelief: forMemoryRelief)
     }
 
     /// Wait until no other prewarm body is running, then take the slot.
@@ -2320,12 +2341,7 @@ actor NativeEngineRuntime {
                 prewarmSlotWaitMS: prewarmSlotWaitMS
             )
         } catch {
-            if await warmFailureReleasesModel(error) {
-                await loadCoordinator.unloadModel()
-                activeModelID = nil
-                await clearCloneState()
-                await clearQwen3MemoryCachesIfNeeded()
-            }
+            await releaseModelAfterWarmFailure(error)
             throw NativeRuntimeError.wrapping(
                 error,
                 stage: .prewarm,

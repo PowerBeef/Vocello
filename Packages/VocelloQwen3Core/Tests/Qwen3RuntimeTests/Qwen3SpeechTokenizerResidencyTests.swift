@@ -582,6 +582,25 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         let decodedAlt = try JSONDecoder().decode(Qwen3TTSModelConfig.self, from: Data(validAltKey.utf8))
         XCTAssertEqual(decodedAlt.perLayerQuantization?.quantization(layer: "model.text_embedding")?.bits, 8)
 
+        // Dual-key HF/MLX config: valid primary `quantization` short-circuits so extra HF
+        // keys in `quantization_config` (like `modules_to_not_convert`) do not spuriously fail.
+        let validDualKey = #"""
+        {
+          "quantization": {
+            "group_size": 64,
+            "bits": 4,
+            "model.layers.0.self_attn.q_proj": {"group_size": 64, "bits": 8}
+          },
+          "quantization_config": {
+            "group_size": 64,
+            "bits": 4,
+            "modules_to_not_convert": ["lm_head"]
+          }
+        }
+        """#
+        let decodedDual = try JSONDecoder().decode(Qwen3TTSModelConfig.self, from: Data(validDualKey.utf8))
+        XCTAssertEqual(decodedDual.perLayerQuantization?.quantization(layer: "model.layers.0.self_attn.q_proj")?.bits, 8)
+
         // Malformed per-layer entries must throw DecodingError rather than silently dropping overrides.
         let malformedConfigs: [(label: String, json: String)] = [
             (

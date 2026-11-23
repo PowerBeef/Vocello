@@ -635,9 +635,12 @@ public struct Qwen3TTSModelConfig: Decodable, Sendable {
         speakerEncoderConfig = try c.decodeIfPresent(Qwen3TTSSpeakerEncoderConfig.self, forKey: .speakerEncoderConfig)
             ?? Qwen3TTSSpeakerEncoderConfig()
         tokenizerConfig = try c.decodeIfPresent(Qwen3TTSTokenizerConfig.self, forKey: .tokenizerConfig)
-        let primaryQuant = try Self.decodePerLayerQuantization(from: c, forKey: .quantization)
-        let altQuant = try Self.decodePerLayerQuantization(from: c, forKey: .quantizationConfig)
-        let resolvedQuant = primaryQuant ?? altQuant
+        let resolvedQuant: (quantization: BaseConfiguration.Quantization, perLayer: BaseConfiguration.PerLayerQuantization)?
+        if let primaryQuant = try Self.decodePerLayerQuantization(from: c, forKey: .quantization) {
+            resolvedQuant = primaryQuant
+        } else {
+            resolvedQuant = try Self.decodePerLayerQuantization(from: c, forKey: .quantizationConfig)
+        }
         quantization = resolvedQuant?.quantization
         perLayerQuantization = resolvedQuant?.perLayer
         tokenizerType = try c.decodeIfPresent(String.self, forKey: .tokenizerType) ?? "qwen3_tts_tokenizer_12hz"

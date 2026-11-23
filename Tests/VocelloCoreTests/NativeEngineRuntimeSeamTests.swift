@@ -688,6 +688,186 @@ final class NativeEngineRuntimeSeamTests: XCTestCase {
         return warm
     }
 
+    /// RF-68 (B1.5b): `makeActorRequest` wires `captureIntrospection` directly
+    /// into `VocelloQwen3SynthesisRequest` while keeping `captureCodecTrace`
+    /// orthogonal.
+    func testMakeActorRequestWiresCaptureIntrospectionFlag() throws {
+        let request = GenerationRequest(
+            mode: .custom,
+            modelID: RuntimeSeam.customModel,
+            text: "Hello from Vocello.",
+            outputPath: "/tmp/vocello-seam-introspection.wav",
+            shouldStream: true,
+            payload: .custom(speakerID: "ryan", deliveryStyle: nil)
+        )
+        let memoryPolicy = NativeMemoryPolicyResolver.policy(mode: .custom, isBatch: false)
+        let requestMemory = NativeMemoryPolicyResolver.memoryConfiguration(for: memoryPolicy)
+        let sampling = Qwen3TalkerSamplingOverride.samplingConfiguration(for: request)
+
+        let offRequest = try NativeEngineRuntime.makeActorRequest(
+            request: request,
+            generationID: UUID(),
+            capabilities: RuntimeSeamCoordinator.testCapabilities,
+            memoryPolicy: memoryPolicy,
+            samplingConfiguration: sampling,
+            requestMemory: requestMemory,
+            cloneConditioning: nil,
+            speakerNativeLanguage: "english",
+            captureIntrospection: false
+        )
+        XCTAssertFalse(offRequest.captureIntrospection)
+
+        let onRequest = try NativeEngineRuntime.makeActorRequest(
+            request: request,
+            generationID: UUID(),
+            capabilities: RuntimeSeamCoordinator.testCapabilities,
+            memoryPolicy: memoryPolicy,
+            samplingConfiguration: sampling,
+            requestMemory: requestMemory,
+            cloneConditioning: nil,
+            speakerNativeLanguage: "english",
+            captureIntrospection: true
+        )
+        XCTAssertTrue(onRequest.captureIntrospection)
+    }
+
+    /// RF-69 (B-05): an OOM / allocation failure during `loadModel` clears the
+    /// process-global Qwen3 runtime caches on macOS (`forMemoryRelief: true`),
+    /// whereas an ordinary non-OOM load failure preserves them for fast retry.
+    @concurrent func testAllocationFailureDuringLoadClearsMacRuntimeCachesForMemoryRelief() async {
+        let fixture = RuntimeSeamFixture()
+
+        await fixture.coordinator.failNextLoad()
+        do {
+            _ = try await fixture.runtime.loadModel(id: RuntimeSeam.modelA)
+            XCTFail("Expected non-OOM load failure")
+        } catch {
+            // Expected.
+        }
+        XCTAssertEqual(
+            fixture.runtimeCacheClears.entries,
+            [],
+            "ordinary non-OOM Mac load failure keeps Qwen3 runtime caches"
+        )
+
+        await fixture.coordinator.failNextLoad(
+            with: VocelloQwen3RuntimeFailure.allocation
+        )
+        do {
+            _ = try await fixture.runtime.loadModel(id: RuntimeSeam.modelA)
+            XCTFail("Expected allocation load failure")
+        } catch {
+            // Expected.
+        }
+        XCTAssertEqual(
+            fixture.runtimeCacheClears.entries,
+            ["runtime-caches"],
+            "OOM load failure must drop Mac Qwen3 runtime caches for memory relief (B-05)"
+        )
+    }
+
+    /// RF-68 (B1.5b): exercises the real `NativeEngineRuntime.prepareGeneration`
+    /// caller seam (`captureIntrospection: telemetryRecorder != nil`) for BOTH
+    /// nil and non-nil telemetry recorders without MLX. Reverting line 1176 fails
+    /// the non-nil arm deterministically.
+    @concurrent func testPrepareGenerationCallerSeamWiresCaptureIntrospectionFromTelemetryWorkPlan() async throws {
+        let request = GenerationRequest(
+            mode: .custom,
+            modelID: RuntimeSeam.customModel,
+            text: "Hello from Vocello.",
+            outputPath: "/tmp/vocello-seam-prepare-introspection.wav",
+            shouldStream: true,
+            payload: .custom(speakerID: "ryan", deliveryStyle: nil)
+        )
+        let sampling = Qwen3TalkerSamplingOverride.samplingConfiguration(for: request)
+
+        let nilTelemetryFixture = RuntimeSeamFixture(telemetryRecorderFactory: { nil })
+        await nilTelemetryFixture.coordinator.answerIsPrewarmed([true])
+        let preparedOff = try await nilTelemetryFixture.runtime.prepareGeneration(
+            for: request,
+            telemetryTerminalPolicy: .publish,
+            retryAttempt: 0,
+            operationGeneration: 1,
+            fixedSamplingConfiguration: sampling
+        )
+        XCTAssertNil(preparedOff.telemetryRecorder)
+        XCTAssertFalse(
+            preparedOff.actorRequest.captureIntrospection,
+            "prepareGeneration must set captureIntrospection=false when telemetryRecorder is nil"
+        )
+
+        let activeTelemetryFixture = RuntimeSeamFixture(
+            telemetryRecorderFactory: { NativeTelemetryRecorder(clock: NativeTelemetryClock()) }
+        )
+        await activeTelemetryFixture.coordinator.answerIsPrewarmed([true])
+        let preparedOn = try await activeTelemetryFixture.runtime.prepareGeneration(
+            for: request,
+            telemetryTerminalPolicy: .publish,
+            retryAttempt: 0,
+            operationGeneration: 2,
+            fixedSamplingConfiguration: sampling
+        )
+        XCTAssertNotNil(preparedOn.telemetryRecorder)
+        XCTAssertTrue(
+            preparedOn.actorRequest.captureIntrospection,
+            "prepareGeneration must set captureIntrospection=true when telemetryRecorder is active"
+        )
+    }
+
+    /// RF-69 (B-05): exercises `ensureWarmStateIfNeeded`'s own catch block
+    /// (`releaseModelAfterWarmFailure`, stage == `.prewarm`, after `loadModel`
+    /// succeeds): ordinary errors keep Mac Qwen3 runtime caches warm, whereas an
+    /// `.allocation` failure drops them (`forMemoryRelief: true`).
+    @concurrent func testAllocationFailureDuringPrewarmClearsMacRuntimeCachesForMemoryRelief() async {
+        // 1) Ordinary failure inside `ensureWarmStateIfNeeded` (2nd qwen3Capabilities call):
+        //    `loadModel` succeeds, prewarm fails with ordinary error -> runtime caches preserved.
+        let ordinaryFixture = RuntimeSeamFixture()
+        await ordinaryFixture.coordinator.answerIsPrewarmed([false, false])
+        await ordinaryFixture.coordinator.failCapabilities(
+            onCall: 2,
+            with: RuntimeSeamCoordinator.CapabilitiesFailure()
+        )
+        do {
+            _ = try await ordinaryFixture.runtime.prepareInteractiveReadiness(
+                for: RuntimeSeam.warmRequest(modelID: RuntimeSeam.customModel)
+            )
+            XCTFail("Expected ordinary prewarm failure")
+        } catch let error as NativeRuntimeError {
+            XCTAssertEqual(error.stage, .prewarm, "failure must come from ensureWarmStateIfNeeded, not loadModel")
+        } catch {
+            XCTFail("Expected NativeRuntimeError(.prewarm), got \(error)")
+        }
+        XCTAssertEqual(
+            ordinaryFixture.runtimeCacheClears.entries,
+            [],
+            "ordinary non-OOM prewarm failure keeps Mac Qwen3 runtime caches"
+        )
+
+        // 2) Allocation failure inside `ensureWarmStateIfNeeded` (2nd qwen3Capabilities call):
+        //    `loadModel` succeeds, prewarm throws `.allocation` -> Mac runtime caches dropped.
+        let oomFixture = RuntimeSeamFixture()
+        await oomFixture.coordinator.answerIsPrewarmed([false, false])
+        await oomFixture.coordinator.failCapabilities(
+            onCall: 2,
+            with: VocelloQwen3RuntimeFailure.allocation
+        )
+        do {
+            _ = try await oomFixture.runtime.prepareInteractiveReadiness(
+                for: RuntimeSeam.warmRequest(modelID: RuntimeSeam.customModel)
+            )
+            XCTFail("Expected allocation failure inside ensureWarmStateIfNeeded")
+        } catch let error as NativeRuntimeError {
+            XCTAssertEqual(error.stage, .prewarm, "failure must come from ensureWarmStateIfNeeded, not loadModel")
+        } catch {
+            XCTFail("Expected NativeRuntimeError(.prewarm), got \(error)")
+        }
+        XCTAssertEqual(
+            oomFixture.runtimeCacheClears.entries,
+            ["runtime-caches"],
+            "OOM failure inside prewarm must drop Mac Qwen3 runtime caches for memory relief (B-05)"
+        )
+    }
+
     /// A later trim takes the prewarm slot; a leaked slot fails the test after
     /// the timeout instead of hanging the suite.
     @concurrent private func assertPrewarmSlotIsFree(_ runtime: NativeEngineRuntime) async {
@@ -713,7 +893,7 @@ private struct RuntimeSeamFixture {
     let coordinator: RuntimeSeamCoordinator
     let runtime: NativeEngineRuntime
 
-    init() {
+    init(telemetryRecorderFactory: (@Sendable () -> NativeTelemetryRecorder?)? = nil) {
         let log = RuntimeSeamLog()
         let runtimeCacheClears = RuntimeSeamLog()
         let coordinator = RuntimeSeamCoordinator(log: log)
@@ -724,6 +904,7 @@ private struct RuntimeSeamFixture {
             loadCoordinator: coordinator,
             audioPreparationService: NativeAudioPreparationService(),
             lightweightWarmupText: "Hi.",
+            telemetryRecorderFactory: telemetryRecorderFactory,
             allocatorControl: NativeMLXAllocatorControl(
                 applyPolicy: { log.append("allocator.applyPolicy:\($0.name)") },
                 clearCache: { log.append(RuntimeSeam.clearCache) },
@@ -910,8 +1091,10 @@ private actor RuntimeSeamCoordinator: MLXModelCoordinating {
     private var heldCalls: [Call: [CheckedContinuation<Void, Never>]] = [:]
     private var residentModelID: String?
     private var unloadCount = 0
-    private var failsNextLoad = false
+    private var nextLoadFailureError: (any Error)?
     private var failsCapabilities = false
+    private var capabilitiesCallCount = 0
+    private var capabilitiesFailureByCall: [Int: any Error] = [:]
     private var isPrewarmedAnswers: [Bool] = []
     private var observedRuntimeFailure = false
 
@@ -935,12 +1118,16 @@ private actor RuntimeSeamCoordinator: MLXModelCoordinating {
         }
     }
 
-    func failNextLoad() {
-        failsNextLoad = true
+    func failNextLoad(with error: any Error = LoadFailure()) {
+        nextLoadFailureError = error
     }
 
     func failCapabilities(_ fails: Bool) {
         failsCapabilities = fails
+    }
+
+    func failCapabilities(onCall callIndex: Int, with error: any Error) {
+        capabilitiesFailureByCall[callIndex] = error
     }
 
     /// Answers for the next `isPrewarmed` queries, in order; `false` after.
@@ -957,6 +1144,10 @@ private actor RuntimeSeamCoordinator: MLXModelCoordinating {
 
     func qwen3Capabilities(for id: String) async throws -> Qwen3TTSModelCapabilities {
         log.append("capabilities")
+        capabilitiesCallCount += 1
+        if let scheduledError = capabilitiesFailureByCall.removeValue(forKey: capabilitiesCallCount) {
+            throw scheduledError
+        }
         if failsCapabilities {
             throw CapabilitiesFailure()
         }
@@ -971,9 +1162,9 @@ private actor RuntimeSeamCoordinator: MLXModelCoordinating {
         loadProfiles.append(capabilityProfile)
         let unloadsAtStart = unloadCount
         await pauseIfHeld(.load)
-        if failsNextLoad {
-            failsNextLoad = false
-            throw LoadFailure()
+        if let error = nextLoadFailureError {
+            nextLoadFailureError = nil
+            throw error
         }
         guard unloadCount == unloadsAtStart else {
             throw CancellationError()
@@ -1047,6 +1238,7 @@ private actor RuntimeSeamCoordinator: MLXModelCoordinating {
     }
 
     /// A Base model that serves every mode, so clone validation passes.
+    static let testCapabilities = capabilities
     private static let capabilities = Qwen3TTSModelCapabilities(
         modelSize: .pro1b7,
         familyType: .baseClone,

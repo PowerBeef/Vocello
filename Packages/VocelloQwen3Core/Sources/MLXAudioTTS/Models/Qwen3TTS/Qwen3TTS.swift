@@ -1909,7 +1909,14 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
             return (frames, true)
         }
         let primed = try primeStreamingDecoder(decoder, referenceCodes: referenceCodes, pieceFrames: pieceFrames)
-        if let snapshot = try decoder.streamingStateSnapshot() {
+        let snapshot: Qwen3DecoderStreamingSnapshot?
+        do {
+            snapshot = try decoder.streamingStateSnapshot()
+        } catch {
+            decoder.resetStreamingState()
+            throw error
+        }
+        if let snapshot {
             primedStates.store(snapshot, forReference: reference, decoder: decoder)
         }
         return (primed, false)

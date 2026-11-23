@@ -53,12 +53,12 @@
     },
     {
       "path": "Sources/MLXAudioMark/AudioSealGenerator.swift",
-      "sha256": "ee660c8a0084c906694c3dea74cf0cca2539c2667d7beca5925a7140473fbbbd",
+      "sha256": "496f4d53a1ad2ac37c7d4fa6626a07525212b103b49bc1ef184a9d8762eeb3c1",
       "upstreamStatus": "added"
     },
     {
       "path": "Sources/MLXAudioTTS/Generation.swift",
-      "sha256": "d5b9beb9d4da4b92ba67164ccbde91731d731247d900df39406b393579b038e6",
+      "sha256": "983a2e07c7ed2048ae9ff0dd9f93faaa7fbf8eb189f71732c3778ef507724ef2",
       "upstreamStatus": "modified"
     },
     {
@@ -73,7 +73,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-      "sha256": "0bdc5fa67581358428736f153682059eda1ea57802daeea80b8e2c690eccb2f8",
+      "sha256": "f7263bae496a54d86e31515bd6f9515caa759d0800e8def6ba7844557e3bdad2",
       "upstreamStatus": "modified"
     },
     {
@@ -83,17 +83,17 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictor.swift",
-      "sha256": "80086f2eb87abd8c4e26e1bd8596a411773e6bf6b2e2d390a770a2495070a8a2",
+      "sha256": "b09761593911914493aa36105a23a2b48dc98ad391690cfb69f713106465fdc5",
       "upstreamStatus": "modified"
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCodePredictorCompiled.swift",
-      "sha256": "cbd570dbc444947ed16018c394ca2a489278a15664c7e9adb3fe577d826b52de",
+      "sha256": "9500b3ee04215d1b22f5e96ce2975a471933bac904272dedaef075a3ef44c8af",
       "upstreamStatus": "added"
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSConfig.swift",
-      "sha256": "937b5686d1fe8475eda3cd59fa9cfb7ce31f8bc22d12be6fb0ff6637c09e1e54",
+      "sha256": "d07b25572087b376f7573d3e5ffd31d3038cb4def3241aadb2e730fc530faf2b",
       "upstreamStatus": "modified"
     },
     {
@@ -103,7 +103,7 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSFusedProjection.swift",
-      "sha256": "037bad48a10899fe540a9f497fd1fccf954d5a8f3c6380db011efc902865e406",
+      "sha256": "79cc5acb0cfc60816fccd0a1a4f553ef33e4331ba9c7da009990f3188295f5f4",
       "upstreamStatus": "added"
     },
     {
@@ -113,12 +113,12 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSLoading.swift",
-      "sha256": "2f7143c58889d191d560caf68ac63a83919578e94b3a53077c394568c056a560",
+      "sha256": "a87b1c74c967c94e2cb126293f1007d8ec663fb677cc545945ab430f08894843",
       "upstreamStatus": "added"
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSPromptAssembly.swift",
-      "sha256": "6ea33242a876c97607b4e6e7704ade18a30dde1b4506b9fa2ee035a4900c1b1d",
+      "sha256": "f9e683418355851adfffaaf0d7644f28c971b649b58a2231e81ae91eb6b8468a",
       "upstreamStatus": "added"
     },
     {
@@ -138,12 +138,12 @@
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift",
-      "sha256": "cc43e21ddccb8703a8caa41be270ac4c8b5fb2ef0ae03086300c126030e48eaf",
+      "sha256": "3f219ad2aef5465773f61cfe59463939db66a413599127f15f3632dfc693644c",
       "upstreamStatus": "modified"
     },
     {
       "path": "Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSTalker.swift",
-      "sha256": "546d7614b6b54cf127a68cd265a04a549094defa1d29184334f7044cf51be485",
+      "sha256": "8938f0e740405b9d5e5e3b0921c020ca88ee695bfa22b4032b942706670a9d31",
       "upstreamStatus": "modified"
     },
     {
@@ -193,7 +193,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Contracts.swift",
-      "sha256": "37dac1dad325370e29c6270ed63120e29adb01b72d4a3a68fc81e45ead5f5007",
+      "sha256": "586a8674cb46aac128407c8a7710ce25f8e51d6a053674f46d1a54d5625705e4",
       "upstreamStatus": "added"
     },
     {
@@ -208,7 +208,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/LoadedModel.swift",
-      "sha256": "d2b12995ab04dc193f06b1ed704c9c0857c7c022715459c4e7a7753e1b85c4ae",
+      "sha256": "8825afea3c3340e38b4be00875945242acb5f2a80bf5749eea4c0da22e1c718d",
       "upstreamStatus": "added"
     },
     {
@@ -223,7 +223,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/AudioSealParityTests.swift",
-      "sha256": "acf1c35b78580e30d4a36a44477a3be4271979aef8322cd627ca62d429126e74",
+      "sha256": "ee731248bf189e5d4b1abf366ebb5445ca0054584aa4af649c508dc10bf193d9",
       "upstreamStatus": "added"
     },
     {
@@ -238,7 +238,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3CodePredictorCompiledTests.swift",
-      "sha256": "c46507f23ec64eaac64ce396a348fa143dad90484c7aeb5bbaad673aed31cbb1",
+      "sha256": "1ca00e16519086ca61d8d60227a6dfd0773ae9231925246b955e15b2efeb4e22",
       "upstreamStatus": "added"
     },
     {
@@ -248,12 +248,12 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3DecoderPartitionTests.swift",
-      "sha256": "95bca4997b02e6fdd3e168b31246473f0eb2cef082168bd3b4d0f8e86e495d88",
+      "sha256": "37e831a64556b9dcc05c23cfd8670c0a11f5238799d650a89d2ee66a3b8026d4",
       "upstreamStatus": "added"
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3FusedProjectionTests.swift",
-      "sha256": "a6b29bcb2810dcf26722003f28030473e64f5835eb00bb673b547811c5f9b04f",
+      "sha256": "f179df679d5e95227cfce50cfb55dafe29fb889e894b6ccc483a8e7f1c40047c",
       "upstreamStatus": "added"
     },
     {
@@ -273,7 +273,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3QualityFirstDecodeWindowTests.swift",
-      "sha256": "153c0a5f1c31b6121506fab4ae65017744f87f9910254207adf3c4f2ac0e8fb1",
+      "sha256": "22a6ee7cbe8b8d3ce0f9f807e1e39a67175e8f2b0842df9f938e8b027d89dcc8",
       "upstreamStatus": "added"
     },
     {
@@ -293,7 +293,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3SpeechTokenizerResidencyTests.swift",
-      "sha256": "ab780714adbedd80c8db2affe833d388cb8fbb0c8d0d3fae546fb888ec32f1b2",
+      "sha256": "6a3342939774779b9a374b0db7d715630cde47911e7457215f3b3a0345dbf79b",
       "upstreamStatus": "added"
     },
     {
@@ -308,7 +308,7 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/Qwen3TalkerGenerateLoopTests.swift",
-      "sha256": "d357f511b097f7505c6d1925c796ee1e173f92918c70a8fc49dafd931aeec0fb",
+      "sha256": "1c2745ab3d00edfa4d3f7e67970fced5ffba3743c32c375d03e8cda85135254c",
       "upstreamStatus": "added"
     },
     {
@@ -328,12 +328,12 @@
     },
     {
       "path": "Tests/Qwen3RuntimeTests/RuntimeFailureCaptureTests.swift",
-      "sha256": "4090d5bd70a248cc7ae2636dd5d799124a4e8b7d96ceeb54de7ce66a751bc6dc",
+      "sha256": "6e6a144ae4d6c116362495e684f29f865583f7a484e76c628971d2bb12532d95",
       "upstreamStatus": "added"
     },
     {
       "path": "Tests/Qwen3RuntimeTests/VocelloQwen3FacadeTests.swift",
-      "sha256": "65a5f6898d04712d805cc8c3728efa222f08b96ac3454f9b605d2ec2fc1a6600",
+      "sha256": "f33a91d01926aa86191404f0827799237042910dc8d1734e4f576ced25aa34d7",
       "upstreamStatus": "added"
     }
   ],

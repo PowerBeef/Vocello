@@ -279,7 +279,7 @@ public final class AudioSealGenerator {
     /// a buffer MLX never filled (F-03, engine audit 2026-10-16).
     public func watermarkDelta(pcm: [Float]) throws -> [Float] {
         let x = MLXArray(pcm).reshaped([1, pcm.count, 1])
-        let d = decoderConvs(frameStages(encoderConvs(x)))
+        let d = try withError { decoderConvs(frameStages(encoderConvs(x))) }
         let count = min(pcm.count, d.dim(1))
         let delta = d[0..., 0 ..< count, 0].reshaped([count])
         try withError { delta.eval() }
@@ -340,14 +340,12 @@ public final class AudioSealGenerator {
                 let windowEnd = min(pcm.count, (coreEnd + marginFrames) * stride)
                 let x = MLXArray(Array(pcm[windowStart ..< windowEnd]))
                     .reshaped([1, windowEnd - windowStart, 1])
-                try withError {
-                    let window = encoderConvs(x)
-                    let lo = frame - windowStartFrame
-                    let hi = min(lo + (coreEnd - frame), window.dim(1))
-                    let core = window[0..., lo ..< hi, 0...]
-                    core.eval()
-                    bottleneckParts.append(core)
-                }
+                let window = try withError { encoderConvs(x) }
+                let lo = frame - windowStartFrame
+                let hi = min(lo + (coreEnd - frame), window.dim(1))
+                let core = window[0..., lo ..< hi, 0...]
+                try withError { core.eval() }
+                bottleneckParts.append(core)
                 frame = coreEnd
             }
         }
@@ -379,19 +377,15 @@ public final class AudioSealGenerator {
                 let coreStart = frame * stride
                 let coreSampleEnd = min(coreEnd * stride, pcm.count)
                 let span = coreSampleEnd - coreStart
-                var evaluatedSlice: MLXArray?
-                try withError {
-                    let window = decoderConvs(lstmOut[0..., windowStartFrame ..< windowEndFrame, 0...])
-                    let deltaSlice = window[0..., sampleLo ..< min(sampleLo + span, window.dim(1)), 0]
-                        .reshaped([-1])
-                    deltaSlice.eval()
-                    evaluatedSlice = deltaSlice
+                let window = try withError {
+                    decoderConvs(lstmOut[0..., windowStartFrame ..< windowEndFrame, 0...])
                 }
-                if let deltaSlice = evaluatedSlice {
-                    let delta = deltaSlice.asArray(Float.self)
-                    for i in 0 ..< min(span, delta.count) {
-                        out[coreStart + i] = Self.markedSample(pcm[coreStart + i], delta: delta[i])
-                    }
+                let deltaSlice = window[0..., sampleLo ..< min(sampleLo + span, window.dim(1)), 0]
+                    .reshaped([-1])
+                try withError { deltaSlice.eval() }
+                let delta = deltaSlice.asArray(Float.self)
+                for i in 0 ..< min(span, delta.count) {
+                    out[coreStart + i] = Self.markedSample(pcm[coreStart + i], delta: delta[i])
                 }
                 frame = coreEnd
             }

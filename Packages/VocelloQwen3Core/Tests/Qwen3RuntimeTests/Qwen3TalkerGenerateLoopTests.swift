@@ -1177,6 +1177,72 @@ final class Qwen3TalkerGenerateLoopTests: XCTestCase {
         XCTAssertEqual(first.samples.map(\.bitPattern), cold.samples.map(\.bitPattern))
     }
 
+    /// RF-68 (B1.4): fusing a quantized code predictor's projections increments
+    /// `projectionFusionGeneration` and invalidates any previously hoisted
+    /// `CodePredictorCompiledPlan` so the next call builds a fresh plan.
+    func testFusingQuantizedCodePredictorInvalidatesHoistedCompiledPlanCache() throws {
+        let talkerJSON = """
+        {
+          "vocab_size": 1040,
+          "hidden_size": 64,
+          "intermediate_size": 64,
+          "num_hidden_layers": 1,
+          "num_attention_heads": 2,
+          "num_key_value_heads": 2,
+          "head_dim": 32,
+          "hidden_act": "silu",
+          "max_position_embeddings": 128,
+          "rms_norm_eps": 1e-6,
+          "rope_theta": 10000,
+          "attention_bias": false,
+          "num_code_groups": 3,
+          "text_hidden_size": 64,
+          "text_vocab_size": 64,
+          "code_predictor_config": {
+            "vocab_size": 16,
+            "hidden_size": 64,
+            "intermediate_size": 64,
+            "num_hidden_layers": 1,
+            "num_attention_heads": 2,
+            "num_key_value_heads": 2,
+            "head_dim": 32,
+            "hidden_act": "silu",
+            "max_position_embeddings": 64,
+            "rms_norm_eps": 1e-6,
+            "rope_theta": 10000,
+            "attention_bias": false,
+            "attention_dropout": 0,
+            "num_code_groups": 3
+          }
+        }
+        """
+        let talkerConfig = try JSONDecoder().decode(Qwen3TTSTalkerConfig.self, from: Data(talkerJSON.utf8))
+        let config = try JSONDecoder().decode(Qwen3TTSModelConfig.self, from: Data("{}".utf8))
+        let talker = Qwen3TTSTalkerForConditionalGeneration(config: talkerConfig)
+        quantize(model: talker, groupSize: 64, bits: 4)
+        eval(talker)
+        let model = Qwen3TTSModel(config: config, talker: talker, speakerEncoder: nil)
+        let sampling = CompiledPassSampling(temperature: 0.9, topK: 4, castsLogitsToFloat32: true)
+
+        let beforeFusion = model.cachedCodePredictorPlan(dtype: .float32, sampling: sampling)
+        XCTAssertEqual(talker.codePredictor.projectionFusionGeneration, 0)
+        XCTAssertTrue(
+            model.cachedCodePredictorPlan(dtype: .float32, sampling: sampling) === beforeFusion,
+            "repeated lookup before fusion must hit the cached plan"
+        )
+
+        let summary = talker.codePredictor.fuseProjections()
+        XCTAssertGreaterThan(summary.fusedGroupCount, 0)
+        XCTAssertEqual(talker.codePredictor.projectionFusionGeneration, 1)
+
+        let afterFusion = model.cachedCodePredictorPlan(dtype: .float32, sampling: sampling)
+        XCTAssertFalse(
+            afterFusion === beforeFusion,
+            "fusing quantized projections must invalidate the prior hoisted plan instance"
+        )
+        XCTAssertEqual(model.cachedCodePredictorPlanCount, 1)
+    }
+
     /// RF-68 (B1.4): when a streaming chunk emit coincides with `memoryClearCadence`,
     /// `generateCore` must call `clearGenerationCache()` once for that step, not twice.
     func testStreamingChunkEmitAndMemoryClearCadenceDoNotDoubleClearCache() async throws {

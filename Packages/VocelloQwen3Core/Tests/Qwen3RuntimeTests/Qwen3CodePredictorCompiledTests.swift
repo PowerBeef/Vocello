@@ -296,9 +296,9 @@ final class Qwen3CodePredictorCompiledTests: XCTestCase {
     /// per-pass KV buffers on `init` or `runFrame`, and `releasePerPassBuffers`
     /// must drop lazy buffers cleanly while allowing subsequent `run` calls.
     func testCompiledPassSamplingHashableAndLazyPerPassBuffers() throws {
-        let firstSampling = CompiledPassSampling(temperature: 0.9, topK: 50, castsLogitsToFloat32: true)
-        let equalSampling = CompiledPassSampling(temperature: 0.9, topK: 50, castsLogitsToFloat32: true)
-        let otherSampling = CompiledPassSampling(temperature: 0.7, topK: 20, castsLogitsToFloat32: true)
+        let firstSampling = CompiledPassSampling(temperature: 0.9, topK: 8, castsLogitsToFloat32: true)
+        let equalSampling = CompiledPassSampling(temperature: 0.9, topK: 8, castsLogitsToFloat32: true)
+        let otherSampling = CompiledPassSampling(temperature: 0.7, topK: 4, castsLogitsToFloat32: true)
         let samplingSet: Set<CompiledPassSampling> = [firstSampling, equalSampling, otherSampling]
         XCTAssertEqual(samplingSet.count, 2)
 

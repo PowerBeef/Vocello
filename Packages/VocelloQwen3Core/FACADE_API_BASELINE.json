@@ -133,7 +133,8 @@
     "Sources/VocelloQwen3Core/Contracts.swift::public let chunking: VocelloQwen3StreamChunkConfiguration",
     "Sources/VocelloQwen3Core/Contracts.swift::public let executionStyle: VocelloQwen3ExecutionStyle",
     "Sources/VocelloQwen3Core/Contracts.swift::public let captureCodecTrace: Bool",
-    "Sources/VocelloQwen3Core/Contracts.swift::public init( generationID: UUID, text: String, language: String, input: VocelloQwen3SynthesisInput, sampling: VocelloQwen3SamplingConfiguration, memory: VocelloQwen3MemoryConfiguration, chunking: VocelloQwen3StreamChunkConfiguration? = nil, executionStyle: VocelloQwen3ExecutionStyle = .streaming, captureCodecTrace: Bool = false )",
+    "Sources/VocelloQwen3Core/Contracts.swift::public let captureIntrospection: Bool",
+    "Sources/VocelloQwen3Core/Contracts.swift::public init( generationID: UUID, text: String, language: String, input: VocelloQwen3SynthesisInput, sampling: VocelloQwen3SamplingConfiguration, memory: VocelloQwen3MemoryConfiguration, chunking: VocelloQwen3StreamChunkConfiguration? = nil, executionStyle: VocelloQwen3ExecutionStyle = .streaming, captureCodecTrace: Bool = false, captureIntrospection: Bool = false )",
     "Sources/VocelloQwen3Core/Contracts.swift::public var mode: VocelloQwen3SynthesisMode",
     "Sources/VocelloQwen3Core/Contracts.swift::public func validated(for capabilities: VocelloQwen3CapabilitySet) throws -> Self",
     "Sources/VocelloQwen3Core/Contracts.swift::public init(from decoder: any Decoder) throws",
@@ -452,7 +453,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/Contracts.swift",
-      "sha256": "37dac1dad325370e29c6270ed63120e29adb01b72d4a3a68fc81e45ead5f5007"
+      "sha256": "586a8674cb46aac128407c8a7710ce25f8e51d6a053674f46d1a54d5625705e4"
     },
     {
       "path": "Sources/VocelloQwen3Core/Engine.swift",
@@ -464,7 +465,7 @@
     },
     {
       "path": "Sources/VocelloQwen3Core/LoadedModel.swift",
-      "sha256": "d2b12995ab04dc193f06b1ed704c9c0857c7c022715459c4e7a7753e1b85c4ae"
+      "sha256": "8825afea3c3340e38b4be00875945242acb5f2a80bf5749eea4c0da22e1c718d"
     },
     {
       "path": "Sources/VocelloQwen3Core/ProductOutputAdapter.swift",

@@ -1,0 +1,194 @@
+{
+ "axisStatus": {
+  "clone": "abstain_uncalibrated",
+  "delivery": "active_advisory",
+  "diction": "active_advisory",
+  "pairwise": "active_advisory"
+ },
+ "createdAt": "2026-11-23T08:11:41Z",
+ "neverGates": true,
+ "q1": {
+  "c1IdenticalTie": {
+   "barMin": 0.9,
+   "lower": 0.7354,
+   "n": 12,
+   "passed": true,
+   "rate": 1.0,
+   "successes": 12,
+   "upper": 1.0
+  },
+  "c2ClearPerturbationWin": {
+   "barMin": 0.85,
+   "lower": 0.6306,
+   "n": 8,
+   "passed": true,
+   "rate": 1.0,
+   "successes": 8,
+   "upper": 1.0
+  },
+  "c2OrderFlip": {
+   "barMax": 0.15,
+   "lower": 0.0016,
+   "n": 16,
+   "passed": true,
+   "positionBias": {
+    "firstChosen": 17,
+    "firstShareOfDirectional": 0.5667,
+    "secondChosen": 13,
+    "ties": 2,
+    "uncertain": 0
+   },
+   "rate": 0.0625,
+   "successes": 1,
+   "upper": 0.3023
+  },
+  "c3AdversarialMismatch": {
+   "barMin": 0.9,
+   "lower": 0.7354,
+   "n": 12,
+   "passed": true,
+   "rate": 1.0,
+   "successes": 12,
+   "upper": 1.0
+  },
+  "c4SpeakerIdentity": {
+   "balancedAccuracy": 0.75,
+   "barMin": 0.85,
+   "differentSpeakerSpecificity": {
+    "lower": 0.8316,
+    "n": 20,
+    "rate": 1.0,
+    "successes": 20,
+    "upper": 1.0
+   },
+   "passed": false,
+   "sameSpeakerRecall": {
+    "lower": 0.272,
+    "n": 20,
+    "rate": 0.5,
+    "successes": 10,
+    "upper": 0.728
+   }
+  },
+  "c5DeliveryBriefMatch": {
+   "lower": 0.1181,
+   "n": 6,
+   "rate": 0.5,
+   "successes": 3,
+   "upper": 0.8819
+  },
+  "c5DeliveryBriefMismatch": {
+   "barMin": 0.8,
+   "lower": 0.3588,
+   "n": 6,
+   "rate": 0.8333,
+   "successes": 5,
+   "upper": 0.9958
+  },
+  "c5HarmlessTransformFalseAlarm": {
+   "barMax": 0.1,
+   "lower": 0.0,
+   "n": 8,
+   "rate": 0.0,
+   "successes": 0,
+   "upper": 0.3694
+  },
+  "c5Passed": true,
+  "session": "q1-controls-v1"
+ },
+ "q2": {
+  "byLanguage": {
+   "english": {
+    "flaggedPrecision": {
+     "lower": 0.4735,
+     "n": 8,
+     "rate": 0.875,
+     "successes": 7,
+     "upper": 0.9968
+    },
+    "unflaggedUnusableRate": {
+     "lower": 0.0,
+     "n": 5,
+     "rate": 0.0,
+     "successes": 0,
+     "upper": 0.5218
+    }
+   },
+   "french": {
+    "flaggedPrecision": {
+     "lower": 0.025,
+     "n": 1,
+     "rate": 1.0,
+     "successes": 1,
+     "upper": 1.0
+    },
+    "unflaggedUnusableRate": {
+     "lower": 0.0,
+     "n": 6,
+     "rate": 0.0,
+     "successes": 0,
+     "upper": 0.4593
+    }
+   }
+  },
+  "cleanHumanFalseAlarm": {
+   "barMax": 0.1,
+   "lower": 0.0008,
+   "n": 30,
+   "passed": true,
+   "rate": 0.0333,
+   "successes": 1,
+   "upper": 0.1722
+  },
+  "confirmBroadFlaggedPrecision": {
+   "lower": 0.2682,
+   "n": 23,
+   "rate": 0.4783,
+   "successes": 11,
+   "upper": 0.6941
+  },
+  "confirmBroadFlaggedRecall": {
+   "lower": 0.7151,
+   "n": 11,
+   "rate": 1.0,
+   "successes": 11,
+   "upper": 1.0
+  },
+  "confirmDecisiveTotal": 34,
+  "confirmHumanUncertainExcluded": 5,
+  "confirmPassed": true,
+  "confirmStrictUnusablePrecision": {
+   "lower": 0.5175,
+   "n": 9,
+   "rate": 0.8889,
+   "successes": 8,
+   "upper": 0.9972
+  },
+  "confirmStrictUnusableRecall": {
+   "lower": 0.3903,
+   "n": 11,
+   "rate": 0.7273,
+   "successes": 8,
+   "upper": 0.9398
+  },
+  "confirmUnflaggedUnusableRate": {
+   "lower": 0.0,
+   "n": 11,
+   "rate": 0.0,
+   "successes": 0,
+   "upper": 0.2849
+  },
+  "historicalQcV2PrecisionBaseline": 0.31,
+  "precisionBarMin": 0.55,
+  "separationBarMin": 0.15,
+  "separationBroad": 0.4783,
+  "separationStrict": 0.8889,
+  "session": "q2-blind-cal-v1"
+ },
+ "rubricSHA256": "89acedc04ac25c31f7bb70d007bed10baa09f53504864331b8082efc24e5018a",
+ "rubricSchema": "vocello.qc.multimodal.rubric/1",
+ "rubricVersion": 1,
+ "schema": "vocello.qc.multimodal.eval/1",
+ "status": "report-only-advisory",
+ "targetModel": "gemini-4-neon"
+}

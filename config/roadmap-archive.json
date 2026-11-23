@@ -6770,6 +6770,28 @@
         "run:ios-xcui-perf-20261122-014227-2dc60e89",
         "file:config/ui-perf-thresholds-ios.json"
       ]
+    },
+    {
+      "id": "RF-72",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Multimodal audio QC complement (Gemini 4 Neon) with bias controls and blind calibration",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "An offline, strictly report-only multimodal audio QC extension (scripts/qc/multimodal*.py, config/qc/multimodal-rubric-v1.json, scripts/qc.py multimodal and an Antigravity run_workflow orchestrator using native audio read_file) complements QC v2 on mispronunciation/local phonation, delivery/long-form consistency and dynamic voice-clone fidelity without altering QC v2 SCORING_SOURCES/scoring_identity, Fast QC or RF-57 gating rules. Staging enforces opaque randomized filenames, 16 kHz mono single-stream stitching (local zoom crops, [Ref|Take], dual-order [A|B]/[B|A], long-form seams) and allowlisted non-personal audio roots. Deterministic unit tests pass, Q1 synthetic/public bias controls (C1-C5) and Q2 blind calibration on the 39 non-clone historical confirmations + 30 human controls complete with aggregate-only results committed in benchmarks/qc/multimodal-eval-v1.json, and docs/reference/qc.md documents active vs abstaining axes.",
+      "sourceOfTruth": [
+        "scripts/qc.py",
+        "scripts/qc/detectors.py",
+        "config/qc/protocol.json",
+        "docs/reference/qc.md"
+      ],
+      "updated": "2026-11-23",
+      "notes": "Opened 2026-11-22 at the maintainer's request as Step 1 of the Vocello 3.2 implementation plan (ahead of RF-68, RF-69 and RF-70). Zero Swift edits, zero new Python packages and zero external API keys: runs via Antigravity native audio read_file and run_workflow on Gemini 4 Neon, keeping personal user audio blocked by default and zero raw audio/transcripts in Git. Q1 (128 blinded tasks) and Q2 (69 blind takes: 39 non-clone confirm-1..7 + 30 human controls) calibrated on Gemini 4 Neon via Antigravity read_file/run_workflow. Active advisory: diction, delivery, pairwise (C1 12/12, C2 win 8/8, swap flip 1/16=6.25%, C3 12/12, C5 mismatch 5/6 & harmless FA 0/8, Q2 strict unusable precision 8/9=88.9% vs 31% QC v2 baseline, broad recall 11/11=100%, unflagged unusable 0/11=0%, clean human FA 1/30=3.3%). Static speaker verification (clone) failed C4 balanced accuracy (75.0% < 85%: diff-speaker 20/20, same-speaker 10/20) and stays fail-closed at abstain_uncalibrated.",
+      "evidence": [
+        "commit:b736c494",
+        "commit:c11648dd",
+        "doc:docs/reference/qc.md",
+        "file:benchmarks/qc/multimodal-eval-v1.json"
+      ]
     }
   ]
 }

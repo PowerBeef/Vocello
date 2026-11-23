@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 53/95 (56%) |
+| `release-first-3-0-2026-09` | active | release-qa | 54/95 (57%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 13/17 (76%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (82)
+### Mac, remotely (81)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -123,7 +123,6 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `RF-69` (planned) Engine Pack B (part 2): sample-preserving runtime, Mac/CLI lease, Fast QC and delivery hardening
 - `RF-70` (planned) Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B) (also: At the keyboard, iPhone)
 - `RF-71` (planned) Ship Vocello and the vocello CLI 3.2 on the Mac (also: At the keyboard)
-- `RF-72` (in-flight) Multimodal audio QC complement (Gemini 4 Neon) with bias controls and blind calibration
 - `UIF-08` (parked) Native acceptance of the iOS-derived screens on current source
 
 ### At the keyboard (19)
@@ -267,7 +266,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-69` | planned | Engine Pack B (part 2): sample-preserving runtime, Mac/CLI lease, Fast QC and delivery hardening | — |
 | `RF-70` | planned | Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B) | `RF-68` |
 | `RF-71` | planned | Ship Vocello and the vocello CLI 3.2 on the Mac | `RF-68`, `RF-69`, `RF-70`, `RF-72` |
-| `RF-72` | in-flight | Multimodal audio QC complement (Gemini 4 Neon) with bias controls and blind calibration | — |
 
 ### Open items in detail
 
@@ -398,9 +396,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-71`** (planned) — Ship Vocello and the vocello CLI 3.2 on the Mac.
   gate: Vocello and the vocello CLI 3.2.0 are public on the Mac. Before the tag: MARKETING_VERSION 3.2.0 with a build number above the last release tag's; Mac benchmark, memory, language and UI-perf lanes recorded on the 3.2 engine (and reseeded baselines/lineage if RF-70 updates model artifacts or alters samples); docs/releases/v3.2.0.md passes check_release_notes.py; README charts, website copy/numbers and config/public-product-facts.json describe 3.2; push CI, release rehearsal, full macOS smoke and engine bench pass on the release commit. Then the maintainer's signed v3.2.0 tag builds a verified draft through release.yml; the macOS promotion lanes and signed CLI qualification pass on the tag checkout; the maintainer promotes the release and the website deploys with it.
-
-- **`RF-72`** (in-flight) — Multimodal audio QC complement (Gemini 4 Neon) with bias controls and blind calibration.
-  gate: An offline, strictly report-only multimodal audio QC extension (scripts/qc/multimodal*.py, config/qc/multimodal-rubric-v1.json, scripts/qc.py multimodal and an Antigravity run_workflow orchestrator using native audio read_file) complements QC v2 on mispronunciation/local phonation, delivery/long-form consistency and dynamic voice-clone fidelity without altering QC v2 SCORING_SOURCES/scoring_identity, Fast QC or RF-57 gating rules. Staging enforces opaque randomized filenames, 16 kHz mono single-stream stitching (local zoom crops, [Ref|Take], dual-order [A|B]/[B|A], long-form seams) and allowlisted non-personal audio roots. Deterministic unit tests pass, Q1 synthetic/public bias controls (C1-C5) and Q2 blind calibration on the 39 non-clone historical confirmations + 30 human controls complete with aggregate-only results committed in benchmarks/qc/multimodal-eval-v1.json, and docs/reference/qc.md documents active vs abstaining axes.
 
 ## Specialist-audit remediation
 

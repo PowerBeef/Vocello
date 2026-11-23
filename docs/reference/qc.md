@@ -1,14 +1,17 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-10
-summary: The offline, report-only audio QC v2 harness — its models, detectors, norms, calibration, levels, lanes, labels and data layout, and the coverage and qualification contract behind the strict gate's exit codes.
+reviewed: 2026-11-23
+summary: The offline, report-only audio QC v2 harness — its models, detectors, norms, calibration, levels, lanes, labels, data layout, coverage/qualification contract, and the calibrated Gemini 4 Neon multimodal audio QC complement (RF-72).
 sourceOfTruth:
   - scripts/qc.py
   - scripts/qc/lanes.py
+  - scripts/qc/multimodal.py
   - config/qc/models.json
   - config/qc/detectors.json
   - config/qc/thresholds-v1.json
+  - config/qc/multimodal-rubric-v1.json
+  - benchmarks/qc/multimodal-eval-v1.json
 ---
 # Audio QC v2
 
@@ -183,7 +186,7 @@ QC v2 keeps only what the external reviews recommend:
   - the ending as a trimming check, with cut-offs judged from content;
   - human controls, labels first, and out-of-fold evaluation.
 
-No audio-LLM judge: on 2026-10-02 the maintainer found a cloud audio LLM useless for defect detection, Gemma 4 documents its audio for ASR and translation only, and audio LLMs lean on the words more than the voice; v2 measures instead.
+No audio-LLM judge in QC v2 core: on 2026-10-02 the maintainer found an earlier cloud audio LLM useless for defect detection, Gemma 4 documents its audio for ASR and translation only, and audio LLMs can lean on the words more than the voice; v2's core detectors measure instead and never call an LLM. As a separate, strictly offline and report-only complement (`RF-72`, 2026-11-23), `qc.py multimodal` adds blinded two-pass and dual-order pairwise listening via Antigravity on Gemini 4 Neon with pre-registered Q1/Q2 controls (see [Multimodal audio QC complement](#multimodal-audio-qc-complement-rf-72)).
 
 Pitch and speaker identity are kept for clones only, by the maintainer's decision of 2026-10-02: FCPE and SwiftF0 measure a clone's register against its reference clip, and ReDimNet2+ its similarity to it.
 
@@ -220,6 +223,7 @@ All commands go through `python3 scripts/qc.py`.
 | `norms --takes <qc-takes runs…> [--min-count 100] [--dry-run]` | Measures per-language pause, pace and ending percentiles from the pool's audio and cached results, and writes `config/qc/norms-v<N>.json` (see [Per-language norms](#per-language-norms)). |
 | `controls build [--sources <corpus>:<language> …] [--per-language 200] [--per-speaker 5]` | Writes a takes manifest of human read speech from the speaker corpora, each take marked `control`; score it with `run --lane controls`. The [corpora per language](#calibration-on-human-controls) cover eight languages. |
 | `controls report --runs <controls runs…> [--generated <runs…>]` | Each detector's flag rate on the human controls (with bounds) beside the generated takes', and every feature's p50 and p90. |
+| `multimodal prepare\|workflow\|aggregate\|qualify` | Offline, report-only Gemini 4 Neon blinded listening complement (`RF-72`): stages 16 kHz mono / stitched audio under `build/private/qc/multimodal/`, emits a resumable Antigravity `run_workflow` script, reconciles dual-order `AB`/`BA` verdicts, and scores Q1/Q2 calibration (`benchmarks/qc/multimodal-eval-v1.json`). Never gates CI or releases and does not alter QC v2 `scoring_identity()`. |
 
 ## Models and runtimes
 
@@ -637,8 +641,34 @@ Re-labelling appends a new line, and the latest line per rater and token wins; a
 | `build/private/qc/eval-ledger.jsonl` | The label sets each evaluation scored (tokens), so a deleted eval file cannot hide a re-run. |
 | `build/private/qc/runs/<run-id>/` | `takes.json`, `features.json` and `flags.json` of each `qc.py run`. |
 | `build/private/qc/queues/` | The listening queues `queue` writes. |
+| `build/private/qc/multimodal/<session>/` | Staged 16 kHz mono / stitched WAVs, opaque token manifests, generated `workflow.py`, raw verdicts and aggregated report-only multimodal summaries (git-ignored, never committed). |
 | `config/qc/thresholds-v<N>.json`, `benchmarks/qc/eval-v<N>.json` | Thresholds calibrated on human controls (or fitted on labels) and their evaluation, both committed. |
+| `config/qc/multimodal-rubric-v1.json`, `benchmarks/qc/multimodal-eval-v1.json` | Versioned multimodal listening rubric, pre-registered Q1/Q2 qualification bars, and aggregate-only Q1/Q2 calibration receipt (no audio, transcripts or private paths). |
 | `config/qc/norms-v<N>.json` | Per-language percentiles for the provisional rules, committed; aggregates only. |
+
+## Multimodal audio QC complement (RF-72)
+
+`qc.py multimodal` (`scripts/qc/multimodal.py`, `scripts/qc/multimodal_audio.py`, `scripts/qc/multimodal_workflow.py`, rubric `config/qc/multimodal-rubric-v1.json`, skill `vocello-audio-qc`) is an offline, report-only multimodal listening complement powered by Gemini 4 Neon through Antigravity's native `read_file` audio modality and `run_workflow`.
+
+**Hard boundaries:**
+- **Strictly report-only (`neverGates: true`):** never gates CI, never alters `qc.py gate` exit codes or `SCORING_SOURCES` / `scoring_identity()`, never runs inside the shipped app or CLI, and never replaces QC v2 or `quality_screen.py` quantitative gates.
+- **Privacy fail-closed:** staging refuses paths outside `build/private/qc/`, `build/cache/qc/` and `benchmarks/`, rejects clone confirm audio and personal recordings, requires explicit `--allow-synthetic-confirm` for non-clone synthetic confirm WAVs, strips all path/model/seed/score metadata behind opaque hex tokens, and writes all audio, manifests, transcripts and per-take verdicts exclusively under git-ignored `build/private/qc/multimodal/<session>/`. Only aggregate counts, Wilson/Clopper-Pearson bounds and rubric digests enter Git (`benchmarks/qc/multimodal-eval-v1.json`).
+- **Two-pass blinded protocol:** every take goes through Pass 1 (audio-only blind audition: verbatim transcription, language/accent cues, tone, audible defects without seeing the script, mode or scores) before Pass 2 targeted audits (diction, delivery-brief compliance, or dual-order `AB`/`BA` pairwise comparison). Audio is resampled to 16 kHz mono PCM16; multi-clip comparisons stitch clips with 440 Hz cosine-ramped tone markers, long-form clips stitch three deterministic slices (`start`, `middle`, `end`), and flagged QC v2 spans receive 2.5 s local zoom crops. Pairwise comparisons require `AB` and `BA` order agreement to record a win; opposite orders reconcile to `tie_order_unstable`.
+
+**Empirical qualification (`benchmarks/qc/multimodal-eval-v1.json`, 2026-11-23, rubric SHA-256 `89acedc0…`):**
+
+| Qualification axis | Result | Pre-registered bar | Recorded `axisStatus` |
+|---|---|---|---|
+| **Q1 C1 Identical-audio tie discipline** | `12/12` (**100.0%**, 95% CI `[73.5%, 100.0%]`) | `>= 90%` | `pairwise: active_advisory` |
+| **Q1 C2 Clear perturbation consistent win (`AB`+`BA`)** | `8/8` (**100.0%**, 95% CI `[63.1%, 100.0%]`) | `>= 85%` | `pairwise: active_advisory` |
+| **Q1 C2 Order-swap flip rate** | `1/16` (**6.25%**, 95% CI `[0.2%, 30.2%]`; first-share `17/30 = 56.7%`) | `<= 15%` | `pairwise: active_advisory` |
+| **Q1 C3 Adversarial text/language mismatch** | `12/12` (**100.0%**, 95% CI `[73.5%, 100.0%]`) | `>= 90%` | `diction: active_advisory` |
+| **Q1 C4 Speaker identity discrimination** | Diff-speaker specificity `20/20` (**100.0%**), same-speaker recall `10/20` (**50.0%**), balanced accuracy **75.0%** | `>= 85%` | **`clone: abstain_uncalibrated`** |
+| **Q1 C5 Delivery brief mismatch / harmless transform FA** | Mismatch caught `5/6` (**83.3%**), harmless transform (`±3 dB`, 200 ms lead silence) FA `0/8` (**0.0%**) | `>= 80%` / `<= 10%` | `delivery: active_advisory` |
+| **Q2 Blind confirm strict `unusable` precision (`n=34` decisive)** | `8/9` (**88.9%**, 95% CI `[51.8%, 99.7%]`; strict recall `8/11 = 72.7%`, broad recall `11/11 = 100.0%`, unflagged unusable `0/11 = 0.0%`) | `>= 55%` (vs 31% QC v2 baseline) & separation `>= +15 pp` (`+88.9 pp` observed) | `diction` + `delivery`: **`active_advisory`** |
+| **Q2 Clean human controls false-alarm rate** | `1/30` (**3.3%**, 95% CI `[0.1%, 17.2%]`) | `<= 10%` | `diction` + `delivery`: **`active_advisory`** |
+
+**Scope of calibrated use:** `diction`, `delivery` and dual-order `pairwise` (`screen-ab`) are calibrated for report-only advisory use (including Pack C `RF-70` candidate screens). Static clone speaker verification (`clone`) stays fail-closed at `abstain_uncalibrated`: Q1 C4 showed 100% rejection of impostors alongside 50% false rejection of valid same-speaker clips across prosodic/F0 register shifts (`|ΔF0| >= ~1.5–3.5 st`), so static speaker identity and register remain owned by QC v2's `ReDimNet2+` + `FCPE`/`SwiftF0`.
 
 `build/cache/qc` (`qc-cache`) is re-creatable from the registry and pins; `qc.py models prune` removes what the registry no longer lists. `build/private/qc` (`qc-private`) is preserved by every cleanup. Both are registered in `config/build-output-policy.json` and git-ignored under `build/`. Labels, transcripts and take paths never enter Git; only aggregates and digests are committed.
 

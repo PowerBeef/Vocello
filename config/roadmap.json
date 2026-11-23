@@ -705,25 +705,6 @@
       "notes": "Opened 2026-11-16 from two external audits of the 3.1.0 tree, each claim re-checked against the code and Apple's current pages. No demo video exists (gap G5 of the 2026-11-04 audit). It pre-empts the most likely Guideline 2.1 round, a reviewer who cannot see the model download or the consent gate. The screenshots from the same build stay under ASR-05."
     },
     {
-      "id": "RF-72",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Multimodal audio QC complement (Gemini 4 Neon) with bias controls and blind calibration",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "An offline, strictly report-only multimodal audio QC extension (scripts/qc/multimodal*.py, config/qc/multimodal-rubric-v1.json, scripts/qc.py multimodal and an Antigravity run_workflow orchestrator using native audio read_file) complements QC v2 on mispronunciation/local phonation, delivery/long-form consistency and dynamic voice-clone fidelity without altering QC v2 SCORING_SOURCES/scoring_identity, Fast QC or RF-57 gating rules. Staging enforces opaque randomized filenames, 16 kHz mono single-stream stitching (local zoom crops, [Ref|Take], dual-order [A|B]/[B|A], long-form seams) and allowlisted non-personal audio roots. Deterministic unit tests pass, Q1 synthetic/public bias controls (C1-C5) and Q2 blind calibration on the 39 non-clone historical confirmations + 30 human controls complete with aggregate-only results committed in benchmarks/qc/multimodal-eval-v1.json, and docs/reference/qc.md documents active vs abstaining axes.",
-      "sourceOfTruth": [
-        "scripts/qc.py",
-        "scripts/qc/detectors.py",
-        "config/qc/protocol.json",
-        "docs/reference/qc.md"
-      ],
-      "needs": [
-        "mac"
-      ],
-      "updated": "2026-11-22",
-      "notes": "Opened 2026-11-22 at the maintainer's request as Step 1 of the Vocello 3.2 implementation plan (ahead of RF-68, RF-69 and RF-70). Zero Swift edits, zero new Python packages and zero external API keys: runs via Antigravity native audio read_file and run_workflow on Gemini 4 Neon, keeping personal user audio blocked by default and zero raw audio/transcripts in Git."
-    },
-    {
       "id": "RF-68",
       "plan": "release-first-3-0-2026-09",
       "title": "Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance",

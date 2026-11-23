@@ -777,7 +777,7 @@
       "benchmarkRecordIDs": [],
       "upstreamDisposition": "local-only",
       "upstreamEquivalentCommit": null,
-      "removalCriteria": "Remove once RF-55 is decided: QWENVOICE_CODE_PREDICTOR_BITS=8 takes the code predictor and QWENVOICE_MIXED_PRECISION=<recipe> the talker layer tensors a recipe names from the installed 8-bit sibling. The maintainer either publishes a mixed-precision artifact (then the artifact carries the recipe in its per-layer quantization and both keys go) or keeps the stock ones."
+      "removalCriteria": "Remove once RF-55 and RF-70 are decided: QWENVOICE_CODE_PREDICTOR_BITS=8 takes the code predictor and QWENVOICE_MIXED_PRECISION=<recipe> (down, attn, attn-down, mlp, talker, attn-io, attn-io-edge) takes the talker modules a recipe names from the installed 8-bit sibling. Once the final mixed-precision artifact is published (carrying the recipe in its per-layer quantization), retire the diagnostic overrides."
     }
   ]
 }

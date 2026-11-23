@@ -40,15 +40,40 @@ INTEGRITY = ".qwenvoice-model-integrity.json"
 SHARED = ".qwenvoice-shared-components.json"
 MODES = {"custom": "CustomVoice", "design": "VoiceDesign", "base": "Base"}
 CONTRACT_IDS = {"custom": "pro_custom", "design": "pro_design", "base": "pro_clone"}
-# Each recipe's talker layer modules; mirrors Qwen3MixedPrecisionRecipe in the package
+# Each recipe's talker modules; mirrors Qwen3MixedPrecisionRecipe in the package
 # (Qwen3StreamingMemoryTuning.swift), which the diagnostic key selects with.
+ATTENTION_MODULES = ("self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj")
+MLP_MODULES = ("mlp.gate_proj", "mlp.up_proj", "mlp.down_proj")
+EDGE_LAYER_INDICES = frozenset({0, 1, 26, 27})
+IO_MODULES = (
+    "text_projection.linear_fc1",
+    "text_projection.linear_fc2",
+    "codec_head",
+    "code_predictor.small_to_mtp_projection",
+    "code_predictor.lm_head",
+)
+LAYER_RECIPES = {
+    "down": ("mlp.down_proj",),
+    "attn": ATTENTION_MODULES,
+    "attn-down": ATTENTION_MODULES + ("mlp.down_proj",),
+    "mlp": MLP_MODULES,
+    "attn-io": ATTENTION_MODULES,
+    "attn-io-edge": ATTENTION_MODULES,
+}
 RECIPES = {
     "down": ("mlp.down_proj",),
-    "attn": ("self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj"),
-    "attn-down": ("self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj", "mlp.down_proj"),
-    "mlp": ("mlp.gate_proj", "mlp.up_proj", "mlp.down_proj"),
+    "attn": ATTENTION_MODULES,
+    "attn-down": ATTENTION_MODULES + ("mlp.down_proj",),
+    "mlp": MLP_MODULES,
+    "attn-io": ATTENTION_MODULES + IO_MODULES,
+    "attn-io-edge": ATTENTION_MODULES + IO_MODULES + MLP_MODULES,
 }
-LAYER_TENSOR = re.compile(r"^talker\.(model\.layers\.(\d+)\.([a-z_]+\.[a-z_]+))\.(weight|scales|biases)$")
+LAYER_TENSOR = re.compile(
+    r"^talker\.(model\.layers\.(\d+)\.([a-z_]+\.[a-z_]+))\.(weight|scales|biases|bias)$"
+)
+IO_TENSOR = re.compile(
+    r"^talker\.(text_projection\.linear_fc[12]|codec_head|code_predictor\.small_to_mtp_projection|code_predictor\.lm_head\.\d+)\.(weight|scales|biases|bias)$"
+)
 CHUNK = 64 * 1024 * 1024
 
 
@@ -72,11 +97,21 @@ def read_header(path: Path) -> tuple[dict, int]:
 
 
 def selected_module(key: str, recipe: str) -> str | None:
-    """The talker-relative module path (`model.layers.3.self_attn.q_proj`) when the recipe takes this
-    tensor from the 8-bit model, else None."""
+    """The talker-relative module path (`model.layers.3.self_attn.q_proj`, `codec_head`,
+    `code_predictor.lm_head.0`, etc.) when the recipe takes this tensor (including unquantized
+    `.bias` on biased I/O projections) from the 8-bit model, else None."""
+    layer_modules = LAYER_RECIPES[recipe]
     match = LAYER_TENSOR.match(key)
-    if match and match.group(3) in RECIPES[recipe]:
-        return match.group(1)
+    if match:
+        if match.group(3) in layer_modules:
+            return match.group(1)
+        if recipe == "attn-io-edge" and int(match.group(2)) in EDGE_LAYER_INDICES and match.group(3) in MLP_MODULES:
+            return match.group(1)
+        return None
+    if recipe in ("attn-io", "attn-io-edge"):
+        io_match = IO_TENSOR.match(key)
+        if io_match:
+            return io_match.group(1)
     return None
 
 
@@ -137,11 +172,37 @@ def local_repo(folder: str) -> str:
     return f"local/{folder}"
 
 
+def recipe_scope_description(recipe: str, layers: int) -> tuple[str, str]:
+    """Returns `(upgraded_clause, remainder_clause)` describing a recipe's 8-bit and 4-bit scope."""
+    if recipe == "attn-io":
+        attn = ", ".join(f"`{module}`" for module in ATTENTION_MODULES)
+        io_mods = ", ".join(f"`{module}`" for module in IO_MODULES)
+        return (
+            f"the talker's {attn} in each of its {layers} layers plus the I/O projections {io_mods}",
+            "Every other tensor, including the code predictor's transformer layers and embeddings, is the 4-bit artifact's own",
+        )
+    if recipe == "attn-io-edge":
+        attn = ", ".join(f"`{module}`" for module in ATTENTION_MODULES)
+        io_mods = ", ".join(f"`{module}`" for module in IO_MODULES)
+        edge_mlps = ", ".join(f"`{module}`" for module in MLP_MODULES)
+        edge_layers = ", ".join(str(index) for index in sorted(EDGE_LAYER_INDICES))
+        return (
+            f"the talker's {attn} in each of its {layers} layers, the I/O projections {io_mods}, "
+            f"and {edge_mlps} in edge layers {edge_layers}",
+            "Every other tensor, including middle-layer MLPs and the code predictor's transformer layers and embeddings, is the 4-bit artifact's own",
+        )
+    modules = ", ".join(f"`{module}`" for module in RECIPES[recipe])
+    return (
+        f"the talker's {modules} in each of its {layers} layers",
+        "Every other tensor, the code predictor's included, is the 4-bit artifact's own",
+    )
+
+
 def model_card(owner: str, folder: str, recipe: str, layers: int, added_bytes: int,
                four: tuple[str, str], eight: tuple[str, str]) -> str:
     """The card a published artifact carries: licence, sources at their exact revisions, the recipe and
     what the screens measured, in the shape of the shipped 8-bit artifacts' cards."""
-    modules = ", ".join(f"`{module}`" for module in RECIPES[recipe])
+    upgraded_clause, remainder_clause = recipe_scope_description(recipe, layers)
     return (
         "---\nlicense: apache-2.0\ntags:\n- mlx\n- text-to-speech\n- tts\n- vocello\nlibrary_name: mlx-audio\n"
         f"base_model:\n- {four[0]}\n- {eight[0]}\n---\n"
@@ -150,11 +211,11 @@ def model_card(owner: str, folder: str, recipe: str, layers: int, added_bytes: i
         "by tensor from two Vocello artifacts of the same MLX conversion, with no requantization:\n\n"
         f"- every tensor of [`{four[0]}`](https://huggingface.co/{four[0]}) at revision `{four[1]}`\n"
         "  (affine 4-bit, group size 64);\n"
-        f"- except the talker's {modules} in each of its {layers} layers, taken from\n"
+        f"- except {upgraded_clause}, taken from\n"
         f"  [`{eight[0]}`](https://huggingface.co/{eight[0]}) at revision `{eight[1]}` (affine 8-bit,\n"
         f"  group size 64), {added_bytes / 1e6:.0f} MB more weights.\n\n"
-        "`config.json` names each of those modules under `quantization`. Every other tensor, the code\n"
-        "predictor's included, is the 4-bit artifact's own, and so is every file but this card, `config.json`\n"
+        f"`config.json` names each of those modules under `quantization`. {remainder_clause},\n"
+        "and so is every file but this card, `config.json`\n"
         "and the index: the speech tokenizer, and `marking/`, which holds Meta's AudioSeal generator (MIT\n"
         "licence), unchanged.\n\n"
         "Chosen by machine screens recorded before their takes, on a Mac with fixed seeds (nobody listened):\n"
@@ -190,10 +251,13 @@ def build_mode(mode: str, recipe: str, models: Path, out: Path, contract: dict, 
             sources[key] = (four / "model.safetensors", value, four_start)
     if not modules:
         raise BuildError(f"{mode}: recipe {recipe} selected nothing")
-    for module in modules:  # weight, scales and biases move together
+    for module in modules:  # weight, scales, biases, and optional .bias move together
         for tensor in ("weight", "scales", "biases"):
             if f"talker.{module}.{tensor}" not in sources or sources[f"talker.{module}.{tensor}"][0].parent != eight:
                 raise BuildError(f"{mode}: {module} is incomplete in the 8-bit artifact")
+        bias_key = f"talker.{module}.bias"
+        if bias_key in four_header and sources[bias_key][0].parent != eight:
+            raise BuildError(f"{mode}: {module}.bias was not taken from the 8-bit artifact")
 
     folder = out / f"{speed['folder'].removesuffix('-4bit')}-hybrid-{recipe}"
     if folder.exists():
@@ -210,14 +274,21 @@ def build_mode(mode: str, recipe: str, models: Path, out: Path, contract: dict, 
     index = {"metadata": {"total_size": total}, "weight_map": {key: "model.safetensors" for key in sorted(sources)}}
     (folder / "model.safetensors.index.json").write_text(json.dumps(index, indent=2) + "\n")
     added = total - (four / "model.safetensors").stat().st_size + four_start
+    layer_count = len({
+        parts[2]
+        for module in modules
+        for parts in (module.split("."),)
+        if len(parts) >= 3 and parts[0] == "model" and parts[1] == "layers"
+    })
+    upgraded_clause, _remainder = recipe_scope_description(recipe, layer_count)
     (folder / "README.md").write_text(
-        model_card(owner, folder.name, recipe, len({module.split(".")[2] for module in modules}), added,
+        model_card(owner, folder.name, recipe, layer_count, added,
                    (speed["huggingFaceRepo"], speed["huggingFaceRevision"]),
                    (entry["huggingFaceRepo"], entry["huggingFaceRevision"]))
         if owner else
         f"# Vocello hybrid ({recipe}) — Qwen3-TTS-12Hz-1.7B-{MODES[mode]}\n\n"
-        "A derivative of Qwen/Qwen3-TTS (Apache-2.0) made by Vocello: the 4-bit model with the talker's "
-        f"{', '.join(RECIPES[recipe])} taken from the 8-bit model of the same conversion. Development build; not published.\n")
+        f"A derivative of Qwen/Qwen3-TTS (Apache-2.0) made by Vocello: the 4-bit model with {upgraded_clause} "
+        "taken from the 8-bit model of the same conversion. Development build; not published.\n")
 
     # Every other required file is the 4-bit artifact's own, linked where the volume allows.
     for relative in speed["requiredRelativePaths"]:

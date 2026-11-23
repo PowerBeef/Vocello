@@ -129,39 +129,104 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         XCTAssertEqual(bits("model.layers.0.mlp.gate_proj"), 4)
         XCTAssertEqual(bits("code_predictor_shadow.proj"), 4, "only the code predictor itself")
 
-        // A mixed-precision recipe gives the sibling's recipe to the layer
-        // tensors it names, never to the code predictor or anything else.
+        // A mixed-precision recipe gives the sibling's recipe to the modules
+        // it names while keeping fused projection groups aligned at one precision.
         func mixedBits(_ path: String, _ recipe: Qwen3MixedPrecisionRecipe) -> Int? {
             Qwen3TTSModel.talkerQuantization(
                 path: path, hasScales: true, config: config, codePredictor: nil, mixed: (eight, recipe))?.1
         }
         let layer = "model.layers.7."
-        let expected: [Qwen3MixedPrecisionRecipe: Set<String>] = [
-            .down: ["mlp.down_proj"],
-            .attn: ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj"],
-            .attnDown: ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj", "mlp.down_proj"],
-            .mlp: ["mlp.gate_proj", "mlp.up_proj", "mlp.down_proj"],
-            .talker: ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj",
-                      "mlp.gate_proj", "mlp.up_proj", "mlp.down_proj"],
+        let attentionLeaves: Set<String> = ["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj"]
+        let allLayerLeaves: Set<String> = [
+            "self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj",
+            "mlp.gate_proj", "mlp.up_proj", "mlp.down_proj",
         ]
-        XCTAssertEqual(Set(expected.keys), Set(Qwen3MixedPrecisionRecipe.allCases))
-        for (recipe, eightBit) in expected {
-            for leaf in expected[.talker]! {
+        let expectedMiddleLayer: [Qwen3MixedPrecisionRecipe: Set<String>] = [
+            .down: ["mlp.down_proj"],
+            .attn: attentionLeaves,
+            .attnDown: attentionLeaves.union(["mlp.down_proj"]),
+            .mlp: ["mlp.gate_proj", "mlp.up_proj", "mlp.down_proj"],
+            .talker: allLayerLeaves,
+            .attnIO: attentionLeaves,
+            .attnIOEdge: attentionLeaves,
+        ]
+        let ioRecipeSet: Set<Qwen3MixedPrecisionRecipe> = [.attnIO, .attnIOEdge]
+        XCTAssertEqual(Set(expectedMiddleLayer.keys), Set(Qwen3MixedPrecisionRecipe.allCases))
+        for (recipe, eightBit) in expectedMiddleLayer {
+            for leaf in allLayerLeaves {
                 XCTAssertEqual(mixedBits(layer + leaf, recipe), eightBit.contains(leaf) ? 8 : 4, "\(recipe) \(leaf)")
             }
-            XCTAssertEqual(mixedBits("code_predictor.model.layers.2.mlp.down_proj", recipe), 4, "never the code predictor")
-            XCTAssertEqual(mixedBits("codec_head", recipe), 4)
+            XCTAssertEqual(mixedBits("code_predictor.model.layers.2.mlp.down_proj", recipe), 4, "never code_predictor transformer layers")
+            XCTAssertEqual(mixedBits("code_predictor.model.layers.0.self_attn.q_proj", recipe), 4, "never code_predictor attention layers")
+            XCTAssertEqual(mixedBits("code_predictor.model.layers.0.mlp.gate_proj", recipe), 4, "never code_predictor edge-index MLPs")
+            XCTAssertFalse(Qwen3TTSModel.takesFromSibling(
+                weightKey: "code_predictor.model.layers.0.self_attn.q_proj.weight", codePredictor: false, recipe: recipe))
+            XCTAssertFalse(Qwen3TTSModel.takesFromSibling(
+                weightKey: "code_predictor.model.layers.0.mlp.gate_proj.weight", codePredictor: false, recipe: recipe))
+            XCTAssertEqual(mixedBits("code_predictor.model.codec_embedding.0", recipe), 4, "never code_predictor embeddings")
+            XCTAssertEqual(mixedBits("codec_head", recipe), ioRecipeSet.contains(recipe) ? 8 : 4, "\(recipe) codec_head")
+            XCTAssertEqual(mixedBits("text_projection.linear_fc1", recipe), ioRecipeSet.contains(recipe) ? 8 : 4)
+            XCTAssertEqual(mixedBits("text_projection.linear_fc2", recipe), ioRecipeSet.contains(recipe) ? 8 : 4)
+            XCTAssertEqual(mixedBits("code_predictor.small_to_mtp_projection", recipe), ioRecipeSet.contains(recipe) ? 8 : 4)
+            XCTAssertEqual(mixedBits("code_predictor.lm_head.0", recipe), ioRecipeSet.contains(recipe) ? 8 : 4)
+            XCTAssertEqual(mixedBits("code_predictor.lm_head.14", recipe), ioRecipeSet.contains(recipe) ? 8 : 4)
             XCTAssertEqual(mixedBits("model.text_embedding", recipe), 8, "its own per-layer recipe")
+            XCTAssertFalse(Qwen3TTSModel.takesFromSibling(
+                weightKey: "model.text_embedding.weight", codePredictor: false, recipe: recipe),
+                "recipes must never pull model.text_embedding from the sibling")
             // The fused projections need their members at one precision.
             XCTAssertEqual(Set(["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj"].map(eightBit.contains)).count, 1)
             XCTAssertEqual(Set(["mlp.gate_proj", "mlp.up_proj"].map(eightBit.contains)).count, 1)
             // The weights replaced are exactly the selected modules' tensors.
-            for leaf in expected[.talker]! {
+            for leaf in allLayerLeaves {
                 for tensor in ["weight", "scales", "biases"] {
                     XCTAssertEqual(Qwen3TTSModel.takesFromSibling(
                         weightKey: "\(layer)\(leaf).\(tensor)", codePredictor: false, recipe: recipe),
                         eightBit.contains(leaf), "\(recipe) \(leaf) \(tensor)")
                 }
+            }
+        }
+        // Pack C Bundle A (`attn-io`) and Bundle B (`attn-io-edge`) exact boundaries:
+        // biased I/O modules carry `.bias` alongside `.weight/.scales/.biases`,
+        // unquantized modules (`hasScales: false`) stay nil under mixed recipes,
+        // and only edge layers {0, 1, 26, 27} promote MLPs in `attn-io-edge`.
+        XCTAssertNil(Qwen3TTSModel.talkerQuantization(
+            path: "text_projection.linear_fc1", hasScales: false, config: config, codePredictor: nil, mixed: (eight, .attnIO)))
+        XCTAssertNil(Qwen3TTSModel.talkerQuantization(
+            path: "code_predictor.model.codec_embedding.0", hasScales: false, config: config, codePredictor: nil, mixed: (eight, .attnIO)))
+        for biasedModule in ["text_projection.linear_fc1", "text_projection.linear_fc2", "code_predictor.small_to_mtp_projection"] {
+            for tensor in ["weight", "scales", "biases", "bias"] {
+                XCTAssertTrue(Qwen3TTSModel.takesFromSibling(
+                    weightKey: "\(biasedModule).\(tensor)", codePredictor: false, recipe: .attnIO))
+                XCTAssertTrue(Qwen3TTSModel.takesFromSibling(
+                    weightKey: "\(biasedModule).\(tensor)", codePredictor: false, recipe: .attnIOEdge))
+                XCTAssertFalse(Qwen3TTSModel.takesFromSibling(
+                    weightKey: "\(biasedModule).\(tensor)", codePredictor: false, recipe: .attn))
+            }
+        }
+        XCTAssertFalse(Qwen3MixedPrecisionRecipe.attnIO.selects("code_predictor.lm_head."))
+        XCTAssertFalse(Qwen3MixedPrecisionRecipe.attnIO.selects("code_predictor.lm_head.0.extra"))
+        for layerIndex in 0 ..< 28 {
+            let isEdge = [0, 1, 26, 27].contains(layerIndex)
+            for attnLeaf in attentionLeaves {
+                let path = "model.layers.\(layerIndex).\(attnLeaf)"
+                XCTAssertEqual(mixedBits(path, .attnIO), 8, "attn-io \(path)")
+                XCTAssertEqual(mixedBits(path, .attnIOEdge), 8, "attn-io-edge \(path)")
+            }
+            for mlpLeaf in ["mlp.gate_proj", "mlp.up_proj", "mlp.down_proj"] {
+                let path = "model.layers.\(layerIndex).\(mlpLeaf)"
+                XCTAssertEqual(mixedBits(path, .attnIOEdge), isEdge ? 8 : 4, "attn-io-edge \(path)")
+                XCTAssertEqual(mixedBits(path, .attnIO), 4, "attn-io \(path)")
+            }
+            for recipe in [Qwen3MixedPrecisionRecipe.attnIO, .attnIOEdge] {
+                XCTAssertEqual(
+                    Set(["self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj"].map {
+                        mixedBits("model.layers.\(layerIndex).\($0)", recipe)
+                    }).count, 1, "\(recipe) layer \(layerIndex) QKV precision must stay aligned")
+                XCTAssertEqual(
+                    Set(["mlp.gate_proj", "mlp.up_proj"].map {
+                        mixedBits("model.layers.\(layerIndex).\($0)", recipe)
+                    }).count, 1, "\(recipe) layer \(layerIndex) GateUp precision must stay aligned")
             }
         }
         // The weights replaced are exactly those modules' tensors.
@@ -237,6 +302,7 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
         XCTAssertEqual(internalRun.mixedPrecisionRecipe, .down)
         XCTAssertNil(Qwen3LoadTimeDiagnosticOverrides.production.mixedPrecisionRecipe)
         for (value, expected) in [(" MLP ", Qwen3MixedPrecisionRecipe.mlp), ("attn-down", .attnDown), ("talker", .talker),
+                                  (" ATTN-IO ", .attnIO), ("attn-io-edge", .attnIOEdge), ("attn-io-edges", nil),
                                   ("on", nil), ("v-down", nil), ("", nil)] as [(String, Qwen3MixedPrecisionRecipe?)] {
             var mixed = everyOverrideRequested
             mixed["QWENVOICE_MIXED_PRECISION"] = value
@@ -244,6 +310,10 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
                 .mixedPrecisionRecipe, expected, value)
             XCTAssertNil(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: false, environment: mixed)
                 .mixedPrecisionRecipe, value)
+            var noDebug = mixed
+            noDebug["QWENVOICE_DEBUG"] = nil
+            XCTAssertNil(Qwen3LoadTimeDiagnosticOverrides.resolve(internalDiagnosticsAvailable: true, environment: noDebug)
+                .mixedPrecisionRecipe, "\(value) without QWENVOICE_DEBUG")
         }
         // RF-55: the code predictor from the 8-bit sibling, only for "8".
         XCTAssertEqual(internalRun.codePredictorBits, 8)

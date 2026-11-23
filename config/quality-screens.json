@@ -934,6 +934,54 @@
             },
             "note": "Inside every margin; speaker similarity lower than Quality's with its interval excluding zero (-0.022 [-0.030, -0.014]). Error rate +0.009 [-0.001, +0.021]."
           }
+        },
+        "hybrid-attn-io-clone": {
+          "recorded": "2026-11-23",
+          "question": "Does Pack C Bundle A (QWENVOICE_MIXED_PRECISION=attn-io on the 4-bit stock model: attn plus 19 talker/code-predictor I/O projections and lm_head, +24.12 MB over attn, zero requantization) improve or preserve transcript-backed clones against shipped attn (RF-70)?",
+          "arms": "Fresh seed set 16 of the clone screen (192 takes per arm), --stock against the 3.0 4-bit and 8-bit research artifacts, generated after this rule was recorded. A: QWENVOICE_MIXED_PRECISION=attn. B: QWENVOICE_MIXED_PRECISION=attn-io. Self-test noise floor: A on seed set 16 against A on fresh seed set 17 (compare --expect noise --b-run), measured before comparing A vs B.",
+          "requires": "The fresh self-test noise floor sits inside 0.71 of each guard margin. B differs from A on its takes (not INERT). Calibrated RF-72 advisory pairwise audit runs on a stratified 24-36 take slice (clone speaker verification stays abstain_uncalibrated).",
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 4,
+          "guards": {
+            "speakerSimilarity": {
+              "higherIsBetter": true,
+              "margin": 0.05
+            },
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "trailingSilenceMS": {
+              "higherIsBetter": false,
+              "margin": 40
+            }
+          },
+          "expected": "Non-inferior or higher speaker similarity and lower error rate than attn, narrowing the -0.022 speaker-similarity gap to Quality without exceeding +24.12 MB.",
+          "decision": "ADOPT (Bundle A clears clone non-inferiority) when every requirement holds and no guard interval reaches past its margin on B's harmful side. REJECT when a guard's whole interval lies past its margin or B adds more than 4 gross failures. Otherwise INCONCLUSIVE. Promotion to a shipped artifact requires clearing hybrid-attn-io (improvement on long-form or clone) and hybrid-attn-io-single."
+        },
+        "hybrid-attn-io-edge-clone": {
+          "recorded": "2026-11-23",
+          "question": "Does Pack C Bundle B (QWENVOICE_MIXED_PRECISION=attn-io-edge on the 4-bit stock model: attn-io plus talker edge layers 0, 1, 26, 27 MLPs, +99.61 MB over attn, zero requantization) improve or preserve transcript-backed clones against Experiment 2's winner (attn-io or attn, RF-70)?",
+          "arms": "Fresh seed set 18 of the clone screen (192 takes per arm), --stock against the 3.0 4-bit and 8-bit research artifacts, generated after this rule was recorded. A: Experiment 2's winner (QWENVOICE_MIXED_PRECISION=attn-io or attn). B: QWENVOICE_MIXED_PRECISION=attn-io-edge. Self-test noise floor: A on seed set 18 against A on fresh seed set 19 (compare --expect noise --b-run), measured before comparing A vs B.",
+          "requires": "The fresh self-test noise floor sits inside 0.71 of each guard margin. B differs from A on its takes (not INERT). Calibrated RF-72 advisory pairwise audit runs on a stratified 24-36 take slice (clone speaker verification stays abstain_uncalibrated).",
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 4,
+          "guards": {
+            "speakerSimilarity": {
+              "higherIsBetter": true,
+              "margin": 0.05
+            },
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "trailingSilenceMS": {
+              "higherIsBetter": false,
+              "margin": 40
+            }
+          },
+          "expected": "Further speaker-similarity and pronunciation gains from 8-bit edge-layer MLPs, justifying the +75.5 MB increment over Bundle A only if clearly superior.",
+          "decision": "ADOPT (Bundle B clears clone non-inferiority) when every requirement holds and no guard interval reaches past its margin on B's harmful side. REJECT when a guard's whole interval lies past its margin or B adds more than 4 gross failures. Otherwise INCONCLUSIVE. Promotion also requires clearing hybrid-attn-io-edge, hybrid-attn-io-edge-single, and the iPhone 17 Pro < 3,662 MiB cold Clone memory gate (D3)."
         }
       },
       "noiseFloor": {
@@ -2312,6 +2360,62 @@
             },
             "note": "Both candidates qualify: their three rules are ADOPT, their median real-time factor is at most 1.07 times Speed's on clones and long-form segments (ceiling 1.20), and their added weights (176 and 352 MB) are under 560 MB. With two qualifiers the one with the fewest added weights is chosen, attn, because attn-down generated fewer long-form projects (63 against 65), not 4 more, and was not better on clone similarity (+0.004 [-0.008, +0.016] against attn). The decision's next steps: the built artifact's identity (done: 192 of 192 clone takes and 21 of 21 long-form projects PCM-identical), Voice Design and Built-in Voice single takes (done: hybrid-attn-single-vs-speed and -vs-quality ADOPT, better than Speed and within the margins of Quality), the iPhone's memory and speed, and the maintainer's publication decision. attn beats Speed and does not match Quality: it keeps Speed's clone likeness, roughly halves Speed's long-form error rate, which stays about twice Quality's, and comes within 0.007 of Quality's error rate on single takes. Replacing Quality is the maintainer's call, made with that gap in view."
           }
+        },
+        "long-form-korean-d1-attn": {
+          "recorded": "2026-11-23",
+          "question": "Does full-text conditioning (QWENVOICE_FULL_TEXT_CONDITIONING=on, D1) reduce refusals or improve error rate on Korean long-form projects on the shipped hybrid-attn Expressive model (RF-70 Experiment 1)?",
+          "arms": "The long-form screen's custom-korean stratum, Expressive variation only, across fresh seed sets 16, 17, and 18 (4 projects per seed set, 12 projects per arm), run against the shipped hybrid-attn artifact (without --stock) after this rule was recorded. A: default (QWENVOICE_FULL_TEXT_CONDITIONING=off). B: QWENVOICE_FULL_TEXT_CONDITIONING=on. Self-test noise floor: A on seed set 16 against A on seed set 17 (compare --expect noise --b-run), measured before comparing A vs B.",
+          "requires": "The control reproduces Korean long-form refusals (at least 3 of 12 projects refused or failed in A). B differs from A on its takes (not INERT). Calibrated RF-72 advisory audit (longform-consistency and pairwise-ab) runs on paired generated projects.",
+          "primaryMetric": "Refused or failed Korean projects across seed sets 16-18 (A against B), B's failure classes against A's, and paired errorRateBetterFamily.",
+          "maximumExtraGrossFailures": 0,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            }
+          },
+          "expected": "Unknown: on 4-bit Speed (long-form-korean-full-text), D1 failed 16/16 vs 14/16; on shipped hybrid-attn (which generates ~50% of Korean long-form projects), D1 may either reduce interior-silence refusals or still degrade long-segment pacing.",
+          "decision": "ADOPT when the control reproduces >= 3 refusals in A, B cuts refusals/failures by at least half with at least 2 fewer refusals and no new failure class, and no seed set's paired errorRateBetterFamily interval reaches past +0.04. REJECT when B refuses or fails more projects than A or an error-rate interval lies wholly past +0.04. Otherwise INCONCLUSIVE, and Korean long-form segments keep trailing text."
+        },
+        "hybrid-attn-io": {
+          "recorded": "2026-11-23",
+          "question": "Does Pack C Bundle A (QWENVOICE_MIXED_PRECISION=attn-io on the 4-bit stock model: attn plus 19 talker/code-predictor I/O projections and lm_head, +24.12 MB over attn, zero requantization) measurably improve long-form or clone quality over shipped attn without regressions (RF-70 Experiment 2)?",
+          "arms": "All 6 strata of the long-form screen, Expressive variation only, across fresh seed sets 19, 20, and 21 (24 projects per seed set, 72 projects per arm), run with --stock against the 3.0 4-bit and 8-bit research artifacts after this rule was recorded. A: QWENVOICE_MIXED_PRECISION=attn. B: QWENVOICE_MIXED_PRECISION=attn-io. Self-test noise floor: A on seed set 19 against A on seed set 20 (compare --expect noise --b-run), measured before comparing A vs B.",
+          "requires": "B differs from A on its takes (not INERT). Paired with hybrid-attn-io-clone (seed set 16), hybrid-attn-io-single (seed set 16, run when long-form or clone clears), vocello bench speed check (median warm RTF <= 1.05x attn), and calibrated RF-72 blinded dual-order pairwise advisory audit.",
+          "primaryMetric": "Across 72 long-form projects (paired by script and seed): errorRateBetterFamily, generated project count (one-sided sign test on discordant pairs), speakerWindowSpread, and clone speakerSimilarity/errorRateBetterFamily from hybrid-attn-io-clone.",
+          "maximumExtraGrossFailures": 0,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "speakerWindowSpread": {
+              "higherIsBetter": false,
+              "margin": 0.05
+            }
+          },
+          "expected": "Lower long-form error rate and/or higher clone speaker similarity than attn by restoring 8-bit precision to text_projection, codec_head, small_to_mtp_projection, and all 15 code-predictor lm_heads for only +24.12 MB.",
+          "decision": "ADOPT (Bundle A beats attn as Experiment 2 winner) when B clears hybrid-attn-io-clone and hybrid-attn-io-single with no harmful guard interval past margin, loses <= 1 project per stratum, introduces no new failure class, keeps warm RTF <= 1.05x attn, AND delivers a statistically clear improvement over attn on at least one primary quality axis (paired 95% CI wholly on the beneficial side in >= 2 of 3 long-form seed sets for errorRateBetterFamily or speakerWindowSpread, OR one-sided sign test p < 0.05 on long-form completions, OR clone speakerSimilarity 95% CI wholly > 0 above noise floor). REJECT when B generates fewer long-form projects than A or a guard interval lies wholly past its harmful margin. Otherwise INCONCLUSIVE, and attn remains incumbent."
+        },
+        "hybrid-attn-io-edge": {
+          "recorded": "2026-11-23",
+          "question": "Does Pack C Bundle B (QWENVOICE_MIXED_PRECISION=attn-io-edge on the 4-bit stock model: attn-io plus edge layers 0, 1, 26, 27 MLPs, +99.61 MB over attn, zero requantization) measurably beat Experiment 2's winner (attn-io or attn) on long-form or clone quality while staying within speed and iPhone memory bounds (RF-70 Experiment 3)?",
+          "arms": "All 6 strata of the long-form screen, Expressive variation only, across fresh seed sets 22, 23, and 24 (24 projects per seed set, 72 projects per arm), run with --stock against the 3.0 4-bit and 8-bit research artifacts after this rule was recorded. A: Experiment 2's winner (QWENVOICE_MIXED_PRECISION=attn-io or attn). B: QWENVOICE_MIXED_PRECISION=attn-io-edge. Self-test noise floor: A on seed set 22 against A on seed set 23 (compare --expect noise --b-run), measured before comparing A vs B.",
+          "requires": "B differs from A on its takes (not INERT). Paired with hybrid-attn-io-edge-clone (seed set 18), hybrid-attn-io-edge-single (seed set 18, run when long-form or clone clears), vocello bench speed check (median warm RTF <= 1.08x attn), calibrated RF-72 blinded dual-order pairwise advisory audit, and if winning on Mac, physical iPhone 17 Pro cold Clone memory gate < 3,662 MiB (D3).",
+          "primaryMetric": "Across 72 long-form projects (paired by script and seed): errorRateBetterFamily, generated project count (one-sided sign test on discordant pairs), speakerWindowSpread, and clone speakerSimilarity/errorRateBetterFamily from hybrid-attn-io-edge-clone.",
+          "maximumExtraGrossFailures": 0,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "speakerWindowSpread": {
+              "higherIsBetter": false,
+              "margin": 0.05
+            }
+          },
+          "expected": "Further reduction in long-form error rate and Korean refusals from promoting the first two and last two talker MLP blocks to 8 bits, justifying +99.61 MB over attn only if clearly better than Experiment 2's winner and safe under iPhone 3,662 MiB.",
+          "decision": "ADOPT (Bundle B beats Experiment 2's winner) when B clears hybrid-attn-io-edge-clone and hybrid-attn-io-edge-single with no harmful guard interval past margin, loses <= 1 project per stratum, introduces no new failure class, keeps warm RTF <= 1.08x attn, clears the iPhone < 3,662 MiB cold Clone memory gate (D3), AND delivers a statistically clear improvement over A on at least one primary quality axis (paired 95% CI wholly beneficial in >= 2 of 3 long-form seed sets for errorRateBetterFamily or speakerWindowSpread, OR one-sided sign test p < 0.05 on long-form completions, OR clone speakerSimilarity 95% CI wholly > 0 above noise floor). REJECT when B generates fewer long-form projects than A or a guard interval lies wholly past its harmful margin. Otherwise INCONCLUSIVE, and Experiment 2's winner stands."
         }
       },
       "noiseFloor": {
@@ -2704,6 +2808,46 @@
             },
             "note": "Every requirement holds and both guards stay inside their margins, with small measured costs against Quality: error rate +0.007 [+0.000, +0.015], window spread +0.010 [+0.005, +0.016], takes 0.6 s longer. No take refused or failed in either arm."
           }
+        },
+        "hybrid-attn-io-single": {
+          "recorded": "2026-11-23",
+          "question": "Are single Built-in Voice and Voice Design takes from Pack C Bundle A (QWENVOICE_MIXED_PRECISION=attn-io, +24.12 MB over attn) no worse than shipped attn (RF-70)?",
+          "arms": "Fresh seed set 16 of the single screen (144 takes per arm), --stock against the 3.0 4-bit and 8-bit research artifacts, generated after this rule was recorded. A: QWENVOICE_MIXED_PRECISION=attn. B: QWENVOICE_MIXED_PRECISION=attn-io. Self-test noise floor: A on seed set 16 against A on fresh seed set 17 (compare --expect noise --b-run).",
+          "requires": "The fresh self-test noise floor sits inside 0.71 of each margin. B differs from A on its takes (not INERT).",
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 2,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "speakerWindowSpread": {
+              "higherIsBetter": false,
+              "margin": 0.05
+            }
+          },
+          "expected": "Non-inferior or slightly lower single-take error rate than attn, narrowing the +0.007 gap to Quality.",
+          "decision": "ADOPT (Bundle A clears single-take non-inferiority) when every requirement holds, no guard interval reaches past its margin on B's harmful side, and B adds at most 2 gross failures. REJECT when a guard interval lies wholly past its margin or B adds more than 2 gross failures. Otherwise INCONCLUSIVE."
+        },
+        "hybrid-attn-io-edge-single": {
+          "recorded": "2026-11-23",
+          "question": "Are single Built-in Voice and Voice Design takes from Pack C Bundle B (QWENVOICE_MIXED_PRECISION=attn-io-edge, +99.61 MB over attn) no worse than Experiment 2's winner (RF-70)?",
+          "arms": "Fresh seed set 18 of the single screen (144 takes per arm), --stock against the 3.0 4-bit and 8-bit research artifacts, generated after this rule was recorded. A: Experiment 2's winner (QWENVOICE_MIXED_PRECISION=attn-io or attn). B: QWENVOICE_MIXED_PRECISION=attn-io-edge. Self-test noise floor: A on seed set 18 against A on fresh seed set 19 (compare --expect noise --b-run).",
+          "requires": "The fresh self-test noise floor sits inside 0.71 of each margin. B differs from A on its takes (not INERT).",
+          "maximumFloorShareOfMargin": 0.71,
+          "maximumExtraGrossFailures": 2,
+          "guards": {
+            "errorRateBetterFamily": {
+              "higherIsBetter": false,
+              "margin": 0.04
+            },
+            "speakerWindowSpread": {
+              "higherIsBetter": false,
+              "margin": 0.05
+            }
+          },
+          "expected": "Non-inferior or slightly lower single-take error rate than Experiment 2's winner.",
+          "decision": "ADOPT (Bundle B clears single-take non-inferiority) when every requirement holds, no guard interval reaches past its margin on B's harmful side, and B adds at most 2 gross failures. REJECT when a guard interval lies wholly past its margin or B adds more than 2 gross failures. Otherwise INCONCLUSIVE."
         }
       }
     },

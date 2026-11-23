@@ -1,12 +1,17 @@
 import Foundation
 
-/// RF-55: which of the talker's layer tensors a mixed-precision load takes
-/// from the 8-bit sibling. The code predictor is never among them (it has its
-/// own key): it runs fifteen times per frame, so its bytes cost fifteen times
-/// their size in memory traffic, while a talker tensor is read once. Every
-/// recipe keeps q, k and v at one precision, and gate and up at one, so the
-/// fused projections (RF-46) stay fused: a recipe that split them would pay
-/// for three products where one runs today.
+/// RF-55 / RF-70: which of the talker's modules a mixed-precision load takes
+/// from the 8-bit sibling. Every recipe keeps q, k and v at one precision, and
+/// gate and up at one, so the fused projections (RF-46) stay fused: a recipe
+/// that split them would pay for three products where one runs today.
+///
+/// The layer-only recipes (`down`, `attn`, `attn-down`, `mlp`, `talker`) never
+/// touch the code predictor. The Pack C recipes (`attn-io`, `attn-io-edge`)
+/// keep the code predictor's transformer layers and embeddings at 4 bits while
+/// promoting only its lightweight projection/head I/O boundaries
+/// (`code_predictor.small_to_mtp_projection`, `code_predictor.lm_head.*`) along
+/// with the talker's I/O projections (`text_projection.linear_fc1/2`,
+/// `codec_head`) and (for `attn-io-edge`) edge layers `{0, 1, 26, 27}` MLPs.
 enum Qwen3MixedPrecisionRecipe: String, Sendable, Equatable, CaseIterable {
     /// The MLP down projection.
     case down
@@ -18,18 +23,66 @@ enum Qwen3MixedPrecisionRecipe: String, Sendable, Equatable, CaseIterable {
     case mlp
     /// Every tensor of the talker's layers.
     case talker
+    /// Pack C Bundle A (`+24.12 MB` over `attn`): the four attention projections
+    /// across all layers plus talker/code-predictor I/O projections
+    /// (`text_projection.linear_fc1/2`, `codec_head`,
+    /// `code_predictor.small_to_mtp_projection`, `code_predictor.lm_head.*`).
+    case attnIO = "attn-io"
+    /// Pack C Bundle B (`+99.61 MB` over `attn`): `attn-io` plus the three MLP
+    /// projections of talker edge layers `0`, `1`, `26`, and `27`.
+    case attnIOEdge = "attn-io-edge"
 
-    /// Whether the talker module at `path` (`model.layers.3.self_attn.v_proj`)
-    /// comes from the sibling.
+    private static let attentionLeaves: Set<String> = ["q_proj", "k_proj", "v_proj", "o_proj"]
+    private static let mlpLeaves: Set<String> = ["gate_proj", "up_proj", "down_proj"]
+    private static let edgeLayerIndices: Set<Int> = [0, 1, 26, 27]
+    private static let ioProjectionModules: Set<String> = [
+        "text_projection.linear_fc1",
+        "text_projection.linear_fc2",
+        "codec_head",
+        "code_predictor.small_to_mtp_projection",
+    ]
+    private static let codePredictorLMHeadPrefix = "code_predictor.lm_head."
+
+    private static func isIOProjection(_ path: String) -> Bool {
+        if ioProjectionModules.contains(path) {
+            return true
+        }
+        guard path.hasPrefix(codePredictorLMHeadPrefix) else { return false }
+        let suffix = path.dropFirst(codePredictorLMHeadPrefix.count)
+        return !suffix.isEmpty && suffix.allSatisfy { $0.isASCII && $0.isNumber }
+    }
+
+    private static func isEdgeLayerMLP(_ path: String) -> Bool {
+        let parts = path.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 5,
+              parts[0] == "model",
+              parts[1] == "layers",
+              let layerIndex = Int(parts[2]),
+              edgeLayerIndices.contains(layerIndex),
+              parts[3] == "mlp"
+        else { return false }
+        return mlpLeaves.contains(String(parts[4]))
+    }
+
+    /// Whether the talker module at `path` (e.g. `model.layers.3.self_attn.v_proj`,
+    /// `codec_head`, `code_predictor.lm_head.0`) comes from the sibling.
     func selects(_ path: String) -> Bool {
-        guard path.hasPrefix("model.layers.") else { return false }
-        let leaf = path.split(separator: ".").last.map(String.init) ?? ""
         switch self {
-        case .down: return leaf == "down_proj"
-        case .attn: return ["q_proj", "k_proj", "v_proj", "o_proj"].contains(leaf)
-        case .attnDown: return ["q_proj", "k_proj", "v_proj", "o_proj", "down_proj"].contains(leaf)
-        case .mlp: return ["gate_proj", "up_proj", "down_proj"].contains(leaf)
-        case .talker: return true
+        case .attnIO:
+            return Self.isIOProjection(path) || Self.attn.selects(path)
+        case .attnIOEdge:
+            return Self.attnIO.selects(path) || Self.isEdgeLayerMLP(path)
+        case .down, .attn, .attnDown, .mlp, .talker:
+            guard path.hasPrefix("model.layers.") else { return false }
+            let leaf = path.split(separator: ".").last.map(String.init) ?? ""
+            switch self {
+            case .down: return leaf == "down_proj"
+            case .attn: return Self.attentionLeaves.contains(leaf)
+            case .attnDown: return Self.attentionLeaves.contains(leaf) || leaf == "down_proj"
+            case .mlp: return Self.mlpLeaves.contains(leaf)
+            case .talker: return true
+            case .attnIO, .attnIOEdge: return false
+            }
         }
     }
 }

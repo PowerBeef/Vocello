@@ -3689,6 +3689,42 @@ class BenchmarkHistoryTests(unittest.TestCase):
             ):
                 history.load_schema_contract(version)
 
+    def test_hybrid_quantization_required_on_new_records_and_legacy_4bit_allowed_when_superseded(self) -> None:
+        contract = json.loads(
+            (history.REPO_ROOT / "Sources/Resources/qwenvoice_contract.json").read_text(encoding="utf-8")
+        )
+        custom = next(model for model in contract["models"] if model["id"] == "pro_custom")
+        speed = next(variant for variant in custom["variants"] if variant["id"] == "speed")
+        self.assertIn("-hybrid-", speed["folder"])
+
+        def make_record(quantization: str) -> dict:
+            return {
+                "run": {"platform": "macos"},
+                "takes": [
+                    {
+                        "mode": "custom",
+                        "modelID": "pro_custom_speed",
+                        "variant": "speed",
+                        "modelRepository": speed["huggingFaceRepo"],
+                        "modelRevision": speed["huggingFaceRevision"],
+                        "modelArtifactVersion": speed["artifactVersion"],
+                        "modelQuantization": quantization,
+                        "modelIntegrityDigest": "a" * 64,
+                        "runtimeProfileSignature": "qwen3_tts|custom_voice|hybrid|24000",
+                        "fixtureDigest": "not-applicable",
+                    }
+                ],
+            }
+
+        models_hybrid = history.default_models(make_record("hybrid"), allow_superseded=False)
+        self.assertEqual(models_hybrid[0]["quantization"], "hybrid")
+
+        with self.assertRaisesRegex(history.HistoryError, "typed quantization"):
+            history.default_models(make_record("4-bit"), allow_superseded=False)
+
+        models_legacy = history.default_models(make_record("4-bit"), allow_superseded=True)
+        self.assertEqual(models_legacy[0]["quantization"], "4-bit")
+
 
 if __name__ == "__main__":
     unittest.main()

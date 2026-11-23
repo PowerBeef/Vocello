@@ -1817,13 +1817,14 @@ def default_models(record: dict[str, Any], *, allow_superseded: bool = False) ->
                 break
         folder = str(selected.get("folder", definition.get("folder", "")))
         quantization_match = re.search(r"-(\d+)bit$", folder, re.IGNORECASE)
-        # As the runtime reads it (Qwen3TTSRuntimeProfile.quantizationTier): the folder's -Nbit
-        # suffix, else config.json's top-level bits. A hybrid (RF-59, `-hybrid-<recipe>`) keeps the
-        # 4-bit model's config, with its 8-bit modules listed per layer, so it reads 4-bit.
+        # As the runtime reads it (Qwen3TTSRuntimeProfile.quantizationTier): per-layer overrides
+        # or a `-hybrid-<recipe>` folder report `"hybrid"`, else the folder's `-Nbit` suffix or
+        # config.json's top-level bits. Pre-RF-69 published records for the same hybrid artifact
+        # pin reported `"4-bit"` before `.hybrid` existed; `allow_superseded` keeps them valid.
         if quantization_match:
             expected_quantization = f"{quantization_match.group(1)}-bit"
         elif re.search(r"-hybrid-[a-z0-9-]+$", folder, re.IGNORECASE):
-            expected_quantization = "4-bit"
+            expected_quantization = "hybrid"
         else:
             expected_quantization = "unquantized"
         expected_repository = str(selected.get("huggingFaceRepo", definition.get("huggingFaceRepo", "")))
@@ -1837,6 +1838,17 @@ def default_models(record: dict[str, Any], *, allow_superseded: bool = False) ->
         }
         for field, expected_value in expected.items():
             if observed[field] != expected_value:
+                # Historical records published on the same hybrid artifact before RF-69
+                # introduced the `.hybrid` telemetry tier recorded `"4-bit"`. Keep those
+                # immutable records valid under `allow_superseded`, while requiring `"hybrid"`
+                # for every new publication (`allow_superseded=False`).
+                if (
+                    allow_superseded
+                    and field == "quantization"
+                    and expected_value == "hybrid"
+                    and observed[field] == "4-bit"
+                ):
+                    continue
                 # Published records are immutable point-in-time evidence. After an
                 # artifact re-pin, existing records keep the identity they measured;
                 # they stay valid only when their pin is strictly older than the

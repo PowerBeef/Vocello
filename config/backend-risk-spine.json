@@ -317,9 +317,13 @@
       "severity": "S2",
       "title": "Mac unloads keep the process-global Qwen3 caches, also at the critical band (E2-01)",
       "source": "Sources/QwenVoiceCore/NativeEngineRuntime.swift",
-      "tests": [],
-      "status": "uncovered",
-      "reason": "Open (ER-06)."
+      "tests": [
+        "VocelloCoreTests/NativeEngineRuntimeSeamTests/testAllocationFailureDuringLoadClearsMacRuntimeCachesForMemoryRelief",
+        "VocelloCoreTests/NativeEngineRuntimeSeamTests/testAllocationFailureDuringPrewarmClearsMacRuntimeCachesForMemoryRelief",
+        "VocelloCoreTests/TTSEngineStoreTests/testAllocationRetryUnloadClearsMacRuntimeCachesForMemoryRelief"
+      ],
+      "status": "implemented",
+      "remaining": []
     },
     {
       "id": "B-06",
@@ -388,9 +392,12 @@
       "severity": "S2",
       "title": "Stereo and multichannel references are mixed to mono implicitly and untested",
       "source": "Sources/QwenVoiceCore/AudioPreparation.swift",
-      "tests": [],
-      "status": "uncovered",
-      "reason": "Open: lands after G-13's audio-preparation version (ER-04)."
+      "tests": [
+        "VocelloCoreTests/CloneConditioningContractTests/testResamplingKeepsALevelAndMixesChannelsDown",
+        "VocelloCoreTests/CloneConditioningContractTests/testAStereoClipAtTheModelsRateIsPreparedAlikeOnBothPaths"
+      ],
+      "status": "implemented",
+      "remaining": []
     },
     {
       "id": "G-07",
@@ -398,9 +405,13 @@
       "severity": "S2",
       "title": "References end abruptly with no trim or fade before 0.5 s of padding (the onset-echo trigger)",
       "source": "Sources/SharedSupport/ViewModels/ReferenceClipRecorder.swift",
-      "tests": [],
-      "status": "uncovered",
-      "reason": "Open: lands after G-13's audio-preparation version (ER-04)."
+      "tests": [
+        "Qwen3RuntimeTests/Qwen3SpeakerMelFrontendTests/testEdgeTrimKeepsAMarginAroundTheSoundAndFadesBothEnds",
+        "Qwen3RuntimeTests/RuntimeFailureCaptureTests/testEdgesTrimmedAndFadedAndReferenceKeyProbeAllocationFailuresInsteadOfTrapping",
+        "VocelloCoreTests/CloneConditioningContractTests/testPromptIdentityUsesHistoricalAutoArtifactWithoutWeakeningProvenance"
+      ],
+      "status": "implemented",
+      "remaining": []
     },
     {
       "id": "F-01",
@@ -492,9 +503,13 @@
       "severity": "S2",
       "title": "Staged files the current plan does not list are hard-linked into the installed model after a catalog layout change",
       "source": "Sources/QwenVoiceCore/SharedModelComponentStore.swift",
-      "tests": [],
-      "status": "uncovered",
-      "reason": "Open, partly mitigated: a launch that finds a request's artifact gone now discards its staging (64ff7f86, applied in the untested coordinator), but staging is still keyed by model and unlisted files are still linked; lands before any catalog layout change (ER-10)."
+      "tests": [
+        "VocelloCoreTests/SharedModelComponentStoreTests/testInstallStagedModelFiltersStrayFilesDirectoriesAndSymlinksWhenAllowedPathsProvided",
+        "VocelloCoreTests/ModelDownloadLifecycleTests/testInstallStagedRepositoryFiltersOutStrayStagedFiles",
+        "VocelloCoreTests/ModelUpdateDecisionsTests/testVersionedStagingPathsSanitizeAndPruneStaleVersions"
+      ],
+      "status": "implemented",
+      "remaining": []
     },
     {
       "id": "C-01",
@@ -538,9 +553,14 @@
       "severity": "S2",
       "title": "A symbol-only paragraph becomes its own segment, and the project fails on every Resume (the refuter rated it S3)",
       "source": "Sources/QwenVoiceCore/LongFormPlanning.swift",
-      "tests": [],
-      "status": "uncovered",
-      "reason": "Open: planner v3 merges unspeakable segments (ER-03)."
+      "tests": [
+        "VocelloCoreTests/LongFormPlanningTests/testUnspeakableSymbolOnlyParagraphsAreSkippedWithoutBecomingStandaloneSegments",
+        "VocelloCoreTests/LongFormPlanningTests/testLeadingTrailingAndConsecutiveUnspeakableParagraphsPreserveFinalBoundary",
+        "VocelloCoreTests/LongFormPlanningTests/testTrailingUnspeakableDividerDoesNotDistortOrphanTailRebalancing",
+        "VocelloCoreTests/LongFormPlanningTests/testAllUnspeakableScriptThrowsEmptyOriginalText"
+      ],
+      "status": "implemented",
+      "remaining": []
     },
     {
       "id": "C-05",

@@ -69,6 +69,7 @@ private extension Qwen3TTSFamilyType {
 enum Qwen3TTSQuantizationTier: String, Codable, Hashable, Sendable {
     case fourBit = "4bit"
     case eightBit = "8bit"
+    case hybrid = "hybrid"
     case unknown
 }
 
@@ -442,11 +443,46 @@ struct Qwen3TTSRuntimeProfile: Hashable, Codable, Sendable {
         return map.keys.map(normalizedCacheText).filter { !$0.isEmpty }.sorted()
     }
 
-    private static func quantizationTier(
+    private static func hasPerLayerQuantizationOverrides(_ config: [String: Any]) -> Bool {
+        // Uniform 4-bit checkpoints keep 8-bit `model.text_embedding` (Stage 2.2)
+        // without being hybrid models; align with `Qwen3TTSLoading.isHybridCheckpoint`.
+        let nonHybridKeys: Set<String> = [
+            "bits", "group_size", "mode", "quant_method", "linear_class", "quantization_mode",
+            "model.text_embedding",
+        ]
+        for containerKey in ["quantization", "quantization_config"] {
+            guard let quant = nested(config, containerKey) else { continue }
+            let defaultBits = int(quant["bits"])
+            for (key, value) in quant where !nonHybridKeys.contains(key) {
+                if let boolValue = value as? Bool, !boolValue {
+                    return true
+                }
+                if let layerMap = value as? [String: Any] {
+                    if let layerBits = int(layerMap["bits"]),
+                       let defaultBits,
+                       layerBits != defaultBits {
+                        return true
+                    }
+                    if defaultBits == nil {
+                        return true
+                    }
+                }
+            }
+        }
+        return false
+    }
+
+    static func quantizationTier(
         descriptor: ModelDescriptor,
         config: [String: Any]
     ) -> Qwen3TTSQuantizationTier {
+        if hasPerLayerQuantizationOverrides(config) {
+            return .hybrid
+        }
         let identity = "\(descriptor.folder)|\(descriptor.huggingFaceRepo)".lowercased()
+        if identity.contains("-hybrid-") {
+            return .hybrid
+        }
         if identity.contains("4bit") {
             return .fourBit
         }

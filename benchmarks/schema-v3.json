@@ -962,6 +962,7 @@
           "enum": [
             "4-bit",
             "8-bit",
+            "hybrid",
             "unquantized"
           ]
         },

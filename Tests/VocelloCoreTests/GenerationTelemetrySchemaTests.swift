@@ -1411,7 +1411,74 @@ final class GenerationTelemetrySchemaTests: XCTestCase {
     func testModelIdentityQuantizationUsesTypedRuntimeTier() {
         XCTAssertEqual(MLXModelLoadCoordinator.telemetryQuantization(for: .fourBit), "4-bit")
         XCTAssertEqual(MLXModelLoadCoordinator.telemetryQuantization(for: .eightBit), "8-bit")
+        XCTAssertEqual(MLXModelLoadCoordinator.telemetryQuantization(for: .hybrid), "hybrid")
         XCTAssertEqual(MLXModelLoadCoordinator.telemetryQuantization(for: .unknown), "unquantized")
+
+        func descriptor(folder: String, repo: String) -> ModelDescriptor {
+            ModelDescriptor(
+                id: "test",
+                name: "Test",
+                tier: "pro",
+                folder: folder,
+                mode: .custom,
+                huggingFaceRepo: repo,
+                artifactVersion: "2026-11-23",
+                iosDownloadEligible: true,
+                estimatedDownloadBytes: nil,
+                outputSubfolder: "custom",
+                requiredRelativePaths: []
+            )
+        }
+
+        let uniform4BitConfig: [String: Any] = [
+            "quantization": ["bits": 4, "group_size": 64, "mode": "affine"]
+        ]
+        let uniform4BitWith8BitTextEmbedding: [String: Any] = [
+            "quantization": [
+                "bits": 4,
+                "group_size": 64,
+                "mode": "affine",
+                "model.text_embedding": ["bits": 8, "group_size": 64, "mode": "affine"],
+            ]
+        ]
+        let hybridConfig: [String: Any] = [
+            "quantization": [
+                "bits": 4,
+                "group_size": 64,
+                "mode": "affine",
+                "model.layers.0.self_attn.q_proj": ["bits": 8, "group_size": 64, "mode": "affine"],
+            ]
+        ]
+        XCTAssertEqual(
+            Qwen3TTSRuntimeProfile.quantizationTier(
+                descriptor: descriptor(folder: "Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit", repo: "org/repo-4bit"),
+                config: uniform4BitConfig
+            ),
+            .fourBit
+        )
+        XCTAssertEqual(
+            Qwen3TTSRuntimeProfile.quantizationTier(
+                descriptor: descriptor(folder: "Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit", repo: "org/repo-4bit"),
+                config: uniform4BitWith8BitTextEmbedding
+            ),
+            .fourBit,
+            "uniform 4-bit checkpoints with 8-bit model.text_embedding must stay .fourBit (matching Qwen3TTSLoading.isHybridCheckpoint)"
+        )
+        XCTAssertEqual(
+            Qwen3TTSRuntimeProfile.quantizationTier(
+                descriptor: descriptor(folder: "Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn", repo: "org/repo-hybrid-attn"),
+                config: hybridConfig
+            ),
+            .hybrid
+        )
+        XCTAssertEqual(
+            Qwen3TTSRuntimeProfile.quantizationTier(
+                descriptor: descriptor(folder: "CustomLocalFolder", repo: "local/custom"),
+                config: hybridConfig
+            ),
+            .hybrid,
+            "per-layer overrides must classify as .hybrid even without a -hybrid- folder suffix"
+        )
     }
 
     func testProcessResourceDeltaClampsCounterResets() {

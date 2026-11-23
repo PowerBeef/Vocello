@@ -612,6 +612,7 @@ actor MLXModelLoadCoordinator: MLXModelCoordinating {
         switch tier {
         case .fourBit: return "4-bit"
         case .eightBit: return "8-bit"
+        case .hybrid: return "hybrid"
         case .unknown: return "unquantized"
         }
     }

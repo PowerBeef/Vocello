@@ -1153,7 +1153,7 @@ def runtime_identity(row: dict[str, Any], *, mode: str, model_id: str) -> dict[s
         for field, value in required.items():
             if not isinstance(value, str) or not value:
                 raise PublicationError(f"schema-v7 engine telemetry lacks {field}")
-        if required["modelQuantization"] not in {"4-bit", "8-bit", "unquantized"}:
+        if required["modelQuantization"] not in {"4-bit", "8-bit", "hybrid", "unquantized"}:
             raise PublicationError("schema-v7 engine telemetry has invalid modelQuantization")
         for field in ("modelRevision", "modelIntegrityDigest"):
             value = required[field]

@@ -303,7 +303,7 @@ def _normalized_model_runtime_identity(row: dict, *, generation_id: str) -> dict
         normalized[field] = value
     if normalized["resolvedModelID"] != MODEL_ID:
         raise RuntimeError(f"generation {generation_id} resolved the wrong model")
-    if normalized["quantization"] not in {"4-bit", "8-bit", "unquantized"}:
+    if normalized["quantization"] not in {"4-bit", "8-bit", "hybrid", "unquantized"}:
         raise RuntimeError(f"generation {generation_id} has invalid model quantization")
     _require_lower_hex(
         normalized["huggingFaceRevision"], length=40, field="huggingFaceRevision"

@@ -58,11 +58,13 @@ def speed_identity(model_id: str) -> dict[str, str]:
     so the fixtures follow an artifact swap (RF-59) instead of pinning one."""
     model = next(item for item in MODEL_CONTRACT["models"] if item["id"] == model_id)
     speed = next(variant for variant in model["variants"] if variant["kind"] == "speed")
+    folder = str(speed.get("folder", ""))
+    quantization = "hybrid" if "-hybrid-" in folder.lower() else "4-bit"
     return {
         "modelRepository": speed["huggingFaceRepo"],
         "huggingFaceRevision": speed["huggingFaceRevision"],
         "artifactVersion": speed["artifactVersion"],
-        "quantization": "4-bit",
+        "quantization": quantization,
     }
 
 

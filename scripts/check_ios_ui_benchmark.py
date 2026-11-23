@@ -1227,7 +1227,7 @@ def main() -> int:
                 failures.append(f"{row.get('generationID', '?')}: missing pinned model revision")
             if not isinstance(identity.get("artifactVersion"), str) or not identity["artifactVersion"]:
                 failures.append(f"{row.get('generationID', '?')}: missing model artifact version")
-            if identity.get("quantization") not in {"4-bit", "8-bit", "unquantized"}:
+            if identity.get("quantization") not in {"4-bit", "8-bit", "hybrid", "unquantized"}:
                 failures.append(f"{row.get('generationID', '?')}: invalid model quantization")
             if not is_digest(identity.get("integrityManifestDigest")):
                 failures.append(f"{row.get('generationID', '?')}: missing model integrity-manifest digest")

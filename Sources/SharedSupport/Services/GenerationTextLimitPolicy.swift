@@ -38,10 +38,11 @@ struct GenerationTextLimitPolicy {
         /// punctuation, symbols or emoji keeps Generate disabled like an empty
         /// one, because the model ends such a take before any audio.
         let hasSpeakableText: Bool
-        /// A script that runs as a long-form project and that Auto sends as
-        /// Korean: both apps warn before it starts, because Korean long-form
-        /// projects stop at a failed segment far more often than any other
-        /// language (RF-60). Measured only for a long-form script.
+        /// A script that runs as a long-form project and is sent as Korean
+        /// (explicitly selected as `.korean` or resolved to Korean under Auto):
+        /// both apps warn before it starts, because Korean long-form projects
+        /// stop at a failed segment far more often than any other language
+        /// (RF-60, RF-69). Measured only for a long-form script.
         let warnsKoreanLongForm: Bool
 
         /// Characters left for a single take, in the script's own characters:
@@ -75,7 +76,11 @@ struct GenerationTextLimitPolicy {
         }
     }
 
-    static func state(for text: String, mode: GenerationMode) -> State {
+    static func state(
+        for text: String,
+        mode: GenerationMode,
+        language: Qwen3SupportedLanguage? = nil
+    ) -> State {
         let measure = SingleTakeScriptBudget.measure(text)
         return State(
             count: measure.characters,
@@ -84,7 +89,7 @@ struct GenerationTextLimitPolicy {
             countsEastAsianCharacters: measure.eastAsianCharacters * 2 > measure.characters,
             trimmedIsEmpty: text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             hasSpeakableText: measure.hasSpeakableContent,
-            warnsKoreanLongForm: measure.exceedsSingleTake && GenerationSemantics.resolvesToKorean(text)
+            warnsKoreanLongForm: measure.exceedsSingleTake && warnsKoreanLongForm(text, language: language)
         )
     }
 
@@ -95,11 +100,20 @@ struct GenerationTextLimitPolicy {
         SingleTakeScriptBudget.exceedsSingleTake(text)
     }
 
-    /// Whether a long-form project of `text` gets the Korean caution (RF-60):
-    /// Auto sends it as Korean. The caller decides that the script runs as a
-    /// long-form project (the Mac batch sheet runs any length as one).
-    static func warnsKoreanLongForm(_ text: String) -> Bool {
-        GenerationSemantics.resolvesToKorean(text)
+    /// Whether a long-form project of `text` gets the Korean caution (RF-60,
+    /// RF-69): an explicit `.korean` selection always warns (even for mixed or
+    /// non-Hangul scripts), another explicit language suppresses it, and
+    /// `nil`/`.auto` follows `GenerationSemantics.resolvesToKorean(text)`. The
+    /// caller decides that the script runs as a long-form project (the Mac
+    /// batch sheet runs any length as one).
+    static func warnsKoreanLongForm(
+        _ text: String,
+        language: Qwen3SupportedLanguage? = nil
+    ) -> Bool {
+        if let language, language != .auto {
+            return language == .korean
+        }
+        return GenerationSemantics.resolvesToKorean(text)
     }
 
     /// Whether a script has anything to speak (U29).

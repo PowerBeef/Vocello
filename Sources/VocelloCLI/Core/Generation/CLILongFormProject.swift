@@ -81,12 +81,22 @@ public enum CLILongFormProject {
         return plan
     }
 
-    /// RF-60: Korean long-form projects stop at a failed segment far more often
-    /// than any other language. The apps warn before one starts; vocello adds
-    /// one `long_form_korean` warning for the projects Auto sends as Korean,
-    /// naming the 1-based lines of a batch (`namesLines`).
-    public static func warnIfKorean(_ scripts: [String], namesLines: Bool) {
-        let lines = scripts.indices.filter { GenerationSemantics.resolvesToKorean(scripts[$0]) }
+    /// RF-60 / RF-69: Korean long-form projects stop at a failed segment far
+    /// more often than any other language. The apps warn before one starts;
+    /// vocello adds one `long_form_korean` warning for projects sent as Korean
+    /// (either explicitly via `--language korean` or when Auto resolves a script
+    /// as Korean), naming the 1-based lines of a batch (`namesLines`).
+    public static func warnIfKorean(
+        _ scripts: [String],
+        namesLines: Bool,
+        language: Qwen3SupportedLanguage? = nil
+    ) {
+        let lines: [Int]
+        if let language, language != .auto {
+            lines = language == .korean ? Array(scripts.indices) : []
+        } else {
+            lines = scripts.indices.filter { GenerationSemantics.resolvesToKorean(scripts[$0]) }
+        }
         guard !lines.isEmpty else { return }
         CLIPresenter.warn(
             "long_form_korean",

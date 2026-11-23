@@ -317,17 +317,20 @@ public final class GenerationFailureDiagnosticLogger: Sendable {
         return ErrorMetadata(code: "generation.unknown", classification: .unknown)
     }
 
-    /// L14-04: a full disk or a read-only volume reaches the generation path as
-    /// a POSIX error (the publishing rename), an Audio Toolbox status that
-    /// carries the errno (`AVAudioFile.write`), or either one under
-    /// `NSUnderlyingErrorKey`; only `NSCocoaErrorDomain` was mapped, so the
-    /// storage copy never reached a take. Only write-side errnos are mapped: a
-    /// permission errno cannot tell a read from a write.
+    /// L14-04 / RF-69: a full disk or a read-only volume reaches the generation
+    /// path as a POSIX error (the publishing rename), an Audio Toolbox status
+    /// that carries the errno or Carbon `dskFulErr` (-34) (`AVAudioFile.write`),
+    /// or either one under `NSUnderlyingErrorKey`; only `NSCocoaErrorDomain` was
+    /// mapped before, so the storage copy never reached a take. Only write-side
+    /// errnos are mapped: a permission errno cannot tell a read from a write.
     private static func storageWriteMetadata(_ error: NSError, depth: Int = 0) -> ErrorMetadata? {
-        let carriesErrno = error.domain == NSPOSIXErrorDomain
-            || error.domain == NSOSStatusErrorDomain
+        let isOSStatusDomain = error.domain == NSOSStatusErrorDomain
             || error.domain == "com.apple.coreaudio.avfaudio"
-        if carriesErrno {
+        if isOSStatusDomain, error.code == -34 {
+            // Carbon MacErrors.h `dskFulErr` (-34), surfaced by CoreAudio / File Manager bridges.
+            return ErrorMetadata(code: "storage.full", classification: .storage)
+        }
+        if error.domain == NSPOSIXErrorDomain || isOSStatusDomain {
             switch Int32(truncatingIfNeeded: error.code) {
             case ENOSPC, EDQUOT:
                 return ErrorMetadata(code: "storage.full", classification: .storage)

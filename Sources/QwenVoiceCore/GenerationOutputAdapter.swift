@@ -704,10 +704,12 @@ private enum AtomicFilePublisher {
             .appendingPathComponent(temporaryName)
     }
 
-    /// `synchronizingDirectory` also commits the directory entry the rename
-    /// wrote, so a published take survives a power loss. The final WAV asks
-    /// for it; a streaming preview chunk, written many times a take and
-    /// replayable from the final WAV, does not.
+    /// `synchronizingDirectory` also `fsync`s the parent directory so the
+    /// directory entry the rename wrote is flushed to OS storage buffers for
+    /// app-crash and Jetsam durability (it does not invoke `F_FULLFSYNC` for
+    /// hardware power-loss guarantees). The final WAV asks for it; a streaming
+    /// preview chunk, written many times a take and replayable from the final
+    /// WAV, does not.
     static func publishAtomically(
         temporaryURL: URL,
         finalURL: URL,

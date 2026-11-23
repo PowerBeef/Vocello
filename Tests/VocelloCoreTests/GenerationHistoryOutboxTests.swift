@@ -1593,6 +1593,71 @@ final class GenerationHistoryOutboxTests: XCTestCase {
         XCTAssertEqual(rows, 1)
     }
 
+    /// RF-69: outbox entries and markers publish through hidden synced staging
+    /// files + POSIX `rename(2)`, leaving zero stray staging files on success
+    /// or failure and never unlinking a prior final file before its replacement
+    /// succeeds.
+    func testDurableAtomicWritePreservesPriorStateAndCleansUpStagingOnFailure() throws {
+        let fixture = try makeFixture()
+        let first = GenerationHistoryClearTransaction(
+            deleteAudio: true,
+            audioPaths: [fixture.audioURL.path],
+            pendingEntryIDs: [],
+            maxRowID: 1
+        )
+        let second = first.markingRowsDeleted()
+
+        try fixture.store.writeClearTransaction(first)
+        XCTAssertEqual(try fixture.store.loadClearTransaction(), first)
+
+        // Replace an existing marker atomically and verify zero hidden `.tmp`
+        // or `.writing` files remain in the outbox folder.
+        try fixture.store.writeClearTransaction(second)
+        XCTAssertEqual(try fixture.store.loadClearTransaction(), second)
+        let afterReplace = try FileManager.default.contentsOfDirectory(
+            atPath: fixture.store.rootURL.path
+        )
+        XCTAssertEqual(afterReplace, ["clear-transaction.json"])
+
+        // A failed rewrite (read-only outbox folder) leaves the prior marker intact
+        // and leaves zero temporary files behind.
+        try lock(fixture.store.rootURL)
+        XCTAssertThrowsError(try fixture.store.writeClearTransaction(first)) { error in
+            XCTAssertEqual(error as? GenerationHistoryOutboxError, .clearUnavailable)
+        }
+        try unlock(fixture.store.rootURL)
+        XCTAssertEqual(try fixture.store.loadClearTransaction(), second)
+        XCTAssertEqual(
+            try FileManager.default.contentsOfDirectory(atPath: fixture.store.rootURL.path),
+            ["clear-transaction.json"]
+        )
+
+        // When POSIX `rename(2)` fails after staging has been written and fsynced
+        // (target replaced by a directory -> EISDIR), the hidden `.tmp` staging
+        // file is removed in cleanup.
+        let renameFailureFixture = try makeFixture()
+        let blockingDirectory = renameFailureFixture.store.rootURL
+            .appendingPathComponent("clear-transaction.json", isDirectory: true)
+        try FileManager.default.createDirectory(at: blockingDirectory, withIntermediateDirectories: true)
+        XCTAssertThrowsError(try renameFailureFixture.store.writeClearTransaction(first)) { error in
+            XCTAssertEqual(error as? GenerationHistoryOutboxError, .clearUnavailable)
+        }
+        XCTAssertEqual(
+            try FileManager.default.contentsOfDirectory(atPath: renameFailureFixture.store.rootURL.path),
+            ["clear-transaction.json"],
+            "staging temp file must be cleaned up when rename fails"
+        )
+
+        // Enqueue and pending audio removals also leave zero hidden staging files.
+        let entry = try fixture.store.enqueue(fixture.generation, operation: .append)
+        try fixture.store.writePendingAudioRemovals([fixture.audioURL.path])
+        let files = Set(try FileManager.default.contentsOfDirectory(atPath: fixture.store.rootURL.path))
+        XCTAssertEqual(
+            files,
+            ["clear-transaction.json", "audio-removals.json", "\(entry.id.uuidString.lowercased()).json"]
+        )
+    }
+
     /// A clear marker as written before the bound existed.
     private func writeUnboundedMarker(
         in fixture: (store: GenerationHistoryOutboxStore, generation: Generation, audioURL: URL),

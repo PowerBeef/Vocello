@@ -53,26 +53,29 @@ enum AudioQualityGate {
         }
     }
 
-    private static func report(from qc: AudioQCReport) -> Report {
-        let failed = qc.verdict == .fail
-        let warned = qc.verdict == .warn
+    /// Converts an already-computed `AudioQCReport` (such as the pre-watermark
+    /// Fast QC report attached to `GenerationResult.audioQC`) into the app-level
+    /// gate report without re-reading or re-scoring the published WAV on disk.
+    static func report(from audioQC: AudioQCReport) -> Report {
+        let failed = audioQC.verdict == .fail
+        let warned = audioQC.verdict == .warn
         let metrics: [String: Double] = [
-            "algorithm_version": Double(qc.algorithmVersion),
-            "duration_seconds": qc.durationSeconds,
-            "peak": qc.peak,
-            "clipped_samples": Double(qc.clippedSamples),
-            "hot_samples": Double(qc.hotSamples),
-            "non_finite_samples": Double(qc.nonFiniteSamples),
-            "click_events": Double(qc.clickEvents),
-            "longest_silence_ms": Double(qc.longestSilenceMS),
-            "rms_dbfs": qc.rmsDBFS ?? -160,
-            "dc_offset": qc.dcOffset ?? 0,
+            "algorithm_version": Double(audioQC.algorithmVersion),
+            "duration_seconds": audioQC.durationSeconds,
+            "peak": audioQC.peak,
+            "clipped_samples": Double(audioQC.clippedSamples),
+            "hot_samples": Double(audioQC.hotSamples),
+            "non_finite_samples": Double(audioQC.nonFiniteSamples),
+            "click_events": Double(audioQC.clickEvents),
+            "longest_silence_ms": Double(audioQC.longestSilenceMS),
+            "rms_dbfs": audioQC.rmsDBFS ?? -160,
+            "dc_offset": audioQC.dcOffset ?? 0,
         ]
         let check = Check(
-            name: "persisted_wav_qc_v\(qc.algorithmVersion)",
+            name: "persisted_wav_qc_v\(audioQC.algorithmVersion)",
             passed: !failed && !warned,
             severity: failed ? .error : .warning,
-            message: qc.flags.isEmpty ? nil : qc.flags.joined(separator: ", "),
+            message: audioQC.flags.isEmpty ? nil : audioQC.flags.joined(separator: ", "),
             metrics: metrics
         )
         return Report(

@@ -91,6 +91,33 @@ final class CLILongFormTests: XCTestCase {
         let lines = Array(repeating: sentence, count: 3).joined(separator: "\n")
         let lineBatch = try await koreanWarnings(["--text", lines, "--line-by-line"])
         XCTAssertEqual([project, take, english, lineBatch], [1, 0, 0, 0])
+
+        // RF-69: explicit `--language korean` warns even for non-Hangul long-form
+        // projects, while another explicit language suppresses the Auto Hangul
+        // warning; short explicit-Korean takes still do not warn.
+        let explicitKoreanEnglishText = try await koreanWarnings(["--text", Self.story, "--seed", "7", "--language", "korean"])
+        let explicitKoreanForced = try await koreanWarnings(["--text", "Hello there.", "--long-form", "always", "--language", "korean"])
+        let explicitKoreanSingleTake = try await koreanWarnings(["--text", "Hello there.", "--language", "korean"])
+        let explicitEnglishKoreanText = try await koreanWarnings(["--text", korean, "--seed", "7", "--language", "english"])
+        let explicitAutoKoreanText = try await koreanWarnings(["--text", korean, "--seed", "7", "--language", "auto"])
+        XCTAssertEqual(
+            [
+                explicitKoreanEnglishText,
+                explicitKoreanForced,
+                explicitKoreanSingleTake,
+                explicitEnglishKoreanText,
+                explicitAutoKoreanText,
+            ],
+            [1, 1, 0, 0, 1]
+        )
+
+        let batchCapture = CLIPresenterCapture()
+        CLIPresenter.$capture.withValue(batchCapture) {
+            CLILongFormProject.warnIfKorean(["First line.", "Second line."], namesLines: true, language: .korean)
+            CLIPresenter.succeed(["done": true])
+        }
+        let batchWarning = try XCTUnwrap(batchCapture.report?.warnings.first(where: { $0.code == "long_form_korean" }))
+        XCTAssertEqual(batchWarning.detail?["lines"], .array([.integer(1), .integer(2)]))
     }
 
     @MainActor

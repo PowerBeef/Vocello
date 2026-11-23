@@ -147,6 +147,23 @@ final class CLIContractTests: XCTestCase {
         XCTAssertEqual(CLIFailure.classify(NSError(domain: NSPOSIXErrorDomain, code: Int(EDQUOT))).code, .storageFull)
         XCTAssertEqual(CLIFailure.classify(Errno.noSpace).code, .storageFull)
         XCTAssertEqual(CLIFailure.classify(Errno.noSuchFileOrDirectory).code, .internalError)
+        // RF-69: Carbon `dskFulErr` (-34) under OSStatus / AVFAudio is storage_full,
+        // both directly and wrapped under another error (e.g. URLError).
+        let carbonDiskFull = NSError(domain: NSOSStatusErrorDomain, code: -34)
+        let avfCarbonDiskFull = NSError(domain: "com.apple.coreaudio.avfaudio", code: -34)
+        XCTAssertTrue(CLIFailure.isStorageFull(carbonDiskFull))
+        XCTAssertTrue(CLIFailure.isStorageFull(avfCarbonDiskFull))
+        XCTAssertEqual(CLIFailure.classify(carbonDiskFull).code, .storageFull)
+        XCTAssertEqual(CLIFailure.classify(carbonDiskFull).exitCode, 74)
+        XCTAssertEqual(CLIFailure.classify(avfCarbonDiskFull).code, .storageFull)
+        let wrappedCarbon = NSError(
+            domain: NSURLErrorDomain, code: NSURLErrorCannotWriteToFile,
+            userInfo: [NSUnderlyingErrorKey: carbonDiskFull]
+        )
+        XCTAssertTrue(CLIFailure.isStorageFull(wrappedCarbon))
+        XCTAssertEqual(CLIFailure.classify(wrappedCarbon).code, .storageFull)
+        XCTAssertFalse(CLIFailure.isStorageFull(NSError(domain: NSPOSIXErrorDomain, code: -34)))
+        XCTAssertFalse(CLIFailure.isStorageFull(NSError(domain: NSOSStatusErrorDomain, code: -50)))
         // A transfer that could not write its file wraps the volume's error.
         let transfer = NSError(
             domain: NSURLErrorDomain, code: NSURLErrorCannotWriteToFile, userInfo: [NSUnderlyingErrorKey: noSpace]

@@ -897,6 +897,23 @@ final class IOSLongFormProjectRunner {
         }.value
     }
 
+    /// Consumes the engine's pre-watermark Fast QC report when attached to
+    /// `result` instead of re-reading and re-scoring the post-watermark WAV
+    /// without `speakingRateText`. Falls back to persisted-WAV evaluation when
+    /// `result.audioQC` is nil (e.g. legacy or test fixture results).
+    private func resolveSegmentQC(
+        result: GenerationResult,
+        line: String
+    ) async -> AudioQualityGate.Report {
+        if let audioQC = result.audioQC {
+            return AudioQualityGate.report(from: audioQC)
+        }
+        return await evaluateQC(
+            path: result.audioPath,
+            expectedPauseCount: PersistedWAVAudioQCAnalyzer.expectedPauseCount(in: line)
+        )
+    }
+
     func run(
         request: IOSLongFormProjectRequest,
         initialSegments: [IOSLongFormSegmentState],
@@ -1036,10 +1053,7 @@ final class IOSLongFormProjectRunner {
                 generationCompleted = true
                 hooks.segmentTelemetryFinalized(generationID: generationID, publishedAudioURL: nil)
 
-                let report = await evaluateQC(
-                    path: result.audioPath,
-                    expectedPauseCount: PersistedWAVAudioQCAnalyzer.expectedPauseCount(in: line)
-                )
+                let report = await resolveSegmentQC(result: result, line: line)
                 qualityReports.append(report)
                 segments[index].qualityReport = report
                 guard report.passed else {
@@ -1307,10 +1321,7 @@ final class IOSLongFormProjectRunner {
             generationCompleted = true
             hooks.segmentTelemetryFinalized(generationID: generationID, publishedAudioURL: nil)
 
-            let report = await evaluateQC(
-                path: result.audioPath,
-                expectedPauseCount: PersistedWAVAudioQCAnalyzer.expectedPauseCount(in: line)
-            )
+            let report = await resolveSegmentQC(result: result, line: line)
             guard report.passed else {
                 // The rejected candidate's live preview stops with it (U09).
                 audioPlayer.abortLivePreviewIfNeeded()

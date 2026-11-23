@@ -104,6 +104,40 @@ final class GenerationTextLimitPolicyTests: XCTestCase {
                       "the batch sheet runs any length as a project, so the helper does not route")
     }
 
+    /// RF-69: explicit `.korean` triggers the long-form caution even for
+    /// non-Hangul or mixed scripts, another explicit language suppresses it on
+    /// Hangul scripts, and `nil`/`.auto` preserves Hangul-script detection.
+    func testExplicitKoreanLanguageTriggersLongFormCautionAndOtherExplicitLanguagesSuppressIt() {
+        let korean = "기차는 새벽에 역을 떠났다. "
+        let english = "The narrator kept a steady, unhurried pace through the winding chapters. "
+        let longEnglish = String(String(repeating: english, count: 13).prefix(901))
+        let longMixed = String(repeating: english, count: 13) + "안녕하세요"
+        let longKorean = String(repeating: korean, count: 30)
+        let shortKorean = String(repeating: korean, count: 5)
+
+        XCTAssertFalse(GenerationTextLimitPolicy.state(for: longEnglish, mode: .custom, language: nil).warnsKoreanLongForm)
+        XCTAssertFalse(GenerationTextLimitPolicy.state(for: longEnglish, mode: .custom, language: .auto).warnsKoreanLongForm)
+        XCTAssertTrue(GenerationTextLimitPolicy.state(for: longEnglish, mode: .custom, language: .korean).warnsKoreanLongForm)
+        XCTAssertTrue(GenerationTextLimitPolicy.state(for: longMixed, mode: .custom, language: .korean).warnsKoreanLongForm)
+        XCTAssertFalse(GenerationTextLimitPolicy.state(for: longMixed, mode: .custom, language: .auto).warnsKoreanLongForm)
+
+        // Single takes never show the long-form caution even under explicit `.korean`.
+        XCTAssertFalse(GenerationTextLimitPolicy.state(for: "Hello world.", mode: .custom, language: .korean).warnsKoreanLongForm)
+        XCTAssertFalse(GenerationTextLimitPolicy.state(for: shortKorean, mode: .custom, language: .korean).warnsKoreanLongForm)
+
+        // Explicit non-Korean overrides Hangul auto-detection.
+        XCTAssertTrue(GenerationTextLimitPolicy.state(for: longKorean, mode: .custom, language: .auto).warnsKoreanLongForm)
+        XCTAssertTrue(GenerationTextLimitPolicy.state(for: longKorean, mode: .custom, language: .korean).warnsKoreanLongForm)
+        XCTAssertFalse(GenerationTextLimitPolicy.state(for: longKorean, mode: .custom, language: .english).warnsKoreanLongForm)
+
+        // Direct long-form helper (Mac batch sheet) respects explicit language.
+        XCTAssertTrue(GenerationTextLimitPolicy.warnsKoreanLongForm("Hello world.", language: .korean))
+        XCTAssertTrue(GenerationTextLimitPolicy.warnsKoreanLongForm("", language: .korean))
+        XCTAssertFalse(GenerationTextLimitPolicy.warnsKoreanLongForm("Hello world.", language: .auto))
+        XCTAssertTrue(GenerationTextLimitPolicy.warnsKoreanLongForm(shortKorean, language: .auto))
+        XCTAssertFalse(GenerationTextLimitPolicy.warnsKoreanLongForm(shortKorean, language: .english))
+    }
+
     /// The counter speaks in the script's own characters: 300 for a Chinese
     /// single take, 900 for an English one.
     func testCounterStateUsesTheScriptsOwnCharacters() {

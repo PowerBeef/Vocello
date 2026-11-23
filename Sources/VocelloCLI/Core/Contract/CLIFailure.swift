@@ -165,7 +165,9 @@ public enum CLIFailure {
     static let storageFullHint = "free some space on the volume, then retry"
 
     /// Whether `error`, or an error under it, says the volume is full: Cocoa's
-    /// out-of-space code, or ENOSPC or EDQUOT as a POSIX error or a System `Errno`.
+    /// out-of-space code, ENOSPC or EDQUOT as a POSIX error or a System `Errno`,
+    /// or Carbon `dskFulErr` (-34) / POSIX ENOSPC / EDQUOT under
+    /// `NSOSStatusErrorDomain` or `com.apple.coreaudio.avfaudio`.
     static func isStorageFull(_ error: any Error, depth: Int = 0) -> Bool {
         if let posix = error as? Errno {
             return posix.rawValue == ENOSPC || posix.rawValue == EDQUOT
@@ -173,6 +175,10 @@ public enum CLIFailure {
         let cocoa = error as NSError
         if cocoa.domain == NSCocoaErrorDomain, cocoa.code == NSFileWriteOutOfSpaceError { return true }
         if cocoa.domain == NSPOSIXErrorDomain, cocoa.code == Int(ENOSPC) || cocoa.code == Int(EDQUOT) { return true }
+        if cocoa.domain == NSOSStatusErrorDomain || cocoa.domain == "com.apple.coreaudio.avfaudio",
+           cocoa.code == -34 || cocoa.code == Int(ENOSPC) || cocoa.code == Int(EDQUOT) {
+            return true
+        }
         guard depth < 4, let underlying = cocoa.userInfo[NSUnderlyingErrorKey] as? NSError else { return false }
         return isStorageFull(underlying, depth: depth + 1)
     }

@@ -23,6 +23,8 @@ final class LongFormFixtureEngine: StoreFixtureEngine {
 
     /// Outcome by take index over the engine's life; unlisted takes speak.
     var scriptedTakes: [Int: Take] = [:]
+    /// Pre-watermark Fast QC report attached to a take's `GenerationResult`, by take index.
+    var scriptedAudioQC: [Int: AudioQCReport] = [:]
     /// Take indices held open until `releaseGeneration()` or the barrier.
     var heldTakes: Set<Int> = []
     /// Every request that reached the engine, including failed takes.
@@ -49,7 +51,22 @@ final class LongFormFixtureEngine: StoreFixtureEngine {
         holdsGeneration = heldTakes.contains(index)
         let result = try await super.generate(request)
         try Self.write(take, to: request.outputPath)
-        return result
+        guard let audioQC = scriptedAudioQC[index] else {
+            return result
+        }
+        return GenerationResult(
+            audioPath: result.audioPath,
+            durationSeconds: result.durationSeconds,
+            streamSessionDirectory: result.streamSessionDirectory,
+            usedStreaming: result.usedStreaming,
+            finishReason: result.finishReason,
+            diagnosticTimingsMS: result.diagnosticTimingsMS,
+            diagnosticBooleanFlags: result.diagnosticBooleanFlags,
+            diagnosticStringFlags: result.diagnosticStringFlags,
+            telemetrySummary: result.telemetrySummary,
+            audioQC: audioQC,
+            completionReceipt: result.completionReceipt
+        )
     }
 
     /// Half a second at 24 kHz: a 250 Hz tone (a whole number of periods) at
@@ -1529,5 +1546,125 @@ final class IOSLongFormProjectRunnerTests: XCTestCase {
         XCTAssertFalse(coordinator.isProcessing, "Neither starts on the deleted voice")
         XCTAssertEqual(f.engine.takeRequests.count, 3)
         XCTAssertEqual(try rows(f, role: "segment").count, 3, "Its History stays")
+    }
+
+    // MARK: - Pre-watermark Fast QC reuse (RF-69)
+
+    /// RF-69: freshly generated long-form segments consume `result.audioQC`
+    /// directly instead of re-scoring the post-watermark WAV without
+    /// `speakingRateText`, while preserving the file-based fallback when
+    /// `result.audioQC` is nil.
+    func testRunConsumesResultAudioQCWithoutReevaluatingPublishedWAV() async throws {
+        let f = try makeFixture()
+        let warnQC = AudioQCReport(
+            verdict: .warn,
+            flags: ["speaking_rate_slow"],
+            rmsDBFS: -18.0,
+            dcOffset: 0.0,
+            peak: 0.5,
+            clippedSamples: 0,
+            hotSamples: 0,
+            nonFiniteSamples: 0,
+            clickEvents: 0,
+            longestSilenceMS: 123,
+            durationSeconds: 1.25,
+            speakingRateTextUnits: 20,
+            secondsPerTextUnit: 0.25
+        )
+        f.engine.scriptedAudioQC = [0: warnQC]
+
+        let outcome = try await runProject(f)
+        guard case .completed(let segments, _, _) = outcome else {
+            return XCTFail("Expected a completed project, got \(outcome)")
+        }
+        XCTAssertEqual(segments[0].qualityReport?.passed, true)
+        XCTAssertEqual(segments[0].qualityReport?.warnings, ["speaking_rate_slow"])
+        XCTAssertEqual(segments[0].qualityReport?.metrics["longest_silence_ms"], 123)
+        XCTAssertEqual(segments[1].qualityReport?.passed, true, "nil audioQC falls back to persisted-WAV QC")
+        XCTAssertEqual(segments[1].qualityReport?.warnings, [])
+        let manifest = try XCTUnwrap(f.services.acceptanceCandidates.last?.manifest)
+        XCTAssertEqual(manifest.execution?.segments.first?.qcWarnings, ["speaking_rate_slow"])
+
+        // A failing pre-watermark `result.audioQC` rejects the segment even
+        // when the WAV on disk would pass file-only re-evaluation.
+        let failingFixture = try makeFixture()
+        failingFixture.engine.scriptedTakes = [0: .speech]
+        failingFixture.engine.scriptedAudioQC = [
+            0: AudioQCReport(
+                verdict: .fail,
+                flags: ["speaking_rate_fast"],
+                rmsDBFS: -16.0,
+                dcOffset: 0.0,
+                peak: 0.5,
+                clippedSamples: 0,
+                hotSamples: 0,
+                nonFiniteSamples: 0,
+                clickEvents: 0,
+                longestSilenceMS: 0,
+                durationSeconds: 0.2
+            ),
+        ]
+        let rejected = try await runProject(failingFixture)
+        guard case .failed(let failedSegments, let message) = rejected else {
+            return XCTFail("Expected QC failure from result.audioQC, got \(rejected)")
+        }
+        XCTAssertEqual(message, failingFixture.hooks.presentation.segmentQCRejected(1))
+        XCTAssertEqual(failedSegments[0].qualityReport?.passed, false)
+        XCTAssertEqual(failedSegments[0].qualityReport?.checks.first?.message, "speaking_rate_fast")
+        let rejectedPath = try XCTUnwrap(failingFixture.engine.takeRequests.first?.outputPath)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: rejectedPath))
+    }
+
+    /// RF-69: `regenerateSegment` consumes `result.audioQC` when present for
+    /// both warnings (recording them in replacement evidence) and rejections.
+    func testRegenerateSegmentConsumesResultAudioQCWithoutReevaluatingPublishedWAV() async throws {
+        let f = try makeFixture()
+        let coordinator = f.makeCoordinator()
+        coordinator.start(request: f.request, ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
+        await waitUntil("the initial project to finish") { !coordinator.isProcessing }
+
+        let warnQC = AudioQCReport(
+            verdict: .warn,
+            flags: ["speaking_rate_slow"],
+            rmsDBFS: -18.5,
+            dcOffset: 0.0,
+            peak: 0.5,
+            clippedSamples: 0,
+            hotSamples: 0,
+            nonFiniteSamples: 0,
+            clickEvents: 0,
+            longestSilenceMS: 210,
+            durationSeconds: 2.0
+        )
+        f.engine.scriptedTakes[3] = .speech
+        f.engine.scriptedAudioQC[3] = warnQC
+        coordinator.regenerateSegment(index: 1, ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
+        await waitUntil("the warned replacement to finish") { !coordinator.isProcessing }
+
+        XCTAssertEqual(coordinator.segments[1].qualityReport?.warnings, ["speaking_rate_slow"])
+        XCTAssertEqual(coordinator.replacements.last?.qcWarnings, ["speaking_rate_slow"])
+        let acceptedAfterWarn = coordinator.outcome
+
+        let failQC = AudioQCReport(
+            verdict: .fail,
+            flags: ["speaking_rate_fast"],
+            rmsDBFS: -16.0,
+            dcOffset: 0.0,
+            peak: 0.5,
+            clippedSamples: 0,
+            hotSamples: 0,
+            nonFiniteSamples: 0,
+            clickEvents: 0,
+            longestSilenceMS: 0,
+            durationSeconds: 0.2
+        )
+        f.engine.scriptedTakes[4] = .speech
+        f.engine.scriptedAudioQC[4] = failQC
+        coordinator.regenerateSegment(index: 1, ttsEngine: f.store, audioPlayer: f.player, studioCoordinator: f.studio)
+        await waitUntil("the rejected replacement to stop") { !coordinator.isProcessing }
+
+        XCTAssertEqual(coordinator.outcome, acceptedAfterWarn, "The prior accepted project stays untouched")
+        XCTAssertEqual(f.studio.errorMessage, f.hooks.presentation.regeneratedQCRejected)
+        XCTAssertEqual(coordinator.replacements.count, 1)
     }
 }

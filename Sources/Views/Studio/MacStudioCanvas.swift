@@ -108,6 +108,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
     let modelInstalled: Bool
     /// RF-59: the mode's model needs its update (or is updating): the install button says so.
     let modelUpdate: ModelManagerViewModel.StudioModelUpdate?
+    let selectedLanguage: Qwen3SupportedLanguage
     let setupChips: SetupChips
     /// Rows under the chip row (custom tone field, hints, warnings). Empty on
     /// a ready Built-in Voice screen, which is why that screen renders exactly
@@ -139,6 +140,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         lineByLine: Binding<Bool>,
         modelInstalled: Bool,
         modelUpdate: ModelManagerViewModel.StudioModelUpdate? = nil,
+        selectedLanguage: Qwen3SupportedLanguage = .auto,
         @ViewBuilder setupChips: () -> SetupChips,
         @ViewBuilder footer: () -> Footer,
         onGenerate: @escaping () -> Void,
@@ -160,6 +162,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
         self.canRunBatch = canRunBatch
         self.modelInstalled = modelInstalled
         self.modelUpdate = modelUpdate
+        self.selectedLanguage = selectedLanguage
         self.setupChips = setupChips()
         self.footer = footer()
         self.onGenerate = onGenerate
@@ -307,6 +310,7 @@ struct MacStudioCanvas<SetupChips: View, Footer: View>: View {
             MacKoreanLongFormCaution(
                 script: script,
                 isLongForm: batchMode == .longForm,
+                language: selectedLanguage,
                 accessibilityIdentifier: "textInput_koreanLongFormCaution"
             )
             .padding(.bottom, MacTheme.Spacing.snug)
@@ -617,10 +621,23 @@ struct MacStudioBatchButton: View {
 struct MacKoreanLongFormCaution: View {
     let script: String
     let isLongForm: Bool
+    let language: Qwen3SupportedLanguage?
     let accessibilityIdentifier: String
 
+    init(
+        script: String,
+        isLongForm: Bool,
+        language: Qwen3SupportedLanguage? = nil,
+        accessibilityIdentifier: String
+    ) {
+        self.script = script
+        self.isLongForm = isLongForm
+        self.language = language
+        self.accessibilityIdentifier = accessibilityIdentifier
+    }
+
     var body: some View {
-        if isLongForm, GenerationTextLimitPolicy.warnsKoreanLongForm(script) {
+        if isLongForm, GenerationTextLimitPolicy.warnsKoreanLongForm(script, language: language) {
             Label {
                 Text(MacInterfaceText.presentation.longFormKoreanCaution)
                     .foregroundStyle(MacTheme.Text.secondary)

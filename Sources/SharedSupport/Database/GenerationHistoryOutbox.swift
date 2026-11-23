@@ -1,5 +1,7 @@
+import Darwin
 import Foundation
 import QwenVoiceCore
+import System
 
 enum GenerationHistoryOutboxOperation: String, Codable, Sendable {
     case append
@@ -756,37 +758,78 @@ struct GenerationHistoryOutboxStore: Sendable {
     }
 
     /// A fresh entry's id is new, so no final file of its own predates it and
-    /// none is ever replaced. Enqueue runs off the coordinator, whose scan may
-    /// promote this `.writing` first: that is the same publication, so the
-    /// entry is in place either way (AUD-05).
+    /// none is ever replaced. Staging through a hidden `.tmp` file keeps
+    /// concurrent `scan()` calls from observing a partial file, while `fsync` +
+    /// `Darwin.rename` + parent-directory `fsync` publishes it whole (AUD-05,
+    /// RF-69).
     private func publishNewEntry(_ data: Data, id: UUID) throws {
-        let fileManager = FileManager.default
-        let writing = writingURL(for: id)
         let final = entryURL(for: id)
         do {
-            try data.write(to: writing, options: [.atomic])
-            try fileManager.moveItem(at: writing, to: final)
+            try durableAtomicWrite(data, to: final)
         } catch {
-            if !fileManager.fileExists(atPath: writing.path), fileManager.fileExists(atPath: final.path) {
-                return
-            }
             throw GenerationHistoryOutboxError.unavailable
         }
     }
 
     private func atomicWrite(_ data: Data, to finalURL: URL, writingURL: URL) throws {
         let fileManager = FileManager.default
-        if fileManager.fileExists(atPath: writingURL.path) {
-            try fileManager.removeItem(at: writingURL)
-        }
         do {
-            try data.write(to: writingURL, options: [.atomic])
-            if fileManager.fileExists(atPath: finalURL.path) {
-                try fileManager.removeItem(at: finalURL)
+            if fileManager.fileExists(atPath: writingURL.path) {
+                try fileManager.removeItem(at: writingURL)
             }
-            try fileManager.moveItem(at: writingURL, to: finalURL)
+            try durableAtomicWrite(data, to: finalURL)
         } catch {
             throw GenerationHistoryOutboxError.unavailable
+        }
+    }
+
+    /// Writes `data` to a private hidden sibling file, `fsync`s it, atomically
+    /// publishes it over `finalURL` via POSIX `rename(2)` (never unlinking an
+    /// existing `finalURL` first), and `fsync`s the outbox folder. Mirrors
+    /// `ModelUpdateLedger.write`.
+    private func durableAtomicWrite(_ data: Data, to finalURL: URL) throws {
+        let temporary = rootURL.appendingPathComponent(
+            ".\(finalURL.lastPathComponent).\(UUID().uuidString).tmp",
+            isDirectory: false
+        )
+        do {
+            let descriptor = try FileDescriptor.open(
+                FilePath(temporary.path), .writeOnly,
+                options: [.create, .exclusiveCreate, .closeOnExec],
+                permissions: [.ownerReadWrite]
+            )
+            try descriptor.closeAfter {
+                _ = try descriptor.writeAll(data)
+                try Self.syncDescriptor(descriptor)
+            }
+            guard unsafe Darwin.rename(temporary.path, finalURL.path) == 0 else {
+                throw Errno(rawValue: errno)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: temporary)
+            throw error
+        }
+        Self.syncFolder(rootURL)
+    }
+
+    private static func syncDescriptor(_ descriptor: FileDescriptor) throws {
+        while fsync(descriptor.rawValue) != 0 {
+            let failure = Errno(rawValue: errno)
+            guard failure == .interrupted else { throw failure }
+        }
+    }
+
+    /// Best effort: the rename is already visible; syncing the parent directory
+    /// flushes the directory entry to OS buffers for crash durability.
+    private static func syncFolder(_ folder: URL) {
+        guard let descriptor = try? FileDescriptor.open(
+            FilePath(folder.path), .readOnly, options: [.closeOnExec]
+        ) else {
+            return
+        }
+        defer { try? descriptor.close() }
+        while fsync(descriptor.rawValue) != 0 {
+            guard Errno(rawValue: errno) == .interrupted else { break }
         }
     }
 }

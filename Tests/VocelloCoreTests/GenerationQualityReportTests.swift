@@ -124,6 +124,84 @@ final class GenerationQualityReportTests: XCTestCase {
         XCTAssertFalse(schedule.permitsConcurrentHeavyReviewerAndSynthesis)
     }
 
+    func testAudioQualityGateReportFromAudioQCPreservesVerdictFlagsAndMetrics() throws {
+        let passed = AudioQualityGate.report(
+            from: AudioQCReport(
+                verdict: .pass,
+                flags: [],
+                rmsDBFS: -19.2,
+                dcOffset: 0.001,
+                peak: 0.65,
+                clippedSamples: 0,
+                hotSamples: 0,
+                nonFiniteSamples: 0,
+                clickEvents: 0,
+                longestSilenceMS: 120,
+                durationSeconds: 3.25
+            )
+        )
+        XCTAssertTrue(passed.passed)
+        XCTAssertTrue(passed.requiredFailures.isEmpty)
+        XCTAssertTrue(passed.warnings.isEmpty)
+        XCTAssertEqual(passed.metrics["algorithm_version"], Double(AudioQCReport.currentAlgorithmVersion))
+        XCTAssertEqual(passed.metrics["duration_seconds"], 3.25)
+        XCTAssertEqual(passed.metrics["rms_dbfs"], -19.2)
+        XCTAssertEqual(passed.metrics["dc_offset"], 0.001)
+        let passedCheck = try XCTUnwrap(passed.checks.first)
+        XCTAssertEqual(passedCheck.name, "persisted_wav_qc_v\(AudioQCReport.currentAlgorithmVersion)")
+        XCTAssertTrue(passedCheck.passed)
+        XCTAssertNil(passedCheck.message)
+
+        let warned = AudioQualityGate.report(
+            from: AudioQCReport(
+                verdict: .warn,
+                flags: ["speaking_rate_slow", "onset_step_burst"],
+                rmsDBFS: nil,
+                dcOffset: nil,
+                peak: 0.8,
+                clippedSamples: 0,
+                hotSamples: 4,
+                nonFiniteSamples: 0,
+                clickEvents: 1,
+                longestSilenceMS: 350,
+                durationSeconds: 9.5,
+                speakingRateTextUnits: 42,
+                secondsPerTextUnit: 0.226
+            )
+        )
+        XCTAssertTrue(warned.passed)
+        XCTAssertTrue(warned.requiredFailures.isEmpty)
+        XCTAssertEqual(warned.warnings, ["speaking_rate_slow, onset_step_burst"])
+        XCTAssertEqual(warned.metrics["rms_dbfs"], -160)
+        XCTAssertEqual(warned.metrics["dc_offset"], 0)
+        let warnedCheck = try XCTUnwrap(warned.checks.first)
+        XCTAssertFalse(warnedCheck.passed)
+        XCTAssertEqual(warnedCheck.severity, .warning)
+
+        let failed = AudioQualityGate.report(
+            from: AudioQCReport(
+                verdict: .fail,
+                flags: ["speaking_rate_fast"],
+                rmsDBFS: -16.0,
+                dcOffset: 0,
+                peak: 0.5,
+                clippedSamples: 0,
+                hotSamples: 0,
+                nonFiniteSamples: 0,
+                clickEvents: 0,
+                longestSilenceMS: 0,
+                durationSeconds: 0.4
+            )
+        )
+        XCTAssertFalse(failed.passed)
+        XCTAssertEqual(failed.requiredFailures, ["persisted_wav_qc_v\(AudioQCReport.currentAlgorithmVersion)"])
+        XCTAssertTrue(failed.warnings.isEmpty)
+        let failedCheck = try XCTUnwrap(failed.checks.first)
+        XCTAssertFalse(failedCheck.passed)
+        XCTAssertEqual(failedCheck.severity, .error)
+        XCTAssertEqual(failedCheck.message, "speaking_rate_fast")
+    }
+
     private func passingResults(
         for policy: QualityReviewPolicy
     ) -> [GenerationQualityGateResult] {

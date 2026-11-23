@@ -278,7 +278,7 @@ public enum GenerateCommand {
         // Planned before boot, so a script the apps would refuse never costs a model load.
         let longFormPlan = routesToLongForm ? try CLILongFormProject.plan(text, seed: seed) : nil
         if routesToLongForm {
-            CLILongFormProject.warnIfKorean([text], namesLines: false)
+            CLILongFormProject.warnIfKorean([text], namesLines: false, language: language)
         }
         let settings = DesktopAppSettings()
         try noteRetiredVariation(args)

@@ -43,6 +43,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
     let modelDisplayName: String
     /// RF-59: the install button reads "Update" for an earlier Vocello's model.
     let modelNeedsUpdate: Bool
+    let selectedLanguage: Qwen3SupportedLanguage
     let setupChips: SetupChips
     let onGenerate: () -> Void
     let onCancel: () -> Void
@@ -70,6 +71,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         modelInstalled: Bool,
         modelDisplayName: String,
         modelNeedsUpdate: Bool = false,
+        selectedLanguage: Qwen3SupportedLanguage = .auto,
         @ViewBuilder setupChips: () -> SetupChips,
         onGenerate: @escaping () -> Void,
         onCancel: @escaping () -> Void,
@@ -91,6 +93,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         self.modelInstalled = modelInstalled
         self.modelDisplayName = modelDisplayName
         self.modelNeedsUpdate = modelNeedsUpdate
+        self.selectedLanguage = selectedLanguage
         self.setupChips = setupChips()
         self.onGenerate = onGenerate
         self.onCancel = onCancel
@@ -212,7 +215,11 @@ struct IOSStudioCanvas<SetupChips: View>: View {
     // with the mode label on the left and the counter on the right.
     private var composerPad: some View {
         // One measure of the script per render, for both long-form indicators.
-        let limitState = IOSGenerationTextLimitPolicy.state(for: script, mode: mode)
+        let limitState = IOSGenerationTextLimitPolicy.state(
+            for: script,
+            mode: mode,
+            language: selectedLanguage
+        )
         return VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .topLeading) {
                 if script.isEmpty {

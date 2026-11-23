@@ -426,6 +426,30 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
         XCTAssertEqual(Reason(POSIXError(.EROFS)), .storageUnavailable)
         XCTAssertEqual(Reason(NSError(domain: "com.apple.coreaudio.avfaudio", code: Int(ENOSPC))), .storageFull)
         XCTAssertEqual(Reason(NSError(domain: NSOSStatusErrorDomain, code: Int(ENOSPC))), .storageFull)
+        // RF-69: Carbon `dskFulErr` (-34) under OSStatus / AVFAudio is also disk-full.
+        let carbonDiskFull = NSError(domain: NSOSStatusErrorDomain, code: -34)
+        let avfCarbonDiskFull = NSError(domain: "com.apple.coreaudio.avfaudio", code: -34)
+        XCTAssertEqual(GenerationFailureDiagnosticLogger.errorMetadata(for: carbonDiskFull).code, "storage.full")
+        XCTAssertEqual(GenerationFailureDiagnosticLogger.errorMetadata(for: carbonDiskFull).classification, .storage)
+        XCTAssertEqual(Reason(carbonDiskFull), .storageFull)
+        XCTAssertEqual(GenerationFailureDiagnosticLogger.errorMetadata(for: avfCarbonDiskFull).code, "storage.full")
+        XCTAssertEqual(Reason(avfCarbonDiskFull), .storageFull)
+        let wrappedCarbonDiskFull = NSError(
+            domain: "com.apple.coreaudio.avfaudio",
+            code: -50,
+            userInfo: [NSUnderlyingErrorKey: carbonDiskFull]
+        )
+        XCTAssertEqual(Reason(wrappedCarbonDiskFull), .storageFull)
+        XCTAssertEqual(
+            Reason(MLXTTSEngine.surfacedGenerationError(carbonDiskFull, allocationRetryAttempted: false)),
+            .storageFull
+        )
+        // Carbon -34 is an OSStatus, not a POSIX errno.
+        XCTAssertNil(Reason(NSError(domain: NSPOSIXErrorDomain, code: -34)))
+        XCTAssertEqual(
+            GenerationFailureDiagnosticLogger.errorMetadata(for: NSError(domain: NSPOSIXErrorDomain, code: -34)).code,
+            "generation.unknown"
+        )
         let wrappedInAudio = NSError(
             domain: "com.apple.coreaudio.avfaudio",
             code: -50,

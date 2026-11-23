@@ -465,4 +465,31 @@ final class AudioQCSignalObservationTests: XCTestCase {
         )
         XCTAssertNil(bareObject["engineIntrospection"], "rows without introspection keep their shape")
     }
+
+    /// RF-69 (C-05, Decision D1): `PCM16LeadingSilenceGate` owns its explicit
+    /// `0.001` activation floor independently of `PCM16StreamLimiter.silenceFloor`,
+    /// preserving identical Clone leading-edge trimming and Fast QC v10.
+    func testLeadingSilenceGateOwnsItsSilenceFloorAndPreservesTrimmingBehavior() {
+        XCTAssertEqual(PCM16LeadingSilenceGate.silenceFloor, 0.001)
+        XCTAssertEqual(AudioQCReport.currentAlgorithmVersion, 10)
+
+        // At 1 kHz: 1 window = 20 samples, pre-roll = 4 windows (80 samples),
+        // activation = 3 consecutive windows (60 samples).
+        var gate = PCM16LeadingSilenceGate(policy: .cloneEdgeV1, sampleRate: 1_000)
+        let leadingQuiet = [Float](repeating: 0.0005, count: 200)
+        XCTAssertTrue(gate.filter(leadingQuiet).isEmpty)
+        XCTAssertFalse(gate.metrics.opened)
+
+        let onset = [Float](repeating: 0.0011, count: 60)
+        let emitted = gate.filter(onset)
+        XCTAssertTrue(gate.metrics.opened)
+        XCTAssertEqual(gate.metrics.trimmedSamples, 120)
+        XCTAssertEqual(gate.metrics.retainedPreRollSamples, 80)
+        XCTAssertEqual(emitted.count, 140)
+
+        var quietGate = PCM16LeadingSilenceGate(policy: .cloneEdgeV1, sampleRate: 1_000)
+        XCTAssertTrue(quietGate.filter([Float](repeating: 0.0009, count: 200)).isEmpty)
+        XCTAssertFalse(quietGate.metrics.opened)
+        XCTAssertTrue(quietGate.metrics.suppressedAllAudio)
+    }
 }

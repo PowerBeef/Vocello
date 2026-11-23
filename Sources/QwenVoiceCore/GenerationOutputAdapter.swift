@@ -1020,8 +1020,9 @@ final class PCM16ScratchBuffer: @unchecked Sendable {
 /// model output, not a transport gap, and publishing it makes an otherwise
 /// valid take unusable. This gate drops only the leading near-silent edge. It
 /// never edits an interior pause, changes a seed, regenerates a take, or turns
-/// failed QC into a pass. Three consecutive 20 ms windows must cross the same
-/// silence floor used by Fast QC; at most 80 ms of pre-roll is retained.
+/// failed QC into a pass. Three consecutive 20 ms windows must cross this
+/// gate's own silence floor (decoupled from Fast QC's dropout floor); at most
+/// 80 ms of pre-roll is retained.
 /// Memory is bounded by the pre-roll and activation windows, independent of
 /// how long the model remains silent.
 struct PCM16LeadingSilenceGate: Sendable {
@@ -1049,6 +1050,10 @@ struct PCM16LeadingSilenceGate: Sendable {
     static let analysisWindowMilliseconds = 20
     static let activationWindowCount = 3
     static let preRollMilliseconds = 80
+    /// Own RMS activation floor for Clone leading-edge trimming (~-60 dBFS),
+    /// deliberately decoupled from `PCM16StreamLimiter.silenceFloor` so future
+    /// Fast QC dropout-threshold tuning cannot alter Clone PCM output (C-05).
+    static let silenceFloor: Float = 0.001
 
     private let policy: Policy
     private let sampleRate: Int
@@ -1102,7 +1107,7 @@ struct PCM16LeadingSilenceGate: Sendable {
                 let finite = sample.isFinite ? Double(sample) : 0
                 partial += finite * finite
             } / Double(completedWindow.count)
-            if sqrt(meanSquare) >= Double(PCM16StreamLimiter.silenceFloor) {
+            if sqrt(meanSquare) >= Double(Self.silenceFloor) {
                 consecutiveActiveWindows += 1
             } else {
                 consecutiveActiveWindows = 0

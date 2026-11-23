@@ -648,6 +648,70 @@ final class LongFormPlanningTests: XCTestCase {
         }
     }
 
+    // MARK: - C-04: unspeakable symbol-only paragraphs
+
+    func testUnspeakableSymbolOnlyParagraphsAreSkippedWithoutBecomingStandaloneSegments() throws {
+        let p1 = "First paragraph."
+        let p2 = "Second paragraph."
+        let limit = max(try measuredEstimate(p1), try measuredEstimate(p2))
+
+        for divider in ["---", "***", "🙂🙂", "…!? —", "<|im_end|>"] {
+            let plan = try makePlan("\(p1)\n\n\(divider)\n\n\(p2)", tokenLimit: limit)
+            XCTAssertEqual(plan.segments.map(\.spokenTextForGeneration), [p1, p2], divider)
+            XCTAssertEqual(plan.segments.map(\.evidence.boundary), [.paragraph, .endOfText], divider)
+            XCTAssertTrue(
+                plan.segments.allSatisfy { SingleTakeScriptBudget.hasSpeakableContent($0.spokenTextForGeneration) },
+                divider
+            )
+            XCTAssertNoThrow(try LongFormManifestV4(plan: plan.evidence).validated(), divider)
+        }
+    }
+
+    func testLeadingTrailingAndConsecutiveUnspeakableParagraphsPreserveFinalBoundary() throws {
+        let p1 = "First paragraph."
+        let p2 = "Second paragraph."
+        let limit = max(try measuredEstimate(p1), try measuredEstimate(p2))
+
+        let leading = try makePlan("---\n\n\(p1)\n\n\(p2)", tokenLimit: limit)
+        XCTAssertEqual(leading.segments.map(\.spokenTextForGeneration), [p1, p2])
+        XCTAssertEqual(leading.segments.map(\.evidence.boundary), [.paragraph, .endOfText])
+
+        let trailing = try makePlan("\(p1)\n\n\(p2)\n\n---", tokenLimit: limit)
+        XCTAssertEqual(trailing.segments.map(\.spokenTextForGeneration), [p1, p2])
+        XCTAssertEqual(trailing.segments.map(\.evidence.boundary), [.paragraph, .endOfText])
+        XCTAssertEqual(trailing.segments.last?.evidence.intendedPauseMilliseconds, 0)
+
+        let consecutive = try makePlan("\(p1)\n\n---\n\n***\n\n\(p2)", tokenLimit: limit)
+        XCTAssertEqual(consecutive.segments.map(\.spokenTextForGeneration), [p1, p2])
+        XCTAssertEqual(consecutive.segments.map(\.evidence.boundary), [.paragraph, .endOfText])
+    }
+
+    func testTrailingUnspeakableDividerDoesNotDistortOrphanTailRebalancing() throws {
+        let p1 = "The northern road climbs steadily through terraced fields and past low stone walls."
+        let p2 = "Travelers rest beside the bridge."
+        let combined = "\(p1)\n\n\(p2)"
+        let combinedEstimate = try measuredEstimate(combined)
+
+        let plan = try makePlan("\(combined)\n\n---", tokenLimit: combinedEstimate)
+        XCTAssertEqual(plan.segments.map(\.spokenTextForGeneration), [combined])
+        XCTAssertEqual(plan.segments.map(\.evidence.boundary), [.endOfText])
+    }
+
+    func testAllUnspeakableScriptThrowsEmptyOriginalText() throws {
+        for script in ["---", "***\n\n---", "🙂🙂", "<|im_end|>\n\n<tts_pad>"] {
+            let spoken = try SpokenTextPlanner.plan(originalText: script)
+            XCTAssertThrowsError(
+                try LongFormPlanner.plan(
+                    spokenTextPlan: spoken,
+                    configuration: LongFormPlanningConfiguration(runtimeTokenLimit: 12, baseSeed: 7)
+                ),
+                script
+            ) { error in
+                XCTAssertEqual(error as? SpokenTextPlanningError, .emptyOriginalText, script)
+            }
+        }
+    }
+
     private func utf8Range(of needle: String, in text: String) throws -> TextUTF8Range {
         let range = try XCTUnwrap(text.range(of: needle))
         return TextUTF8Range(

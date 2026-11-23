@@ -245,6 +245,7 @@ public enum LongFormPlanner {
             // rebalancing the last boundary. Pure text decision; boundary kinds never
             // degrade and paragraph pauses are never crossed.
             if selection.kind != .endOfText,
+               SingleTakeScriptBudget.hasSpeakableContent(String(text[start..<selection.index])),
                let rebalanced = rebalancedAgainstOrphanTail(
                    text: text,
                    start: start,
@@ -259,6 +260,19 @@ public enum LongFormPlanner {
             guard trimmedEnd > start else {
                 throw LongFormPlanningError.tokenLimitCannotFitGrapheme
             }
+            let segmentText = String(text[start..<trimmedEnd])
+            // C-04: symbol-only dividers ("---", "***", emoji, control tokens)
+            // cannot produce speech on their own and used to fail every Resume
+            // as standalone segments. Skip them while keeping the strongest
+            // surrounding boundary (including `.endOfText` for trailing dividers).
+            if !SingleTakeScriptBudget.hasSpeakableContent(segmentText) {
+                if !drafts.isEmpty,
+                   selection.kind.precedence < drafts[drafts.count - 1].boundary.precedence {
+                    drafts[drafts.count - 1].boundary = selection.kind
+                }
+                start = text.indexAfterWhitespace(from: selection.index)
+                continue
+            }
             let spokenRange = TextUTF8Range(
                 lowerBound: text.utf8Offset(of: start),
                 upperBound: text.utf8Offset(of: trimmedEnd)
@@ -270,7 +284,6 @@ public enum LongFormPlanner {
             guard let originalRange = spokenTextPlan.sourceRange(forSpokenRange: spokenRange) else {
                 throw LongFormPlanningError.sourceMappingUnavailable
             }
-            let segmentText = String(text[start..<trimmedEnd])
             let tokenEstimate = ConservativeTokenEstimator.estimate(segmentText)
             guard tokenEstimate <= configuration.runtimeTokenLimit else {
                 throw LongFormPlanningError.invalidRuntimeTokenLimit(
@@ -296,6 +309,10 @@ public enum LongFormPlanner {
             )
 
             start = text.indexAfterWhitespace(from: selection.index)
+        }
+
+        guard !drafts.isEmpty else {
+            throw SpokenTextPlanningError.emptyOriginalText
         }
 
         let segmentIdentities = drafts.enumerated().map { index, draft in
@@ -364,7 +381,7 @@ public enum LongFormPlanner {
         let spokenText: String
         let originalRange: DigestBoundTextRange
         let spokenRange: DigestBoundTextRange
-        let boundary: LongFormBoundaryKind
+        var boundary: LongFormBoundaryKind
         let conservativeTokenEstimate: Int
         let riskKinds: [SpokenTextRiskKind]
         let codeSwitchRanges: [SpokenTextCodeSwitchRange]
@@ -506,7 +523,9 @@ public enum LongFormPlanner {
     ) -> BoundaryCandidate? {
         let tailStart = text.indexAfterWhitespace(from: selection.index)
         guard tailStart < text.endIndex else { return nil }
-        let tailEstimate = ConservativeTokenEstimator.estimate(String(text[tailStart...]))
+        let tailText = String(text[tailStart...])
+        guard SingleTakeScriptBudget.hasSpeakableContent(tailText) else { return nil }
+        let tailEstimate = ConservativeTokenEstimator.estimate(tailText)
         guard tailEstimate <= tokenLimit,
               Double(tailEstimate) < minimumTailFraction * Double(tokenLimit)
         else { return nil }
@@ -519,7 +538,9 @@ public enum LongFormPlanner {
             && candidate.kind.precedence <= selection.kind.precedence
             && candidate.index > start
             && candidate.index < selection.index {
-            let head = ConservativeTokenEstimator.estimate(String(text[start..<candidate.index]))
+            let headText = String(text[start..<candidate.index])
+            guard SingleTakeScriptBudget.hasSpeakableContent(headText) else { continue }
+            let head = ConservativeTokenEstimator.estimate(headText)
             let newTailStart = text.indexAfterWhitespace(from: candidate.index)
             guard newTailStart < text.endIndex else { continue }
             let tail = ConservativeTokenEstimator.estimate(String(text[newTailStart...]))

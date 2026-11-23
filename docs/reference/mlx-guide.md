@@ -373,9 +373,9 @@ submitted with `asyncEval` and materialized before its send. The decoder does no
   M6's warm first chunk rose from 146 to 155 ms (§9.5). Since RF-46 the code predictor's fifteen
   draws run inside the frame function, where MLX fuses the sampler's elementwise chains (§4.2).
 - **Prewarm draws through the production sampler** (`productionSamplerWarmDraws`,
-  `Qwen3TTS.swift:683-711`; F-05): with top-p 1.0 and 0.95, one penalized id and then two, on a
-  private random state whose draws are discarded, so the sampler's kernels compile before the first
-  take and no output changes.
+  `Qwen3TTS.swift:755-795`; F-05): with top-p 1.0 and 0.95 through a local `Qwen3SamplerScratch`
+  carrying a warmed `Bool`/`UInt32` `seenMask` on a private random state whose draws are discarded,
+  so the sampler's production kernels compile before the first take and no output changes.
 
 ---
 

@@ -22,40 +22,143 @@ final class Qwen3SamplerBoundaryTests: XCTestCase {
         let scratch = Qwen3TTSModel.Qwen3SamplerScratch(vocabSize: 5)
         scratch.prepareSuppressPairs(base: [4], withEOS: [3, 4], dtype: .float32)
         for id in [0, 1, 0, 1, 2] { scratch.appendRepetitionTokenID(id) }
-        XCTAssertEqual(scratch.repetitionTokenIDsBuffer, [0, 1, 2])
+        XCTAssertEqual(
+            scratch.repetitionSeenMask(vocabUpperBound: 5)?.asArray(Bool.self),
+            [true, true, true, false, false]
+        )
         let expected: [Float] = [2, -4, 0, 1, -.infinity]
         XCTAssertEqual(processed([4, -2, 0, 1, 8], penalty: 2, history: [0, 1, 2], suppress: [4]), expected)
         XCTAssertEqual(processed([4, -2, 0, 1, 8], penalty: 2, scratch: scratch), expected)
         XCTAssertEqual(processed([4, -2, 0, 1, 8], penalty: 2, scratch: scratch, allowsEOS: false)[3], -.infinity)
     }
 
-    /// AUD-11: set membership keeps the first-seen order of the former linear
-    /// scan, and only a first-seen ID rebuilds the cached MLX index array.
-    func testRepetitionMembershipKeepsFirstSeenOrderAndRebuildsOnlyForNewIDs() {
+    /// RF-68 narrow A3 / AUD-11: fixed-shape GPU `seenMask` stays nil until the
+    /// first in-range token, ignores out-of-range IDs, updates only for newly
+    /// seen IDs, and accepts `nextToken` directly from greedy/stochastic draws.
+    func testRepetitionSeenMaskUpdatesOnlyForNewInRangeIDsAndMatchesSetPath() {
         let scratch = Qwen3TTSModel.Qwen3SamplerScratch(vocabSize: 16)
-        XCTAssertNil(scratch.repetitionTokenMLXArray(vocabUpperBound: 16))
-        var reference: [Int32] = []
+        XCTAssertNil(scratch.repetitionSeenMask(vocabUpperBound: 16))
+        scratch.appendRepetitionTokenID(-1)
+        scratch.appendRepetitionTokenID(16)
+        XCTAssertNil(scratch.repetitionSeenMask(vocabUpperBound: 16))
+
+        var reference = Set<Int>()
         var cached: MLXArray?
-        var rebuilds = 0
+        var updates = 0
         for step in 0..<96 {
             let id = (step * 7 + step / 5) % 13
-            let isNew = !reference.contains(Int32(id))
-            if isNew { reference.append(Int32(id)) }
-            scratch.appendRepetitionTokenID(id)
-            XCTAssertEqual(scratch.repetitionTokenIDsBuffer, reference)
-            let indices = scratch.repetitionTokenMLXArray(vocabUpperBound: 16)
+            let isNew = reference.insert(id).inserted
+            let tokenArray = step.isMultiple(of: 2)
+                ? MLXArray([UInt32(id)]).reshaped(1, 1)
+                : nil
+            scratch.appendRepetitionTokenID(id, tokenArray: tokenArray)
+            let mask = scratch.repetitionSeenMask(vocabUpperBound: 16)
             if isNew {
-                XCTAssertFalse(indices === cached, "A new ID must rebuild the index array (step \(step))")
-                rebuilds += 1
+                XCTAssertFalse(mask === cached, "A new ID must update the GPU mask (step \(step))")
+                updates += 1
             } else {
-                XCTAssertTrue(indices === cached, "A repeated ID must keep the cached index array (step \(step))")
+                XCTAssertTrue(mask === cached, "A repeated ID must keep the cached GPU mask (step \(step))")
             }
-            cached = indices
+            cached = mask
         }
-        XCTAssertEqual(reference, [0, 7, 1, 8, 2, 10, 4, 11, 5, 12, 9, 6, 3])
-        XCTAssertEqual(rebuilds, reference.count)
-        XCTAssertEqual(cached?.shape, [1, reference.count])
-        XCTAssertEqual(cached?.asArray(Int32.self), reference)
+        XCTAssertEqual(updates, reference.count)
+        XCTAssertEqual(cached?.shape, [1, 16])
+        XCTAssertEqual(
+            cached?.asArray(Bool.self),
+            (0..<16).map { reference.contains($0) }
+        )
+        XCTAssertNil(scratch.repetitionSeenMask(vocabUpperBound: 0))
+        XCTAssertEqual(
+            scratch.repetitionSeenMask(vocabUpperBound: 8)?.asArray(Bool.self),
+            (0..<8).map { reference.contains($0) }
+        )
+        XCTAssertEqual(
+            scratch.repetitionSeenMask(vocabUpperBound: 20)?.asArray(Bool.self),
+            (0..<20).map { $0 < 16 && reference.contains($0) }
+        )
+
+        // Wrong-shape or non-integer `tokenArray` falls back safely to the Int32 index.
+        let fallbackScratch = Qwen3TTSModel.Qwen3SamplerScratch(vocabSize: 6)
+        fallbackScratch.appendRepetitionTokenID(2, tokenArray: MLXArray([Int32(2), Int32(3)]).reshaped(1, 2))
+        fallbackScratch.appendRepetitionTokenID(4, tokenArray: MLXArray([Float(4)]).reshaped(1, 1))
+        XCTAssertEqual(
+            fallbackScratch.repetitionSeenMask(vocabUpperBound: 6)?.asArray(Bool.self),
+            [false, false, true, false, true, false]
+        )
+
+        // Greedy (argMax -> uint32) and stochastic (categorical -> uint32) `nextToken`
+        // arrays update `seenMask` identically to `generatedTokenIDs: Set<Int>`,
+        // preserving exact IEEE 754 bit patterns across positive, negative, +0.0,
+        // -0.0, unseen, and suppressed -inf logits (float32, bfloat16, and batch > 1).
+        let logits: [Float] = [2.5, -1.25, 0.0, -0.0, 4.0, -3.5, 1.0, 9.0]
+        let greedyScratch = Qwen3TTSModel.Qwen3SamplerScratch(vocabSize: logits.count)
+        greedyScratch.prepareSuppressPairs(base: [7], withEOS: [7], dtype: .float32)
+        let greedyToken = Qwen3TTSModel.sampleToken(
+            MLXArray(logits).reshaped(1, 1, -1),
+            temperature: 0,
+            repetitionPenalty: 1.5,
+            scratch: greedyScratch
+        )
+        let greedyID = Int(greedyToken[0, 0].item(Int32.self))
+        greedyScratch.appendRepetitionTokenID(greedyID, tokenArray: greedyToken)
+        let stochasticToken = withRandomState(MLXRandom.RandomState(seed: 42)) {
+            Qwen3TTSModel.sampleToken(
+                MLXArray(logits).reshaped(1, 1, -1),
+                temperature: 0.9,
+                topP: 1.0,
+                topK: 4,
+                repetitionPenalty: 1.5,
+                scratch: greedyScratch
+            )
+        }
+        let stochasticID = Int(stochasticToken[0, 0].item(Int32.self))
+        greedyScratch.appendRepetitionTokenID(stochasticID, tokenArray: stochasticToken)
+        // Also mark negative, +0.0, -0.0, and suppressed -inf indices seen so every
+        // IEEE 754 branch is verified bit-for-bit against `generatedTokenIDs`.
+        let extraSeen = [1, 2, 3, 7]
+        for id in extraSeen {
+            greedyScratch.appendRepetitionTokenID(id)
+        }
+        let seenSet = Set([greedyID, stochasticID] + extraSeen)
+        XCTAssertEqual(
+            processed(logits, penalty: 1.5, scratch: greedyScratch).map(\.bitPattern),
+            processed(logits, penalty: 1.5, history: seenSet, suppress: [7]).map(\.bitPattern)
+        )
+
+        // bfloat16 (`castsLogitsToFloat32: false`) and batch == 2 broadcast parity
+        // (`temperature: 0` keeps `argMax` batch-preserving for `[2, 1, V]`).
+        let batchLogits = MLXArray(logits + logits.reversed()).reshaped(2, 1, logits.count).asType(.bfloat16)
+        let bf16Scratch = Qwen3TTSModel.Qwen3SamplerScratch(vocabSize: logits.count)
+        for id in seenSet { bf16Scratch.appendRepetitionTokenID(id) }
+        var scratchBF16: MLXArray?
+        var setBF16: MLXArray?
+        _ = Qwen3TTSModel.sampleToken(
+            batchLogits,
+            temperature: 0,
+            topP: 1,
+            topK: 0,
+            repetitionPenalty: 1.5,
+            scratch: bf16Scratch,
+            castsLogitsToFloat32: false,
+            observe: { _, filtered, _, _ in scratchBF16 = filtered }
+        )
+        _ = Qwen3TTSModel.sampleToken(
+            batchLogits,
+            temperature: 0,
+            topP: 1,
+            topK: 0,
+            repetitionPenalty: 1.5,
+            generatedTokenIDs: seenSet,
+            castsLogitsToFloat32: false,
+            observe: { _, filtered, _, _ in setBF16 = filtered }
+        )
+        XCTAssertEqual(scratchBF16?.shape, [2, logits.count])
+        XCTAssertEqual(scratchBF16?.dtype, .bfloat16)
+        XCTAssertEqual(setBF16?.dtype, .bfloat16)
+        XCTAssertEqual(
+            scratchBF16?.asType(.float32).asArray(Float.self).map(\.bitPattern),
+            setBF16?.asType(.float32).asArray(Float.self).map(\.bitPattern)
+        )
     }
 
     func testTemperaturePrecedesNucleusAndMinP() {
@@ -140,7 +243,9 @@ final class Qwen3SamplerBoundaryTests: XCTestCase {
                             eval(raw, filtered, key!, token)
                         } : nil)
                     let value = token.item(Int32.self)
-                    tokens.append(value); history.insert(Int(value)); scratch?.appendRepetitionTokenID(Int(value))
+                    tokens.append(value)
+                    history.insert(Int(value))
+                    scratch?.appendRepetitionTokenID(Int(value), tokenArray: token)
                 }
                 return (tokens, resolve(key: MLXArray?.none).asArray(UInt32.self))
             }

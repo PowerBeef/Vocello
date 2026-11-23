@@ -759,6 +759,20 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
         suppressTokens: [Int]
     ) -> [MLXArray] {
         withRandomState(MLXRandom.RandomState(seed: 0)) {
+            let talkerScratch = Qwen3SamplerScratch(vocabSize: talkerLogits.dim(-1))
+            var suppressWithEOS = suppressTokens
+            if !suppressWithEOS.contains(eosTokenId) {
+                suppressWithEOS.append(eosTokenId)
+            }
+            talkerScratch.prepareSuppressPairs(
+                base: suppressTokens,
+                withEOS: suppressWithEOS,
+                dtype: .float32
+            )
+            // Warm the fixed-shape Bool/UInt32 seenMask scatter (`putAlong`)
+            // and full-vocab masked repetition penalty (`which`) used by
+            // production talker steps (RF-68 narrow A3).
+            talkerScratch.appendRepetitionTokenID(0, tokenArray: MLXArray([UInt32(0)]).reshaped(1, 1))
             var draws: [MLXArray] = []
             for topP: Float in [1.0, 0.95] {
                 draws.append(sampleToken(
@@ -767,11 +781,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                     topP: topP,
                     topK: 50,
                     repetitionPenalty: 1.05,
-                    // One penalized id and then several, as a take's second step
-                    // and later steps hold: MLX picks different binary kernels.
-                    generatedTokenIDs: topP < 1 ? [0, 1] : [0],
-                    suppressTokens: suppressTokens,
                     eosTokenId: eosTokenId,
+                    scratch: talkerScratch,
+                    allowsEOS: true,
                     reinsertsEOSAfterFiltering: !Qwen3ReferenceParity.production.filtersEOS
                 ))
                 if let codeLogits {
@@ -3078,7 +3090,9 @@ public final class Qwen3TTSModel: Module, SpeechGenerationModel, Qwen3OptimizedS
                 recordSinkHandoff(since: handoffStartedAt)
                 try Task.checkCancellation()
             }
-            samplerScratch.appendRepetitionTokenID(tokenId)
+            if repetitionPenalty != 1.0 {
+                samplerScratch.appendRepetitionTokenID(tokenId, tokenArray: nextToken)
+            }
             generationIntrospector.observeCodecToken(tokenId)
             generatedCodeCount += 1
             if isStreaming {

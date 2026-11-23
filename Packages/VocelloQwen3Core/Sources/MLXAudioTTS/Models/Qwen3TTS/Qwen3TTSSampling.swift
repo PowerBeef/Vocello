@@ -23,17 +23,19 @@ extension Qwen3TTSModel {
         private var suppressWithEOSArr: MLXArray?
         private var suppressWithEOSNegInf: MLXArray?
 
-        /// First-seen order of the penalized token IDs; the cached MLX index
-        /// array is built from it. The set answers membership in constant time
-        /// and always holds exactly the buffer's elements.
-        private(set) var repetitionTokenIDsBuffer: [Int32] = []
+        /// Fixed-shape `[1, vocabSize]` GPU mask of seen token IDs for
+        /// repetition penalty (RF-68 narrow A3). `repetitionTokenIDSet` answers
+        /// membership in O(1) so repeated IDs skip mask updates completely, and
+        /// the mask stays `nil` until the first in-range token is recorded.
         private var repetitionTokenIDSet: Set<Int32> = []
-        private var repetitionTokenIDsMLX: MLXArray?
+        private var repetitionSeenMaskArray: MLXArray?
+        private let trueScalar1x1: MLXArray
 
         init(vocabSize: Int) {
             self.vocabSize = vocabSize
             negInfScalar = MLXArray(-Float.infinity)
             arangeIndices = MLXArray(0 ..< vocabSize).reshaped(1, -1).asType(Int32.self)
+            trueScalar1x1 = MLXArray([true]).reshaped(1, 1)
         }
 
         func prepareSuppressPairs(base: [Int], withEOS: [Int], dtype: DType) {
@@ -72,22 +74,37 @@ extension Qwen3TTSModel {
             return (suppressWithEOSArr, suppressWithEOSNegInf)
         }
 
-        func appendRepetitionTokenID(_ tokenID: Int) {
+        /// Marks `tokenID` as seen in the fixed-shape `[1, vocabSize]` GPU mask.
+        /// Caller contract: call only when `repetitionPenalty != 1.0` and after
+        /// each step's sampled token (and therefore the previous mask) has been
+        /// evaluated, keeping the lazy MLX graph depth bounded at <= 1.
+        func appendRepetitionTokenID(_ tokenID: Int, tokenArray: MLXArray? = nil) {
+            guard tokenID >= 0, tokenID < vocabSize else { return }
             let value = Int32(tokenID)
-            // A repeated ID keeps the order and the cached index array.
+            // A repeated ID leaves the fixed-shape GPU mask untouched.
             guard repetitionTokenIDSet.insert(value).inserted else { return }
-            repetitionTokenIDsBuffer.append(value)
-            repetitionTokenIDsMLX = nil
+            let baseMask = repetitionSeenMaskArray ?? MLXArray.zeros([1, vocabSize], type: Bool.self)
+            let index: MLXArray
+            if let tokenArray,
+               tokenArray.shape == [1, 1],
+               tokenArray.dtype == .int32 || tokenArray.dtype == .uint32 {
+                index = tokenArray
+            } else {
+                index = MLXArray([value]).reshaped(1, 1)
+            }
+            repetitionSeenMaskArray = putAlong(baseMask, index, values: trueScalar1x1, axis: -1)
         }
 
-        func repetitionTokenMLXArray(vocabUpperBound: Int) -> MLXArray? {
-            guard !repetitionTokenIDsBuffer.isEmpty else { return nil }
-            if repetitionTokenIDsMLX == nil {
-                let filtered = repetitionTokenIDsBuffer.filter { Int($0) < vocabUpperBound }
-                guard !filtered.isEmpty else { return nil }
-                repetitionTokenIDsMLX = MLXArray(filtered).reshaped(1, -1)
+        func repetitionSeenMask(vocabUpperBound: Int) -> MLXArray? {
+            guard let mask = repetitionSeenMaskArray, vocabUpperBound > 0 else { return nil }
+            if vocabUpperBound == vocabSize {
+                return mask
             }
-            return repetitionTokenIDsMLX
+            if vocabUpperBound < vocabSize {
+                return mask[0..., 0 ..< vocabUpperBound]
+            }
+            let padding = MLXArray.zeros([1, vocabUpperBound - vocabSize], type: Bool.self)
+            return concatenated([mask, padding], axis: -1)
         }
 
         // Single-slot/per-count caches below: sampler shapes are constant for a
@@ -210,25 +227,27 @@ extension Qwen3TTSModel {
 
         // Repetition penalty
         if repetitionPenalty != 1.0 {
-            let tokenIds: MLXArray?
             if let scratch {
-                tokenIds = scratch.repetitionTokenMLXArray(vocabUpperBound: logitsSlice.dim(-1))
+                if let seenMask = scratch.repetitionSeenMask(vocabUpperBound: logitsSlice.dim(-1)) {
+                    let penalized = which(
+                        logitsSlice .< 0,
+                        logitsSlice * repetitionPenalty,
+                        logitsSlice / repetitionPenalty
+                    )
+                    logitsSlice = which(seenMask, penalized, logitsSlice)
+                }
             } else if let tokenIDs = generatedTokenIDs, !tokenIDs.isEmpty {
-                let unique = tokenIDs.filter { $0 < logitsSlice.dim(-1) }
-                tokenIds = unique.isEmpty
-                    ? nil
-                    : MLXArray(unique.map { Int32($0) }).reshaped(1, -1)
-            } else {
-                tokenIds = nil
-            }
-            if let tokenIds {
-                let selected = takeAlong(logitsSlice, tokenIds, axis: -1)
-                let penalized = which(
-                    selected .< 0,
-                    selected * repetitionPenalty,
-                    selected / repetitionPenalty
-                )
-                logitsSlice = putAlong(logitsSlice, tokenIds, values: penalized, axis: -1)
+                let unique = tokenIDs.filter { $0 >= 0 && $0 < logitsSlice.dim(-1) }
+                if !unique.isEmpty {
+                    let tokenIds = MLXArray(unique.map { Int32($0) }).reshaped(1, -1)
+                    let selected = takeAlong(logitsSlice, tokenIds, axis: -1)
+                    let penalized = which(
+                        selected .< 0,
+                        selected * repetitionPenalty,
+                        selected / repetitionPenalty
+                    )
+                    logitsSlice = putAlong(logitsSlice, tokenIds, values: penalized, axis: -1)
+                }
             }
         }
 

@@ -62,7 +62,9 @@ public final class EngineHostLease: Sendable {
             options: [.create, .exclusiveCreate, .closeOnExec], permissions: [.ownerReadWrite]
         )
         do {
-            guard flock(descriptor.rawValue, LOCK_EX | LOCK_NB) == 0 else { throw Errno(rawValue: errno) }
+            guard Self.flockRetryingEINTR(descriptor.rawValue, LOCK_EX | LOCK_NB) == 0 else {
+                throw Errno(rawValue: errno)
+            }
             _ = try descriptor.writeAll(try JSONEncoder().encode(host))
             guard unsafe rename(temporary.path, final.path) == 0 else { throw Errno(rawValue: errno) }
         } catch {
@@ -92,27 +94,56 @@ public final class EngineHostLease: Sendable {
             guard let descriptor = try? FileDescriptor.open(FilePath(url.path), .readOnly, options: [.closeOnExec]) else {
                 continue
             }
-            defer { try? descriptor.close() }
-            if flock(descriptor.rawValue, LOCK_SH | LOCK_NB) == 0 {
-                // Nobody holds it: its process is gone.
+            if Self.flockRetryingEINTR(descriptor.rawValue, LOCK_SH | LOCK_NB) == 0 {
+                // Nobody holds it: its process is gone. Close before unlinking so no
+                // concurrent reader observes a locked-but-unlinked inode.
+                try? descriptor.close()
                 try? FileManager.default.removeItem(at: url)
                 continue
             }
-            let data = try? Data(contentsOf: url)
+            // Read from the already-open descriptor rather than reopening by path
+            // so a concurrent release/unlink cannot turn a live lease into pid 0 / unknown.
+            let data = Self.readHostData(from: descriptor)
+            try? descriptor.close()
             hosts.append(data.flatMap { try? JSONDecoder().decode(Host.self, from: $0) }
                 ?? Host(pid: 0, kind: "unknown", startedAt: ""))
         }
         return hosts
     }
 
-    /// Gives the lease up (also when the process ends).
+    /// Gives the lease up (also when the process ends). Closes the locked
+    /// descriptor before unlinking the path so a concurrent reader never sees
+    /// an unlinked-yet-locked inode.
     public func release() {
         guard let descriptor = self.descriptor.withLock({ held -> FileDescriptor? in
             defer { held = nil }
             return held
         }) else { return }
-        try? FileManager.default.removeItem(at: url)
         try? descriptor.close()
+        try? FileManager.default.removeItem(at: url)
+    }
+
+    private static func flockRetryingEINTR(_ rawValue: Int32, _ operation: Int32) -> Int32 {
+        while true {
+            let result = flock(rawValue, operation)
+            if result == -1, Errno(rawValue: errno) == .interrupted {
+                continue
+            }
+            return result
+        }
+    }
+
+    private static func readHostData(from descriptor: FileDescriptor) -> Data? {
+        let handle = FileHandle(fileDescriptor: descriptor.rawValue, closeOnDealloc: false)
+        var data = Data()
+        let maxBytes = 65_536
+        while data.count < maxBytes {
+            guard let chunk = try? handle.read(upToCount: maxBytes - data.count), !chunk.isEmpty else {
+                break
+            }
+            data.append(chunk)
+        }
+        return data.isEmpty ? nil : data
     }
 }
 
@@ -226,7 +257,9 @@ public final class EngineHostLeaseKeeper {
     /// What the engine last published.
     public private(set) var presence = EngineHostModelPresence.absent
     private var requestsInFlight = 0
+    private var provisionalHolds: [UUID: Task<Void, Never>] = [:]
     private var failureRelease: Task<Void, Never>?
+    private var lastObservedUnloadEpoch: UInt64?
 
     /// `failureWindow` is how long a published failure keeps the lease: the
     /// tier's idle window, after which the engine has unloaded what it left.
@@ -244,6 +277,7 @@ public final class EngineHostLeaseKeeper {
     }
 
     public var holdsLease: Bool { lease != nil }
+    private var hasActiveWork: Bool { requestsInFlight > 0 || !provisionalHolds.isEmpty }
 
     /// Takes over a lease its host was admitted with. A keeper that already
     /// holds one keeps it and gives the new one back.
@@ -267,10 +301,67 @@ public final class EngineHostLeaseKeeper {
         settle(modelAppeared: false)
     }
 
-    /// The engine published a state.
-    public func engineChanged(loadState: EngineLoadState, clonePreparation: ClonePreparationPhase) {
+    /// Adopts a provisionally acquired lease for a fire-and-forget start and
+    /// holds it until the engine publishes `.present`, `endProvisionalHold(_:)`
+    /// cancels it, or `timeout` elapses without a model appearing.
+    @discardableResult
+    public func beginProvisionalHold(
+        adopting admitted: EngineHostLease?,
+        timeout: Duration
+    ) -> UUID {
+        adopt(admitted)
+        let id = UUID()
+        provisionalHolds[id] = Task { [weak self, timeout] in
+            try? await Task.sleep(for: timeout)
+            guard !Task.isCancelled, let self else { return }
+            self.endProvisionalHold(id)
+        }
+        return id
+    }
+
+    /// Ends a provisional hold early (for example, when a start was refused
+    /// before reaching the engine) and releases the lease if nothing else holds it.
+    public func endProvisionalHold(_ id: UUID) {
+        guard let task = provisionalHolds.removeValue(forKey: id) else { return }
+        task.cancel()
+        settle(modelAppeared: false)
+    }
+
+    /// Records an explicit engine unload (`unloadModel()`,
+    /// `trimMemory(.fullUnload)`, or `stop()`), cancelling any pending
+    /// post-failure release window immediately. Unlike `clearVisibleError()`
+    /// (which keeps weights resident and leaves `failureRelease` running), an
+    /// explicit unload proves no weights remain, so the lease releases as soon
+    /// as no request or provisional hold is active.
+    public func modelUnloaded() {
+        failureRelease?.cancel()
+        failureRelease = nil
+        presence = .absent
+        if !hasActiveWork {
+            release()
+        }
+    }
+
+    /// The engine published a state. When the engine supplies a monotonically
+    /// increasing `unloadEpoch` (incremented on `unloadModel()`,
+    /// `trimMemory(.fullUnload)`, and `stop()`, never on `clearVisibleError()`),
+    /// an advancing epoch cancels any pending post-failure release window right
+    /// away instead of leaving a zombie lease for the idle window.
+    public func engineChanged(
+        loadState: EngineLoadState,
+        clonePreparation: ClonePreparationPhase,
+        unloadEpoch: UInt64? = nil
+    ) {
+        let unloaded = recordUnloadEpoch(unloadEpoch)
         let previous = presence
         presence = .of(loadState: loadState, clonePreparation: clonePreparation)
+        if unloaded, presence != .present {
+            failureRelease?.cancel()
+            failureRelease = nil
+            // Even when a failure message remains visible after an unload
+            // (PA-32), no weights remain resident; do not re-arm `failureRelease`.
+            presence = .absent
+        }
         settle(modelAppeared: presence == .present && previous != .present)
     }
 
@@ -278,7 +369,22 @@ public final class EngineHostLeaseKeeper {
     public func releaseNow() {
         failureRelease?.cancel()
         failureRelease = nil
+        cancelProvisionalHolds()
         release()
+    }
+
+    private func recordUnloadEpoch(_ unloadEpoch: UInt64?) -> Bool {
+        guard let unloadEpoch else { return false }
+        defer { lastObservedUnloadEpoch = unloadEpoch }
+        guard let previous = lastObservedUnloadEpoch else { return false }
+        return unloadEpoch != previous
+    }
+
+    private func cancelProvisionalHolds() {
+        for task in provisionalHolds.values {
+            task.cancel()
+        }
+        provisionalHolds.removeAll()
     }
 
     private func settle(modelAppeared: Bool) {
@@ -286,22 +392,23 @@ public final class EngineHostLeaseKeeper {
         case .present:
             failureRelease?.cancel()
             failureRelease = nil
+            cancelProvisionalHolds()
             if lease == nil, modelAppeared {
                 lease = try? EngineHostLease.acquire(in: folder, kind: kind)
             }
         case .absent:
             // A dismissed failure leaves its window running: the weights it
             // left may still be resident.
-            guard requestsInFlight == 0, failureRelease == nil else { return }
+            guard !hasActiveWork, failureRelease == nil else { return }
             release()
         case .absentAfterIdleWindow:
-            guard requestsInFlight == 0, lease != nil, failureRelease == nil else { return }
+            guard !hasActiveWork, lease != nil, failureRelease == nil else { return }
             failureRelease = Task { [weak self, failureWindow] in
                 try? await Task.sleep(for: failureWindow)
                 guard !Task.isCancelled, let self else { return }
                 self.failureRelease = nil
                 // A request running now settles the lease when it ends.
-                if self.presence != .present, self.requestsInFlight == 0 { self.release() }
+                if self.presence != .present, !self.hasActiveWork { self.release() }
             }
         }
     }

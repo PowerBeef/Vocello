@@ -431,6 +431,10 @@ public final class CLIWarmEngine {
 
     public var isBooted: Bool { runtime != nil }
     public var holdsLease: Bool { leaseKeeper.holdsLease }
+    /// This warm engine's own active lease, if any, so in-process operations
+    /// (such as MCP `install_model` reclaiming retired folders) exclude self
+    /// when checking `EngineHostLease.liveHosts(excluding:)`.
+    internal var activeLease: EngineHostLease? { leaseKeeper.lease }
     /// What the engine last published about its model, as the lease reads it.
     var modelPresence: EngineHostModelPresence { leaseKeeper.presence }
 
@@ -444,6 +448,12 @@ public final class CLIWarmEngine {
     /// now, and a loaded model keeps it until the engine unloads.
     public func engineRequestEnded() {
         leaseKeeper.requestEnded()
+    }
+
+    /// Signals an explicit model unload (`unloadModel()`, `trimMemory(.fullUnload)`,
+    /// or `stop()`), cancelling any pending post-failure release window immediately.
+    public func modelUnloaded() {
+        leaseKeeper.modelUnloaded()
     }
 
     func runtime(
@@ -501,6 +511,10 @@ public final class CLIWarmEngine {
         if runtime == nil {
             let started = try outcome.get()
             // From here the lease follows what the engine publishes about its model.
+            // RF-69: once `DesktopEngineHost.observeEngineState` forwards the
+            // engine's explicit `unloadEpoch` (wired in B2.1b), pass it here so
+            // `unloadModel()`, `trimMemory(.fullUnload)`, and `stop()` cancel
+            // any pending failure timer immediately.
             started.host?.observeEngineState { [leaseKeeper] loadState, clonePreparation in
                 leaseKeeper.engineChanged(loadState: loadState, clonePreparation: clonePreparation)
             }

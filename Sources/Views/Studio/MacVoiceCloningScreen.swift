@@ -967,8 +967,10 @@ struct MacVoiceCloningScreen: View {
         let requestKey = GenerationSemantics.clonePreparationKey(modelID: model.id, reference: reference)
         // Seen primed already: an idle unload since then sticks (U18).
         guard session.primingIntent.shouldPrime(key: requestKey) else { return }
-        // RF-61: no proactive load while another Vocello engine holds this 8 GB Mac.
-        guard !MacEngineHostCoordinator.shared.refusesEngineWork else { return }
+        // RF-61 / RF-69: acquire-then-check provisional lease before proactive
+        // clone priming on an 8 GB Mac.
+        guard let admission = MacEngineHostCoordinator.shared.beginScopedEngineWork() else { return }
+        defer { admission.end() }
         do {
             try await ttsEngineStore.ensureCloneReferencePrimed(
                 modelID: model.id,

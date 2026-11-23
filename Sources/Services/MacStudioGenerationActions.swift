@@ -28,14 +28,16 @@ enum MacStudioGenerationActions {
         clonePriming: MacStudioClonePriming? = nil,
         onCompleted: @escaping @MainActor @Sendable (GenerationResult) -> Void = { _ in }
     ) -> Bool {
-        // RF-61: on an 8 GB Mac a take waits while another Vocello engine holds its
-        // lease. It is refused here, before anything is submitted, like every other
-        // start the Studio refuses; an app whose own model is loaded is never refused.
-        if let refusal = MacEngineHostCoordinator.shared.generationRefusalMessage {
-            coordinator.rejectStart(refusal)
+        // RF-61 / RF-69: on an 8 GB Mac a take acquires a provisional lease
+        // before checking other hosts (acquire-then-check, closing the 8 GB
+        // admission TOCTOU) and waits while another Vocello engine holds the
+        // Mac. An app whose own model is loaded is never refused.
+        let (admission, refusal) = MacEngineHostCoordinator.shared.admitGeneration()
+        guard let admission else {
+            coordinator.rejectStart(refusal ?? MacInterfaceText.engineHostBusy)
             return false
         }
-        return MacStudioSingleTakeRunner.start(
+        let started = MacStudioSingleTakeRunner.start(
             plan: plan,
             estimatedAudioDuration: LivePreviewEstimate(text: plan.request.text)?.estimatedAudioDuration ?? 0,
             coordinator: coordinator,
@@ -47,6 +49,10 @@ enum MacStudioGenerationActions {
             },
             onCompleted: onCompleted
         )
+        if !started {
+            admission.end()
+        }
+        return started
     }
 
     static func cancelGeneration(
@@ -99,9 +105,10 @@ enum MacStudioGenerationActions {
         ttsEngine: TTSEngineStore
     ) async {
         guard !priming.isSatisfied(by: ttsEngine.clonePreparationState) else { return }
-        // RF-61: the take that follows is refused while another Vocello engine
-        // holds this 8 GB Mac, so its prime does not load the model first.
-        guard !MacEngineHostCoordinator.shared.refusesEngineWork else { return }
+        // RF-61 / RF-69: acquire-then-check provisional lease so on-demand
+        // clone priming never loads concurrently with another engine on 8 GB.
+        guard let admission = MacEngineHostCoordinator.shared.beginScopedEngineWork() else { return }
+        defer { admission.end() }
         do {
             try await ttsEngine.ensureCloneReferencePrimed(modelID: priming.modelID, reference: priming.reference)
         } catch {

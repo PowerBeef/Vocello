@@ -518,6 +518,36 @@ final class EngineHostLeaseTests: XCTestCase {
                       "one folder per user, whatever the data folder")
     }
 
+    /// RF-69: closing the locked descriptor before unlinking and reading JSON
+    /// directly from the open descriptor prevents a concurrent release from
+    /// turning a live lease into `Host(pid: 0, kind: "unknown", startedAt: "")`.
+    func testConcurrentReleaseNeverProducesUnknownHostFromUnlinkBeforeCloseRace() async throws {
+        let folder = try makeRoot().appendingPathComponent("engine-hosts")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let reader = Task.detached { () -> Bool in
+            while !Task.isCancelled {
+                for host in EngineHostLease.liveHosts(in: folder) {
+                    if host.pid == 0 || host.kind == "unknown" {
+                        return true
+                    }
+                }
+                await Task.yield()
+            }
+            return false
+        }
+        for _ in 0..<60 {
+            let lease = try EngineHostLease.acquire(in: folder, kind: "cli")
+            lease.release()
+        }
+        reader.cancel()
+        let sawUnknown = await reader.value
+        XCTAssertFalse(
+            sawUnknown,
+            "closing descriptor before unlink and reading from the open fd must never emit pid 0 / unknown"
+        )
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [])
+    }
+
     /// Review items 4 and 5 (fc1c4e05): admission refuses, waits, warns and
     /// stops on a signal, with its lease given back while it waits.
     @MainActor
@@ -774,6 +804,151 @@ final class WarmEngineLeaseTests: XCTestCase {
                        .absentAfterIdleWindow)
         XCTAssertEqual(EngineHostLeaseKeeper.failureWindow(for: .floor8GBMac), .seconds(125.0),
                        "the 8 GB tier's two-minute idle window, with room for the unload")
+    }
+
+    /// RF-69: explicit unload (`modelUnloaded()` or an advancing `unloadEpoch`)
+    /// cancels any pending post-failure release window immediately, whereas
+    /// `clearVisibleError()` (same epoch, `.failed` -> `.idle`) preserves it.
+    @MainActor
+    func testExplicitUnloadCancelsPendingFailureLeaseWhileClearVisibleErrorPreservesIt() async throws {
+        let folder = try makeRoot().appendingPathComponent("engine-hosts")
+        let keeper = EngineHostLeaseKeeper(kind: "app", folder: folder, failureWindow: .seconds(60))
+
+        // 1. Direct `modelUnloaded()` cancels a 60s failure timer right away.
+        keeper.engineChanged(loadState: .loaded(modelID: "m"), clonePreparation: .idle, unloadEpoch: 0)
+        keeper.engineChanged(loadState: .failed(message: "boom"), clonePreparation: .idle, unloadEpoch: 0)
+        keeper.engineChanged(loadState: .idle, clonePreparation: .idle, unloadEpoch: 0)
+        XCTAssertTrue(keeper.holdsLease, "clearVisibleError leaves weights resident and keeps the failure timer running")
+
+        keeper.modelUnloaded()
+        XCTAssertFalse(keeper.holdsLease, "explicit modelUnloaded cancels the failure timer immediately")
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [])
+
+        // 2. Advancing `unloadEpoch` cancels the failure timer immediately while
+        // an unchanged epoch on `.idle` preserves it.
+        keeper.engineChanged(loadState: .loaded(modelID: "m"), clonePreparation: .idle, unloadEpoch: 1)
+        keeper.engineChanged(loadState: .failed(message: "boom"), clonePreparation: .idle, unloadEpoch: 1)
+        keeper.engineChanged(loadState: .idle, clonePreparation: .idle, unloadEpoch: 1)
+        XCTAssertTrue(keeper.holdsLease, "unchanged unloadEpoch keeps the failure timer running")
+
+        keeper.engineChanged(loadState: .idle, clonePreparation: .idle, unloadEpoch: 2)
+        XCTAssertFalse(keeper.holdsLease, "advancing unloadEpoch releases the lease immediately")
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [])
+
+        // 3. Captured MLX failure that unloads weights and reports `.failed`
+        // with an advanced epoch does not arm a zombie failure lease.
+        keeper.engineChanged(loadState: .loaded(modelID: "m"), clonePreparation: .idle, unloadEpoch: 2)
+        keeper.engineChanged(loadState: .failed(message: "oom"), clonePreparation: .idle, unloadEpoch: 3)
+        XCTAssertFalse(keeper.holdsLease, "failed state accompanied by an unload epoch drops the lease immediately")
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [])
+
+        // 4. `CLIWarmEngine.modelUnloaded()` clears a pending failure lease immediately.
+        let warmFixture = try fixture(leasesIn: folder)
+        defer { warmFixture.runtime.engine.stop() }
+        warmFixture.warm.engineRequestBegan()
+        try await warmFixture.admit()
+        warmFixture.engine.loadState = .loaded(modelID: "pro_custom_speed")
+        let loaded = await settles { warmFixture.warm.modelPresence == .present }
+        XCTAssertTrue(loaded)
+        warmFixture.warm.engineRequestEnded()
+
+        warmFixture.engine.loadState = .failed(message: "boom")
+        let failed = await settles { warmFixture.warm.modelPresence == .absentAfterIdleWindow }
+        XCTAssertTrue(failed)
+        XCTAssertTrue(warmFixture.warm.holdsLease)
+        warmFixture.warm.modelUnloaded()
+        XCTAssertFalse(warmFixture.warm.holdsLease)
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [])
+    }
+
+    /// RF-69: provisional holds back acquire-then-check admission on macOS,
+    /// releasing immediately on `endProvisionalHold`, releasing on timeout if
+    /// no model loads, and handing off seamlessly once `.present` arrives.
+    @MainActor
+    func testProvisionalHoldHandsOffToLoadedModelAndReleasesWhenUnused() async throws {
+        let folder = try makeRoot().appendingPathComponent("engine-hosts")
+        let keeper = EngineHostLeaseKeeper(kind: "app", folder: folder, failureWindow: .seconds(60))
+
+        // Early cancel releases immediately.
+        let first = try EngineHostLease.acquire(in: folder, kind: "app")
+        let firstID = keeper.beginProvisionalHold(adopting: first, timeout: .seconds(60))
+        XCTAssertTrue(keeper.holdsLease)
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [first.host])
+        keeper.endProvisionalHold(firstID)
+        XCTAssertFalse(keeper.holdsLease)
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [])
+
+        // Timeout without `.present` releases automatically.
+        let second = try EngineHostLease.acquire(in: folder, kind: "app")
+        keeper.beginProvisionalHold(adopting: second, timeout: .milliseconds(30))
+        XCTAssertTrue(keeper.holdsLease)
+        let timedOut = await settles { !keeper.holdsLease }
+        XCTAssertTrue(timedOut, "unused provisional hold must release after timeout")
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [])
+
+        // Handoff to `.starting` retains the exact provisional lease past the timeout.
+        let third = try EngineHostLease.acquire(in: folder, kind: "app")
+        keeper.beginProvisionalHold(adopting: third, timeout: .milliseconds(30))
+        keeper.engineChanged(loadState: .starting, clonePreparation: .idle)
+        try? await Task.sleep(for: .milliseconds(60))
+        XCTAssertTrue(keeper.holdsLease, "handed-off provisional lease stays held while model is present")
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [third.host])
+        keeper.engineChanged(loadState: .idle, clonePreparation: .idle)
+        XCTAssertFalse(keeper.holdsLease, "releasing after handoff drops immediately without waiting for timeout")
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [])
+    }
+
+    /// RF-69: MCP `install_model` runs under `CLIEngineScope.warm` while the
+    /// server's warm engine may hold its own lease; `reclaimRetiredFolders`
+    /// excludes `CLIEngineScope.warm?.activeLease` so it does not self-block,
+    /// while still respecting leases held by any other process.
+    @MainActor
+    func testMCPInstallModelExcludesOwnWarmLeaseFromRetiredReclaim() async throws {
+        let folder = try makeRoot().appendingPathComponent("engine-hosts")
+        let warmFixture = try fixture(leasesIn: folder)
+        defer { warmFixture.runtime.engine.stop() }
+        let warm = warmFixture.warm
+
+        warm.engineRequestBegan()
+        defer { warm.engineRequestEnded() }
+        try await warmFixture.admit()
+        let ownLease = try XCTUnwrap(warm.activeLease)
+        XCTAssertEqual(EngineHostLease.liveHosts(in: folder), [ownLease.host])
+
+        let ctx = try CLIRuntime.bootstrapRegistryOnly(
+            dataDirectory: warmFixture.root,
+            manifestOverride: Self.contract
+        )
+        let retiredFolderName = "Qwen3-TTS-12Hz-1.7B-VoiceDesign-4bit"
+        let retiredDir = ctx.modelsDirectory.appendingPathComponent(retiredFolderName, isDirectory: true)
+        try FileManager.default.createDirectory(at: retiredDir, withIntermediateDirectories: true)
+        try Data("old".utf8).write(to: retiredDir.appendingPathComponent("model.safetensors"))
+
+        // Another host's lease still blocks retired-folder reclaim.
+        let other = try EngineHostLease.acquire(in: folder, kind: "cli")
+        CLIEngineScope.$warm.withValue(warm) {
+            let blocked = ModelsCommand.reclaimRetiredFolders(
+                of: "pro_custom_speed",
+                ctx: ctx,
+                leaseFolder: folder,
+                appRunning: { false }
+            )
+            XCTAssertEqual(blocked, [], "another host's lease must still block retired reclaim")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: retiredDir.path))
+        }
+        other.release()
+
+        // With only this MCP server's warm lease active, retired folders reclaim cleanly.
+        CLIEngineScope.$warm.withValue(warm) {
+            let removed = ModelsCommand.reclaimRetiredFolders(
+                of: "pro_custom_speed",
+                ctx: ctx,
+                leaseFolder: folder,
+                appRunning: { false }
+            )
+            XCTAssertEqual(removed, [retiredFolderName], "MCP server's own warm lease must not self-block reclaim")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: retiredDir.path))
+        }
     }
 }
 

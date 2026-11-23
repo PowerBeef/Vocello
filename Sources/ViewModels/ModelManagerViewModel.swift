@@ -1226,21 +1226,21 @@ final class ModelManagerViewModel {
         MacEngineHostCoordinator.shared.refusesModelDeletion
     }
 
-    /// MAC-20: never removes files the engine is using. A take, a line batch or
-    /// long-form project between two takes, or a load, warm or prime blocks the
-    /// deletion; unless another model is loaded the engine is unloaded first,
-    /// and a refused unload keeps the files (`ModelDeletionSequence`).
+    /// MAC-20 / RF-69: never removes files the engine or another engine host is
+    /// using. A take, a line batch or long-form project between two takes, a
+    /// load, warm or prime, or another host's lease blocks the deletion before
+    /// downloads stop, after downloads stop, and right before removing files;
+    /// unless another model is loaded the engine is unloaded first, and a
+    /// refused unload keeps the files (`ModelDeletionSequence`).
     @discardableResult
     func delete(_ model: TTSModel) async -> DeletionOutcome {
-        // RF-61: another host's engine counts as a busy one. Nothing has changed
-        // yet, so a download of this model keeps running.
-        guard !isDeletionBlockedByAnotherEngineHost else { return .blockedByActiveGeneration }
         let modelDir = model.installDirectory(in: modelsDirectory)
         var stoppedDownloads = false
         var removalError: (any Error)?
         let outcome = await ModelDeletionSequence.run(
             modelID: model.id,
             engine: engine,
+            externalHostBusy: { isDeletionBlockedByAnotherEngineHost },
             stopDownloads: {
                 await stopAndClear(for: model.id)
                 stoppedDownloads = true

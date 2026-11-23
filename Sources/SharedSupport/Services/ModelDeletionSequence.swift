@@ -122,28 +122,37 @@ enum ModelDeletionSequence {
         }
     }
 
-    /// Deletes one model's files unless the engine is using it.
+    /// Deletes one model's files unless the engine (or another engine host) is using it.
     ///
     /// - Parameters:
+    ///   - externalHostBusy: synchronous check for an external engine host lease
+    ///     (for example, the `vocello` CLI on macOS). Checked before stopping
+    ///     downloads, after stopping downloads, and again in the same main-actor
+    ///     turn right before removing files so an external host cannot acquire a
+    ///     lease mid-delete and lose live mmap'd weights.
     ///   - stopDownloads: stops the model's download; runs only once the engine
-    ///     allowed the deletion. `false` means the download could not be
-    ///     stopped: nothing else happens. Staging belongs in `removeFiles`, so a
-    ///     blocked deletion keeps a partial download.
+    ///     and external hosts allowed the deletion. `false` means the download
+    ///     could not be stopped: nothing else happens. Staging belongs in
+    ///     `removeFiles`, so a blocked deletion keeps a partial download.
     ///   - removeFiles: removes the staging and the installed files and reports
     ///     whether that worked; runs synchronously right after the last engine
-    ///     read.
+    ///     and external-host reads.
     ///   - unloadFailed: receives the error of a refused unload, for diagnostics.
     @MainActor
     static func run(
         modelID: String,
         engine: (any ModelDeletionEngineCoordinating)?,
+        externalHostBusy: () -> Bool = { false },
         stopDownloads: @concurrent () async -> Bool,
         removeFiles: () -> Bool,
         unloadFailed: (any Error) -> Void = { _ in }
     ) async -> Outcome {
-        // Before anything changes: a busy engine leaves everything as it was.
-        guard gate(for: modelID, engine: engine) != .busy else { return .blockedByActiveGeneration }
+        // Before anything changes: a busy engine or external host leaves everything as it was.
+        guard !externalHostBusy(), gate(for: modelID, engine: engine) != .busy else {
+            return .blockedByActiveGeneration
+        }
         guard await stopDownloads() else { return .failed(.downloadStop) }
+        guard !externalHostBusy() else { return .blockedByActiveGeneration }
         let gateAfterDownloads = gate(for: modelID, engine: engine)
         guard gateAfterDownloads != .busy else { return .blockedByActiveGeneration }
         if gateAfterDownloads == .mayHoldWeights, let engine {
@@ -160,6 +169,10 @@ enum ModelDeletionSequence {
                 return .blockedByActiveGeneration
             }
         }
+        // Re-check external hosts in the same main-actor turn right before
+        // removing files so a lease acquired during download cancellation or
+        // model unload cannot have its files deleted out from under it.
+        guard !externalHostBusy() else { return .blockedByActiveGeneration }
         // The last read and the removal share one main-actor turn, so nothing
         // can start in between.
         return removeFiles() ? .deleted : .failed(.fileRemoval)

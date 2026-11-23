@@ -164,6 +164,59 @@ final class ModelDeletionSequenceTests: XCTestCase {
         XCTAssertEqual(engine.log, ["stopDownloads"])
     }
 
+    // MARK: - External engine host TOCTOU gate (RF-69)
+
+    func testExternalHostBusyBeforeDownloadsBlocksWithoutStoppingOrRemoving() async {
+        let engine = FakeDeletionEngine(loadedModelID: modelID)
+
+        let outcome = await ModelDeletionSequence.run(
+            modelID: modelID,
+            engine: engine,
+            externalHostBusy: { true },
+            stopDownloads: { engine.log.append("stopDownloads"); return true },
+            removeFiles: { engine.log.append("removeFiles"); return true }
+        )
+
+        XCTAssertEqual(outcome, .blockedByActiveGeneration)
+        XCTAssertEqual(engine.log, [], "An external host busy up front leaves downloads and files untouched")
+        XCTAssertTrue(outcome.showsEngineBusyAlert)
+    }
+
+    func testExternalHostBusyAfterDownloadsBlocksWithoutUnloadingOrRemoving() async {
+        let engine = FakeDeletionEngine(loadedModelID: modelID)
+
+        let outcome = await ModelDeletionSequence.run(
+            modelID: modelID,
+            engine: engine,
+            externalHostBusy: { engine.externalHostBusy },
+            stopDownloads: {
+                engine.log.append("stopDownloads")
+                engine.externalHostBusy = true
+                return true
+            },
+            removeFiles: { engine.log.append("removeFiles"); return true }
+        )
+
+        XCTAssertEqual(outcome, .blockedByActiveGeneration)
+        XCTAssertEqual(engine.log, ["stopDownloads"], "A lease acquired while stopping downloads aborts before unload or removal")
+    }
+
+    func testExternalHostBusyAfterUnloadBlocksWithoutRemovingFiles() async {
+        let engine = FakeDeletionEngine(loadedModelID: modelID)
+        engine.onUnload = { [weak engine] in engine?.externalHostBusy = true }
+
+        let outcome = await ModelDeletionSequence.run(
+            modelID: modelID,
+            engine: engine,
+            externalHostBusy: { engine.externalHostBusy },
+            stopDownloads: { engine.log.append("stopDownloads"); return true },
+            removeFiles: { engine.log.append("removeFiles"); return true }
+        )
+
+        XCTAssertEqual(outcome, .blockedByActiveGeneration)
+        XCTAssertEqual(engine.log, ["stopDownloads", "unload"], "A lease acquired during local unload prevents deleting mmap'd files")
+    }
+
     // MARK: - Removal
 
     func testARemovalFailureIsReportedOnTheRowNotAsBusy() async {
@@ -243,6 +296,7 @@ private final class FakeDeletionEngine: ModelDeletionEngineCoordinating {
     var hasActiveGeneration = false
     var hasSustainedPerformanceActivity = false
     var hasModelOperationInFlight = false
+    var externalHostBusy = false
     var loadedModelID: String?
     var unloadError: (any Error)?
     /// Runs inside the unload, as a take or warm that starts meanwhile would.

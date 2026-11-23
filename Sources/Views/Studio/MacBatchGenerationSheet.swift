@@ -485,20 +485,29 @@ struct MacBatchGenerationSheet: View {
             validationMessage = MacInterfaceText.batchBusy
             return
         }
-        guard !refusedByAnotherEngineHost() else { return }
+        guard let admission = admitEngineHost() else { return }
         guard let model else {
+            admission.end()
             validationMessage = MacInterfaceText.batchModelConfigurationMissing
             return
         }
         switch segmentationMode {
         case .lineSeparated:
-            startLineBatch(model: model, retrying: retry)
+            startLineBatch(model: model, retrying: retry, admission: admission)
         case .longForm:
-            startLongFormProject(model: model)
+            startLongFormProject(model: model, admission: admission)
         }
     }
 
-    private func startLineBatch(model: TTSModel, retrying retry: LineBatchRetry?) {
+    private func startLineBatch(
+        model: TTSModel,
+        retrying retry: LineBatchRetry?,
+        admission: MacEngineHostCoordinator.EngineWorkAdmission
+    ) {
+        var started = false
+        defer {
+            if !started { admission.end() }
+        }
         let lines = MacLineBatchRunner.lines(from: batchText)
         guard !lines.isEmpty else { return }
         guard lines.count <= MacLineBatchRunner.maxLines else {
@@ -513,7 +522,7 @@ struct MacBatchGenerationSheet: View {
             validationMessage = error
             return
         }
-        let started = lineBatch.start(
+        started = lineBatch.start(
             request: request,
             ttsEngine: ttsEngineStore,
             audioPlayer: audioPlayer,
@@ -526,7 +535,14 @@ struct MacBatchGenerationSheet: View {
         }
     }
 
-    private func startLongFormProject(model: TTSModel) {
+    private func startLongFormProject(
+        model: TTSModel,
+        admission: MacEngineHostCoordinator.EngineWorkAdmission
+    ) {
+        var started = false
+        defer {
+            if !started { admission.end() }
+        }
         let plan: LongFormPlan
         do {
             plan = try IOSLongFormCoordinator.plan(originalText: batchText, baseSeed: configuration.pinnedSeed)
@@ -566,45 +582,56 @@ struct MacBatchGenerationSheet: View {
             audioPlayer: audioPlayer,
             studioCoordinator: coordinator
         )
-        noteLongFormOperationStarted()
+        started = noteLongFormOperationStarted()
     }
 
     private func resumeLongForm() {
         validationMessage = nil
-        guard !refusedByAnotherEngineHost() else { return }
+        guard let admission = admitEngineHost() else { return }
         longForm.resume(ttsEngine: ttsEngineStore, audioPlayer: audioPlayer, studioCoordinator: coordinator)
-        noteLongFormOperationStarted()
+        if !noteLongFormOperationStarted() {
+            admission.end()
+        }
     }
 
-    /// RF-61: on an 8 GB Mac a batch or a long-form project waits while
-    /// another Vocello engine (the `vocello` command line) holds its lease;
-    /// the sheet says why instead of starting. Returns whether it refused.
-    private func refusedByAnotherEngineHost() -> Bool {
-        guard let message = MacEngineHostCoordinator.shared.generationRefusalMessage else { return false }
-        validationMessage = message
-        return true
+    /// RF-61 / RF-69: on an 8 GB Mac a batch or a long-form project acquires a
+    /// provisional lease before checking other hosts (`EngineHostAdmission`),
+    /// closing the 8 GB admission TOCTOU; the sheet says why instead of
+    /// starting when another Vocello engine holds the Mac.
+    private func admitEngineHost() -> MacEngineHostCoordinator.EngineWorkAdmission? {
+        let (admission, message) = MacEngineHostCoordinator.shared.admitGeneration()
+        if let message {
+            validationMessage = message
+            return nil
+        }
+        return admission
     }
 
     private func regenerateSegment(_ index: Int) {
         validationMessage = nil
-        guard !refusedByAnotherEngineHost() else { return }
+        guard let admission = admitEngineHost() else { return }
         longForm.regenerateSegment(
             index: index,
             ttsEngine: ttsEngineStore,
             audioPlayer: audioPlayer,
             studioCoordinator: coordinator
         )
-        noteLongFormOperationStarted()
+        if !noteLongFormOperationStarted() {
+            admission.end()
+        }
     }
 
     /// The coordinator starts synchronously or refuses (busy engine, pending
     /// attempt); the sheet's flags follow what actually happened.
-    private func noteLongFormOperationStarted() {
+    @discardableResult
+    private func noteLongFormOperationStarted() -> Bool {
         if longForm.isProcessing, longFormOwnsMode {
             hasStartedFromThisSheet = true
             hidesRetainedLongFormOutcome = false
+            return true
         } else {
             validationMessage = MacInterfaceText.batchBusy
+            return false
         }
     }
 

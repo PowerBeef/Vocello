@@ -498,11 +498,20 @@ public enum ModelsCommand {
     /// catalog; an existing one complete, with every catalog file at its pinned size, the depth of
     /// the iPhone's launch check), so every retired Speed and Quality folder goes, every mode's,
     /// as the apps remove them; never while the app or another engine runs, since an older one may
-    /// still load them.
+    /// still load them. Under an MCP server (`CLIEngineScope.warm`), this process's own warm lease
+    /// is excluded because it runs the current contract and cannot hold retired folders.
     @MainActor
     @discardableResult
-    static func reclaimRetiredFolders(of modelID: String, ctx: CLIRegistryContext) -> [String] {
-        guard !DesktopAppPresence.isAppRunning(), EngineHostLease.liveHosts().isEmpty else { return [] }
+    static func reclaimRetiredFolders(
+        of modelID: String,
+        ctx: CLIRegistryContext,
+        leaseFolder: URL = EngineHostLease.sharedFolder,
+        appRunning: () -> Bool = DesktopAppPresence.isAppRunning
+    ) -> [String] {
+        guard !appRunning(),
+              EngineHostLease.liveHosts(in: leaseFolder, excluding: CLIEngineScope.warm?.activeLease).isEmpty else {
+            return []
+        }
         let modelsDirectory = ctx.modelsDirectory
         let registry = ctx.registry
         let result = registry.reclaimRetiredFolders(

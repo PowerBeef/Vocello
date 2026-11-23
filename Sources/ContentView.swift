@@ -378,13 +378,15 @@ struct ContentView: View {
         // Benchmark cold-start accuracy: skip proactive saved-voice clone preload when
         // warmup is suppressed (the cold generation records its own load instead).
         guard !MacGenerationWarmupCoordinator.isSuppressed else { return }
-        // RF-61: no proactive load while another Vocello engine holds this 8 GB Mac.
-        guard !MacEngineHostCoordinator.shared.refusesEngineWork else { return }
         guard let cloneModelID = plan.cloneModelID?
             .trimmingCharacters(in: .whitespacesAndNewlines),
             !cloneModelID.isEmpty else {
             return
         }
+        // RF-61 / RF-69: acquire-then-check provisional lease before proactive
+        // load on an 8 GB Mac.
+        guard let admission = MacEngineHostCoordinator.shared.beginScopedEngineWork() else { return }
+        defer { admission.end() }
         let trimmedTranscript = plan.handoff.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         // The handoff is a Studio draft in transit, so it states the same
         // intent the screen's own reference will (G-02) and shares its key.

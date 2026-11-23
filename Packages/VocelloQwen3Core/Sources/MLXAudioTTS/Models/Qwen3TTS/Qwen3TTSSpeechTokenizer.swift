@@ -501,12 +501,8 @@ final class DecoderTransformer: Module {
             causalMask = Self.slidingWindowMask(
                 queryStart: offset, queryCount: seqLen, keyCount: offset + seqLen, window: window, dtype: x.dtype)
         } else if causalMask == nil, seqLen > 1 {
-            let totalLen = offset + seqLen
-            var fullMask = MultiHeadAttention.createAdditiveCausalMask(totalLen).asType(x.dtype)
-            if totalLen > seqLen {
-                fullMask = fullMask[(totalLen - seqLen) ..< totalLen, 0...]
-            }
-            causalMask = fullMask
+            causalMask = Self.additiveCausalMask(
+                queryStart: offset, queryCount: seqLen, keyCount: offset + seqLen, dtype: x.dtype)
         }
 
         for (i, layer) in layers.enumerated() {
@@ -517,6 +513,19 @@ final class DecoderTransformer: Module {
 
     func makeCache() -> [any KVCache] {
         layers.map { _ in KVCacheSimple() }
+    }
+
+    /// A-27 (RF-68): rectangular `[queryCount, keyCount]` additive causal mask
+    /// matching `MultiHeadAttention.createAdditiveCausalMask(keyCount).asType(dtype)`
+    /// sliced to `queryStart ..< (queryStart + queryCount)` bit for bit (including
+    /// `-0.0` sign bits and fp16 `-inf` saturation) without materializing the
+    /// `[keyCount, keyCount]` square matrix.
+    static func additiveCausalMask(
+        queryStart: Int, queryCount: Int, keyCount: Int, dtype: DType
+    ) -> MLXArray {
+        let queries = MLXArray(Int32(queryStart) ..< Int32(queryStart + queryCount)).reshaped(queryCount, 1)
+        let keys = MLXArray(Int32(0) ..< Int32(keyCount)).reshaped(1, keyCount)
+        return ((queries .< keys).asType(.float32) * Float(-1e9)).asType(dtype)
     }
 
     /// Additive mask over absolute positions: query `q` sees key `k` when
@@ -875,7 +884,6 @@ final class Qwen3TTSSpeechTokenizerEncoder: Module {
     @ModuleInfo var downsample: MLXAudioCodecs.ConvDownsample1d
     @ModuleInfo var quantizer: MLXAudioCodecs.SplitResidualVectorQuantizer
 
-    let encoderCache: [any KVCache]
     /// A-02: the tokenizer's checkpoint stores its q and k projections in
     /// the layout transformers' `rotate_half` expects (split halves), as the
     /// reference encoder (`MimiModel`) applies them. This port has always
@@ -958,12 +966,15 @@ final class Qwen3TTSSpeechTokenizerEncoder: Module {
             nq: config.numQuantizers,
             bins: config.codebookSize
         )
-        self.encoderCache = projectedTransformer.makeCache()
     }
 
     func encode(_ audio: MLXArray) -> MLXArray {
         encoder.resetState()
-        for cache in encoderCache { cache.trim(cache.offset) }
+        // A-08 (RF-68): allocate a fresh transformer cache per encode so the
+        // encoder's KV buffers release immediately on return instead of being
+        // retained across calls (KVCacheSimple.trim(offset) leaves backing
+        // storage allocated and concatenates stale capacity when offset == 0).
+        let encoderCache: [any KVCache] = encoderTransformer.makeCache()
 
         var hidden = encoder(audio)
         hidden = encoderTransformer(hidden, cache: encoderCache)[0]

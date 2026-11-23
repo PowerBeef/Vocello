@@ -1,5 +1,6 @@
 import Foundation
 import MLX
+import MLXNN
 import MLXRandom
 @testable import MLXAudioTTS
 import XCTest
@@ -424,6 +425,57 @@ final class Qwen3DecoderPartitionTests: XCTestCase {
         let rms = Float((squared / Double(actual.count)).squareRoot())
         XCTAssertLessThanOrEqual(maxAbsolute, maxAbsoluteTolerance, "\(label) max abs")
         XCTAssertLessThanOrEqual(rms, rmsTolerance, "\(label) RMS")
+    }
+
+    /// A-27 (RF-68): the rectangular `[queryCount, keyCount]` additive causal
+    /// mask must match the sliced `[keyCount, keyCount]` square mask bit for bit
+    /// across float32, float16 (including `-inf` saturation), and bfloat16,
+    /// preserving the exact `-0.0` sign bit on allowed positions.
+    func testRectangularAdditiveCausalMaskMatchesSlicedSquareMaskBitForBit() {
+        let cases: [(queryStart: Int, queryCount: Int)] = [
+            (0, 2),
+            (0, 25),
+            (4, 4),
+            (25, 8),
+            (128, 16),
+            (256, 25),
+        ]
+        for dtype in [DType.float32, .float16, .bfloat16] {
+            for (queryStart, queryCount) in cases {
+                let keyCount = queryStart + queryCount
+                let rectangular = DecoderTransformer.additiveCausalMask(
+                    queryStart: queryStart,
+                    queryCount: queryCount,
+                    keyCount: keyCount,
+                    dtype: dtype
+                )
+                var square = MultiHeadAttention.createAdditiveCausalMask(keyCount).asType(dtype)
+                if keyCount > queryCount {
+                    square = square[queryStart ..< keyCount, 0...]
+                }
+                eval(rectangular, square)
+                XCTAssertEqual(rectangular.shape, [queryCount, keyCount], "\(dtype) start=\(queryStart) count=\(queryCount)")
+                XCTAssertEqual(rectangular.dtype, dtype)
+                XCTAssertEqual(
+                    rectangular.asData(access: .copy).data,
+                    square.asData(access: .copy).data,
+                    "bit-exact mismatch for \(dtype) start=\(queryStart) count=\(queryCount)"
+                )
+            }
+        }
+        // Explicitly pin `-0.0` sign bit on allowed cells and fp16 `-inf` on masked cells.
+        let fp32 = DecoderTransformer.additiveCausalMask(queryStart: 0, queryCount: 2, keyCount: 2, dtype: .float32)
+        eval(fp32)
+        let fp32Bits = fp32.asArray(Float.self).map(\.bitPattern)
+        XCTAssertEqual(fp32Bits[0], Float(-0.0).bitPattern)
+        XCTAssertEqual(fp32Bits[1], Float(-1e9).bitPattern)
+        XCTAssertEqual(fp32Bits[2], Float(-0.0).bitPattern)
+        XCTAssertEqual(fp32Bits[3], Float(-0.0).bitPattern)
+
+        let fp16 = DecoderTransformer.additiveCausalMask(queryStart: 0, queryCount: 2, keyCount: 2, dtype: .float16)
+        eval(fp16)
+        let fp16AsFloat = fp16.asType(.float32).asArray(Float.self)
+        XCTAssertTrue(fp16AsFloat[1].isInfinite && fp16AsFloat[1] < 0, "fp16 masked position must saturate to -inf")
     }
 }
 

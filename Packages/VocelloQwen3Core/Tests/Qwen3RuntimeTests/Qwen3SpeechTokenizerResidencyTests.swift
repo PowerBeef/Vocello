@@ -627,4 +627,83 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
             "trusted prepared-checkpoint verify mode must reject mismatched tensor shapes"
         )
     }
+
+    /// A-08 (RF-68): `Qwen3TTSSpeechTokenizerEncoder` must not retain a
+    /// persistent transformer KV cache across calls, and repeated encodes of
+    /// varying lengths past the 256-frame `KVCacheSimple` step must produce
+    /// identical codes without cross-call contamination.
+    func testSpeechTokenizerEncoderRetainsNoPersistentKVCacheAcrossVaryingLengths() throws {
+        let encoderJSON = #"""
+        {
+          "frame_rate": 25.0,
+          "audio_channels": 1,
+          "codebook_dim": 16,
+          "codebook_size": 32,
+          "compress": 2,
+          "dilation_growth_rate": 2,
+          "head_dim": 16,
+          "hidden_size": 32,
+          "intermediate_size": 64,
+          "kernel_size": 3,
+          "last_kernel_size": 3,
+          "layer_scale_initial_scale": 0.01,
+          "max_position_embeddings": 1024,
+          "num_attention_heads": 2,
+          "num_hidden_layers": 2,
+          "num_key_value_heads": 2,
+          "num_filters": 8,
+          "num_quantizers": 4,
+          "num_residual_layers": 1,
+          "num_semantic_quantizers": 1,
+          "residual_kernel_size": 3,
+          "sampling_rate": 200,
+          "sliding_window": 250,
+          "upsampling_ratios": [2, 2],
+          "use_causal_conv": true,
+          "use_conv_shortcut": false,
+          "vector_quantization_hidden_dimension": 16
+        }
+        """#
+        let config = try JSONDecoder().decode(
+            Qwen3TTSTokenizerEncoderConfig.self,
+            from: Data(encoderJSON.utf8)
+        )
+        let encoder = Qwen3TTSSpeechTokenizerEncoder(config: config, validNumQuantizers: 4)
+        eval(encoder.parameters())
+
+        XCTAssertFalse(
+            Mirror(reflecting: encoder).children.contains { $0.label == "encoderCache" },
+            "encoder must allocate transformer KV cache locally per encode instead of retaining encoderCache"
+        )
+
+        func wave(_ count: Int) -> MLXArray {
+            let samples = (0 ..< count).map { index in
+                0.25 * sin(Float(index) * 0.07)
+            }
+            return MLXArray(samples).reshaped([1, 1, count])
+        }
+
+        let shortAudio = wave(64)
+        let firstShort = encoder.encode(shortAudio)
+        eval(firstShort)
+        let firstShortCodes = firstShort.asArray(Int32.self)
+        XCTAssertFalse(firstShortCodes.isEmpty)
+
+        // Encode clips exceeding KVCacheSimple's 256-frame allocation step.
+        autoreleasepool {
+            let medium = encoder.encode(wave(1_200))
+            eval(medium)
+            let long = encoder.encode(wave(2_200))
+            eval(long)
+        }
+        Memory.clearCache()
+
+        let repeatedShort = encoder.encode(shortAudio)
+        eval(repeatedShort)
+        XCTAssertEqual(
+            repeatedShort.asArray(Int32.self),
+            firstShortCodes,
+            "repeated encode after longer clips must produce identical codes"
+        )
+    }
 }

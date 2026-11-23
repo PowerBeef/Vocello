@@ -226,7 +226,7 @@ tool routing".
 - **Workspace plugin** (`.agents/plugins/vocello/`):
   - **Domain rules (`rules/`):** glob-triggered `native.md` and `tooling.md`.
   - **Skills (`skills/`):** `vocello-ios-validation`, `vocello-macos-ui`, `vocello-device-diagnostics`,
-    `vocello-benchmark`, `vocello-debug`, read-only `vocello-release-readiness`. They wrap the scripts
+    `vocello-benchmark`, `vocello-debug`, `vocello-audio-qc`, read-only `vocello-release-readiness`. They wrap the scripts
     and add no gate or permission.
   - **Read-only subagents (`agents/`):** `vocello-swift-review` for Swift diffs and
     `vocello-xcresult-triage` for a finished run directory. Editing subagents use

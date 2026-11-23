@@ -17,7 +17,7 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-from qc import detectors, multimodal, multimodal_audio, store  # noqa: E402
+from qc import detectors, multimodal, multimodal_audio, multimodal_workflow, store  # noqa: E402
 from qc.store import Layout  # noqa: E402
 
 
@@ -43,10 +43,12 @@ class ScoringIdentityIsolationTests(unittest.TestCase):
     def test_multimodal_modules_are_outside_qc_scoring_sources(self) -> None:
         self.assertNotIn("qc/multimodal.py", detectors.SCORING_SOURCES)
         self.assertNotIn("qc/multimodal_audio.py", detectors.SCORING_SOURCES)
+        self.assertNotIn("qc/multimodal_workflow.py", detectors.SCORING_SOURCES)
         identity = detectors.scoring_identity(Layout(ROOT))
         self.assertNotIn("config/qc/multimodal-rubric-v1.json", identity["files"])
         self.assertNotIn("scripts/qc/multimodal.py", identity["files"])
         self.assertNotIn("scripts/qc/multimodal_audio.py", identity["files"])
+        self.assertNotIn("scripts/qc/multimodal_workflow.py", identity["files"])
 
     def test_rubric_contract_is_valid_and_never_gating(self) -> None:
         rubric, digest = multimodal.load_rubric(Layout(ROOT))
@@ -305,6 +307,27 @@ class PrivacyAndBlindingTests(unittest.TestCase):
         self.assertEqual(doc["q2"]["confirmDecisiveTotal"], 2)
         self.assertEqual(doc["q2"]["confirmStrictUnusablePrecision"]["rate"], 1.0)
         self.assertEqual(doc["q2"]["cleanHumanFalseAlarm"]["rate"], 0.0)
+
+    def test_workflow_emitter_produces_isolated_read_only_script(self) -> None:
+        sdir = multimodal.session_dir(self.layout, "wf-session")
+        store.write_json_atomic(sdir / "review-packet.json", {
+            "schema": multimodal.PACKET_SCHEMA,
+            "session": "wf-session",
+            "rubricSHA256": multimodal.rubric_digest(self.layout),
+            "blindTasks": [],
+            "auditTasks": [],
+            "pairwiseTasks": [],
+        })
+        meta = multimodal_workflow.write_workflow_script(self.layout, "wf-session", concurrency=6)
+        wf_path = Path(meta["workflowPath"])
+        self.assertTrue(wf_path.is_file())
+        source = wf_path.read_text(encoding="utf-8")
+        self.assertIn('SESSION = "wf-session"', source)
+        self.assertIn("CONCURRENCY = 6", source)
+        self.assertIn('type_name="research"', source)
+        self.assertNotIn("private-key.json", source)
+        with self.assertRaises(multimodal.MultimodalError):
+            multimodal_workflow.write_workflow_script(self.layout, "wf-session", concurrency=0)
 
 
 if __name__ == "__main__":

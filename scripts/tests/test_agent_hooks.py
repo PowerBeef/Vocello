@@ -1964,7 +1964,8 @@ class SessionStartTests(unittest.TestCase):
 
 class ProjectSkillTests(unittest.TestCase):
     SKILLS = {"vocello-ios-validation", "vocello-macos-ui", "vocello-device-diagnostics",
-              "vocello-benchmark", "vocello-debug", "vocello-release-readiness"}
+              "vocello-benchmark", "vocello-debug", "vocello-release-readiness",
+              "vocello-audio-qc"}
 
     def test_skills_use_antigravity_plugin_discovery_and_supported_metadata(self):
         skills = sorted((PLUGIN / "skills").glob("*/SKILL.md"))

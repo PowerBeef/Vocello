@@ -8,7 +8,7 @@
     python3 scripts/qc.py controls build|report
     python3 scripts/qc.py confirm next|record
     python3 scripts/qc.py language-bench takes|evidence
-    python3 scripts/qc.py multimodal prepare|prepare-screen|prepare-q1|prepare-q2|aggregate|qualify|report
+    python3 scripts/qc.py multimodal prepare|prepare-screen|prepare-q1|prepare-q2|workflow|aggregate|qualify|report
 
 Exit codes: 0 success (gate: pass), 1 failure (gate: fail), 2 error or usage,
 3 gate warn, 4 gate not assessed (coverage-v2). See docs/reference/qc.md.
@@ -380,7 +380,7 @@ def cmd_controls(args: argparse.Namespace, layout: Layout) -> int:
 
 
 def cmd_multimodal(args: argparse.Namespace, layout: Layout) -> int:
-    from qc import multimodal
+    from qc import multimodal, multimodal_workflow
 
     try:
         if args.action == "prepare":
@@ -401,6 +401,11 @@ def cmd_multimodal(args: argparse.Namespace, layout: Layout) -> int:
                 allow_synthetic_confirm_batches=args.allow_synthetic_confirm_batches,
                 clean_per_language=args.clean_per_language, seed=args.seed,
             )
+        elif args.action == "workflow":
+            result = multimodal_workflow.write_workflow_script(
+                layout, args.session, concurrency=args.concurrency,
+                model_label=args.model, output_path=args.output,
+            )
         elif args.action == "aggregate":
             result = multimodal.aggregate_session(layout, args.session, args.verdicts)
         elif args.action == "qualify":
@@ -416,7 +421,7 @@ def cmd_multimodal(args: argparse.Namespace, layout: Layout) -> int:
     except (multimodal.MultimodalError, FileExistsError, ValueError, OSError, KeyError) as error:
         print(f"qc multimodal {args.action}: {error}", file=sys.stderr)
         return EXIT_ERROR
-    if getattr(args, "json", False) or args.action in ("prepare", "prepare-screen", "prepare-q1", "prepare-q2"):
+    if getattr(args, "json", False) or args.action in ("prepare", "prepare-screen", "prepare-q1", "prepare-q2", "workflow"):
         _print_json(result)
     elif args.action == "qualify":
         axes = ", ".join(f"{k}={v}" for k, v in sorted(result["axisStatus"].items()))
@@ -641,6 +646,11 @@ def build_parser() -> argparse.ArgumentParser:
                        help="explicitly opt into reading non-clone synthetic confirm-* WAVs")
     mm_q2.add_argument("--clean-per-language", type=int, default=15)
     mm_q2.add_argument("--seed", type=int, default=20261122)
+    mm_wf = mm_actions.add_parser("workflow", help="emit a resumable Antigravity run_workflow script for a prepared session")
+    mm_wf.add_argument("--session", required=True)
+    mm_wf.add_argument("--concurrency", type=int, default=8)
+    mm_wf.add_argument("--model", help="model label recorded in verdicts.json")
+    mm_wf.add_argument("--output", help="override output workflow path (defaults to session/workflow.py)")
     mm_agg = mm_actions.add_parser("aggregate", help="reconcile worker verdicts and write private report.json")
     mm_agg.add_argument("--session", required=True)
     mm_agg.add_argument("--verdicts", required=True, help="path to vocello.qc.multimodal.verdicts/1 JSON")

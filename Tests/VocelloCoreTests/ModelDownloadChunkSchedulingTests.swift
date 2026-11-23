@@ -1185,4 +1185,66 @@ final class ModelDownloadChunkSchedulingTests: XCTestCase {
             )
         }
     }
+
+    /// RF-69: registering a task that already entered `.canceling` with `task.error == nil`
+    /// (for example after `withTaskCancellationHandler`'s `onCancel` called `task.cancel()`
+    /// ahead of registration), or registering with `taskCancelled: true`, throws
+    /// `DownloadError.cancelled` instead of `URLError(.unknown)`.
+    @concurrent func testRegisteringCancelingOrTaskCancelledTaskThrowsCancelled() async throws {
+        let registry = HuggingFaceDownloader.DownloadStateRegistry(repositoryProgressHandler: nil)
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.invalidateAndCancel() }
+        await registry.beginRepositoryDownload(totalBytes: 1_000, totalFiles: 1)
+
+        // 1. Pre-cancelled task (`.canceling` with nil error or `.completed` with cancelled error).
+        let cancelingTask = makeDummyTask(session: session)
+        cancelingTask.cancel()
+        do {
+            _ = try await withCheckedThrowingContinuation {
+                (continuation: CheckedContinuation<HuggingFaceDownloader.DownloadedTemporaryFile, Error>) in
+                Task { @concurrent in
+                    let shouldResume = await registry.register(
+                        taskKey: 901,
+                        task: cancelingTask,
+                        destination: URL(string: "https://chunk-tests.invalid/blob")!,
+                        continuation: continuation,
+                        resumeDataURL: nil,
+                        fileIndex: 0
+                    )
+                    XCTAssertFalse(shouldResume)
+                }
+            }
+            XCTFail("registering a canceling task must throw DownloadError.cancelled")
+        } catch let error as HuggingFaceDownloader.DownloadError {
+            guard case .cancelled = error else {
+                return XCTFail("expected DownloadError.cancelled, got \(error)")
+            }
+        }
+
+        // 2. Fresh suspended task with `taskCancelled: true` cancels the task and throws `.cancelled`.
+        let freshTask = makeDummyTask(session: session)
+        do {
+            _ = try await withCheckedThrowingContinuation {
+                (continuation: CheckedContinuation<HuggingFaceDownloader.DownloadedTemporaryFile, Error>) in
+                Task { @concurrent in
+                    let shouldResume = await registry.register(
+                        taskKey: 902,
+                        task: freshTask,
+                        destination: URL(string: "https://chunk-tests.invalid/blob")!,
+                        continuation: continuation,
+                        resumeDataURL: nil,
+                        fileIndex: 0,
+                        taskCancelled: true
+                    )
+                    XCTAssertFalse(shouldResume)
+                }
+            }
+            XCTFail("registering with taskCancelled: true must throw DownloadError.cancelled")
+        } catch let error as HuggingFaceDownloader.DownloadError {
+            guard case .cancelled = error else {
+                return XCTFail("expected DownloadError.cancelled, got \(error)")
+            }
+        }
+        XCTAssertTrue(freshTask.state == .canceling || freshTask.state == .completed)
+    }
 }

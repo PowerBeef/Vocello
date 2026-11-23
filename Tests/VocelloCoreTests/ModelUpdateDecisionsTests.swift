@@ -195,4 +195,84 @@ final class ModelUpdateDecisionsTests: XCTestCase {
         )
         XCTAssertEqual(RetiredClonePromptCaches.remove(in: voices, currentModelIDs: ["pro_clone_speed", "pro_clone"]), [])
     }
+
+    /// RF-69 (E-03/ER-10): versioned staging paths sanitize traversal/special characters,
+    /// separate artifact versions under one model container, and prune stale versions and
+    /// legacy unversioned directories cleanly.
+    func testVersionedStagingPathsSanitizeAndPruneStaleVersions() throws {
+        XCTAssertEqual(ModelDownloadStagingPaths.sanitizedPathComponent("2026.11.13.1"), "2026.11.13.1")
+        XCTAssertEqual(ModelDownloadStagingPaths.sanitizedPathComponent("pro_custom_speed"), "pro_custom_speed")
+        let traversal = ModelDownloadStagingPaths.sanitizedPathComponent("../evil/version")
+        XCTAssertFalse(traversal.contains("/"))
+        XCTAssertFalse(traversal.contains(".."))
+        XCTAssertFalse(traversal.hasPrefix("."))
+        XCTAssertNotEqual(
+            ModelDownloadStagingPaths.sanitizedPathComponent("v1/2"),
+            ModelDownloadStagingPaths.sanitizedPathComponent("v1_2"),
+            "distinct raw versions that sanitize identically must not collide"
+        )
+
+        let base = FileManager.default.temporaryDirectory
+            .appendingPathComponent("versioned-staging-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: base) }
+
+        let oldDir = ModelDownloadStagingPaths.versionedStagingRoot(
+            in: base,
+            modelID: "pro_custom_speed",
+            artifactVersion: "2026.10.01.1"
+        )
+        let currentDir = ModelDownloadStagingPaths.versionedStagingRoot(
+            in: base,
+            modelID: "pro_custom_speed",
+            artifactVersion: "2026.11.13.1"
+        )
+        let legacyFilesDir = ModelDownloadStagingPaths.modelContainer(in: base, modelID: "pro_custom_speed")
+            .appendingPathComponent("files", isDirectory: true)
+        let container = ModelDownloadStagingPaths.modelContainer(in: base, modelID: "pro_custom_speed")
+        let oldLock = container.appendingPathComponent(".2026.10.01.1.lock")
+        let currentLock = container.appendingPathComponent(".2026.11.13.1.lock")
+        for dir in [oldDir, currentDir, legacyFilesDir] {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try Data("x".utf8).write(to: dir.appendingPathComponent("marker.bin"))
+        }
+        try Data().write(to: oldLock)
+        try Data().write(to: currentLock)
+
+        let pruned = ModelDownloadStagingPaths.pruneStaleVersions(
+            in: base,
+            modelID: "pro_custom_speed",
+            keepingArtifactVersion: "2026.11.13.1"
+        )
+        XCTAssertEqual(pruned, [".2026.10.01.1.lock", "2026.10.01.1", "files"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldDir.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldLock.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyFilesDir.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: currentDir.appendingPathComponent("marker.bin").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: currentLock.path))
+    }
+
+    /// RF-69: single-row free-space preflight enforces `ModelDeliverySpace.minimumFreeBytes`
+    /// and classifies failures as `.space` in every locale.
+    func testSingleRowFreeSpacePreflightEnforcesMinimumFreeBytesAndClassifiesAsSpace() throws {
+        try ModelDownloadSpacePreflight.ensureSufficientFreeSpace(
+            bytesToFetch: 2 * gigabyte,
+            availableBytes: 4 * gigabyte
+        )
+        try ModelDownloadSpacePreflight.ensureSufficientFreeSpace(
+            bytesToFetch: 2 * gigabyte,
+            availableBytes: nil
+        )
+        XCTAssertThrowsError(
+            try ModelDownloadSpacePreflight.ensureSufficientFreeSpace(
+                bytesToFetch: 2 * gigabyte,
+                availableBytes: 4 * gigabyte - 1
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? ModelDownloadSpacePreflightError,
+                .insufficientDiskSpace(requiredBytes: 4 * gigabyte, availableBytes: 4 * gigabyte - 1)
+            )
+            XCTAssertEqual(ModelUpdateFailure.classify(error), .space)
+        }
+    }
 }

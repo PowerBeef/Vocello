@@ -371,8 +371,11 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             guard descriptor >= 0 else {
                 throw DownloadError.invalidLocalDestination(lockURL.lastPathComponent)
             }
-            guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
+            while true {
+                let lockResult = flock(descriptor, LOCK_EX | LOCK_NB)
+                if lockResult == 0 { break }
                 let failure = errno
+                if lockResult == -1, failure == EINTR { continue }
                 Darwin.close(descriptor)
                 if failure == EWOULDBLOCK { throw Busy() }
                 throw DownloadError.invalidLocalDestination(lockURL.lastPathComponent)
@@ -618,10 +621,11 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             continuation: CheckedContinuation<DownloadedTemporaryFile, Error>,
             resumeDataURL: URL?,
             fileIndex: Int,
-            existingBytes: Int64 = 0
+            existingBytes: Int64 = 0,
+            taskCancelled: Bool = false
         ) -> Bool {
             let taskID = taskKey
-            if isCancelled {
+            if isCancelled || taskCancelled {
                 task.cancel()
                 continuation.resume(throwing: DownloadError.cancelled)
                 return false
@@ -645,17 +649,36 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 unclaimedCompletionsByKey.removeValue(forKey: identity.reconciliationKey)
                 try? FileManager.default.removeItem(at: parked.file.url)
             }
+            // RF-69: a task cancelled by a structured task cancellation handler
+            // (e.g. CLI Ctrl-C) before registration lands enters `.canceling`
+            // with `task.error == nil`. Classify it as `.cancelled` rather than
+            // hanging or misclassifying it as `URLError(.unknown)`.
+            if task.state == .canceling {
+                if let error = task.error, (error as NSError).code != NSURLErrorCancelled {
+                    continuation.resume(throwing: DownloadError.fileDownloadFailed(
+                        path: destination.lastPathComponent,
+                        underlying: error
+                    ))
+                } else {
+                    continuation.resume(throwing: DownloadError.cancelled)
+                }
+                return false
+            }
             // An adopted task may already be terminal: its delegate events ran before
             // this registration. A terminal success was parked above and claimed; a
             // terminal failure was dropped by `resumeFailure` (no continuation existed
             // yet), so registering the dead task would park a continuation no future
             // delegate event can ever resume — hanging the whole download. Fail fast
             // instead; the caller's retry loop re-fetches with a fresh task.
-            if task.state == .completed || task.state == .canceling {
-                continuation.resume(throwing: DownloadError.fileDownloadFailed(
-                    path: destination.lastPathComponent,
-                    underlying: task.error ?? URLError(.unknown)
-                ))
+            if task.state == .completed {
+                if let error = task.error, (error as NSError).code == NSURLErrorCancelled {
+                    continuation.resume(throwing: DownloadError.cancelled)
+                } else {
+                    continuation.resume(throwing: DownloadError.fileDownloadFailed(
+                        path: destination.lastPathComponent,
+                        underlying: task.error ?? URLError(.unknown)
+                    ))
+                }
                 return false
             }
             activeCancellations[taskID] = TaskCancellationBox(task: task, resumeDataURL: resumeDataURL)
@@ -1991,6 +2014,9 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         try await throwIfCancellationRequested()
         await state.setPhase(.installing)
         try await throwIfCancellationRequested()
+        let allowedRelativePaths = Set(
+            try installedFiles.map { try Self.validatedRelativeRepoPath($0.path) }
+        ).union([ModelAssetIntegrityManifest.filename])
         if let sharedComponentPlan {
             let modelsRoot = targetDir.deletingLastPathComponent()
             let targetFolder = targetDir.lastPathComponent
@@ -2000,7 +2026,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 let store = SharedModelComponentStore(modelsRoot: modelsRoot)
                 return try store.installStagedModel(
                     sharedComponentPlan,
-                    stagedModelURL: filesRoot
+                    stagedModelURL: filesRoot,
+                    allowedRelativePaths: allowedRelativePaths
                 ) { stagedModel in
                     try Self.validateStagedRepository(
                         at: stagedModel,
@@ -2013,7 +2040,11 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 }
             }
         } else {
-            try installStagedRepository(filesRoot: filesRoot, targetDir: targetDir)
+            try installStagedRepository(
+                filesRoot: filesRoot,
+                targetDir: targetDir,
+                allowedRelativePaths: allowedRelativePaths
+            )
         }
         // Installation is synchronous, so check once more before publishing
         // success. The iOS coordinator rolls back a target created by this
@@ -2408,13 +2439,22 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             return
         }
 
-        // Retry transient failures (network drops, HTTP 5xx/429, integrity mismatches)
-        // so a single hiccup no longer fails the whole repo download. The partial
-        // already on disk lets each attempt resume via a Range request.
+        // Retry transient failures (network drops, HTTP 5xx/429, integrity mismatches,
+        // and one clean recovery from HTTP 416 on a resumed Range request) so a single
+        // hiccup no longer fails the whole repo download. The partial already on disk
+        // lets each attempt resume via a Range request.
         var retryNumber = 0
         var integrityRetryUsed = false
+        var rangeNotSatisfiableRetryUsed = false
         var avoidChunking = false
         while true {
+            let attemptedRangeOrResume = (!avoidChunking && chunkTransferPlanApplies(size: expectedSize, sha256: sha256))
+                || fileManager.fileExists(atPath: resumeDataURL.path)
+                || Self.resumableBytes(
+                    partialSize: Self.fileSizeIfPresent(at: partialURL),
+                    expectedSize: expectedSize
+                ) > 0
+                || isBackgroundSession
             do {
                 // Clear any stale task state for this file from a prior failed attempt so
                 // its bytes don't inflate the progress counter during the retry.
@@ -2438,7 +2478,8 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 let disposition = ModelDownloadRetryPolicy.disposition(
                     error: error,
                     retryNumber: retryNumber,
-                    integrityRetryAlreadyUsed: integrityRetryUsed
+                    integrityRetryAlreadyUsed: integrityRetryUsed,
+                    rangeNotSatisfiableRetryAlreadyUsed: rangeNotSatisfiableRetryUsed || !attemptedRangeOrResume
                 )
                 // The effective budget is the lower of the engine's and the policy's.
                 let lastRetryNumber = min(
@@ -2479,9 +2520,12 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                         fileIndex: fileIndex,
                         publishReset: true
                     )
-                    if let dlError = error as? DownloadError,
-                       case .integrityCheckFailed = dlError {
-                        integrityRetryUsed = true
+                    if let dlError = error as? DownloadError {
+                        if case .integrityCheckFailed = dlError {
+                            integrityRetryUsed = true
+                        } else if case .httpError(let statusCode, _, _) = dlError, statusCode == 416 {
+                            rangeNotSatisfiableRetryUsed = true
+                        }
                     }
                 }
 
@@ -2619,7 +2663,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         nextAttemptIsLast: Bool = false
     ) -> (avoidChunking: Bool, clearPartial: Bool) {
         switch error {
-        case .rangeUnsupported, .chunkAssemblyFailed:
+        case .rangeUnsupported, .chunkAssemblyFailed, .httpError(statusCode: 416, _, _):
             return (avoidChunking: true, clearPartial: true)
         case .integrityCheckFailed:
             return (avoidChunking: true, clearPartial: false)
@@ -3031,6 +3075,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         // delegate event can arrive (adopted-already-terminal task, registration
         // fail-fast, parked-completion claim, cancellation).
         defer { _ = chunkTaskPathsBox.withLock { $0.removeValue(forKey: key) } }
+        let cancelLatch = TaskCancellationLatch()
         let downloaded: DownloadedTemporaryFile = try await withTaskCancellationHandler { @concurrent in
             try await withCheckedThrowingContinuation { continuation in
                 Task { @concurrent in
@@ -3041,10 +3086,15 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                         continuation: continuation,
                         resumeDataURL: nil,
                         fileIndex: fileIndex,
-                        existingBytes: existingBytes
+                        existingBytes: existingBytes,
+                        taskCancelled: cancelLatch.isCancelled
                     )
                     if shouldResume {
-                        if task.state == .suspended { task.resume() }
+                        if cancelLatch.isCancelled {
+                            task.cancel()
+                        } else if task.state == .suspended {
+                            task.resume()
+                        }
                         await self.finishBackgroundSubmissionSlot(
                             initialSubmissionSlot,
                             submittedLiveTask: true
@@ -3053,6 +3103,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 }
             }
         } onCancel: {
+            cancelLatch.markCancelled()
             task.cancel()
         }
 
@@ -3266,6 +3317,20 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         return bounds.start == expectedStart && bounds.end == expectedEnd
     }
 
+    /// Checked-Sendable cancellation flag bridging `withTaskCancellationHandler`'s
+    /// `onCancel` closure into the unstructured registration `Task` (RF-69).
+    private final class TaskCancellationLatch: Sendable {
+        private let flag = Mutex(false)
+
+        var isCancelled: Bool {
+            flag.withLock { $0 }
+        }
+
+        func markCancelled() {
+            flag.withLock { $0 = true }
+        }
+    }
+
     @concurrent private func downloadTemporaryFile(
         from url: URL,
         existingBytes: Int64,
@@ -3281,28 +3346,37 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
 
         if let adoptedTask = await state.takeAdoptedTask(for: url) {
-            return try await withCheckedThrowingContinuation { continuation in
-                Task { @concurrent in
-                    let receivedBytes = max(existingBytes, adoptedTask.countOfBytesReceived)
-                    let shouldResume = unsafe await state.register(
-                        taskKey: self.taskKey(for: adoptedTask, in: self.session),
-                        task: adoptedTask,
-                        destination: url,
-                        continuation: continuation,
-                        resumeDataURL: resumeDataURL,
-                        fileIndex: fileIndex,
-                        existingBytes: receivedBytes
-                    )
-                    if shouldResume {
-                        if adoptedTask.state == .suspended {
-                            adoptedTask.resume()
-                        }
-                        await self.finishBackgroundSubmissionSlot(
-                            initialSubmissionSlot,
-                            submittedLiveTask: true
+            let cancelLatch = TaskCancellationLatch()
+            return try await withTaskCancellationHandler { @concurrent in
+                try await withCheckedThrowingContinuation { continuation in
+                    Task { @concurrent in
+                        let receivedBytes = max(existingBytes, adoptedTask.countOfBytesReceived)
+                        let shouldResume = unsafe await state.register(
+                            taskKey: self.taskKey(for: adoptedTask, in: self.session),
+                            task: adoptedTask,
+                            destination: url,
+                            continuation: continuation,
+                            resumeDataURL: resumeDataURL,
+                            fileIndex: fileIndex,
+                            existingBytes: receivedBytes,
+                            taskCancelled: cancelLatch.isCancelled
                         )
+                        if shouldResume {
+                            if cancelLatch.isCancelled {
+                                adoptedTask.cancel()
+                            } else if adoptedTask.state == .suspended {
+                                adoptedTask.resume()
+                            }
+                            await self.finishBackgroundSubmissionSlot(
+                                initialSubmissionSlot,
+                                submittedLiveTask: true
+                            )
+                        }
                     }
                 }
+            } onCancel: {
+                cancelLatch.markCancelled()
+                adoptedTask.cancel()
             }
         }
 
@@ -3320,36 +3394,47 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 try? fileManager.removeItem(at: resumeDataURL)
             } else {
                 do {
-                    return try await withCheckedThrowingContinuation { continuation in
-                        let task = resumedTask
-                        Task { @concurrent in
-                            task.taskDescription = await state.expectedIdentity(for: url)?.encodedTaskDescription
-                            let shouldResume = unsafe await state.register(
-                                taskKey: self.taskKey(for: task, in: self.session),
-                                task: task,
-                                destination: url,
-                                continuation: continuation,
-                                resumeDataURL: resumeDataURL,
-                                fileIndex: fileIndex,
-                                existingBytes: existingBytes
-                            )
-                            if shouldResume {
-                                task.resume()
-                                await self.finishBackgroundSubmissionSlot(
-                                    initialSubmissionSlot,
-                                    submittedLiveTask: true
+                    let task = resumedTask
+                    let cancelLatch = TaskCancellationLatch()
+                    return try await withTaskCancellationHandler { @concurrent in
+                        try await withCheckedThrowingContinuation { continuation in
+                            Task { @concurrent in
+                                task.taskDescription = await state.expectedIdentity(for: url)?.encodedTaskDescription
+                                let shouldResume = unsafe await state.register(
+                                    taskKey: self.taskKey(for: task, in: self.session),
+                                    task: task,
+                                    destination: url,
+                                    continuation: continuation,
+                                    resumeDataURL: resumeDataURL,
+                                    fileIndex: fileIndex,
+                                    existingBytes: existingBytes,
+                                    taskCancelled: cancelLatch.isCancelled
                                 )
+                                if shouldResume {
+                                    if cancelLatch.isCancelled {
+                                        task.cancel()
+                                    } else if task.state == .suspended {
+                                        task.resume()
+                                    }
+                                    await self.finishBackgroundSubmissionSlot(
+                                        initialSubmissionSlot,
+                                        submittedLiveTask: true
+                                    )
+                                }
                             }
                         }
+                    } onCancel: {
+                        cancelLatch.markCancelled()
+                        task.cancel()
                     }
                 } catch {
-                    try? fileManager.removeItem(at: resumeDataURL)
-                    if Task.isCancelled {
+                    if Task.isCancelled || ModelDownloadRetryPolicy.isCancellation(error) {
                         throw DownloadError.cancelled
                     }
                     if await state.cancellationRequested() {
                         throw DownloadError.cancelled
                     }
+                    try? fileManager.removeItem(at: resumeDataURL)
                 }
             }
         }
@@ -3365,27 +3450,38 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
             existingBytes: existingBytes,
             allowsCellularAccess: engineConfiguration.cellularAccess?()
         )
-        return try await withCheckedThrowingContinuation { continuation in
-            let task = unsafe session.downloadTask(with: request)
-            Task { @concurrent in
-                task.taskDescription = await state.expectedIdentity(for: url)?.encodedTaskDescription
-                let shouldResume = unsafe await state.register(
-                    taskKey: self.taskKey(for: task, in: self.session),
-                    task: task,
-                    destination: url,
-                    continuation: continuation,
-                    resumeDataURL: resumeDataURL,
-                    fileIndex: fileIndex,
-                    existingBytes: existingBytes
-                )
-                if shouldResume {
-                    task.resume()
-                    await self.finishBackgroundSubmissionSlot(
-                        initialSubmissionSlot,
-                        submittedLiveTask: true
+        let task = unsafe session.downloadTask(with: request)
+        let cancelLatch = TaskCancellationLatch()
+        return try await withTaskCancellationHandler { @concurrent in
+            try await withCheckedThrowingContinuation { continuation in
+                Task { @concurrent in
+                    task.taskDescription = await state.expectedIdentity(for: url)?.encodedTaskDescription
+                    let shouldResume = unsafe await state.register(
+                        taskKey: self.taskKey(for: task, in: self.session),
+                        task: task,
+                        destination: url,
+                        continuation: continuation,
+                        resumeDataURL: resumeDataURL,
+                        fileIndex: fileIndex,
+                        existingBytes: existingBytes,
+                        taskCancelled: cancelLatch.isCancelled
                     )
+                    if shouldResume {
+                        if cancelLatch.isCancelled {
+                            task.cancel()
+                        } else if task.state == .suspended {
+                            task.resume()
+                        }
+                        await self.finishBackgroundSubmissionSlot(
+                            initialSubmissionSlot,
+                            submittedLiveTask: true
+                        )
+                    }
                 }
             }
+        } onCancel: {
+            cancelLatch.markCancelled()
+            task.cancel()
         }
     }
 
@@ -3490,12 +3586,16 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         }
     }
 
-    private func installStagedRepository(filesRoot: URL, targetDir: URL) throws {
+    private func installStagedRepository(
+        filesRoot: URL,
+        targetDir: URL,
+        allowedRelativePaths: Set<String>
+    ) throws {
         let installParent = targetDir.deletingLastPathComponent()
         try fileManager.createDirectory(at: installParent, withIntermediateDirectories: true)
 
         // Named so the component store's startup reclamation sweeps it if the process dies
-        // between the two renames below.
+        // between staging materialization and the final swap below.
         let installingURL = installParent.appendingPathComponent(
             SharedModelComponentStore.workingDirectoryName(
                 .plainInstall,
@@ -3506,9 +3606,46 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
         if fileManager.fileExists(atPath: installingURL.path) {
             try fileManager.removeItem(at: installingURL)
         }
-        try fileManager.moveItem(at: filesRoot, to: installingURL)
+        try fileManager.createDirectory(at: installingURL, withIntermediateDirectories: true)
 
         do {
+            // E-03: materialize only the exact verified artifact paths (plus the
+            // integrity manifest written into `filesRoot`) so stray staged files
+            // can never enter the installed model directory.
+            for relativePath in allowedRelativePaths.sorted() {
+                let source: URL
+                let destination: URL
+                if relativePath == ModelAssetIntegrityManifest.filename {
+                    source = filesRoot.appendingPathComponent(relativePath, isDirectory: false)
+                    destination = installingURL.appendingPathComponent(relativePath, isDirectory: false)
+                } else {
+                    source = try Self.validatedDestinationURL(for: relativePath, in: filesRoot)
+                    destination = try Self.validatedDestinationURL(for: relativePath, in: installingURL)
+                }
+                guard fileManager.fileExists(atPath: source.path) else {
+                    throw DownloadError.integrityCheckFailed(
+                        path: relativePath,
+                        reason: "missing verified staged file during installation"
+                    )
+                }
+                let values = try source.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
+                guard values.isRegularFile == true, values.isSymbolicLink != true else {
+                    throw DownloadError.integrityCheckFailed(
+                        path: relativePath,
+                        reason: "staged file is not a regular file"
+                    )
+                }
+                try fileManager.createDirectory(
+                    at: destination.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
+                )
+                do {
+                    try fileManager.linkItem(at: source, to: destination)
+                } catch {
+                    try fileManager.moveItem(at: source, to: destination)
+                }
+            }
+
             if fileManager.fileExists(atPath: targetDir.path) {
                 _ = try fileManager.replaceItemAt(
                     targetDir,
@@ -3520,8 +3657,7 @@ public final class HuggingFaceDownloader: NSObject, URLSessionDownloadDelegate {
                 try fileManager.moveItem(at: installingURL, to: targetDir)
             }
         } catch {
-            // The staged tree was moved out of the download's staging root, so nothing else
-            // removes it. A failed exchange must not leave a hidden copy of the model behind.
+            // A failed exchange must not leave a hidden copy of the model behind.
             try? fileManager.removeItem(at: installingURL)
             throw error
         }

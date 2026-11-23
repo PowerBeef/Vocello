@@ -779,13 +779,23 @@ final class ModelManagerViewModel {
     /// refresh drops those pins, and a second click does nothing.
     func makeRoomAndStartModelUpdate() async {
         guard !modelUpdateMakingRoom, let registry = updateRegistry else { return }
+        // RF-69: never remove retired model folders while another Vocello engine
+        // host (such as the CLI) holds a lease and may still have them loaded.
+        guard !MacEngineHostCoordinator.shared.refusesModelDeletion else {
+            modelUpdateRoomNotMade = true
+            return
+        }
         modelUpdateMakingRoom = true
         modelUpdateRoomNotMade = false
         defer { modelUpdateMakingRoom = false }
         let modelsDirectory = modelsDirectory
+        let ownLease = MacEngineHostCoordinator.shared.ownLease
         let installed = Set(TTSModel.all.filter { info(for: $0).complete }.map(\.id))
         let result = await Task.detached(priority: .userInitiated) { @concurrent in
-            registry.removeRetiredFoldersBeforeUpdate(in: modelsDirectory) { installed.contains($0.id) }
+            guard EngineHostLease.liveHosts(excluding: ownLease).isEmpty else {
+                return RetiredModelReclamation.nothing
+            }
+            return registry.removeRetiredFoldersBeforeUpdate(in: modelsDirectory) { installed.contains($0.id) }
         }.value
         modelUpdateFreedBytes += result.freedBytes
         for (folder, reason) in result.failed.sorted(by: { $0.key < $1.key }) {
@@ -1092,7 +1102,16 @@ final class ModelManagerViewModel {
                 let catalog = downloadPlan.catalog
                 let artifact = downloadPlan.artifact
                 delivery = try await Task.detached(priority: .utility) { @concurrent in
-                    try catalog.deliveryPlan(for: artifact, modelsRoot: modelsDirectory)
+                    let plan = try catalog.deliveryPlan(for: artifact, modelsRoot: modelsDirectory)
+                    // RF-69: preflight free space for single-row downloads using the
+                    // same `ModelDeliverySpace.minimumFreeBytes(forFetching:)` rule
+                    // as bulk updates so low-space downloads fail fast before transfer.
+                    let bytesToFetch = plan.filesToDownload.reduce(Int64(0)) { $0 + $1.size }
+                    try ModelDownloadSpacePreflight.ensureSufficientFreeSpace(
+                        bytesToFetch: bytesToFetch,
+                        at: modelsDirectory
+                    )
+                    return plan
                 }.value
             } catch {
                 guard self.isCurrentEpoch(epoch, for: modelID) else { return }
@@ -1347,6 +1366,8 @@ final class ModelManagerViewModel {
         clonePromptCachesChecked = true
         let currentModelIDs = currentModelIDs
         let voicesDirectory = AppPaths.voicesDir
+        let allowsRetiredReclaim = !MacEngineHostCoordinator.shared.refusesModelDeletion
+        let ownLease = MacEngineHostCoordinator.shared.ownLease
         let (snapshots, plan, reclaimed, holdsEarlierModels) = await Task.detached(priority: .utility) { @concurrent in
             let snapshots = Self.fetchSnapshots(in: modelsDirectory)
             // RF-59: the plan first (the retired folders are its only evidence), then the reclaim.
@@ -1354,7 +1375,14 @@ final class ModelManagerViewModel {
                 registry: registry, in: modelsDirectory,
                 installed: Set(snapshots.filter(\.complete).map(\.id)), change: .none
             )
-            let reclaimed = Self.reclaimRetiredFolders(in: modelsDirectory, registry: registry, snapshots: snapshots)
+            // RF-69: never reclaim retired folders while another Vocello engine host
+            // holds a lease (re-checked after digest verification right before removal).
+            let reclaimed: RetiredModelReclamation
+            if allowsRetiredReclaim, EngineHostLease.liveHosts(excluding: ownLease).isEmpty {
+                reclaimed = Self.reclaimRetiredFolders(in: modelsDirectory, registry: registry, snapshots: snapshots)
+            } else {
+                reclaimed = .nothing
+            }
             if !currentModelIDs.isEmpty, checkClonePromptCaches || !reclaimed.removed.isEmpty {
                 for cache in RetiredClonePromptCaches.remove(in: voicesDirectory, currentModelIDs: currentModelIDs) {
                     ModelManagerLog.logger.info(

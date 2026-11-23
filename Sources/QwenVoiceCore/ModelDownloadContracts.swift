@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Synchronization
 
@@ -497,6 +498,7 @@ public enum ModelDownloadRetryPolicy {
         error: Error,
         retryNumber: Int,
         integrityRetryAlreadyUsed: Bool,
+        rangeNotSatisfiableRetryAlreadyUsed: Bool = false,
         retryAfterSeconds: Double? = nil
     ) -> ModelDownloadRetryDisposition {
         if error is CancellationError {
@@ -515,6 +517,14 @@ public enum ModelDownloadRetryPolicy {
                     return retryNumber <= maxRetryNumber
                         ? .retry(afterSeconds: boundedDelay(retryAfterSeconds ?? responseRetryAfter ?? backoff(retryNumber)))
                         : .fail
+                }
+                if statusCode == 416 {
+                    guard !rangeNotSatisfiableRetryAlreadyUsed, retryNumber <= maxRetryNumber else {
+                        return .fail
+                    }
+                    return .retryClean(
+                        afterSeconds: boundedDelay(retryAfterSeconds ?? responseRetryAfter ?? backoff(retryNumber))
+                    )
                 }
                 return .fail
             case .rangeUnsupported, .chunkAssemblyFailed:
@@ -600,5 +610,123 @@ public enum ModelDownloadRetryPolicy {
 
     private static func boundedDelay(_ seconds: Double) -> Double {
         min(max(seconds, 0), 300)
+    }
+}
+
+/// Versioned staging path helper (RF-69 / E-03 / ER-10): keys per-model staging
+/// directories by `(modelID, sanitizedArtifactVersion)` so an artifact bump can
+/// never reuse or mix staged files from an earlier version.
+public enum ModelDownloadStagingPaths {
+    public static func sanitizedPathComponent(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let allowed = CharacterSet(
+            charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-"
+        )
+        var sanitized = String(trimmed.unicodeScalars.map { scalar in
+            allowed.contains(scalar) ? Character(scalar) : "_"
+        })
+        while sanitized.hasPrefix(".") {
+            sanitized.removeFirst()
+        }
+        if sanitized.isEmpty {
+            sanitized = "version"
+        }
+        if sanitized != trimmed {
+            let digest = SHA256.hash(data: Data(trimmed.utf8))
+                .prefix(6)
+                .map { unsafe String(format: "%02x", $0) }
+                .joined()
+            return "\(sanitized)-\(digest)"
+        }
+        return sanitized
+    }
+
+    public static func modelContainer(in stagingBase: URL, modelID: String) -> URL {
+        stagingBase.appendingPathComponent(sanitizedPathComponent(modelID), isDirectory: true)
+    }
+
+    public static func versionedStagingRoot(
+        in stagingBase: URL,
+        modelID: String,
+        artifactVersion: String
+    ) -> URL {
+        modelContainer(in: stagingBase, modelID: modelID)
+            .appendingPathComponent(sanitizedPathComponent(artifactVersion), isDirectory: true)
+    }
+
+    /// Removes every sibling entry under `modelContainer(in:modelID:)` whose name
+    /// differs from `sanitizedPathComponent(keepingArtifactVersion)` or its active
+    /// `StagingLock` sidecar (`.<keepName>.lock`), cleaning up older artifact versions,
+    /// their stale lock files, and legacy unversioned `files`/`partials`/`resume-data` trees.
+    @discardableResult
+    public static func pruneStaleVersions(
+        in stagingBase: URL,
+        modelID: String,
+        keepingArtifactVersion: String,
+        fileManager: FileManager = .default
+    ) -> [String] {
+        let container = modelContainer(in: stagingBase, modelID: modelID)
+        let keepName = sanitizedPathComponent(keepingArtifactVersion)
+        let keepLockName = ".\(keepName).lock"
+        guard let entries = try? fileManager.contentsOfDirectory(
+            at: container,
+            includingPropertiesForKeys: nil,
+            options: []
+        ) else {
+            return []
+        }
+        var removed: [String] = []
+        for entry in entries {
+            let name = entry.lastPathComponent
+            if name == keepName || name == keepLockName { continue }
+            if (try? fileManager.removeItem(at: entry)) != nil {
+                removed.append(name)
+            }
+        }
+        return removed.sorted()
+    }
+}
+
+/// Typed free-space preflight error for model downloads (RF-69). Conforms to
+/// `ModelUpdateFailureClassifiable` so `.space` classification works in every locale.
+public enum ModelDownloadSpacePreflightError: LocalizedError, ModelUpdateFailureClassifiable, Equatable, Sendable {
+    case insufficientDiskSpace(requiredBytes: Int64, availableBytes: Int64)
+
+    public var modelUpdateFailureClass: ModelUpdateFailure { .space }
+
+    public var errorDescription: String? {
+        switch self {
+        case .insufficientDiskSpace(let requiredBytes, let availableBytes):
+            let required = ByteCountFormatter.string(fromByteCount: requiredBytes, countStyle: .file)
+            let available = ByteCountFormatter.string(fromByteCount: availableBytes, countStyle: .file)
+            return "Not enough free storage. Need \(required), but only \(available) is available."
+        }
+    }
+}
+
+/// Single-model free-space preflight shared by macOS single-row downloads and tests.
+public enum ModelDownloadSpacePreflight {
+    public static func ensureSufficientFreeSpace(
+        bytesToFetch: Int64,
+        availableBytes: Int64?
+    ) throws {
+        let required = ModelDeliverySpace.minimumFreeBytes(forFetching: max(0, bytesToFetch))
+        guard let available = availableBytes else { return }
+        guard available >= required else {
+            throw ModelDownloadSpacePreflightError.insufficientDiskSpace(
+                requiredBytes: required,
+                availableBytes: available
+            )
+        }
+    }
+
+    public static func ensureSufficientFreeSpace(
+        bytesToFetch: Int64,
+        at directory: URL
+    ) throws {
+        try ensureSufficientFreeSpace(
+            bytesToFetch: bytesToFetch,
+            availableBytes: ModelDeliverySpace.availableBytes(at: directory)
+        )
     }
 }

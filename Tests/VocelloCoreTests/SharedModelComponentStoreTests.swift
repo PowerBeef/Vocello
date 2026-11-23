@@ -1,4 +1,5 @@
 import CryptoKit
+import Darwin
 import Foundation
 import os
 @testable import QwenVoiceCore
@@ -1124,6 +1125,91 @@ final class SharedModelComponentStoreTests: XCTestCase {
             FileManager.default.fileExists(atPath: pinnedBlob.path),
             "background pin reclamation must free orphaned shared blob asynchronously"
         )
+    }
+
+    /// RF-69 (E-03): `installStagedModel(..., allowedRelativePaths:)` installs only the
+    /// exact allowed files (plus verified shared blobs and manifests), leaving stray files,
+    /// stray directories, and stray symlinks out of the installed model directory.
+    func testInstallStagedModelFiltersStrayFilesDirectoriesAndSymlinksWhenAllowedPathsProvided() throws {
+        let root = try temporaryDirectory("rf69-e03-allowed-paths")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let models = root.appendingPathComponent("models", isDirectory: true)
+        let stage = root.appendingPathComponent("staging", isDirectory: true)
+        let sharedBytes = Data("shared-e03".utf8)
+        try write(sharedBytes, to: stage.appendingPathComponent("codec/shared.bin"))
+        try write(Data("unique".utf8), to: stage.appendingPathComponent("unique.bin"))
+        try write(Data("meta".utf8), to: stage.appendingPathComponent("nested/meta.json"))
+        try write(Data("stray".utf8), to: stage.appendingPathComponent("stray-old.bin"))
+        try write(Data("junk".utf8), to: stage.appendingPathComponent("stale_dir/junk.txt"))
+        try FileManager.default.createSymbolicLink(
+            at: stage.appendingPathComponent("stray-link"),
+            withDestinationURL: URL(fileURLWithPath: "/etc/hosts")
+        )
+
+        let sharedFile = try identity(path: "codec/shared.bin", bytes: sharedBytes)
+        let content = try SharedComponentContentIdentity(files: [sharedFile])
+        let manifest = try SharedComponentInstalledModelManifest(
+            modelIdentity: "identity-e03",
+            contentIdentity: content,
+            compatibilityIdentity: compatibility(content: content, capability: .decoderOnly)
+        )
+        let plan = SharedComponentMigrationPlan(modelFolder: "model-e03", manifest: manifest)
+        let store = SharedModelComponentStore(modelsRoot: models)
+
+        // Unsafe allowedRelativePaths fail closed before installing anything.
+        XCTAssertThrowsError(
+            try store.installStagedModel(
+                plan,
+                stagedModelURL: stage,
+                allowedRelativePaths: ["../escape"]
+            ) { _ in }
+        ) { error in
+            XCTAssertEqual(error as? SharedModelComponentStoreError, .invalidRelativePath)
+        }
+
+        let allowed: Set<String> = ["unique.bin", "nested/meta.json", "codec/shared.bin"]
+        _ = try store.installStagedModel(
+            plan,
+            stagedModelURL: stage,
+            allowedRelativePaths: allowed
+        ) { candidate in
+            XCTAssertTrue(FileManager.default.fileExists(atPath: candidate.appendingPathComponent("unique.bin").path))
+            XCTAssertTrue(FileManager.default.fileExists(atPath: candidate.appendingPathComponent("nested/meta.json").path))
+            XCTAssertTrue(FileManager.default.fileExists(atPath: candidate.appendingPathComponent("codec/shared.bin").path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: candidate.appendingPathComponent("stray-old.bin").path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: candidate.appendingPathComponent("stale_dir").path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: candidate.appendingPathComponent("stray-link").path))
+        }
+
+        let installed = models.appendingPathComponent("model-e03", isDirectory: true)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: installed.appendingPathComponent("unique.bin").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: installed.appendingPathComponent("nested/meta.json").path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: installed.appendingPathComponent("codec/shared.bin").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: installed.appendingPathComponent("stray-old.bin").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: installed.appendingPathComponent("stale_dir").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: installed.appendingPathComponent("stray-link").path))
+    }
+
+    /// RF-69: `withPublicationLock` retries `flock(LOCK_EX)` while interrupted by `EINTR`
+    /// and throws `lockFailed` on any non-`EINTR` error.
+    func testAcquireFlockRetryingEINTRRetriesInterruptedAndFailsOnOtherErrors() throws {
+        var attempts = 0
+        try SharedModelComponentStore.acquireFlockRetryingEINTR {
+            attempts += 1
+            return attempts < 3 ? (-1, EINTR) : (0, 0)
+        }
+        XCTAssertEqual(attempts, 3)
+
+        var failingAttempts = 0
+        XCTAssertThrowsError(
+            try SharedModelComponentStore.acquireFlockRetryingEINTR {
+                failingAttempts += 1
+                return failingAttempts == 1 ? (-1, EINTR) : (-1, EBADF)
+            }
+        ) { error in
+            XCTAssertEqual(error as? SharedModelComponentStoreError, .lockFailed(code: EBADF))
+        }
+        XCTAssertEqual(failingAttempts, 2)
     }
 
     /// PA-22 / CORE-08: a model loaded by an earlier build carries the engine's overlay of

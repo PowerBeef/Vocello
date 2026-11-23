@@ -1613,7 +1613,9 @@ final class ModelDownloadLifecycleTests: XCTestCase {
 
     private func makeStubbedDelivery(
         faults: [Int: [RangeStubURLProtocol.Fault]] = [:],
+        rawFaults: [String: [RangeStubURLProtocol.Fault]] = [:],
         ignoreRange: Bool = false,
+        chunkLargeFiles: Bool = true,
         maxRangeRetries: Int = 3,
         maxDownloadRetries: Int = 3,
         cellularAccess: (@Sendable () -> Bool)? = nil
@@ -1622,7 +1624,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         let payload = Data((0..<8_192).map { UInt8(truncatingIfNeeded: $0 &* 31 &+ 7) })
         var configuration = HuggingFaceDownloader.Configuration()
         configuration.maxConcurrentFiles = 1
-        configuration.chunkLargeFiles = true
+        configuration.chunkLargeFiles = chunkLargeFiles
         configuration.chunkedDownloadThreshold = 1_024
         configuration.chunkTargetSize = 1_024
         configuration.chunkWorkerCount = 1
@@ -1635,7 +1637,7 @@ final class ModelDownloadLifecycleTests: XCTestCase {
             chunkSize: configuration.chunkTargetSize,
             tailWorkerCount: configuration.chunkWorkerCount
         )
-        var faultsByHeader: [String: [RangeStubURLProtocol.Fault]] = [:]
+        var faultsByHeader = rawFaults
         for (index, queue) in faults {
             faultsByHeader["bytes=\(ranges[index].start)-\(ranges[index].end)"] = queue
         }
@@ -2076,6 +2078,175 @@ final class ModelDownloadLifecycleTests: XCTestCase {
         )
         XCTAssertEqual(delivery.requests, [delivery.header(0)], "the cancelled range is never re-requested")
     }
+
+    /// RF-69: HTTP 416 maps to `.retryClean` once and fails on a second 416.
+    func testHTTP416PolicyRetriesCleanOnceThenFails() {
+        let error = HuggingFaceDownloader.DownloadError.httpError(
+            statusCode: 416,
+            path: "weights/model.safetensors",
+            retryAfterSeconds: 0
+        )
+        XCTAssertEqual(
+            ModelDownloadRetryPolicy.disposition(
+                error: error,
+                retryNumber: 1,
+                integrityRetryAlreadyUsed: false,
+                rangeNotSatisfiableRetryAlreadyUsed: false
+            ),
+            .retryClean(afterSeconds: 0)
+        )
+        XCTAssertEqual(
+            ModelDownloadRetryPolicy.disposition(
+                error: error,
+                retryNumber: 2,
+                integrityRetryAlreadyUsed: false,
+                rangeNotSatisfiableRetryAlreadyUsed: true
+            ),
+            .fail
+        )
+        let adjustment = HuggingFaceDownloader.chunkFallbackAdjustment(for: error)
+        XCTAssertTrue(adjustment.avoidChunking)
+        XCTAssertTrue(adjustment.clearPartial)
+    }
+
+    /// RF-69: a resumed single-stream Range request receiving HTTP 416 clears its
+    /// partial and retries cleanly without a Range header once, succeeding if the
+    /// clean fetch succeeds and failing immediately on a second 416.
+    @concurrent func testResumedSingleStreamHTTP416RetriesCleanOnceThenFailsOnSecond416() async throws {
+        // Case 1: first Range request returns 416, clean retry without Range succeeds.
+        let recovering = try makeStubbedDelivery(
+            rawFaults: ["bytes=1024-": [.status(416, retryAfter: "0")]],
+            chunkLargeFiles: false
+        )
+        defer { tearDownStubbedDelivery(recovering) }
+        let recoveringPartial = recovering.stagingRoot
+            .appendingPathComponent("partials", isDirectory: true)
+            .appendingPathComponent(Self.stubRelativePath)
+            .appendingPathExtension("partial")
+        try FileManager.default.createDirectory(
+            at: recoveringPartial.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try recovering.payload.prefix(1_024).write(to: recoveringPartial)
+
+        try await recovering.run()
+        XCTAssertEqual(try recovering.installedPayload(), recovering.payload)
+        XCTAssertEqual(
+            recovering.requests,
+            ["bytes=1024-", ""],
+            "416 on a resumed Range clears the partial and retries cleanly without Range"
+        )
+
+        // Case 2: a second 416 on the clean retry fails without further retries.
+        let failing = try makeStubbedDelivery(
+            rawFaults: [
+                "bytes=1024-": [.status(416, retryAfter: "0")],
+                "": [.status(416, retryAfter: "0")],
+            ],
+            chunkLargeFiles: false
+        )
+        defer { tearDownStubbedDelivery(failing) }
+        let failingPartial = failing.stagingRoot
+            .appendingPathComponent("partials", isDirectory: true)
+            .appendingPathComponent(Self.stubRelativePath)
+            .appendingPathExtension("partial")
+        try FileManager.default.createDirectory(
+            at: failingPartial.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try failing.payload.prefix(1_024).write(to: failingPartial)
+
+        do {
+            try await failing.run()
+            XCTFail("a second HTTP 416 must fail")
+        } catch let error as HuggingFaceDownloader.DownloadError {
+            guard case .httpError(let statusCode, _, _) = error else {
+                return XCTFail("expected HTTP 416, got \(error)")
+            }
+            XCTAssertEqual(statusCode, 416)
+        }
+        XCTAssertEqual(failing.requests, ["bytes=1024-", ""])
+    }
+
+    /// RF-69 (E-03): non-shared `installStagedRepository` installs only the exact
+    /// verified artifact relative paths plus the integrity manifest, dropping any
+    /// stray files or directories present in staging.
+    @concurrent func testInstallStagedRepositoryFiltersOutStrayStagedFiles() async throws {
+        let delivery = try makeStubbedDelivery(chunkLargeFiles: false)
+        defer { tearDownStubbedDelivery(delivery) }
+
+        let filesRoot = delivery.stagingRoot.appendingPathComponent("files", isDirectory: true)
+        let strayFile = filesRoot.appendingPathComponent("stray-from-older-version.bin")
+        let strayDirFile = filesRoot
+            .appendingPathComponent("stale_dir", isDirectory: true)
+            .appendingPathComponent("old.txt")
+        try FileManager.default.createDirectory(
+            at: strayDirFile.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data("stray".utf8).write(to: strayFile)
+        try Data("old".utf8).write(to: strayDirFile)
+
+        try await delivery.run()
+
+        XCTAssertEqual(try delivery.installedPayload(), delivery.payload)
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: delivery.targetDir
+                    .appendingPathComponent(ModelAssetIntegrityManifest.filename).path
+            )
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: delivery.targetDir.appendingPathComponent("stray-from-older-version.bin").path
+            ),
+            "stray staged file must never be installed"
+        )
+        XCTAssertFalse(
+            FileManager.default.fileExists(
+                atPath: delivery.targetDir.appendingPathComponent("stale_dir").path
+            ),
+            "stray staged directory must never be installed"
+        )
+    }
+
+    /// RF-69: cancelling the Swift task running a single-stream `downloadTemporaryFile`
+    /// (as CLI Ctrl-C does, without calling `downloader.cancel()`) cancels the underlying
+    /// URLSessionDownloadTask and terminates promptly with `DownloadError.cancelled`.
+    @concurrent func testStructuredTaskCancellationInterruptsSingleStreamDownloadTemporaryFile() async throws {
+        let delivery = try makeStubbedDelivery(
+            rawFaults: ["": [.hangUntilStopped]],
+            chunkLargeFiles: false
+        )
+        defer { tearDownStubbedDelivery(delivery) }
+
+        let started = ContinuousClock.now
+        let transfer = Task { @concurrent in
+            try await delivery.run()
+        }
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while delivery.requests.isEmpty, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertEqual(delivery.requests, [""], "single-stream request must be suspended in downloadTemporaryFile")
+
+        transfer.cancel()
+        do {
+            _ = try await transfer.value
+            XCTFail("a task-cancelled download must not complete")
+        } catch let error as HuggingFaceDownloader.DownloadError {
+            guard case .cancelled = error else {
+                return XCTFail("expected DownloadError.cancelled, got \(error)")
+            }
+        } catch is CancellationError {
+            // Also acceptable if cancellation landed before the continuation suspended.
+        }
+        XCTAssertLessThan(
+            ContinuousClock.now - started,
+            .seconds(5),
+            "structured task cancellation must cancel URLSessionDownloadTask promptly"
+        )
+    }
 }
 
 /// Lock-protected collector for downloader callbacks in the stubbed range-retry tests.
@@ -2105,6 +2276,8 @@ private final class RangeStubURLProtocol: URLProtocol {
         case status(Int, retryAfter: String?)
         /// 206 with the full Content-Range but this many bytes more than the range.
         case oversizedBody(Int)
+        /// Never responds until URLSession cancels the task (`stopLoading()`).
+        case hangUntilStopped
     }
 
     private struct Scenario: Sendable {
@@ -2182,6 +2355,8 @@ private final class RangeStubURLProtocol: URLProtocol {
             var headers: [String: String] = [:]
             if let retryAfter { headers["Retry-After"] = retryAfter }
             respond(statusCode: statusCode, headers: headers, body: Data("unavailable".utf8))
+            return
+        case .hangUntilStopped:
             return
         case .shortBody, .truncatedContentRange, .oversizedBody, nil:
             break

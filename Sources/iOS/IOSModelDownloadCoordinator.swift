@@ -515,7 +515,10 @@ final class IOSModelDownloadCoordinator {
             },
             rollbackRacedInstallation: { rollbackRacedInstallationIfNeeded(active) },
             persistTombstone: { persistCancellationStatus(modelID: modelID, status: .deleted) },
-            removeStaging: { try? fileManager.removeItem(at: active.stagingRoot) },
+            removeStaging: {
+                try? fileManager.removeItem(at: active.stagingRoot)
+                discardStaging(modelID: modelID)
+            },
             publishDeleted: { publishTerminal(modelID: modelID, phase: .deleted) }
         )
         switch outcome {
@@ -624,11 +627,15 @@ final class IOSModelDownloadCoordinator {
                     discardStaging(modelID: request.modelID)
                     ledger.requests[index].status = .failed
                 case .markInstalled:
+                    discardStaging(modelID: request.modelID)
                     ledger.requests[index].status = .installed
-                case .keepFailed, .keepInstalled:
-                    break
+                case .keepFailed:
+                    pruneStaleStagingVersions(modelID: request.modelID, keeping: request.artifactVersion)
+                case .keepInstalled:
+                    discardStaging(modelID: request.modelID)
                 case .requeue:
                     guard let currentDescriptor else { continue }
+                    pruneStaleStagingVersions(modelID: request.modelID, keeping: request.artifactVersion)
                     if request.retryCount > 0 {
                         retryProgressResetModels.insert(request.modelID)
                     }
@@ -736,12 +743,15 @@ final class IOSModelDownloadCoordinator {
                 ? entry.totalBytes
                 : entry.files.reduce(Int64(0)) { $0 + $1.sizeBytes }
             let targetDir = model.installDirectory(in: AppPaths.modelsDir)
-            let stagingRoot = stagingRoot(modelID: model.id)
 
             var ledger = try ledgerStore.load()
             guard let request = ledgerRequest(model.id, in: ledger) else {
                 throw IOSModelDownloadLedgerError.invalidDocument
             }
+            // RF-69 (E-03/ER-10): key staging by (modelID, sanitizedArtifactVersion)
+            // and prune any older version directories before checking free space or transferring.
+            let stagingRoot = stagingRoot(modelID: model.id, artifactVersion: request.artifactVersion)
+            pruneStaleStagingVersions(modelID: model.id, keeping: request.artifactVersion)
             // IOS-20: space is checked again when the transfer actually starts (after
             // a queue wait, or when a relaunch restores the request), for the bytes
             // still to fetch rather than the whole artifact. `receivedBytes` counts
@@ -863,6 +873,8 @@ final class IOSModelDownloadCoordinator {
             guard inflight[model.id]?.operationGeneration == generation,
                   !cancellationBarriers.contains(model.id) else { return }
             inflight.removeValue(forKey: model.id)
+            // Clean up any stale version subdirectories or empty model staging container on activation.
+            discardStaging(modelID: model.id)
             markLedgerTerminal(modelID: model.id, status: .installed, receivedBytes: totalBytes)
             traceCurrentState(
                 layer: "filesystem",
@@ -1258,12 +1270,32 @@ final class IOSModelDownloadCoordinator {
         return recovery.ledger
     }
 
-    private func stagingRoot(modelID: String) -> URL {
-        AppPaths.modelDownloadStagingDir.appendingPathComponent(modelID, isDirectory: true)
+    private func stagingContainer(modelID: String) -> URL {
+        ModelDownloadStagingPaths.modelContainer(
+            in: AppPaths.modelDownloadStagingDir,
+            modelID: modelID
+        )
+    }
+
+    private func stagingRoot(modelID: String, artifactVersion: String) -> URL {
+        ModelDownloadStagingPaths.versionedStagingRoot(
+            in: AppPaths.modelDownloadStagingDir,
+            modelID: modelID,
+            artifactVersion: artifactVersion
+        )
+    }
+
+    private func pruneStaleStagingVersions(modelID: String, keeping artifactVersion: String) {
+        _ = ModelDownloadStagingPaths.pruneStaleVersions(
+            in: AppPaths.modelDownloadStagingDir,
+            modelID: modelID,
+            keepingArtifactVersion: artifactVersion,
+            fileManager: fileManager
+        )
     }
 
     private func discardStaging(modelID: String) {
-        try? fileManager.removeItem(at: stagingRoot(modelID: modelID))
+        try? fileManager.removeItem(at: stagingContainer(modelID: modelID))
     }
 
     @discardableResult
@@ -1634,8 +1666,11 @@ final class IOSModelDownloadCoordinator {
         taskCount: Int? = nil
     ) {
         let request = try? ledgerStore.load().requests.first { $0.modelID == modelID }
-        let staging = stagingInventory(modelID: modelID)
         let model = modelAssetStore.descriptor(id: modelID)?.model
+        let staging = stagingInventory(
+            modelID: modelID,
+            artifactVersion: request?.artifactVersion ?? model?.artifactVersion
+        )
         diagnosticsStore.recordEvent(
             layer: layer,
             event: event,
@@ -1657,8 +1692,13 @@ final class IOSModelDownloadCoordinator {
         )
     }
 
-    private func stagingInventory(modelID: String) -> (fileCount: Int, bytes: Int64) {
-        let root = stagingRoot(modelID: modelID)
+    private func stagingInventory(
+        modelID: String,
+        artifactVersion: String?
+    ) -> (fileCount: Int, bytes: Int64) {
+        let root = artifactVersion.map {
+            stagingRoot(modelID: modelID, artifactVersion: $0)
+        } ?? stagingContainer(modelID: modelID)
         guard let enumerator = fileManager.enumerator(
             at: root,
             includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
@@ -1777,8 +1817,10 @@ final class IOSModelDownloadCoordinator {
             .appendingPathComponent(targetName, isDirectory: true)
         guard fileManager.fileExists(atPath: legacyRoot.path) else { return }
 
-        let destinationRoot = AppPaths.modelDownloadStagingDir
-            .appendingPathComponent(record.modelID, isDirectory: true)
+        let destinationRoot = stagingRoot(
+            modelID: record.modelID,
+            artifactVersion: record.artifactVersion
+        )
         try fileManager.createDirectory(at: destinationRoot, withIntermediateDirectories: true)
         guard let enumerator = fileManager.enumerator(
             at: legacyRoot,

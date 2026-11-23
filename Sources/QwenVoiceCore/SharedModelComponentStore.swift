@@ -679,18 +679,30 @@ public struct SharedModelComponentStore: Sendable {
     /// Builds and atomically publishes a complete installed model from downloader staging.
     ///
     /// Component files may either be present in staging (freshly downloaded) or absent when a
-    /// previously verified store blob is being reused. The complete staged replica is validated
-    /// before publication. The final model exchange and component-liveness publication happen
-    /// under the same cross-process lock, so pruning cannot race through the installation gap.
+    /// previously verified store blob is being reused. When `allowedRelativePaths` is provided
+    /// (E-03), only regular files matching that exact set (plus the plan's verified shared
+    /// component blobs and shared-component manifest) are replicated from staging, preventing
+    /// stray staged files from entering the installed model directory. The complete staged
+    /// replica is validated before publication. The final model exchange and component-liveness
+    /// publication happen under the same cross-process lock, so pruning cannot race through the
+    /// installation gap.
     public func installStagedModel(
         _ plan: SharedComponentMigrationPlan,
         stagedModelURL: URL,
+        allowedRelativePaths: Set<String>? = nil,
         validateInstalledModel: @Sendable (URL) throws -> Void
     ) throws -> SharedComponentMigrationResult {
         try prepareStoreDirectories()
         let stagedModelURL = stagedModelURL.standardizedFileURL
         guard FileManager.default.fileExists(atPath: stagedModelURL.path) else {
             throw SharedModelComponentStoreError.modelNotFound
+        }
+        if let allowedRelativePaths {
+            for path in allowedRelativePaths {
+                guard SharedComponentIdentityValidation.isSafeRelativePath(path) else {
+                    throw SharedModelComponentStoreError.invalidRelativePath
+                }
+            }
         }
 
         // Publish freshly downloaded component files. A missing staged file is eligible only
@@ -728,7 +740,8 @@ public struct SharedModelComponentStore: Sendable {
         do {
             stagedSnapshot = try SharedComponentFileSystem.hardLinkedReplica(
                 source: stagedModelURL,
-                destination: replica
+                destination: replica,
+                allowedRelativePaths: allowedRelativePaths
             )
             for file in plan.manifest.contentIdentity.files {
                 let blob = try blobURL(for: file.sha256)
@@ -767,7 +780,11 @@ public struct SharedModelComponentStore: Sendable {
         })
         do {
             try withPublicationLock {
-                guard try SharedComponentFileSystem.directoryMatches(stagedModelURL, stagedSnapshot) else {
+                guard try SharedComponentFileSystem.directoryMatches(
+                    stagedModelURL,
+                    stagedSnapshot,
+                    allowedRelativePaths: allowedRelativePaths
+                ) else {
                     throw SharedModelComponentStoreError.concurrentModelMutation
                 }
                 for file in plan.manifest.contentIdentity.files {
@@ -1506,11 +1523,28 @@ public struct SharedModelComponentStore: Sendable {
             throw SharedModelComponentStoreError.lockFailed(code: errno)
         }
         defer { close(descriptor) }
-        guard flock(descriptor, LOCK_EX) == 0 else {
-            throw SharedModelComponentStoreError.lockFailed(code: errno)
+        try Self.acquireFlockRetryingEINTR {
+            let result = flock(descriptor, LOCK_EX)
+            return (result, result == 0 ? 0 : errno)
         }
         defer { flock(descriptor, LOCK_UN) }
         return try body()
+    }
+
+    /// Acquires `flock(LOCK_EX)`, retrying on `EINTR` (RF-69).
+    static func acquireFlockRetryingEINTR(
+        lock: () -> (result: Int32, errorCode: Int32)
+    ) throws {
+        while true {
+            let outcome = lock()
+            if outcome.result == 0 {
+                return
+            }
+            if outcome.result == -1, outcome.errorCode == EINTR {
+                continue
+            }
+            throw SharedModelComponentStoreError.lockFailed(code: outcome.errorCode)
+        }
     }
 }
 
@@ -1545,11 +1579,13 @@ public actor SharedModelComponentStoreCoordinator {
     public func installStagedModel(
         _ plan: SharedComponentMigrationPlan,
         stagedModelURL: URL,
+        allowedRelativePaths: Set<String>? = nil,
         validateInstalledModel: @Sendable (URL) throws -> Void
     ) throws -> SharedComponentMigrationResult {
         try store.installStagedModel(
             plan,
             stagedModelURL: stagedModelURL,
+            allowedRelativePaths: allowedRelativePaths,
             validateInstalledModel: validateInstalledModel
         )
     }
@@ -1823,7 +1859,11 @@ private enum SharedComponentFileSystem {
         return lhs.device == rhs.device && lhs.inode == rhs.inode
     }
 
-    static func hardLinkedReplica(source: URL, destination: URL) throws -> DirectorySnapshot {
+    static func hardLinkedReplica(
+        source: URL,
+        destination: URL,
+        allowedRelativePaths: Set<String>? = nil
+    ) throws -> DirectorySnapshot {
         guard !FileManager.default.fileExists(atPath: destination.path) else {
             throw SharedModelComponentStoreError.corruptStoreLayout
         }
@@ -1835,12 +1875,36 @@ private enum SharedComponentFileSystem {
         ) else {
             throw SharedModelComponentStoreError.modelNotFound
         }
+        let allowedDirectories = allowedRelativePaths.map(Self.ancestorDirectories(of:))
         var entries: [String: DirectorySnapshot.Entry] = [:]
         for case let item as URL in enumerator {
-            let relative = try relativePath(of: item, under: source)
             let values = try item.resourceValues(
                 forKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]
             )
+            let relative = try values.isSymbolicLink == true
+                ? entryRelativePath(of: item, under: source)
+                : relativePath(of: item, under: source)
+            if let allowedFiles = allowedRelativePaths, let allowedDirs = allowedDirectories {
+                if values.isSymbolicLink == true {
+                    guard allowedFiles.contains(relative) || allowedDirs.contains(relative) else {
+                        continue
+                    }
+                    throw SharedModelComponentStoreError.nonRegularFile(relativePath: relative)
+                }
+                if values.isDirectory == true {
+                    guard allowedDirs.contains(relative) else {
+                        enumerator.skipDescendants()
+                        continue
+                    }
+                } else if values.isRegularFile == true {
+                    guard allowedFiles.contains(relative) else { continue }
+                } else {
+                    guard allowedFiles.contains(relative) || allowedDirs.contains(relative) else {
+                        continue
+                    }
+                    throw SharedModelComponentStoreError.nonRegularFile(relativePath: relative)
+                }
+            }
             guard values.isSymbolicLink != true else {
                 throw SharedModelComponentStoreError.nonRegularFile(relativePath: relative)
             }
@@ -1862,20 +1926,48 @@ private enum SharedComponentFileSystem {
         return DirectorySnapshot(entries: entries)
     }
 
-    static func directoryMatches(_ root: URL, _ expected: DirectorySnapshot) throws -> Bool {
+    static func directoryMatches(
+        _ root: URL,
+        _ expected: DirectorySnapshot,
+        allowedRelativePaths: Set<String>? = nil
+    ) throws -> Bool {
         guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey],
             options: []
         ) else { return false }
+        let allowedDirectories = allowedRelativePaths.map(Self.ancestorDirectories(of:))
         var actualPaths = Set<String>()
         for case let item as URL in enumerator {
-            let relative = try relativePath(of: item, under: root)
-            actualPaths.insert(relative)
-            guard let expectedValue = expected.entries[relative] else { return false }
             let values = try item.resourceValues(
                 forKeys: [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]
             )
+            let relative = try values.isSymbolicLink == true
+                ? entryRelativePath(of: item, under: root)
+                : relativePath(of: item, under: root)
+            if let allowedFiles = allowedRelativePaths, let allowedDirs = allowedDirectories {
+                if values.isSymbolicLink == true {
+                    guard allowedFiles.contains(relative) || allowedDirs.contains(relative) else {
+                        continue
+                    }
+                    return false
+                }
+                if values.isDirectory == true {
+                    guard allowedDirs.contains(relative) else {
+                        enumerator.skipDescendants()
+                        continue
+                    }
+                } else if values.isRegularFile == true {
+                    guard allowedFiles.contains(relative) else { continue }
+                } else {
+                    guard allowedFiles.contains(relative) || allowedDirs.contains(relative) else {
+                        continue
+                    }
+                    return false
+                }
+            }
+            actualPaths.insert(relative)
+            guard let expectedValue = expected.entries[relative] else { return false }
             guard values.isSymbolicLink != true else { return false }
             switch expectedValue {
             case .file(let expectedFile):
@@ -1885,6 +1977,37 @@ private enum SharedComponentFileSystem {
             }
         }
         return actualPaths == Set(expected.entries.keys)
+    }
+
+    private static func ancestorDirectories(of relativePaths: Set<String>) -> Set<String> {
+        var directories = Set<String>()
+        for path in relativePaths {
+            let components = path.split(separator: "/")
+            guard components.count > 1 else { continue }
+            var prefix = ""
+            for component in components.dropLast() {
+                prefix = prefix.isEmpty ? String(component) : "\(prefix)/\(component)"
+                directories.insert(prefix)
+            }
+        }
+        return directories
+    }
+
+    private static func entryRelativePath(of item: URL, under root: URL) throws -> String {
+        let resolvedRoot = root.resolvingSymlinksInPath().standardizedFileURL.path
+        let resolvedEntry = item.deletingLastPathComponent()
+            .resolvingSymlinksInPath()
+            .appendingPathComponent(item.lastPathComponent)
+            .standardizedFileURL
+            .path
+        guard resolvedEntry.hasPrefix(resolvedRoot + "/") else {
+            throw SharedModelComponentStoreError.invalidRelativePath
+        }
+        let relative = String(resolvedEntry.dropFirst(resolvedRoot.count + 1))
+        guard SharedComponentIdentityValidation.isSafeRelativePath(relative) else {
+            throw SharedModelComponentStoreError.invalidRelativePath
+        }
+        return relative
     }
 
     static func relativePath(of item: URL, under root: URL) throws -> String {

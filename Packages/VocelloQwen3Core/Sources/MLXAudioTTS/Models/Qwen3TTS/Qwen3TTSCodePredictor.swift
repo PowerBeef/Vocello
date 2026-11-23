@@ -46,8 +46,11 @@ final class CodePredictorAttention: Module {
     private(set) var fusedQKV: FusedQuantizedProjection?
 
     /// Call once the parameters are loaded and evaluated.
-    func fuseProjections() {
-        fusedQKV = FusedQuantizedProjection.fuse([qProj, kProj, vProj])
+    @discardableResult
+    func fuseProjections() -> FusedProjectionSummary {
+        let result = FusedQuantizedProjection.fuseWithSummary([qProj, kProj, vProj])
+        fusedQKV = result.projection
+        return result.summary
     }
 
     /// The three projections of `x`, from the fused matrix when `x` is one
@@ -126,8 +129,11 @@ final class CodePredictorMLP: Module {
     private(set) var fusedGateUp: FusedQuantizedProjection?
 
     /// Call once the parameters are loaded and evaluated.
-    func fuseProjections() {
-        fusedGateUp = FusedQuantizedProjection.fuse([gateProj, upProj])
+    @discardableResult
+    func fuseProjections() -> FusedProjectionSummary {
+        let result = FusedQuantizedProjection.fuseWithSummary([gateProj, upProj])
+        fusedGateUp = result.projection
+        return result.summary
     }
 
     /// The gate and up projections of `x`, from the fused matrix when `x` is
@@ -277,11 +283,14 @@ final class Qwen3TTSCodePredictor: Module {
     /// Fuses each layer's projections that share an input (RF-46). Call once
     /// the parameters are loaded and evaluated, before the first compiled
     /// plan is traced: a plan bakes in the projections it was traced with.
-    func fuseProjections() {
+    @discardableResult
+    func fuseProjections() -> FusedProjectionSummary {
+        var summary = FusedProjectionSummary.zero
         for layer in model.layers {
-            layer.selfAttn.fuseProjections()
-            layer.mlp.fuseProjections()
+            summary.formUnion(layer.selfAttn.fuseProjections())
+            summary.formUnion(layer.mlp.fuseProjections())
         }
+        return summary
     }
 
     init(config: Qwen3TTSTalkerCodePredictorConfig, talkerHiddenSize: Int) {

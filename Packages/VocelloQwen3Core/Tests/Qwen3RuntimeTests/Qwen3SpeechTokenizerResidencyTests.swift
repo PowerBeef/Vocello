@@ -2,6 +2,7 @@ import Foundation
 import MLX
 import MLXAudioCodecs
 import MLXLMCommon
+import MLXNN
 @testable import MLXAudioTTS
 import XCTest
 
@@ -537,6 +538,93 @@ final class Qwen3SpeechTokenizerResidencyTests: XCTestCase {
             Qwen3TTSModel.speechTokenizerComponentIdentity(
                 at: root.appendingPathComponent("missing"), includeEncoder: false
             )
+        )
+    }
+
+    /// RF-68 (B1.2): per-layer quantization configs must decode cleanly even
+    /// without `"model_type"` (and from `"quantization_config"`), while any
+    /// malformed per-layer override, unknown field, or boolean `true` throws
+    /// `DecodingError` instead of silently falling back to uniform 4-bit.
+    func testPerLayerQuantizationDecodesWithoutModelTypeAndFailsClosedOnMalformedEntries() throws {
+        // Valid config without "model_type" preserves per-layer overrides and false skips.
+        let validWithoutModelType = #"""
+        {
+          "tts_model_type": "base",
+          "quantization": {
+            "group_size": 64,
+            "bits": 4,
+            "mode": "affine",
+            "model.text_embedding": {"group_size": 64, "bits": 8, "mode": "affine"},
+            "model.layers.0.self_attn.q_proj": {"group_size": 64, "bits": 8, "mode": "affine"},
+            "model.layers.0.self_attn.q_norm": false
+          }
+        }
+        """#
+        let decoded = try JSONDecoder().decode(Qwen3TTSModelConfig.self, from: Data(validWithoutModelType.utf8))
+        XCTAssertEqual(decoded.quantization?.bits, 4)
+        XCTAssertEqual(decoded.quantization?.groupSize, 64)
+        XCTAssertEqual(decoded.perLayerQuantization?.quantization(layer: "model.text_embedding")?.bits, 8)
+        XCTAssertEqual(decoded.perLayerQuantization?.quantization(layer: "model.layers.0.self_attn.q_proj")?.bits, 8)
+        XCTAssertEqual(decoded.perLayerQuantization?.quantization(layer: "model.layers.0.mlp.gate_proj")?.bits, 4)
+        XCTAssertNil(decoded.perLayerQuantization?.quantization(layer: "model.layers.0.self_attn.q_norm"))
+
+        // Valid config using "quantization_config" key instead of "quantization".
+        let validAltKey = #"""
+        {
+          "tts_model_type": "base",
+          "quantization_config": {
+            "group_size": 64,
+            "bits": 4,
+            "model.text_embedding": {"group_size": 64, "bits": 8}
+          }
+        }
+        """#
+        let decodedAlt = try JSONDecoder().decode(Qwen3TTSModelConfig.self, from: Data(validAltKey.utf8))
+        XCTAssertEqual(decodedAlt.perLayerQuantization?.quantization(layer: "model.text_embedding")?.bits, 8)
+
+        // Malformed per-layer entries must throw DecodingError rather than silently dropping overrides.
+        let malformedConfigs: [(label: String, json: String)] = [
+            (
+                "boolean true override",
+                #"{"model_type": "qwen3_tts", "quantization": {"group_size": 64, "bits": 4, "model.layers.0.self_attn.q_proj": true}}"#
+            ),
+            (
+                "missing group_size in per-layer entry",
+                #"{"model_type": "qwen3_tts", "quantization": {"group_size": 64, "bits": 4, "model.layers.0.self_attn.q_proj": {"bits": 8}}}"#
+            ),
+            (
+                "wrong value type for per-layer entry",
+                #"{"model_type": "qwen3_tts", "quantization": {"group_size": 64, "bits": 4, "model.layers.0.self_attn.q_proj": "8bit"}}"#
+            ),
+            (
+                "unexpected metadata key inside quantization",
+                #"{"model_type": "qwen3_tts", "quantization": {"group_size": 64, "bits": 4, "unexpected_metadata": 123}}"#
+            ),
+        ]
+        for (label, json) in malformedConfigs {
+            XCTAssertThrowsError(
+                try JSONDecoder().decode(Qwen3TTSModelConfig.self, from: Data(json.utf8)),
+                "\(label) must fail closed instead of silently dropping per-layer quantization"
+            ) { error in
+                XCTAssertTrue(error is DecodingError, "\(label) threw non-DecodingError: \(error)")
+            }
+        }
+    }
+
+    /// RF-68 (B1.2): prepared-checkpoint verification must enforce shape checks
+    /// alongside unused-key checks so a mismatched tensor fails closed at load time.
+    func testPreparedCheckpointVerifyModeRejectsShapeMismatch() throws {
+        let mode = Qwen3TTSModel.preparedCheckpointVerifyMode(trustPreparedCheckpoint: true)
+        XCTAssertTrue(mode.contains(.noUnusedKeys))
+        XCTAssertTrue(mode.contains(.shapeMismatch))
+
+        let layer = Linear(4, 4, bias: false)
+        let wrongShape = ModuleParameters.unflattened([
+            ("weight", MLXArray.zeros([3, 4], type: Float.self)),
+        ])
+        XCTAssertThrowsError(
+            try layer.update(parameters: wrongShape, verify: mode),
+            "trusted prepared-checkpoint verify mode must reject mismatched tensor shapes"
         )
     }
 }

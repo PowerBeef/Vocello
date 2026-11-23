@@ -144,4 +144,116 @@ final class Qwen3FusedProjectionTests: XCTestCase {
             "a width that is not a multiple of eight could change the one-row kernel"
         )
     }
+
+    /// RF-68 (B1.2): `fuseWithSummary` and `fuseProjections()` must distinguish
+    /// expected float groups from quantized groups that unexpectedly skipped fusion.
+    func testFusedProjectionSummaryTracksFusedSkippedQuantizedAndFloatGroups() throws {
+        let input = 512
+
+        let floatOutcome = FusedQuantizedProjection.fuseWithSummary([
+            Linear(input, 64, bias: false),
+            Linear(input, 64, bias: false),
+        ])
+        XCTAssertNil(floatOutcome.projection)
+        XCTAssertEqual(
+            floatOutcome.summary,
+            FusedProjectionSummary(fusedGroupCount: 0, skippedQuantizedGroupCount: 0, floatGroupCount: 1)
+        )
+
+        let fusedOutcome = FusedQuantizedProjection.fuseWithSummary([
+            quantizedLayer(input, 64, seed: 12),
+            quantizedLayer(input, 64, seed: 13),
+        ])
+        XCTAssertNotNil(fusedOutcome.projection)
+        XCTAssertEqual(
+            fusedOutcome.summary,
+            FusedProjectionSummary(fusedGroupCount: 1, skippedQuantizedGroupCount: 0, floatGroupCount: 0)
+        )
+
+        let mismatchedBitsOutcome = FusedQuantizedProjection.fuseWithSummary([
+            quantizedLayer(input, 64, seed: 14),
+            QuantizedLinear(weight: MLXRandom.normal([64, input]), bias: nil, groupSize: 64, bits: 8),
+        ])
+        XCTAssertNil(mismatchedBitsOutcome.projection)
+        XCTAssertEqual(
+            mismatchedBitsOutcome.summary,
+            FusedProjectionSummary(fusedGroupCount: 0, skippedQuantizedGroupCount: 1, floatGroupCount: 0)
+        )
+
+        let mixedFloatAndQuantizedOutcome = FusedQuantizedProjection.fuseWithSummary([
+            quantizedLayer(input, 64, seed: 15),
+            Linear(input, 64, bias: false),
+        ])
+        XCTAssertNil(mixedFloatAndQuantizedOutcome.projection)
+        XCTAssertEqual(
+            mixedFloatAndQuantizedOutcome.summary,
+            FusedProjectionSummary(fusedGroupCount: 0, skippedQuantizedGroupCount: 1, floatGroupCount: 0)
+        )
+
+        // End-to-end talker summary: 2 talker layers + 1 code-predictor layer = 6 groups.
+        let talkerJSON = """
+        {
+          "vocab_size": 1040,
+          "hidden_size": 64,
+          "intermediate_size": 64,
+          "num_hidden_layers": 2,
+          "num_attention_heads": 2,
+          "num_key_value_heads": 2,
+          "head_dim": 32,
+          "hidden_act": "silu",
+          "max_position_embeddings": 128,
+          "rms_norm_eps": 1e-6,
+          "rope_theta": 10000,
+          "attention_bias": false,
+          "num_code_groups": 3,
+          "text_hidden_size": 64,
+          "text_vocab_size": 64,
+          "code_predictor_config": {
+            "vocab_size": 16,
+            "hidden_size": 64,
+            "intermediate_size": 64,
+            "num_hidden_layers": 1,
+            "num_attention_heads": 2,
+            "num_key_value_heads": 2,
+            "head_dim": 32,
+            "hidden_act": "silu",
+            "max_position_embeddings": 64,
+            "rms_norm_eps": 1e-6,
+            "rope_theta": 10000,
+            "attention_bias": false,
+            "attention_dropout": 0,
+            "num_code_groups": 3
+          }
+        }
+        """
+        let talkerConfig = try JSONDecoder().decode(Qwen3TTSTalkerConfig.self, from: Data(talkerJSON.utf8))
+
+        let floatTalker = Qwen3TTSTalkerForConditionalGeneration(config: talkerConfig)
+        XCTAssertEqual(
+            floatTalker.fuseProjections(),
+            FusedProjectionSummary(fusedGroupCount: 0, skippedQuantizedGroupCount: 0, floatGroupCount: 6)
+        )
+
+        let quantizedTalker = Qwen3TTSTalkerForConditionalGeneration(config: talkerConfig)
+        quantize(model: quantizedTalker, groupSize: 64, bits: 4)
+        eval(quantizedTalker)
+        XCTAssertEqual(
+            quantizedTalker.fuseProjections(),
+            FusedProjectionSummary(fusedGroupCount: 6, skippedQuantizedGroupCount: 0, floatGroupCount: 0)
+        )
+
+        // Breaking one quantized group (mismatched precision on up_proj) reports skippedQuantizedGroupCount == 1.
+        let mismatchedTalker = Qwen3TTSTalkerForConditionalGeneration(config: talkerConfig)
+        quantize(model: mismatchedTalker) { path, _ in
+            if path == "model.layers.0.mlp.up_proj" {
+                return (64, 8, .affine)
+            }
+            return (64, 4, .affine)
+        }
+        eval(mismatchedTalker)
+        XCTAssertEqual(
+            mismatchedTalker.fuseProjections(),
+            FusedProjectionSummary(fusedGroupCount: 5, skippedQuantizedGroupCount: 1, floatGroupCount: 0)
+        )
+    }
 }

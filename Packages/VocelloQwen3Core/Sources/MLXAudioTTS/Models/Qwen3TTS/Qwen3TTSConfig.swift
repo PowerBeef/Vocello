@@ -566,18 +566,80 @@ public struct Qwen3TTSModelConfig: Decodable, Sendable {
         case sampleRate = "sample_rate"
     }
 
+    private struct DynamicCodingKey: CodingKey {
+        let stringValue: String
+        let intValue: Int?
+
+        init(stringValue: String) {
+            self.stringValue = stringValue
+            self.intValue = Int(stringValue)
+        }
+
+        init(intValue: Int) {
+            self.stringValue = "\(intValue)"
+            self.intValue = intValue
+        }
+    }
+
+    /// RF-68 (B1.2): explicitly decodes global and per-layer quantization from
+    /// `"quantization"` or `"quantization_config"` without requiring top-level
+    /// `"model_type"`. Any malformed per-layer entry, wrong value type, or
+    /// boolean `true` throws `DecodingError` instead of silently dropping
+    /// per-layer overrides and falling back to uniform quantization.
+    private static func decodePerLayerQuantization(
+        from container: KeyedDecodingContainer<CodingKeys>,
+        forKey key: CodingKeys
+    ) throws -> (quantization: BaseConfiguration.Quantization, perLayer: BaseConfiguration.PerLayerQuantization)? {
+        guard container.contains(key) else {
+            return nil
+        }
+        if try container.decodeNil(forKey: key) {
+            return nil
+        }
+        let globalQuant = try container.decode(BaseConfiguration.Quantization.self, forKey: key)
+        let nested = try container.nestedContainer(keyedBy: DynamicCodingKey.self, forKey: key)
+        var overrides: [String: BaseConfiguration.QuantizationOption] = [:]
+        for layerKey in nested.allKeys {
+            switch layerKey.stringValue {
+            case "group_size", "bits", "mode", "quant_method", "linear_class", "quantization_mode":
+                continue
+            default:
+                if let flag = try? nested.decode(Bool.self, forKey: layerKey) {
+                    guard !flag else {
+                        throw DecodingError.dataCorruptedError(
+                            forKey: layerKey,
+                            in: nested,
+                            debugDescription: "Per-layer quantization boolean override must be false (skip), not true"
+                        )
+                    }
+                    overrides[layerKey.stringValue] = .skip
+                } else {
+                    let layerQuant = try nested.decode(BaseConfiguration.Quantization.self, forKey: layerKey)
+                    overrides[layerKey.stringValue] = .quantize(layerQuant)
+                }
+            }
+        }
+        return (
+            globalQuant,
+            BaseConfiguration.PerLayerQuantization(
+                quantization: globalQuant,
+                perLayerQuantization: overrides
+            )
+        )
+    }
+
     public init(from decoder: Swift.Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        let baseConfig = try? BaseConfiguration(from: decoder)
         modelType = try c.decodeIfPresent(String.self, forKey: .modelType) ?? "qwen3_tts"
         talkerConfig = try c.decodeIfPresent(Qwen3TTSTalkerConfig.self, forKey: .talkerConfig)
         speakerEncoderConfig = try c.decodeIfPresent(Qwen3TTSSpeakerEncoderConfig.self, forKey: .speakerEncoderConfig)
             ?? Qwen3TTSSpeakerEncoderConfig()
         tokenizerConfig = try c.decodeIfPresent(Qwen3TTSTokenizerConfig.self, forKey: .tokenizerConfig)
-        let globalQuant = try c.decodeIfPresent(BaseConfiguration.Quantization.self, forKey: .quantization)
-        let altGlobalQuant = try c.decodeIfPresent(BaseConfiguration.Quantization.self, forKey: .quantizationConfig)
-        quantization = globalQuant ?? altGlobalQuant
-        perLayerQuantization = baseConfig?.perLayerQuantization
+        let primaryQuant = try Self.decodePerLayerQuantization(from: c, forKey: .quantization)
+        let altQuant = try Self.decodePerLayerQuantization(from: c, forKey: .quantizationConfig)
+        let resolvedQuant = primaryQuant ?? altQuant
+        quantization = resolvedQuant?.quantization
+        perLayerQuantization = resolvedQuant?.perLayer
         tokenizerType = try c.decodeIfPresent(String.self, forKey: .tokenizerType) ?? "qwen3_tts_tokenizer_12hz"
         ttsModelSize = try c.decodeIfPresent(String.self, forKey: .ttsModelSize) ?? "0b6"
         ttsModelType = try c.decodeIfPresent(String.self, forKey: .ttsModelType) ?? "base"

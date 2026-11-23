@@ -167,8 +167,11 @@ final class TalkerAttention: Module {
     private(set) var fusedQKV: FusedQuantizedProjection?
 
     /// Call once the parameters are loaded and evaluated.
-    func fuseProjections() {
-        fusedQKV = FusedQuantizedProjection.fuse([qProj, kProj, vProj])
+    @discardableResult
+    func fuseProjections() -> FusedProjectionSummary {
+        let result = FusedQuantizedProjection.fuseWithSummary([qProj, kProj, vProj])
+        fusedQKV = result.projection
+        return result.summary
     }
 
     init(config: Qwen3TTSTalkerConfig, layerIdx: Int) {
@@ -243,8 +246,11 @@ final class TalkerMLP: Module {
     private(set) var fusedGateUp: FusedQuantizedProjection?
 
     /// Call once the parameters are loaded and evaluated.
-    func fuseProjections() {
-        fusedGateUp = FusedQuantizedProjection.fuse([gateProj, upProj])
+    @discardableResult
+    func fuseProjections() -> FusedProjectionSummary {
+        let result = FusedQuantizedProjection.fuseWithSummary([gateProj, upProj])
+        fusedGateUp = result.projection
+        return result.summary
     }
 
     func callAsFunction(_ x: MLXArray) -> MLXArray {
@@ -472,12 +478,15 @@ final class Qwen3TTSTalkerForConditionalGeneration: Module {
     /// Fuses the projections that share an input, in the talker and in the
     /// code predictor (RF-46). Call once the parameters are loaded and
     /// evaluated; a float checkpoint is left as it is.
-    func fuseProjections() {
+    @discardableResult
+    func fuseProjections() -> FusedProjectionSummary {
+        var summary = FusedProjectionSummary.zero
         for layer in model.layers {
-            layer.selfAttn.fuseProjections()
-            layer.mlp.fuseProjections()
+            summary.formUnion(layer.selfAttn.fuseProjections())
+            summary.formUnion(layer.mlp.fuseProjections())
         }
-        codePredictor.fuseProjections()
+        summary.formUnion(codePredictor.fuseProjections())
+        return summary
     }
 
     func makeRotatingCache(keep: Int, window: Int) -> [any KVCache] {

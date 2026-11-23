@@ -478,6 +478,9 @@ extension Qwen3TTSModel {
         }
         talkerTimingsMS["talker_quantize_prepare"] = talkerQuantizeStartedAt.elapsedMilliseconds
 
+        let talkerVerifyMode = Self.preparedCheckpointVerifyMode(
+            trustPreparedCheckpoint: loadOptions.trustPreparedCheckpoint && !usedSibling
+        )
         await emitPreparedLoadDiagnostic(
             diagnosticEventSink,
             action: "qwen-talker-before-update",
@@ -487,13 +490,12 @@ extension Qwen3TTSModel {
                 extra: [
                     "ttsModelType": config.ttsModelType,
                     "talkerPairCount": "\(talkerPairs.count)",
-                    "verifyMode": loadOptions.trustPreparedCheckpoint ? "no_unused_keys" : "all",
+                    "verifyMode": loadOptions.trustPreparedCheckpoint && !usedSibling
+                        ? "no_unused_keys_and_shape_mismatch"
+                        : "all",
                 ]
             )
         )
-        let talkerVerifyMode: Module.VerifyUpdate = loadOptions.trustPreparedCheckpoint && !usedSibling
-            ? .noUnusedKeys
-            : .all
 
         let talkerUpdateStartedAt = ContinuousClock.now
         try talker.update(
@@ -595,9 +597,18 @@ extension Qwen3TTSModel {
         // layer's originals are released as it is fused and the transient is
         // one layer's projections.
         let talkerFuseStartedAt = ContinuousClock.now
-        talker.fuseProjections()
+        let fusionSummary = talker.fuseProjections()
         Memory.clearCache()
         talkerTimingsMS["talker_projection_fuse"] = talkerFuseStartedAt.elapsedMilliseconds
+        talkerTimingsMS["talker_projection_fused_groups"] = fusionSummary.fusedGroupCount
+        talkerTimingsMS["talker_projection_skipped_quantized_groups"] = fusionSummary.skippedQuantizedGroupCount
+        talkerTimingsMS["talker_projection_float_groups"] = fusionSummary.floatGroupCount
+        if fusionSummary.skippedQuantizedGroupCount > 0 {
+            qwen3TTSLog(
+                "Warning: skipped quantized projection fusion for \(fusionSummary.skippedQuantizedGroupCount) group(s) "
+                    + "(fused=\(fusionSummary.fusedGroupCount), float=\(fusionSummary.floatGroupCount))"
+            )
+        }
 
         return LoadedTalkerComponents(
             talker: talker,
@@ -1067,6 +1078,13 @@ extension Qwen3TTSModel {
     }
 
     /// The talker's text embedding as the model's parameter tree names it.
+    /// RF-68 (B1.2): trusted prepared checkpoints skip only the full key-completeness
+    /// check while keeping both unused-key and shape-mismatch verification enabled
+    /// (O(1) tensor metadata comparison, zero array evaluation).
+    static func preparedCheckpointVerifyMode(trustPreparedCheckpoint: Bool) -> Module.VerifyUpdate {
+        trustPreparedCheckpoint ? [.noUnusedKeys, .shapeMismatch] : .all
+    }
+
     private static let textEmbeddingModuleKey = "model.text_embedding"
 
     /// A row reader over the checkpoint's text embedding, or nil when the
@@ -1297,7 +1315,7 @@ extension Qwen3TTSModel {
             var pairs = sanitized.map { ($0.key, $0.value) }
             try speechTokenizer.update(
                 parameters: ModuleParameters.unflattened(pairs),
-                verify: trustPreparedCheckpoint ? .noUnusedKeys : .all
+                verify: Self.preparedCheckpointVerifyMode(trustPreparedCheckpoint: trustPreparedCheckpoint)
             )
             pairs.removeAll(keepingCapacity: false)
             sanitized.removeAll(keepingCapacity: false)

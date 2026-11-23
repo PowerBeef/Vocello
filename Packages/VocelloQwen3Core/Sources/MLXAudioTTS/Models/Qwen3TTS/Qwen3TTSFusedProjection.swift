@@ -26,6 +26,22 @@ import MLXNN
 /// stay usable on their own. Nothing updates a loaded talker's parameters
 /// today (a reload builds a new one); code that ever does must fuse again,
 /// because a holder keeps the arrays it was built from.
+/// Summary of quantized projection fusion across one or more projection groups
+/// (RF-46, RF-68).
+struct FusedProjectionSummary: Equatable, Sendable {
+    var fusedGroupCount: Int = 0
+    var skippedQuantizedGroupCount: Int = 0
+    var floatGroupCount: Int = 0
+
+    static let zero = FusedProjectionSummary()
+
+    mutating func formUnion(_ other: FusedProjectionSummary) {
+        fusedGroupCount += other.fusedGroupCount
+        skippedQuantizedGroupCount += other.skippedQuantizedGroupCount
+        floatGroupCount += other.floatGroupCount
+    }
+}
+
 struct FusedQuantizedProjection {
     let weight: MLXArray
     let scales: MLXArray
@@ -94,6 +110,20 @@ struct FusedQuantizedProjection {
             bits: first.bits,
             outputRanges: ranges
         )
+    }
+
+    /// Fuses `layers` and classifies the outcome so callers can distinguish
+    /// expected float groups from quantized groups that unexpectedly skipped fusion.
+    static func fuseWithSummary(
+        _ layers: [Linear]
+    ) -> (projection: FusedQuantizedProjection?, summary: FusedProjectionSummary) {
+        if let projection = fuse(layers) {
+            return (projection, FusedProjectionSummary(fusedGroupCount: 1))
+        }
+        if layers.contains(where: { $0 is QuantizedLinear }) {
+            return (nil, FusedProjectionSummary(skippedQuantizedGroupCount: 1))
+        }
+        return (nil, FusedProjectionSummary(floatGroupCount: 1))
     }
 
     /// Whether `x` is a single row of the fused input width: the one shape

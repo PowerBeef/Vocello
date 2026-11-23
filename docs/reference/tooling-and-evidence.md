@@ -2,7 +2,7 @@
 status: active
 owner: release-qa
 summary: Tooling, CI, packaging, benchmark and evidence rule; Antigravity loads it on demand through .agents/plugins/vocello/rules/tooling.md when matching files are touched.
-reviewed: 2026-11-21
+reviewed: 2026-11-23
 paths:
   - "scripts/**"
   - ".github/**"
@@ -185,7 +185,15 @@ rules they enforce:
   agree for consensus, and shared metrics live in `scripts/lib/language_metrics.py` and
   `scripts/lib/audio_qc.py`. Labels, transcripts and take paths stay under `build/private/qc`; Git
   holds aggregates and digests. Every QC model's weights carry a commercial-use license
-  (`config/qc/models.json`).
+  (`config/qc/models.json`). As a separate, strictly offline and report-only advisory complement
+  (`RF-72`, 2026-11-23), `scripts/qc.py multimodal` (`config/qc/multimodal-rubric-v1.json`,
+  `vocello-audio-qc`) runs blinded two-pass and dual-order `AB`/`BA` pairwise listening on Gemini 4
+  Neon via Antigravity `read_file` and `run_workflow`. It sits strictly outside QC v2
+  `SCORING_SOURCES` and Fast QC, blocks personal audio and clone confirm clips by default, writes
+  all staged audio and per-take verdicts under git-ignored `build/private/qc/multimodal/`, and
+  publishes only aggregate Q1/Q2 calibration receipts (`benchmarks/qc/multimodal-eval-v1.json`:
+  `diction`, `delivery`, and `pairwise` `active_advisory`; static `clone` verification fail-closed
+  at `abstain_uncalibrated`). It never gates CI or releases and never alters QC v2 `scoring_identity()`.
 - **UI timing gates are declared.** The macOS UI benchmark's stall gate takes its statistic, limit and
   calibration profile from `config/macos-ui-stall-gate.json`; a provisional limit only reports, and only
   a contract calibrated with its run IDs fails a run. A calibrated gate fails a run with a take above

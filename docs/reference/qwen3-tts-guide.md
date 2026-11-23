@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-15
+reviewed: 2026-11-23
 summary: Model reference for the Qwen3-TTS checkpoints Vocello ships — the upstream family, the shipped artifacts and conversion recipe, the architecture, generation semantics as shipped after RF-18 and CONV-21, languages and speakers, the failure catalogue and the parity ledger.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift
@@ -781,12 +781,15 @@ updated for RF-18. The upstream readings in the clone, loop and number rows were
 - **Korean long-form projects stop most often (RF-60).** Of the 12 Korean projects of seed sets 13
   to 15 (Mac, Expressive), Speed generated 3, the `attn` hybrid 6 and Quality 9. A segment that fails
   Fast QC stops its project, and resuming it generates a new take of that segment. No recipe
-  screened so far closes the gap: an 8-bit code predictor showed nothing (RF-55), and the hybrid
-  refuses 6 against Speed's 9. So the maintainer chose on 2026-11-13 to document the limitation and warn
-  up front: both apps show a caution under a long-form script that Auto sends as Korean
-  (`GenerationSemantics.resolvesToKorean`, before Generate and in the Mac batch sheet), and `vocello` adds a
-  `long_form_korean` warning. Korean single takes refuse far less often (Speed 4 of 52 exploratory
-  takes, Quality none). The iPhone's Korean long-form rate is not measured.
+  screened so far closes the gap: an 8-bit code predictor showed nothing (RF-55), full-text
+  conditioning (`D1`) on shipped `hybrid-attn` (`long-form-korean-d1-attn`, RF-70 Exp 1, 2026-11-23)
+  was decisively `REJECT`ed (2/3 seed sets spiked `+0.152` and `+0.324` in paired error rate from
+  32–44 s of skipped text), and the hybrid refuses 6 against Speed's 9. So the maintainer chose on
+  2026-11-13 to document the limitation and warn up front: both apps show a caution under a
+  long-form script that Auto sends as Korean (`GenerationSemantics.resolvesToKorean`, before
+  Generate and in the Mac batch sheet; also surfaced directly in the Mac and iOS UIs since `bb006502`),
+  and `vocello` adds a `long_form_korean` warning. Korean single takes refuse far less often (Speed
+  4 of 52 exploratory takes, Quality none). The iPhone's Korean long-form rate is not measured.
 - **Single takes see their whole text (D1, adopted 2026-10-20, RF-21).** With the streaming text
   layout, a short take that opened with a sigh or a long pause could feed its whole script before
   speech started; the talker then saw only `tts_pad` and whispered or mumbled (a French take ran to

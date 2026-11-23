@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-21
+reviewed: 2026-11-23
 summary: Vocello's hybrid (mixed-precision) Qwen3-TTS model, RF-55 — the recipe and why, how it is built from the two 3.0 artifacts, the identity proof, the evidence that chose it, how it was delivered, and what one model means for the backend.
 sourceOfTruth:
   - scripts/build_hybrid_model.py
@@ -83,9 +83,15 @@ python3 scripts/build_hybrid_model.py self-test
     revision is the SHA-1 of its file list, a content identity that changes with any byte;
   - the folder and the repository must both name Qwen3-TTS (`Qwen3TTSRuntimeProfile`); a local build's
     repository is `local/<folder>`. **A published name must keep "Qwen3-TTS" in it.**
-- **The diagnostic key.** `QWENVOICE_MIXED_PRECISION=attn` (a diagnostics build with `QWENVOICE_DEBUG=1`)
-  takes the same tensors from the installed 8-bit sibling at load, so a recipe can be screened before
-  anything is built. It needs both siblings installed, so it is Mac-only.
+- **The diagnostic key.** `QWENVOICE_MIXED_PRECISION=<recipe>` (a diagnostics build with
+  `QWENVOICE_DEBUG=1`) takes the recipe's tensors from the installed 8-bit sibling at load so a
+  recipe can be screened before anything is built. It needs both 3.0 siblings installed (Mac-only)
+  and `validateMixedPrecisionTarget` refuses to overlay onto an already-hybrid checkpoint. Since
+  `4a42d25d` (`RF-70`), the recipes include Pack C's `attn-io` (131 modules, `+24.12 MB` over `attn`:
+  `attn` plus `text_projection`, `codec_head`, `small_to_mtp_projection`, and all 15 code-predictor
+  `lm_head`s) and `attn-io-edge` (143 modules, `+99.61 MB` over `attn`: `attn-io` plus edge talker
+  layers `0, 1, 26, 27` MLPs), and `scripts/build_hybrid_model.py` copies and verifies optional
+  `.bias` tensors alongside `.weight`/`.scales`/`.biases` for non-layer I/O projections.
 
 ## 3. Identity proof
 
@@ -234,17 +240,25 @@ view: `attn` replaces both Speed and Quality, and the selector goes (RF-59). Its
 - **The selector.** A mode with one model shows no Speed/Quality switch, no "Prefer lower-memory
   models" toggle, and a package row that reads Model. `--variant quality`, `models use … quality` and
   `models prefer-lower-memory` parse, warn `variant_retired` and change nothing.
-- **Tooling.** The publisher reads a hybrid's quantization as the runtime does (4-bit, its config's
-  top-level bits), and quality promotion's `quality-generation` capability applies nowhere.
+- **Tooling.** Since `efe6400f` (`RF-69`), the runtime (`ModelQuantization.hybrid`) and benchmark
+  tooling (`schema-v2.json`, `schema-v3.json`, `publish_benchmark_history.py`, `benchmark_history.py`)
+  classify any checkpoint carrying per-layer `quantization` entries alongside top-level `quantization`
+  as `"hybrid"` rather than `"4-bit"`, and quality promotion's `quality-generation` capability applies
+  nowhere.
 
-**iPhone qualification & next steps (2026-11-21):** Wave 5 measured the shipped `attn` hybrid on
+**iPhone qualification & Pack B/C progress (2026-11-23):** Wave 5 measured the shipped `attn` hybrid on
 the canonical iPhone 17 Pro (`5cc8ed43`: UI benchmark 29/29 PASS in `f1e8631c`, retained memory 9/9
 PASS with 0 MB retained growth in `c2b75046` — warm Custom 1,969 MB, Design 1,949 MB, Clone 2,503 MB /
 3,584 MB cold peak; `cloneCapableMinimumProcessLimitBytes` aligned to 4,779 MiB in `1d8397f6`).
 `config/public-product-facts.json`, the README and the website moved to the one model with the 3.1
-Mac/CLI publication (RF-61). RF-58 (one take variation, Expressive) landed first. Further hybrid
-refinements (Pack C: `RF-70`, zero-weight Korean `D1`, Bundle A `+24.12 MB`, Bundle B `+99.62 MB`)
-sit behind `RF-57` machine screens ahead of the 3.2 release and 3.2.0 iOS App Store submission.
+Mac/CLI publication (RF-61). RF-58 (one take variation, Expressive) landed first. Pack B (`RF-68` Mac
+work & `RF-69`) landed bit-identical on the Mac (14/14 PCM takes, quiet-Mac retained memory
+`mac-memory-qualification-20261123-180900-4b639d73`: `0.0 MB` cross-model leak, Clone cold MLX peak
+`3,749.3 MB` / `3,084.5 MB` retained). Under Pack C (`RF-70`), Experiment 1 (`long-form-korean-d1-attn`,
+full-text conditioning `D1` on shipped `hybrid-attn`) was decisively `REJECT`ed on 2026-11-23 (2/3
+seed sets jumped `+0.152` and `+0.324` in paired error rate from 32–44 s of skipped text); Bundle A
+(`attn-io`, `+24.12 MB`) and Bundle B (`attn-io-edge`, `+99.61 MB`) remain next behind their
+pre-registered `RF-57` screens ahead of the 3.2 release and 3.2.0 iOS App Store submission.
 
 ## 7. Licence and attribution
 

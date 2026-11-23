@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-21
+reviewed: 2026-11-23
 summary: Setting up a new Mac, the local edit loop, the commit lint and how push CI routes lanes; scripts/dev.sh is the interface and CI on main is the gate.
 sourceOfTruth:
   - scripts/dev.sh
@@ -169,7 +169,7 @@ Never copy `build/` from another machine; rebuild it.
 
 Open the clone in Antigravity at the repository root; Antigravity automatically discovers `AGENTS.md`,
 `website/AGENTS.md` (when touching website files), `.agents/hooks.json` and the workspace plugin
-under `.agents/plugins/vocello/` (glob-triggered domain rules, six `vocello-*` skills and two
+under `.agents/plugins/vocello/` (glob-triggered domain rules, seven `vocello-*` skills and two
 read-only subagents). Verify hooks and discovery in a fresh session following the
 [fresh-session procedure](#antigravity-setup-and-tool-routing).
 
@@ -572,7 +572,7 @@ are in [`tooling-and-evidence.md`](tooling-and-evidence.md), Host preflight.
 
 Antigravity reads `AGENTS.md` at the repository root and `website/AGENTS.md` when website files are
 touched. `.agents/plugins/vocello/` packages the glob-triggered domain rules (`rules/native.md`,
-`rules/tooling.md`), the six `vocello-*` skills (`skills/`) and the two read-only subagents
+`rules/tooling.md`), the seven `vocello-*` skills (`skills/`) and the two read-only subagents
 (`agents/vocello-swift-review.md`, `agents/vocello-xcresult-triage.md`). Reusable `run_workflow`
 orchestration scripts live in `.agents/workflows/` (excluded from Ruff/Pyright because they use
 top-level `await` and runtime-injected workflow primitives; see `.agents/workflows/README.md`). No
@@ -606,7 +606,9 @@ the lead's model; read-only research/visual/policy sweeps may use a lighter tier
 - **Gemini 4 Carbon (`model="pro"` / lead):** architecture changes, MLX runtime and concurrency fixes,
   root-cause crash/Instruments triage, release-critical and adversarial Swift reviews.
 - **Gemini 4 Neon (`model="inherit"`):** daily Swift/Python/website implementation, editing worktree
-  subagents (`Workspace: "share"`), contract/test authoring, CI maintenance.
+  subagents (`Workspace: "share"`), contract/test authoring, CI maintenance, and the calibrated
+  offline/report-only multimodal audio QC complement (`scripts/qc.py multimodal`, `vocello-audio-qc`,
+  blinded two-pass & dual-order `AB`/`BA` listening via `run_workflow` + native `read_file`).
 - **Gemini 4 Hydrogen (`model="flash"` / `"flash_lite"`):** parallel multimodal XCUITest screenshot QA,
   read-only codebase discovery, privacy/release-policy sweeps, QC v2 metric fan-out, log summarization.
 
@@ -671,7 +673,7 @@ routed so a deletion or reintroduction still runs the hook tests; harness-only e
 behavioral checks without triggering native builds.
 
 For a fresh-session smoke check, start a new Antigravity conversation at the repository root. Confirm:
-the `SessionStart` banner ("AGENTS.md: Start here"); `AGENTS.md` loaded (and no `CLAUDE.md`); the six
+the `SessionStart` banner ("AGENTS.md: Start here"); `AGENTS.md` loaded (and no `CLAUDE.md`); the seven
 `vocello-*` skills and both read-only subagents discoverable; harmless guard fixtures denied
 (`git switch -c smoke`, an `edit_file` on `docs/ROADMAP.md`, `call_mcp_tool` to `mobilebuildmcp`
 `list_sims` or `cua-driver_cua-driver` `list_apps`); an external write (`git push --dry-run` or

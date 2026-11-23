@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-15
+reviewed: 2026-11-23
 summary: Testing entry point and evidence boundaries; platform guides own execution, the development workflow owns the edit loop, and delivery research stays opt-in.
 sourceOfTruth:
   - scripts/check_project_inputs.sh
@@ -42,10 +42,10 @@ weaknesses within their existing owner, then retire the obsolete execution path.
 
 ## Antigravity QA shortcuts
 
-Routine edits use `scripts/dev.sh`; no skill is required. The six `vocello-*` workspace skills in
+Routine edits use `scripts/dev.sh`; no skill is required. The seven `vocello-*` workspace skills in
 `.agents/plugins/vocello/skills/` select the existing iOS, macOS UI, device diagnostics, benchmark,
-debugging and read-only release-readiness procedures; they add no gate or authority
-([tool routing](development-workflow.md#antigravity-setup-and-tool-routing)).
+debugging, offline multimodal audio QC and read-only release-readiness procedures; they add no gate
+or authority ([tool routing](development-workflow.md#antigravity-setup-and-tool-routing)).
 
 ### Read a finished run
 

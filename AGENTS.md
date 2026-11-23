@@ -81,12 +81,15 @@ and re-render in one call. `docs/ARCHITECTURE.md` traces ownership and lifecycle
   catalog (`Sources/Resources/qwenvoice_ios_model_catalog.json`), plus
   `config/model-artifact-receipts.json` for a Mac-only artifact.
   Hosts download, verify, then atomically activate complete artifacts; never infer checksums.
-- **Audio quality:** three separate systems. In-app Fast QC ships with every take; QC v2
-  (`scripts/qc.py`, `scripts/qc/`, `config/qc/`) is an offline, report-only harness whose `gate`
-  exits 0 pass, 1 fail, 2 error, 3 warn, 4 NOT_ASSESSED; older prosody/delivery/clone gates remain.
-  No automated score is a quality verdict. For 3.x nobody listens (maintainer decision 2026-10-13):
-  machine screens catch gross failures only, and subtle defects ship as a documented known limitation
-  (detail: `docs/reference/tooling-and-evidence.md`, Audio QA).
+- **Audio quality:** in-app Fast QC gates every shipped take; QC v2 (`scripts/qc.py`, `scripts/qc/`,
+  `config/qc/`) is an offline, report-only harness whose `gate` exits 0 pass, 1 fail, 2 error, 3 warn,
+  4 NOT_ASSESSED; older prosody/delivery/clone gates remain. As a separate, strictly offline and
+  report-only advisory complement (`RF-72`, `scripts/qc.py multimodal`, `vocello-audio-qc`,
+  calibrated in `benchmarks/qc/multimodal-eval-v1.json`), Gemini 4 Neon performs blinded listening and
+  dual-order pairwise audits strictly outside QC v2 `SCORING_SOURCES` and Fast QC, blocking personal
+  audio by default. No automated score is a quality verdict. For 3.x nobody listens (maintainer
+  decision 2026-10-13): machine screens catch gross failures only, and subtle defects ship as a
+  documented known limitation (detail: `docs/reference/tooling-and-evidence.md`, Audio QA).
 - **Website** (`website/`): React 19 + Vite SSR/prerender, Playwright acceptance, deployed by Vercel
   from Git. Its rules are in `website/AGENTS.md`.
 
@@ -141,8 +144,9 @@ Lanes, learned on the 3.1 run (2026-11-14):
   TestFlight builds):** the `focusLock` in `config/roadmap.json` makes `release-first-3-0-2026-09`
   the only plan with live work, at most `focusLock.maxInFlight` items in flight (`roadmap.py
   validate` enforces it). `focusLock.decision` is the authority for the order and the gates: no
-  target dates, and Pack B (`RF-68`, `RF-69`) and RF-57-screened Pack C (`RF-70`) land before the
-  3.2 release (`RF-71` on Mac/CLI) and the 3.2.0 iOS App Store submission (`v3.2.0-ios.N`).
+  target dates; `RF-72` (multimodal audio QC complement) and Pack B (`RF-69` done, `RF-68` Mac work
+  complete / iPhone proof pending) plus `RF-57`-screened Pack C (`RF-70`) land before the 3.2 release
+  (`RF-71` on Mac/CLI) and the 3.2.0 iOS App Store submission (`v3.2.0-ios.N`).
   - **Classify every new finding.** A release blocker joins that plan with a gate: an App Review
     rejection risk, a crash or hang, data loss, a broken purchase or restore, or a privacy or metadata
     mismatch on iOS. Anything else becomes one parked line in `post-3-0-backlog-2026-10`, with no

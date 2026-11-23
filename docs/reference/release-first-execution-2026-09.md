@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-21
+reviewed: 2026-11-23
 summary: The 3.2 release path (Mac/CLI 3.1 shipped Nov 17 under RF-61; no more 3.1 TestFlight builds since 2026-11-21; Pack B/C RF-68..RF-70 land before the 3.2 Mac/CLI release RF-71 and the 3.2.0 iOS App Store submission), the October 12 rebaseline, maintainer decisions, and focus-lock rules.
 sourceOfTruth:
   - config/roadmap.json
@@ -214,20 +214,38 @@ Between September 4 and October 12 the release did not move:
   (`RF-12`, `RF-15`, `RF-17`, `RF-16`). `RF-35`, `RF-41` and `RF-42` move back to `planned` behind
   `RF-12` so all three focus-lock in-flight slots serve `RF-68`..`RF-70`.
 
+- **2026-11-22.** The maintainer approves the Vocello 3.2 implementation plan (decisions D0–D5),
+  adding **`RF-72`** ahead of Pack B/C — an offline, report-only multimodal audio QC complement on
+  Gemini 4 Neon (`scripts/qc.py multimodal`, `vocello-audio-qc`, strictly outside QC v2
+  `SCORING_SOURCES` and Fast QC, blocking personal audio by default, empirically qualified on Q1/Q2
+  controls before advising `RF-70` and `RF-15`) — and approving **Option A** for `RF-65` (measure the
+  shipped 3.2 hybrid on a real iPhone 15 Pro via AWS Device Farm on-demand XCUITest, keeping
+  BrowserStack as fallback).
+- **2026-11-23.** **`RF-72`** closed (`26bbfeec`: `diction`, `delivery`, and `pairwise` calibrated
+  `active_advisory`; static `clone` verification fail-closed at `abstain_uncalibrated`). **Pack B**
+  completed on the Mac: **`RF-69`** closed (`f54479b5`) and **`RF-68`** narrowed to `needs: iphone`
+  only (14/14 bit-identical PCM takes, `0.0 MB` cross-model leak in
+  `mac-memory-qualification-20261123-180900-4b639d73`, including the `87d6a4b0` fix for the
+  `180.2 MiB/switch` cross-thread MLX `CompileCache` leak). Under **Pack C (`RF-70`)**, Step 3.1
+  pre-registered 7 fresh-seed rules, added `.attnIO`/`attn-io-edge` recipes, and fixed
+  `build_hybrid_model.py` `.bias` parity (`4a42d25d`); Experiment 1 (`long-form-korean-d1-attn`)
+  was decisively **`REJECT`**ed (2/3 seed sets spiked `+0.152` and `+0.324` in paired error rate from
+  32–44 s of skipped text), leaving Experiment 2 (Bundle A `attn-io`, `+24.12 MB`) next.
+
 ## The path
 
-The status below reflects the 2026-11-21 state; `config/roadmap.json` is the live authority. The path
+The status below reflects the 2026-11-23 state; `config/roadmap.json` is the live authority. The path
 carries no dates since the maintainer removed them on November 10: each step ends at its exit, Mac
-and CLI 3.1.0 (`RF-61`) and Pack A (`RB-01`..`RB-12`) have landed, Pack B/C (`RF-68`..`RF-70`) now
-run ahead of 3.2, and the remaining steps close on the **3.2.0** Mac/CLI release (`RF-71`) and
-**3.2.0** iPhone submission candidate.
+and CLI 3.1.0 (`RF-61`), Pack A (`RB-01`..`RB-12`), `RF-72`, and Pack B (`RF-69` + `RF-68` Mac work)
+have landed, Pack C (`RF-70`, Exp 2 Bundle A next) runs ahead of 3.2, and the remaining steps close on
+the **3.2.0** Mac/CLI release (`RF-71`) and **3.2.0** iPhone submission candidate.
 
 | Step | Items | Exit | Who | Status |
 | --- | --- | --- | --- | --- |
 | 1 — decisions | RF-02, ASR-02, ASR-04, ASR-09 | Recorded privacy, rights and region answers; App Store Connect prerequisites, including the Paid Apps agreement | Maintainer; Antigravity drafts the facts | ASR-04 closed Nov 1; RF-02 account steps (private record) and ASR-02 readback remain; ASR-09 fresh North America proof runs within 24 hours of submission |
 | 2 — before the freeze | RF-14; AUD-01, AUD-02, AUD-07, AUD-09, F-01, F-16, DA-04; BG-01, CONV-21, RF-18, RF-19 | D3 the default; the blockers' code fixes with deterministic tests; the engine-audit items with their iPhone proofs | Antigravity; the phone in an announced window | Done except AUD-01, AUD-02, AUD-07 and AUD-09, whose device proof comes from RF-15 |
 | 3 — export purchase | RF-13 | The purchase lane passes on the phone | Antigravity, in a phone window | Done Oct 16 |
-| 4 — freeze, 3.1 Mac/CLI & 3.2 engine Pack B/C | ASR-08, RF-09, RF-61; RF-68, RF-69, RF-70, RF-71 | Freeze recorded; Mac/CLI 3.1.0 shipped; Pack B (`RF-68`, `RF-69`) and RF-57-screened Pack C (`RF-70`) land before 3.2; Mac/CLI 3.2.0 (`RF-71`) ships | Antigravity; maintainer authorizes any new model upload and tags | Frozen Oct 23 (`e7a8e2ae`); Mac/CLI 3.1.0 (`v3.1.0`, `RF-61`) published Nov 17; Pack A & Wave 5 done Nov 21; Pack B (`RF-68`, `RF-69`) next, then Pack C (`RF-70`) and Mac/CLI 3.2 (`RF-71`) |
+| 4 — freeze, 3.1 Mac/CLI & 3.2 engine Pack B/C | ASR-08, RF-09, RF-61; RF-72, RF-68, RF-69, RF-70, RF-71 | Freeze recorded; Mac/CLI 3.1.0 shipped; `RF-72`, Pack B (`RF-68`, `RF-69`) and RF-57-screened Pack C (`RF-70`) land before 3.2; Mac/CLI 3.2.0 (`RF-71`) ships | Antigravity; maintainer authorizes any new model upload and tags | Frozen Oct 23 (`e7a8e2ae`); Mac/CLI 3.1.0 (`v3.1.0`, `RF-61`) published Nov 17; Pack A & Wave 5 done Nov 21; `RF-72` & `RF-69` closed and `RF-68` Mac work done (`needs: iphone`) Nov 23; `RF-70` Exp 1 Korean `D1` `REJECT`, Exp 2 Bundle A (`attn-io`) next, then Exp 3 & Mac/CLI 3.2 (`RF-71`) |
 | 5 — archive and TestFlight | ASR-10, ASR-07, RF-12 | A `v3.2.0-ios.N` candidate tag archives, verifies and uploads to internal TestFlight; the processed build installs with personal data preserved | Maintainer requests the tag; Antigravity verifies | ASR-10 and ASR-07 done Oct 24; 3.0 builds 29–30 and internal 3.1.0 builds 31–33 superseded (no more 3.1 TestFlight since Nov 21); next candidate is `v3.2.0-ios.1` after `RF-68`..`RF-70`; owned-export row waits on RF-02 |
 | 6 — acceptance and promotion | RF-15, ASR-06, RF-17 | Risk-based acceptance of the processed 3.2.0 build, with a machine screen of its takes; exact-tag promotion evidence | Antigravity and the phone | Waiting for `v3.2.0-ios.N` after `RF-68`..`RF-70` and `RF-02` |
 | 7 — store materials | ASR-05, ASR-11, RF-62, RF-63, RF-66 | Screenshots, 3.2.0 metadata, age-rating descriptors, privacy answers, reviewer notes, demo video; read-only account check | Maintainer; Antigravity prepares | 3.0.0 copy entered Nov 1–10; 3.2.0 review notes, demo video (`RF-66`), screenshots, ASC 3.2.0 update and `ASR-11` remain |

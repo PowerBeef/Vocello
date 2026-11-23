@@ -2375,7 +2375,132 @@
             }
           },
           "expected": "Unknown: on 4-bit Speed (long-form-korean-full-text), D1 failed 16/16 vs 14/16; on shipped hybrid-attn (which generates ~50% of Korean long-form projects), D1 may either reduce interior-silence refusals or still degrade long-segment pacing.",
-          "decision": "ADOPT when the control reproduces >= 3 refusals in A, B cuts refusals/failures by at least half with at least 2 fewer refusals and no new failure class, and no seed set's paired errorRateBetterFamily interval reaches past +0.04. REJECT when B refuses or fails more projects than A or an error-rate interval lies wholly past +0.04. Otherwise INCONCLUSIVE, and Korean long-form segments keep trailing text."
+          "decision": "ADOPT when the control reproduces >= 3 refusals in A, B cuts refusals/failures by at least half with at least 2 fewer refusals and no new failure class, and no seed set's paired errorRateBetterFamily interval reaches past +0.04. REJECT when B refuses or fails more projects than A or an error-rate interval lies wholly past +0.04. Otherwise INCONCLUSIVE, and Korean long-form segments keep trailing text.",
+          "result": {
+            "decided": "2026-11-23",
+            "verdict": "REJECT",
+            "toolVerdicts": {
+              "seedSet16": "REJECT (errorRateBetterFamily worse by +0.1521, past +0.04 margin)",
+              "seedSet17": "ADOPT (errorRateBetterFamily +0.0038)",
+              "seedSet18": "REJECT (errorRateBetterFamily worse by +0.3238, past +0.04 margin)"
+            },
+            "commit": "4a42d25d (executable 25c6e733f7f38f15)",
+            "arms": {
+              "a": "off (shipped hybrid-attn, QWENVOICE_FULL_TEXT_CONDITIONING=off)",
+              "b": "on (shipped hybrid-attn, QWENVOICE_FULL_TEXT_CONDITIONING=on)",
+              "floor": "off on seed set 16 against off on seed set 17 (compare-off-vs-off.json)",
+              "runs": "pack-c-exp1-korean-d1-seeds16, -seeds17, -seeds18 (without --stock)"
+            },
+            "floor": {
+              "verdict": "NOISE-FLOOR",
+              "outcomes": {
+                "a": {
+                  "generated": 2,
+                  "refused": 2,
+                  "failed": 0
+                },
+                "b": {
+                  "generated": 2,
+                  "refused": 2,
+                  "failed": 0
+                }
+              },
+              "paired": 1,
+              "grossFailures": {
+                "a": 2,
+                "b": 2
+              },
+              "errorRateBetterFamily": {
+                "meanA": 0.0418,
+                "meanB": 0.0266,
+                "meanDifference": -0.0152
+              },
+              "durationSeconds": {
+                "meanA": 166.0,
+                "meanB": 152.0,
+                "meanDifference": -14.0
+              }
+            },
+            "outcomes": {
+              "a": {
+                "generated": 5,
+                "refused": 7,
+                "failed": 0
+              },
+              "b": {
+                "generated": 9,
+                "refused": 3,
+                "failed": 0
+              }
+            },
+            "pairedBySeedSet": {
+              "seedSet16": {
+                "paired": 1,
+                "errorRateBetterFamily": {
+                  "meanA": 0.0418,
+                  "meanB": 0.1939,
+                  "meanDifference": 0.1521
+                },
+                "errorRateQwen3ASR": {
+                  "meanA": 0.0456,
+                  "meanB": 0.1939,
+                  "meanDifference": 0.1483
+                },
+                "errorRateWhisper": {
+                  "meanA": 0.0418,
+                  "meanB": 0.1958,
+                  "meanDifference": 0.154
+                },
+                "durationSeconds": {
+                  "meanA": 166.0,
+                  "meanB": 122.2,
+                  "meanDifference": -43.8
+                }
+              },
+              "seedSet17": {
+                "paired": 1,
+                "errorRateBetterFamily": {
+                  "meanA": 0.0266,
+                  "meanB": 0.0304,
+                  "meanDifference": 0.0038
+                },
+                "durationSeconds": {
+                  "meanA": 152.0,
+                  "meanB": 120.1,
+                  "meanDifference": -31.9
+                },
+                "speakerWindowSpread": {
+                  "meanA": 0.2278,
+                  "meanB": 0.3133,
+                  "meanDifference": 0.0855
+                }
+              },
+              "seedSet18": {
+                "paired": 1,
+                "errorRateBetterFamily": {
+                  "meanA": 0.0383,
+                  "meanB": 0.3621,
+                  "meanDifference": 0.3238
+                },
+                "errorRateQwen3ASR": {
+                  "meanA": 0.0383,
+                  "meanB": 0.3678,
+                  "meanDifference": 0.3295
+                },
+                "errorRateWhisper": {
+                  "meanA": 0.0421,
+                  "meanB": 0.3621,
+                  "meanDifference": 0.3199
+                },
+                "durationSeconds": {
+                  "meanA": 129.8,
+                  "meanB": 92.4,
+                  "meanDifference": -37.4
+                }
+              }
+            },
+            "note": "Control reproduced the defect (7/12 Korean Expressive projects refused in A, >= 3 required). Full-text conditioning (B) cut Fast QC refusals to 3/12 only by truncating or skipping 31.9-43.8 s of speech per paired project, driving large paired error-rate spikes in 2 of 3 seed sets (+0.1521 on seed set 16 and +0.3238 on seed set 18, both Qwen3-ASR and Whisper agreeing, wholly past the +0.04 guard margin). Decisive REJECT under the pre-registered rule; D1 is dropped for Korean long-form and long-form segments keep trailing text."
+          }
         },
         "hybrid-attn-io": {
           "recorded": "2026-11-23",

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-11
+reviewed: 2026-11-23
 summary: The Qwen3-TTS 12 Hz speech tokenizer guide (formerly the Mimi codec guide; the filename is kept) — the Mimi-derived encoder, split RVQ and Qwen decoder as owned in Vocello, streaming and partition semantics, where Vocello's decode and clone-reference encode diverge from the reference (A-02, A-03, A-04, G-03), and the shipped fp32 codec.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift
@@ -195,8 +195,9 @@ proposed, would move Vocello away from the reference.
 - **Eager encode (F-07, fixed).** `createVoiceClonePrompt` now evaluates the reference codes inside
   the caller's MLX scope (`Q:1030-1033`), so the lazy encode no longer escapes into `MLX.save` or the
   first take.
-- **Memory (A-08, A-28, open).** The encoder KV cache is kept between calls and a longer input
-  concatenates onto the stale buffer (MEM-1). The SEANet encoder runs on the whole reference: about
+- **Memory (A-08 fixed in RF-68; A-28 open).** Since Pack B (`RF-68`, 2026-11-23), the encoder
+  allocates a fresh per-encode KV cache so no KV state is retained between clone-reference calls
+  (fixing `A-08` / MEM-1). The SEANet encoder still runs on the whole reference (`A-28`): about
   126 MB per activation for a 20 s reference and 740 MB for a 120 s Mac reference.
 - **Reference padding and edges.** The reference is encoded with no padding, as upstream does (since
   2026-11-11, A-12; Vocello appended 0.5 s of silence before then). Since 2026-11-12 a
@@ -491,8 +492,10 @@ Measured figures are from the engine audit (iPhone 17 Pro on iOS 27 with Speed 4
 - **Share of the loop.** Decode is 15–16% of the iPhone token loop and about 4% on the M6. On the
   iPhone its per-frame cost grows 8–21% over a take (D-10/D-11), which the unbounded KV and mask
   explain in part (A-03, A-27).
-- **Mask (A-27).** Each multi-frame chunk builds an `(offset + n)²` additive mask, 16.8 MB at the
-  cap, and keeps `n` rows.
+- **Mask (A-27, fixed in RF-68).** Historically, each multi-frame chunk built an `(offset + n)²`
+  additive mask (16.8 MB at the cap) and kept `n` rows. Since Pack B (`RF-68`, 2026-11-23),
+  `Qwen3TTSSpeechTokenizer` constructs the rectangular `[n, offset + n]` causal mask directly
+  (bit-identical PCM, cutting transient mask memory on long takes).
 - **First take after launch (D-02).** The Custom path never warms the codec decoder on the iPhone
   or the 8 GB Mac, so the iPhone's first take after every launch pays 0.21–0.23 s more. The audit's refuter confirmed Custom and
   refuted Design, whose `warmPreparedInputs` precompiles the decoder. The decoder warm-up shapes

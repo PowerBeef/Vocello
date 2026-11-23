@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-21
+reviewed: 2026-11-23
 summary: Project-specific MLX reference for the Qwen3-TTS engine on mlx-swift 0.32.3 — lazy evaluation and the pipelined per-frame step, MLX error scopes, quantization mechanics and the per-layer recipe, the KV cache, sampler and seed behaviour, cache clearing and memory posture, the version pins and the pin-move procedure (§9).
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Package.swift
@@ -14,9 +14,12 @@ sourceOfTruth:
 # MLX Guide for Vocello
 
 > **Living document.** When this guide disagrees with the code, the code wins: fix this file.
-> Reviewed 2026-11-21 against the shipping pins (mlx-swift 0.32.3, mlx-swift-lm 3.32.3,
+> Reviewed 2026-11-23 against the shipping pins (mlx-swift 0.32.3, mlx-swift-lm 3.32.3,
 > swift-transformers 1.3.5 and swift-huggingface 1.0.0, moved together by CONV-21 on 2026-10-16),
-> the RF-18 sampling changes of 2026-10-20, and the RF-55/RF-59 `attn` hybrid artifacts of 2026-11-13. Finding IDs (BG-1, DEP-n, A-n, B-n, D-n, F-n) are the
+> the RF-18 sampling changes of 2026-10-20, the RF-55/RF-59 `attn` hybrid artifacts of 2026-11-13,
+> and Pack B (`RF-68`: hoisted `CodePredictorCompiledPlan` with `compile(inputs: [weightInputs])`,
+> narrow `A3` GPU `seenMask`, `A-08`/`A-27` codec memory fixes, and `[.noUnusedKeys, .shapeMismatch]`
+> load verification). Finding IDs (BG-1, DEP-n, A-n, B-n, D-n, F-n) are the
 > [engine runtime audit](../audits/2026-10-16-engine-runtime-audit.md)'s; upstream issue citations
 > (`QwenLM#n`, `MA#n`, `MAS#n`) come from the
 > [Qwen3-TTS model research](../audits/2026-10-17-qwen3-tts-model-research.md).
@@ -178,9 +181,10 @@ not used.
   4-bit CustomVoice index); the codec embeddings, norms and biases stay bf16, the Base speaker encoder
   stays float, and the speech tokenizer is a separate fp32 file. The full map, the bytes and the
   artifact history are [`model-delivery.md`](model-delivery.md)'s (artifact provenance).
-- **Verification.** A trusted prepared checkpoint loads with `verify: .noUnusedKeys`, an untrusted
-  one with `.all` (`Qwen3TTSLoading.swift:388-390`); a trusted load therefore checks only for unused keys
-  (A-20).
+- **Verification.** Since Pack B (`RF-68`, 2026-11-23), a trusted prepared checkpoint loads with
+  `verify: [.noUnusedKeys, .shapeMismatch]` and an untrusted one with `.all`
+  (`Qwen3TTSLoading.swift`), catching shape mismatches even on trusted loads (closing A-20's shape
+  gap).
 - **Batched materialization.** Weights are evaluated four talker or code-predictor layers at a time
   and eight speech-tokenizer parameter arrays at a time (`Qwen3TTSLoading.swift:47-48`), which bounds the
   transient unified-memory peak.
@@ -315,15 +319,23 @@ The model itself (the talker, the 15-pass code predictor, the codec) is describe
   pins the drawn codes and the embedding sum against the eager path under one seed; the end-to-end
   identity rests on the fixed-seed PCM digests (`scripts/pcm_identity.py`), since a fused kernel
   may round differently on another MLX or GPU.
-- **Weights are baked at trace time** (A-16). The plan lives for one generation today; reusing it
-  across takes (PERF-10) must declare the weights as inputs or key the plan by load epoch.
-- **Single flight.** Every take traces its compiled functions afresh: the one frame function in
-  production (RF-46), or 15 per-pass functions with a nested compiled `silu` on the eager-sampler
-  path (F-09). The prewarm runs only the eager predictor and sampler, so the frame function's
-  kernels first compile inside the first take; cold first-chunk latency did not move on the M6.
-  mlx-swift 0.32.x contains #461, the fix for a lock-order deadlock between compiled functions and
-  `evalLock`; before it, single-flight generation kept that deadlock unreachable (DEP-2). Keep every
-  MLX caller single-flight anyway.
+- **Hoisted across takes with explicit weight inputs (`RF-68`, `574d58d8`, `87d6a4b0`).** The plan
+  is now hoisted onto `Qwen3TTSModel` and prewarmed during model warmup instead of re-traced on every
+  take, with lazy per-pass KV buffers allocated only when the eager-sampler path is used. Crucially,
+  both the frame function and per-pass functions pass flattened `predictor.parameters()` plus
+  `fusedQKV`/`fusedGateUp` arrays through `compile(inputs: [weightInputs])` (`87d6a4b0`): on
+  `mlx-swift 0.32.3`, `mlx::core::detail::compile_cache()` is `thread_local`, so capturing quantized
+  weights inside a Swift closure leaked **180.2 MiB per model switch** whenever a `CompiledFunction`
+  deallocated on a different Swift Concurrency cooperative thread than the one that traced it.
+  Passing weights as `inputs:` traces zero-byte placeholders into the cache and releases 100% of the
+  weights on unload (pinned by `testCrossThreadPlanDeinitReleasesPredictorWeightsWhileTraceThreadStaysAlive`,
+  `< 64 KiB` retained; 14/14 bit-identical PCM and `0.0 MB` cross-model leak in
+  `mac-memory-qualification-20261123-180900-4b639d73`).
+- **Single flight.** Prewarm compiles the production frame function before the first take; observed
+  takes and non-default subtalker stages still use the 15 per-pass functions with a nested compiled
+  `silu` on the eager-sampler path (F-09). mlx-swift 0.32.x contains #461, the fix for a lock-order
+  deadlock between compiled functions and `evalLock`; before it, single-flight generation kept that
+  deadlock unreachable (DEP-2). Keep every MLX caller single-flight anyway.
 
 ### 4.3 The per-frame step
 
@@ -372,6 +384,11 @@ submitted with `asyncEval` and materialized before its send. The decoder does no
 - **Cost (F-04).** The new sampler path adds about 80 kernel launches per frame (16 draws × 5); the
   M6's warm first chunk rose from 146 to 155 ms (§9.5). Since RF-46 the code predictor's fifteen
   draws run inside the frame function, where MLX fuses the sampler's elementwise chains (§4.2).
+- **Fixed-shape GPU `seenMask` for talker repetition penalty (`RF-68`, `3852e8c7`, narrow A3).**
+  Instead of re-uploading a growing `[N]` `generatedTokenIDs` array on every talker decode step,
+  `Qwen3SamplerScratch` maintains a fixed-shape 3 KiB `[1, vocabSize]` GPU `Bool` `seenMask` updated
+  in-graph via `MLX.where`. Verified 14/14 bit-identical PCM (`post-pack-b-final-20261123-181128`),
+  cutting host CPU by 3.56% and warm first-chunk latency by 9 ms on Custom short/medium.
 - **Prewarm draws through the production sampler** (`productionSamplerWarmDraws`,
   `Qwen3TTS.swift:755-795`; F-05): with top-p 1.0 and 0.95 through a local `Qwen3SamplerScratch`
   carrying a warmed `Bool`/`UInt32` `seenMask` on a private random state whose draws are discarded,
@@ -538,16 +555,18 @@ Caching dtype-keyed `-inf` rows, zero rows, EOS rows and the code predictor's pa
 about 17K allocations per generation. Wall time moved within noise on the Mac (0.80 → 0.81); the
 allocator relief matters more on the iPhone.
 
-### 7.4 `compile()`: quantized parameters as `inputs:` (rejected) and the pass-indexed plan (shipped)
+### 7.4 `compile()`: per-call `shapeless: true` talker MLP (rejected) vs hoisted code-predictor plan (shipped)
 
-- **Rejected:** compiling the quantized talker MLP with its packed weights as `inputs:`
-  (`compile(inputs: [gate, up, down], shapeless: true)`). It ran correctly but cost about 5% warm
-  decode speedup (0.80 → 0.76): declaring quantized parameters as inputs marshals their packed state
-  on every call, and the cost grows with the compiled region. Re-confirmed on 0.31.6 (§Q: +0.74%
-  slower on medium, 6/6 seeds).
-- **Shipped:** the pass-indexed code-predictor plan (§4.2), which owns its K/V buffers instead of
-  marshalling them. Its same-day A/B measured +8.3% to +10.6% warm decode speedup; the evidence stays
-  classed `diagnostic` until a clean canonical matrix upgrades it.
+- **Rejected:** compiling the quantized talker MLP with its packed weights as `inputs:` on a
+  per-call `shapeless: true` region (`compile(inputs: [gate, up, down], shapeless: true)`). It ran
+  correctly but cost about 5% warm decode speedup (0.80 → 0.76): marshalling a large layer's packed
+  state through a `shapeless: true` call on every step outweighed fusion. Re-confirmed on 0.31.6
+  (§Q: +0.74% slower on medium, 6/6 seeds).
+- **Shipped:** the hoisted, prewarmed code-predictor plan (§4.2), which owns its K/V buffers and
+  (since `87d6a4b0`, `RF-68`) passes flattened `predictor.parameters()` and fused projections as
+  `compile(inputs: [weightInputs])` (fixed shape, non-shapeless) so `mlx-swift 0.32.3`'s
+  `thread_local` `CompileCache` traces zero-byte weight placeholders and leaks `0.0 MB` across
+  model switches while staying bit-identical and faster (`mac-memory-qualification-20261123-180900-4b639d73`).
 
 ### 7.5 KV cache alternatives
 
@@ -660,6 +679,14 @@ Couplings:
   - A row slice of an evaluated array shares its buffer (`shared_buffer_slice`), which is what keeps
     one copy of the weights.
 
+- **`thread_local CompileCache` deinit (`mlx-swift 0.32.3`, `87d6a4b0`, `RF-68`).**
+  `mlx::core::detail::compile_cache()` is `thread_local`, and `CompiledFunction.deinit` clears only
+  the *deallocating* thread's cache. Any model-scoped `CompiledFunction` (such as
+  `CodePredictorCompiledPlan`) that captures weight `MLXArray`s inside its Swift closure instead of
+  passing them through `compile(inputs:)` leaks those weights whenever Swift Concurrency deallocates
+  the plan on a different cooperative thread than the one that traced it (`180.2 MiB/switch` before
+  `87d6a4b0`). Pinned by `testCrossThreadPlanDeinitReleasesPredictorWeightsWhileTraceThreadStaysAlive`.
+
 mlx-swift 0.31 and later ship a `CudaBuild` build-tool plugin that cannot be fingerprint-approved
 headlessly; `xcb_run` (`scripts/lib/build_cache.sh`) passes `-skipPackagePluginValidation`
 unconditionally, with the reviewed justification in its header.
@@ -752,10 +779,13 @@ Do not regress these without a maintainer decision:
 - **Keep MLX callers single-flight** (§4.2).
 - **No talker KV quantization by default** (§7.5), and **no talker KV window with the streaming text
   layout** (A-05).
-- **No `compile()` that declares quantized parameters as `inputs:`** (§7.4). The pass-indexed
-  code-predictor plan is the shipped exception and must keep matching the eager path within
-  tolerance (`Qwen3CodePredictorCompiledTests`). The frame function (§4.2) must draw the eager
-  sampler's codes from one seed, and takes its random keys as inputs, never as traced constants.
+- **Do not `compile(..., shapeless: true)` quantized talker MLP weights as `inputs:`** (§7.4), and
+  **never capture model weight `MLXArray`s in a hoisted `CompiledFunction` closure** (§4.2, §9.1):
+  `CodePredictorCompiledPlan` must pass flattened predictor weights via `compile(inputs: [weightInputs])`
+  so cross-thread `CompiledFunction.deinit` leaks `0 B` (`testCrossThreadPlanDeinitReleasesPredictorWeightsWhileTraceThreadStaysAlive`),
+  must keep matching the eager path within tolerance (`Qwen3CodePredictorCompiledTests`), and its
+  frame function must draw the eager sampler's codes from one seed by taking random keys as inputs,
+  never as traced constants.
 - **An mlx-swift move changes `mlxNumericsVersion`** in the same change (§9.1).
 - **No output-side silence gating.** Suppressing natural pauses masks real defects.
 - **Do not revert the input-side decoder-drift fix (`4fab110`).**
@@ -805,6 +835,8 @@ override key names and a digest, never raw values.
 | `QWENVOICE_SUPPRESS_WARMUP=1` | Skip proactive warm-up to measure a true cold load. |
 | `QWENVOICE_SAMPLER_FLOAT32=off` | Sample from model-precision logits (D3 off). |
 | `QWENVOICE_TALKER_FILTER_EOS=off` | Re-insert EOS after the filters (D2 off). |
+| `QWENVOICE_FULL_TEXT_CONDITIONING=on\|off` | Full-text vs streaming text conditioning for long-form screens (D1; rejected on Korean `hybrid-attn`, RF-70). |
+| `QWENVOICE_MIXED_PRECISION=attn\|attn-io\|attn-io-edge\|...` | Overlay 8-bit sibling tensors onto a 4-bit stock checkpoint for Mac quality screening (refused on already-hybrid checkpoints). |
 | `QWENVOICE_TOKENIZER_RESIDENCY` | Override speech-tokenizer residency. |
 | `QVOICE_TALKER_KV_WINDOW=<n>` | Sliding-window talker KV cache. |
 | `QVOICE_TALKER_KV_QUANT=4\|8` | Quantized talker KV cache. |

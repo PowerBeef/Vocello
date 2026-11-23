@@ -685,8 +685,8 @@
       "needs": [
         "iphone"
       ],
-      "updated": "2026-11-16",
-      "notes": "Opened 2026-11-16 from two external audits of the 3.1.0 tree, each claim re-checked against the code and Apple's current pages. The 15 Pro was measured as about 3x slower than the 17 Pro rested (RF-43) and has never run the one-model build, which the 17 Pro and the Mac screened. The paired iPhone is not a 15 Pro: a borrowed device is the maintainer's to supply, and a cloud device farm would be a paid service needing their word."
+      "updated": "2026-11-23",
+      "notes": "Opened 2026-11-16 from two external audits of the 3.1.0 tree, each claim re-checked against the code and Apple's current pages. The 15 Pro was measured as about 3x slower than the 17 Pro rested (RF-43) and has never run the one-model build, which the 17 Pro and the Mac screened. The paired iPhone is not a 15 Pro: a borrowed device is the maintainer's to supply, and a cloud device farm would be a paid service needing their word. 2026-11-22 maintainer decision (D4 Option A): run the real iPhone 15 Pro measurement on AWS Device Farm on-demand XCUITest (with BrowserStack App Automate as fallback) using the 3.2 candidate once Pack B/C land; no borrowed or purchased 15 Pro required."
     },
     {
       "id": "RF-66",
@@ -745,8 +745,8 @@
         "keyboard",
         "iphone"
       ],
-      "updated": "2026-11-21",
-      "notes": "Opened 2026-11-21 at the maintainer's request: moves ahead of the 3.2 release and iOS 3.2.0 submission. Sequenced after RF-68 so A-08/A-27 memory savings and non-silent quantization config verification are in place first (Wave 5 measured cold hybrid Clone at 3,584 MiB on iPhone 17 Pro, leaving 78 MiB under the 5,000 MiB floor's 3,662 MiB guarded ceiling: Bundle A +24 MiB fits now, while Bundle B +100 MiB relies on RF-68 headroom)."
+      "updated": "2026-11-23",
+      "notes": "Opened 2026-11-21 at the maintainer's request: moves ahead of the 3.2 release and iOS 3.2.0 submission. Sequenced after RF-68 so A-08/A-27 memory savings and non-silent quantization config verification are in place first (Wave 5 measured cold hybrid Clone at 3,584 MiB on iPhone 17 Pro, leaving 78 MiB under the 5,000 MiB floor's 3,662 MiB guarded ceiling: Bundle A +24 MiB fits now, while Bundle B +100 MiB relies on RF-68 headroom). 2026-11-23: Step 3.1 landed (4a42d25d: 7 fresh-seed >=16 rules pre-registered in config/quality-screens.json, attn-io/+24.12 MB and attn-io-edge/+99.61 MB recipes wired, build_hybrid_model.py .bias parity fixed). Step 3.2 Exp 1 (long-form-korean-d1-attn on shipped hybrid-attn Expressive, seeds 16-18, self-test noise floor seeds16 vs seeds17) is a decisive REJECT: off reproduced 7/12 refusals, while on cut refusals to 3/12 only by skipping 31.9-43.8 s per paired project, spiking errorRateBetterFamily +0.1521 (seed 16) and +0.3238 (seed 18) past +0.04; Korean long-form drops D1. Resume next at Step 3.3 Exp 2 (Bundle A attn-io vs attn, --stock)."
     },
     {
       "id": "RF-71",

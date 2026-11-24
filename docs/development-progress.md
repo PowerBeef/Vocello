@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-23
+reviewed: 2026-11-24
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,6 +17,59 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 `a0597deb` every checkpoint before them.
 
 ## Resume now
+
+### November 24 (pause checkpoint): `8f84ac97` CI green; Pack C Exp 2 (`attn-io`) clone screen done & all 6 long-form arms generated (`68/72` vs `64/72`), 1/6 scored
+
+**Workspace & Git state:** Clean local `main` (1 checkpoint commit ahead of `origin/main` `8f84ac97`,
+**unpushed**), 0 linked worktrees, 0 active subagents or background tasks. All four GitHub Actions
+workflows on `8f84ac97` (`CI`, `Release rehearsal`, `Nightly`, `Swift dependency watch`) passed.
+`build/vocello` (SHA-256 `25c6e733f7f38f15…`) and all six 3.0 4-bit/8-bit research artifacts remain
+in place.
+
+**Completed in Pack C Step 3.3 — Experiment 2 (Bundle A `attn-io`, `+24.12 MB`, `--stock`):**
+
+- **Clone screen (`hybrid-attn-io-clone`, `pack-c-exp2-clone-seeds{16,17}`): `ADOPT` on
+  non-inferiority, flat on quality.**
+  - Fresh self-test noise floor (`seeds16 attn` vs `seeds17 attn`, 190 paired, `compare-attn-vs-attn.json`):
+    `speakerSimilarity −0.0057 [−0.0119, +0.0008]`, `errorRateBetterFamily +0.0007 [−0.0078, +0.0102]`,
+    `trailingSilenceMS −0.2 ms [−13.3, +12.8]` (all well inside `0.71` of their margins).
+  - `attn` (`190/192`, `0` refused, `2` failed) vs `attn-io` (`191/192`, `1` refused, `0` failed),
+    189 paired, 0 identical PCM (`compare-attn-vs-attn-io.json`): `verdict: ADOPT` (`harms: []`,
+    gross failures `3 vs 2`), `speakerSimilarity −0.0080 [−0.0185, +0.0009]` (`0.7199 → 0.7119`),
+    `errorRateBetterFamily +0.0007 [−0.0065, +0.0081]` (`0.0211 → 0.0219`), `trailingSilenceMS +2.1 ms
+    [−9.9, +13.4]`. No clone speaker-similarity gain; adoption turns on the long-form screen.
+- **Long-form screen (`hybrid-attn-io`, all 6 strata Expressive, `pack-c-exp2-longform-seeds{19,20,21}`):**
+  - **All 6 arms generated and preserved on disk (zero regeneration needed on resume):**
+    - Baseline `attn`: **`64/72`** generated, `8` refused, `0` failed (`seeds19: 21/24`,
+      `seeds20: 22/24`, `seeds21: 21/24`).
+    - Candidate `attn-io`: **`68/72`** generated, `4` refused, `0` failed (`seeds19: 24/24`,
+      `seeds20: 22/24`, `seeds21: 22/24`).
+  - **Scoring progress (1 of 6 arms scored, ~20 min/arm):**
+    - `pack-c-exp2-longform-seeds19` arm `attn`: **SCORED** (`21/21`, `errors=0`, QC run
+      `quality-screen-20261124-192112-9cfd`).
+    - Remaining 5 arms waiting to score: `seeds20 attn`, `seeds21 attn`, `seeds19 attn-io`,
+      `seeds20 attn-io`, `seeds21 attn-io` (~100 min total).
+
+**Resume next session directly here (no generation lost — start straight at scoring arm 2/6):**
+
+1. Score the remaining 5 already-generated long-form arms sequentially (`BypassSandbox: true`, using
+   `/opt/homebrew/opt/python@3.14/libexec/bin/python3 scripts/quality_screen.py score --run <dir> --arm <arm>`):
+   - `build/artifacts/macos/quality-screens/pack-c-exp2-longform-seeds20` (`--arm attn`)
+   - `build/artifacts/macos/quality-screens/pack-c-exp2-longform-seeds21` (`--arm attn`)
+   - `build/artifacts/macos/quality-screens/pack-c-exp2-longform-seeds19` (`--arm attn-io`)
+   - `build/artifacts/macos/quality-screens/pack-c-exp2-longform-seeds20` (`--arm attn-io`)
+   - `build/artifacts/macos/quality-screens/pack-c-exp2-longform-seeds21` (`--arm attn-io`)
+2. Compare fresh self-test noise floor (`seeds19 attn` vs `seeds20 attn`, `compare --expect noise --b-run`)
+   and run `compare --rule hybrid-attn-io` on `seeds19`, `seeds20`, and `seeds21`, plus the discordant-pair
+   sign test across all 72 projects.
+3. **If Bundle A clears `hybrid-attn-io`:** run `hybrid-attn-io-single` (seed set `16` + noise floor `17`,
+   `--stock`), `vocello bench` speed check (`<= 1.05× attn`), and calibrated `RF-72` blinded dual-order
+   `AB`/`BA` pairwise listening (`scripts/qc.py multimodal`) on a stratified 24–36 take slice (clone +
+   long-form), then record `hybrid-attn-io*` results in `config/quality-screens.json`.
+4. **Next:** Experiment 3 — Bundle B (`attn-io-edge`, `+99.61 MB`, `--stock`, seed sets `22–24` long-form,
+   `18`/`19` clone/single) against Experiment 2's winner (`attn-io` or `attn`), then Steps 3.5–3.6
+   (conditional build/identity/maintainer HF upload + closing `RF-70`, `RF-54`, `RF-57`), Phase 4 (`RF-71`),
+   and Phase 5 (`v3.2.0-ios.1`, grouped iPhone window, AWS Device Farm `RF-65` Option A, `RF-16`).
 
 ### November 23 (pause checkpoint): `RF-72` closed; Pack B (`RF-69` closed, `RF-68` Mac done); Pack C (`RF-70`) Step 3.1 landed & Exp 1 Korean `D1` `REJECT` — resume at Exp 2 (Bundle A `attn-io`)
 

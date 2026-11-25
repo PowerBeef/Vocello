@@ -69541,6 +69541,72 @@
         }
       }
     },
+    "vocello.error.disallowed_voice_imitation": {
+      "comment": "Studio error when a Voice Design brief or delivery instruction asks to imitate a celebrity or real person (RF-73 / D2).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voice instructions cannot request celebrity imitation or impersonation of a real person. Describe vocal qualities instead."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les instructions vocales ne peuvent pas demander d’imiter une célébrité ou d’usurper la voix d’une personne réelle. Décrivez plutôt les qualités de la voix."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las instrucciones de voz no pueden pedir la imitación de una celebridad ni la suplantación de una persona real. Describe cualidades vocales en su lugar."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stimmanweisungen dürfen keine Imitation von Prominenten oder realen Personen anfordern. Beschreibe stattdessen Stimmmerkmale."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le istruzioni vocali non possono richiedere l’imitazione di una celebrità o di una persona reale. Descrivi invece le qualità della voce."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As instruções de voz não podem pedir a imitação de uma celebridade ou de uma pessoa real. Descreva as características vocais em vez disso."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语音指令不能要求模仿名人或冒充真实人物。请改为描述声音特征。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音声の指示で有名人や実在の人物の声真似・なりすましを求めることはできません。代わりに声質の特徴を記述してください。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "음성 지시에는 유명인이나 실존 인물의 목소리 모방이나 사칭을 요청할 수 없습니다. 대신 목소리 특성을 설명해 주세요."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Инструкции для голоса не могут запрашивать имитацию знаменитостей или реальных людей. Вместо этого опишите качества голоса."
+          }
+        }
+      }
+    },
     "vocello.error.audio_qc_silent_gap": {
       "comment": "Studio error when the automatic audio-quality check rejected a finished take because it contained an unusually long silence. The take was discarded; retrying generates a new one.",
       "extractionState": "manual",

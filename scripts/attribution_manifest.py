@@ -201,7 +201,7 @@ def build(root: Path) -> dict:
             if digest(notice_bytes) != expected:
                 raise ContractError(f"package {identity} NOTICE digest drift")
             notice = notice_bytes.decode("utf-8")
-        components.append({
+        component = {
             "id": identity,
             "displayName": rule.get("displayName"),
             "version": state.get("version") or "revision",
@@ -212,7 +212,17 @@ def build(root: Path) -> dict:
             "copyrightNotice": rule.get("copyrightNotice"),
             "notice": notice,
             "scope": "application" if identity not in owned else "application-and-owned-runtime",
-        })
+        }
+        platforms = rule.get("platforms")
+        if platforms is not None:
+            if (
+                not isinstance(platforms, list)
+                or not platforms
+                or any(not isinstance(p, str) or p not in {"macOS", "iOS"} for p in platforms)
+            ):
+                raise ContractError(f"package {identity} platforms must be a non-empty list of macOS/iOS")
+            component["platforms"] = platforms
+        components.append(component)
 
     owned_policy = unique_map(policy.get("ownedComponents"), "identity", "owned components")
     marketing_match = re.search(
@@ -316,11 +326,52 @@ def build(root: Path) -> dict:
             "sourceURL": f"https://huggingface.co/{artifact['repo']}/tree/{artifact['revision']}",
         })
 
+    # Shared auxiliary model weights bundled with every catalog artifact (e.g. Meta AudioSeal
+    # watermark generator weights, MIT-licensed; RF-73 / E3).
+    auxiliary_weights = unique_map(policy.get("auxiliaryModelWeights", []), "id", "auxiliary model weights")
+    for aux_id in sorted(auxiliary_weights):
+        rule = auxiliary_weights[aux_id]
+        relative_path = rule.get("relativePath")
+        if not isinstance(relative_path, str) or not relative_path.strip():
+            raise ContractError(f"auxiliary model {aux_id} names no relativePath")
+        digests: set[str] = set()
+        for artifact in artifacts:
+            matches = [row for row in artifact.get("files", []) if row.get("relativePath") == relative_path]
+            if len(matches) != 1:
+                raise ContractError(
+                    f"auxiliary model {aux_id} ({relative_path}) missing from catalog artifact {artifact['repo']}"
+                )
+            digests.add(matches[0]["sha256"])
+        if len(digests) != 1:
+            raise ContractError(f"auxiliary model {aux_id} ({relative_path}) digest differs across catalog artifacts")
+        aux_digest = next(iter(digests))
+        aux_repo, aux_revision = repository_at(rule, "repo", "revision", f"auxiliary model {aux_id}")
+        if rule.get("licenseID") not in licenses:
+            raise ContractError(f"auxiliary model {aux_id} has unsupported license")
+        models.append({
+            "id": aux_id,
+            "displayName": rule.get("displayName"),
+            "modelID": aux_id,
+            "variantID": "shared",
+            "repo": aux_repo,
+            "revision": aux_revision,
+            "modelCardSHA256": aux_digest,
+            "licenseID": rule["licenseID"],
+            "baseRepo": aux_repo,
+            "baseRevision": aux_revision,
+            "copyrightNotice": rule.get("copyrightNotice"),
+            "notice": rule.get("notice"),
+            "redistributionDecision": redistribution_decision(rule, aux_repo),
+            "sourceURL": https_url(rule.get("sourceURL"), f"auxiliary model {aux_id} sourceURL"),
+        })
+
     rights = policy.get("contentRights")
     unique_map(rights, "id", "content-rights records")
     for row in rights:
         if row.get("status") not in {
             "source-proven-not-redistributed",
+            "attested-maintainer-asr04-2026-11-01",
+            "attested-account-declaration-verified",
             "pending-qualified-review",
             "pending-account-and-qualified-review",
             "pending-qualified-review-account-declaration-verified",

@@ -915,7 +915,7 @@ public enum GenerationSemantics {
                Qwen3TTSRuntimeProfile.containsDisallowedVoiceImitationInstruction(
                    normalizedConditioningCacheKeyText(deliveryStyle)
                ) {
-                throw MLXTTSEngineError.unsupportedRequest(
+                throw MLXTTSEngineError.disallowedVoiceImitation(
                     "Built-in Voice delivery instructions cannot request celebrity imitation or voice impersonation."
                 )
             }
@@ -927,7 +927,7 @@ public enum GenerationSemantics {
             if Qwen3TTSRuntimeProfile.containsDisallowedVoiceImitationInstruction(
                 normalizedConditioningCacheKeyText(instruction)
             ) {
-                throw MLXTTSEngineError.unsupportedRequest(
+                throw MLXTTSEngineError.disallowedVoiceImitation(
                     "Voice Design descriptions cannot request celebrity imitation or voice impersonation."
                 )
             }

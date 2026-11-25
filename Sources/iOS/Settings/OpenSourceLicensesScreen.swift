@@ -31,8 +31,9 @@ struct OpenSourceLicensesScreen: View {
                     .padding(.horizontal, 4)
 
                 if let manifest {
+                    let softwareComponents = manifest.iosComponents
                     IOSSettingsSection(title: IOSAppLanguage.shared.localized(localized: "vocello.licenses.software")) {
-                        ForEach(Array(manifest.components.enumerated()), id: \.element.id) { index, component in
+                        ForEach(Array(softwareComponents.enumerated()), id: \.element.id) { index, component in
                             NavigationLink {
                                 IOSAttributionDetailScreen(
                                     title: component.displayName,
@@ -60,7 +61,7 @@ struct OpenSourceLicensesScreen: View {
                             .accessibilityValue("\(component.version), \(component.licenseID)")
                             .accessibilityHint(IOSAppLanguage.shared.localized(localized: "vocello.licenses.detail_hint"))
 
-                            if index < manifest.components.count - 1 {
+                            if index < softwareComponents.count - 1 {
                                 IOSSettingsDivider()
                             }
                         }
@@ -74,7 +75,7 @@ struct OpenSourceLicensesScreen: View {
                                     subtitle: String(model.revision.prefix(12)),
                                     sourceURL: model.sourceURL,
                                     licenseID: model.licenseID,
-                                    copyrightNotice: nil,
+                                    copyrightNotice: model.copyrightNotice,
                                     notice: model.attributionNoticeText,
                                     origins: nil,
                                     licenseText: manifest.licenses.first(where: { $0.id == model.licenseID })?.text ?? ""

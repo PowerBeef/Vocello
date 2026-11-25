@@ -398,6 +398,27 @@ final class GenerationFailureDiagnosticLoggerTests: XCTestCase {
         XCTAssertEqual(Reason(TTSEngineError.insufficientMemory("fixture")), .insufficientMemory)
         XCTAssertEqual(Reason(TTSEngineError.notInitialized), .engineNotReady)
         XCTAssertEqual(Reason(TTSEngineError.savedVoiceStoreBusy), .savedVoiceStoreBusy)
+        XCTAssertEqual(Reason(TTSEngineError.disallowedVoiceImitation("fixture")), .disallowedVoiceImitation)
+        XCTAssertEqual(
+            GenerationFailureDiagnosticLogger.errorMetadata(for: TTSEngineError.disallowedVoiceImitation("fixture")).code,
+            "request.disallowed_voice_imitation"
+        )
+        let profileImitation = Qwen3TTSRuntimeProfileError.disallowedVoiceImitation("fixture")
+        XCTAssertEqual(Reason(profileImitation), .disallowedVoiceImitation)
+        XCTAssertEqual(
+            GenerationFailureDiagnosticLogger.errorMetadata(for: profileImitation).code,
+            "request.disallowed_voice_imitation"
+        )
+        XCTAssertEqual(
+            GenerationFailureDiagnosticLogger.errorMetadata(for: profileImitation).classification,
+            .invalidRequest
+        )
+        let surfacedImitation = MLXTTSEngine.surfacedGenerationError(
+            TTSEngineError.disallowedVoiceImitation("fixture"),
+            allocationRetryAttempted: false
+        )
+        XCTAssertEqual(surfacedImitation.stage, .requestValidation)
+        XCTAssertEqual(Reason(surfacedImitation), .disallowedVoiceImitation)
         XCTAssertEqual(Reason(TTSEngineError.unknownModel("fixture")), .modelUnavailable)
         XCTAssertEqual(Reason(AudioPreparationError.missingInputFile("/private/fixture.wav")), .referenceAudioMissing)
         XCTAssertEqual(Reason(CocoaError(.fileWriteOutOfSpace)), .storageFull)

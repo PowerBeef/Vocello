@@ -749,6 +749,10 @@ struct VocelloPresentationText: Sendable {
             return localization.string(localized: "vocello.error.generation_script_too_long",
                 defaultValue: "This script is too long to speak in one take. Shorten it, or split it into shorter takes.",
                 comment: "Studio error when a script is far too long for one take, refused before generation starts.")
+        case .disallowedVoiceImitation:
+            return localization.string(localized: "vocello.error.disallowed_voice_imitation",
+                defaultValue: "Voice instructions cannot request celebrity imitation or impersonation of a real person. Describe vocal qualities instead.",
+                comment: "Studio error when a Voice Design brief or delivery instruction asks to imitate a celebrity or real person.")
         case .noAudioProduced:
             return localization.string(localized: "vocello.error.generation_no_audio",
                 defaultValue: "The model produced no audio for this script, so nothing was saved. Check that the script has words to speak, then retry.",

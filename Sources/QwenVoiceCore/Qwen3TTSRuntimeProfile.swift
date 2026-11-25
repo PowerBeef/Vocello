@@ -5,12 +5,14 @@ enum Qwen3TTSRuntimeProfileError: LocalizedError, Sendable {
     case missingFile(String)
     case invalidMetadata(String)
     case unsupportedCapability(String)
+    case disallowedVoiceImitation(String)
 
     var errorDescription: String? {
         switch self {
         case .missingFile(let message),
              .invalidMetadata(let message),
-             .unsupportedCapability(let message):
+             .unsupportedCapability(let message),
+             .disallowedVoiceImitation(let message):
             return message
         }
     }
@@ -269,7 +271,7 @@ struct Qwen3TTSRuntimeProfile: Hashable, Codable, Sendable {
             throw Qwen3TTSRuntimeProfileError.invalidMetadata("\(label) must not be empty.")
         }
         guard !Self.containsDisallowedVoiceImitationInstruction(normalized) else {
-            throw Qwen3TTSRuntimeProfileError.invalidMetadata(
+            throw Qwen3TTSRuntimeProfileError.disallowedVoiceImitation(
                 "\(label) cannot request celebrity imitation or voice impersonation."
             )
         }
@@ -393,22 +395,138 @@ struct Qwen3TTSRuntimeProfile: Hashable, Codable, Sendable {
             .lowercased()
     }
 
+    /// Explicit impersonation / celebrity-imitation intent guard across all 10
+    /// supported languages (P02-10, RF-73 / D2). Refuses impersonation intent
+    /// phrases without maintaining a celebrity-name blocklist, and allows
+    /// ordinary character/archetype descriptions introduced by an indefinite
+    /// article (e.g. "in the voice of an old sea captain", "dans la voix d'un
+    /// vieux capitaine").
     static func containsDisallowedVoiceImitationInstruction(_ normalizedText: String) -> Bool {
         let markers = [
+            // English
             "celebrity",
-            "impersonate",
+            "impersonat",
             "imitate the voice",
             "clone the voice",
+            "mimic the voice",
+            // French
+            "célébrité",
+            "celebrite",
+            "usurper",
+            "imiter la voix",
+            "imite la voix",
+            "cloner la voix",
+            "clone la voix",
+            "se faire passer pour",
+            // Spanish
+            "celebridad",
+            "suplantar",
+            "imitar la voz",
+            "imita la voz",
+            "clonar la voz",
+            "clona la voz",
+            "hacerse pasar por",
+            // German
+            "prominente stimme",
+            "prominente person",
+            "einen prominenten",
+            "einer prominenten",
+            "promi-stimme",
+            "promistimme",
+            "stimme imitieren",
+            "stimme nachahmen",
+            "stimme klonen",
+            "ausgeben als",
+            // Italian
+            "celebrità",
+            "celebrita",
+            "impersonare",
+            "imitare la voce",
+            "imita la voce",
+            "clonare la voce",
+            "clona la voce",
+            "spacciarsi per",
+            // Portuguese
+            "celebridade",
+            "fingir ser",
+            "imitar a voz",
+            "imita a voz",
+            "clonar a voz",
+            "clona a voz",
+            "se passar por",
+            // Chinese (Simplified & Traditional)
+            "名人",
+            "明星",
+            "冒充",
+            "假冒",
+            "模仿他人",
+            "模仿别人",
+            "模仿別人",
+            "模仿某人",
+            "模仿本人",
+            "克隆他人",
+            "克隆别人",
+            "克隆別人",
+            "克隆某人",
+            "克隆本人",
+            // Japanese
+            "有名人",
+            "芸能人",
+            "なりすまし",
+            "なりすます",
+            "ものまね",
+            "モノマネ",
+            "声真似",
+            "声まね",
+            "声を真似",
+            "声をまね",
+            "声をクローン",
+            "声をコピー",
+            // Korean
+            "유명인",
+            "연예인",
+            "사칭",
+            "성대모사",
+            "목소리 흉내",
+            "목소리를 흉내",
+            "목소리 모방",
+            "목소리를 모방",
+            "목소리 복제",
+            "목소리를 복제",
+            // Russian
+            "знаменитост",
+            "выдавать себя за",
+            "имитировать голос",
+            "имитируй голос",
+            "подражать голосу",
+            "клонировать голос",
+            "клонируй голос",
         ]
         if markers.contains(where: { normalizedText.contains($0) }) { return true }
-        // P02-10: a likeness phrase names someone unless an indefinite article
-        // follows it. "In the voice of an old sea captain" and "sound just like
-        // a bedtime story" describe a character or a mood and are allowed; "in
-        // the voice of morgan freeman" and "sounds exactly like my boss" are not.
-        return normalizedText.range(
-            of: #"\b(?:sound(?:s|ing)? (?:exactly|just) like|in the voice of) (?!(?:a|an) )"#,
-            options: .regularExpression
-        ) != nil
+        // P02-10 & RF-73/D2: a named-likeness phrase names someone unless an
+        // indefinite article follows it. "In the voice of an old sea captain"
+        // and "sound just like a bedtime story" describe a character or mood
+        // and are allowed; "in the voice of morgan freeman" and "sounds exactly
+        // like my boss" are not.
+        let likenessPatterns = [
+            // English
+            #"\b(?:sound(?:s|ing)? (?:exactly|just) like|in the voice of) (?!(?:a|an) )"#,
+            // French (exempts un/une/des and elided d'un/d'une while catching named d'Emmanuel)
+            #"\b(?:(?:dans|avec) la voix (?:de (?!(?:un|une|des) )|d['’](?!(?:un|une) ))|exactement comme (?!(?:un|une|des) ))"#,
+            // Spanish
+            #"\b(?:con la voz de|en la voz de|suena (?:exactamente|igual) (?:a|que)) (?!(?:un|una|unos|unas) )"#,
+            // German
+            #"\b(?:mit der stimme von|in der stimme von|klingt genau wie) (?!(?:ein|eine|einem|einer|einen) )"#,
+            // Italian (exempts un/una/uno + space and elided un'/un’ attached directly to a vowel)
+            #"\b(?:con la voce di|nella voce di|suona esattamente come) (?!(?:(?:un|una|uno) |un['’]))"#,
+            // Portuguese
+            #"\b(?:com a voz de|na voz de|soa exatamente como) (?!(?:um|uma|uns|umas) )"#,
+            // Russian (explicit personal/known-person target; Russian lacks indefinite articles)
+            #"(?:^|\s)точно как голос (?:моего|моей|нашего|реального|известного)\b"#,
+        ]
+        return likenessPatterns.contains { pattern in
+            normalizedText.range(of: pattern, options: .regularExpression) != nil
+        }
     }
 
     private static func readJSONObject(_ url: URL) throws -> [String: Any] {

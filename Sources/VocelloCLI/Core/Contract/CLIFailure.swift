@@ -229,6 +229,7 @@ public enum CLIFailure {
         case .memoryPressure: return .memoryPressure
         case .runtimeFailure, .preparationFailure, .generationLimit, .noAudioProduced: return .generationFailed
         case .scriptTooLongForTake: return .textTooLong
+        case .disallowedVoiceImitation: return .invalidInput
         case .audioSilentGap, .audioNoSpeech, .audioUnstable, .audioQualityRejected: return .qcRejected
         case .insufficientMemory: return .insufficientMemory
         case .engineNotReady: return .internalError
@@ -253,6 +254,8 @@ public enum CLIFailure {
             return "the saved voices are in use by another Vocello process; retry shortly"
         case .scriptTooLongForTake:
             return "run it as a long-form project: `vocello generate` does by default (--long-form auto)"
+        case .disallowedVoiceImitation:
+            return "describe vocal qualities instead of naming or imitating a real person"
         case .modelUnavailable:
             return "install it with `vocello models install <id>` (see `vocello models list`)"
         case .audioSilentGap, .audioNoSpeech, .audioUnstable, .audioQualityRejected:

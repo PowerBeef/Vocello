@@ -16,6 +16,9 @@ public enum TTSEngineError: LocalizedError, Equatable {
     case unknownModel(String)
     case modelUnavailable(String)
     case unsupportedRequest(String)
+    /// Prompt or delivery instruction explicitly asked to imitate a real person or celebrity (RF-73 / D2).
+    /// Typed so the apps localize the refusal while the CLI and diagnostics retain the English description.
+    case disallowedVoiceImitation(String)
     case generationFailed(String)
     case insufficientMemory(String)
     /// Another Vocello process (the app or the CLI, which share one support
@@ -39,6 +42,7 @@ public enum TTSEngineError: LocalizedError, Equatable {
             return "The native MLX engine could not find model '\(modelID)'."
         case .modelUnavailable(let message),
              .unsupportedRequest(let message),
+             .disallowedVoiceImitation(let message),
              .generationFailed(let message),
              .insufficientMemory(let message):
             return message
@@ -2073,6 +2077,23 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
                 message: "The model produced no audio for this script, so nothing was saved. Check that the script has words to speak, then retry.",
                 underlying: error,
                 diagnosticDetail: "end_before_first_audio_frame"
+            )
+        }
+        // RF-73 / D2: a prompt-contract impersonation refusal is request validation,
+        // never a runtime startup error. Preserving its message keeps CLI/journal
+        // reporting accurate while its wrapped typed reason drives 10-language app copy.
+        if case .disallowedVoiceImitation(let refusalMessage)? = error as? TTSEngineError {
+            return NativeRuntimeError(
+                stage: .requestValidation,
+                message: refusalMessage,
+                underlying: error
+            )
+        }
+        if case .disallowedVoiceImitation(let refusalMessage)? = error as? Qwen3TTSRuntimeProfileError {
+            return NativeRuntimeError(
+                stage: .requestValidation,
+                message: refusalMessage,
+                underlying: error
             )
         }
         let message = allocationRetryAttempted

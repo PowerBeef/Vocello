@@ -67,6 +67,9 @@
       "id": "sparkle",
       "licenseID": "MIT",
       "notice": "Copyright (c) 2006-2013 Andy Matuschak.\nCopyright (c) 2009-2013 Elgato Systems GmbH.\nCopyright (c) 2011-2014 Kornel Lesiński.\nCopyright (c) 2015-2017 Mayur Pawashe.\nCopyright (c) 2014 C.W. Betts.\nCopyright (c) 2014 Petroules Corporation.\nCopyright (c) 2014 Big Nerd Ranch.\nAll rights reserved.\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of\nthis software and associated documentation files (the \"Software\"), to deal in\nthe Software without restriction, including without limitation the rights to\nuse, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of\nthe Software, and to permit persons to whom the Software is furnished to do so,\nsubject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS\nFOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR\nCOPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER\nIN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN\nCONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n\n=================\nEXTERNAL LICENSES\n=================\n\nbspatch.c and bsdiff.c, from bsdiff 4.3 <http://www.daemonology.net/bsdiff/>:\n\nCopyright 2003-2005 Colin Percival\nAll rights reserved\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted providing that the following conditions \nare met:\n1. Redistributions of source code must retain the above copyright\n   notice, this list of conditions and the following disclaimer.\n2. Redistributions in binary form must reproduce the above copyright\n   notice, this list of conditions and the following disclaimer in the\n   documentation and/or other materials provided with the distribution.\n\nTHIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR\nIMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED\nWARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE\nARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY\nDIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL\nDAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS\nOR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)\nHOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,\nSTRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING\nIN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE\nPOSSIBILITY OF SUCH DAMAGE.\n\n--\n\nsais.c and sais.h, from sais-lite (2010/08/07) <https://sites.google.com/site/yuta256/sais>:\n\nThe sais-lite copyright is as follows:\n\nCopyright (c) 2008-2010 Yuta Mori All Rights Reserved.\n\nPermission is hereby granted, free of charge, to any person\nobtaining a copy of this software and associated documentation\nfiles (the \"Software\"), to deal in the Software without\nrestriction, including without limitation the rights to use,\ncopy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the\nSoftware is furnished to do so, subject to the following\nconditions:\n\nThe above copyright notice and this permission notice shall be\nincluded in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\nEXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES\nOF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND\nNONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT\nHOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,\nWHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING\nFROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR\nOTHER DEALINGS IN THE SOFTWARE.\n\n--\n\nPortable C implementation of Ed25519, from https://github.com/orlp/ed25519\n\nCopyright (c) 2015 Orson Peters <orsonpeters@gmail.com>\n\nThis software is provided 'as-is', without any express or implied warranty. In no event will the\nauthors be held liable for any damages arising from the use of this software.\n\nPermission is granted to anyone to use this software for any purpose, including commercial\napplications, and to alter it and redistribute it freely, subject to the following restrictions:\n\n1. The origin of this software must not be misrepresented; you must not claim that you wrote the\n   original software. If you use this software in a product, an acknowledgment in the product\n   documentation would be appreciated but is not required.\n\n2. Altered source versions must be plainly marked as such, and must not be misrepresented as\n   being the original software.\n\n3. This notice may not be removed or altered from any source distribution.\n\n--\n\nSUSignatureVerifier.m:\n\nCopyright (c) 2011 Mark Hamlin.\n\nAll rights reserved.\n\nRedistribution and use in source and binary forms, with or without\nmodification, are permitted providing that the following conditions\nare met:\n1. Redistributions of source code must retain the above copyright\n   notice, this list of conditions and the following disclaimer.\n2. Redistributions in binary form must reproduce the above copyright\n   notice, this list of conditions and the following disclaimer in the\n   documentation and/or other materials provided with the distribution.\n\nTHIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR\nIMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED\nWARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE\nARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY\nDIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL\nDAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS\nOR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)\nHOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,\nSTRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING\nIN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE\nPOSSIBILITY OF SUCH DAMAGE.\n",
+      "platforms": [
+        "macOS"
+      ],
       "revision": "eef1a539a373c1f1a320624b1130fc5de7b2e100",
       "scope": "application",
       "sourceURL": "https://github.com/sparkle-project/Sparkle",
@@ -248,19 +251,19 @@
   ],
   "contentRights": [
     {
-      "description": "Bundled built-in speaker preview audio",
+      "description": "Bundled built-in speaker preview audio (maintainer attestation ASR04-2026-11-01)",
       "id": "voice-previews",
-      "status": "pending-qualified-review"
+      "status": "attested-maintainer-asr04-2026-11-01"
     },
     {
-      "description": "Generated audio used in marketing materials",
+      "description": "Generated audio used in marketing materials (maintainer attestation ASR04-2026-11-01)",
       "id": "marketing-audio",
-      "status": "pending-qualified-review"
+      "status": "attested-maintainer-asr04-2026-11-01"
     },
     {
-      "description": "App icons and original product artwork",
+      "description": "App icons and original product artwork (maintainer attestation ASR04-2026-11-01)",
       "id": "app-artwork",
-      "status": "pending-qualified-review"
+      "status": "attested-maintainer-asr04-2026-11-01"
     },
     {
       "description": "Apple system fonts and SF Symbols are referenced through platform APIs and are not redistributed as standalone assets",
@@ -268,15 +271,15 @@
       "status": "source-proven-not-redistributed"
     },
     {
-      "description": "App Store Connect declares that the app uses third-party content; qualified rights review remains pending",
+      "description": "App Store Connect declares USES_THIRD_PARTY_CONTENT; maintainer asset attestation ASR04-2026-11-01 recorded (not legal counsel clearance)",
       "id": "app-store-content-rights",
-      "status": "pending-qualified-review-account-declaration-verified"
+      "status": "attested-account-declaration-verified"
     }
   ],
   "generatedFrom": {
     "applicationPackageResolutionSHA256": "925d49ee1e34ca36aed94f4b360628af1f94eadda04d3dc90a5441a59cc2b4dd",
     "ownedRuntimePackageResolutionSHA256": "f0d6902e9f07a0a68b597a4f3dff097f6baff57cb0c0b2a48144490363799068",
-    "policySHA256": "8688e8311730b76ceaf803d1029b0124ddb7a8d3f2bf38c6fb604a3aa1a8228f",
+    "policySHA256": "96ca35fcbb7fcd29d98f6dd4cff9b43781985a1f1de11ca2ebcd1cbeea0077b4",
     "productionModelCatalogSHA256": "fd2bd3b9b82b54d4cac593acb2327e961a2f7d9905d6c7810616bf9d47217c8d"
   },
   "licenses": [
@@ -322,7 +325,7 @@
       "licenseID": "Apache-2.0",
       "modelCardSHA256": "92a47ffc4a4a57f83e79302996063597d31fcf7f5b71a3f1fbc5567e1087be28",
       "modelID": "pro_clone",
-      "redistributionDecision": "pending-qualified-review",
+      "redistributionDecision": "attested-maintainer-asr04-2026-11-01",
       "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-hybrid-attn",
       "revision": "5af70b5c61199b060152d80f5b232d7aa1da9618",
       "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-Base-hybrid-attn/tree/5af70b5c61199b060152d80f5b232d7aa1da9618",
@@ -353,7 +356,7 @@
       "licenseID": "Apache-2.0",
       "modelCardSHA256": "850d09a7f0ca1925f845c18e2f658a89dc3ae1b5536edf6eb66a962529e4d3a0",
       "modelID": "pro_custom",
-      "redistributionDecision": "pending-qualified-review",
+      "redistributionDecision": "attested-maintainer-asr04-2026-11-01",
       "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn",
       "revision": "c36e22eddb74ed1ae3c9f054b961b1173f7c093f",
       "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn/tree/c36e22eddb74ed1ae3c9f054b961b1173f7c093f",
@@ -384,17 +387,33 @@
       "licenseID": "Apache-2.0",
       "modelCardSHA256": "f0f1e7661717ad803d56ed942b53586f3475516c255303287178f5558e689cd9",
       "modelID": "pro_design",
-      "redistributionDecision": "pending-qualified-review",
+      "redistributionDecision": "attested-maintainer-asr04-2026-11-01",
       "repo": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-hybrid-attn",
       "revision": "6bcae41e75db1312816efae9792661a7e70ba75e",
       "sourceURL": "https://huggingface.co/PowerBeef02/Qwen3-TTS-12Hz-1.7B-VoiceDesign-hybrid-attn/tree/6bcae41e75db1312816efae9792661a7e70ba75e",
       "variantID": "speed"
+    },
+    {
+      "baseRepo": "facebook/audioseal",
+      "baseRevision": "3c19eba53390776cf2cc9ed5f6c9ac67ce72ecba",
+      "copyrightNotice": "Copyright (c) Meta Platforms, Inc. and affiliates.",
+      "displayName": "Meta AudioSeal (audioseal_wm_16bits)",
+      "id": "meta-audioseal-wm16",
+      "licenseID": "MIT",
+      "modelCardSHA256": "0e743d11fb8e973803aaa605bed2779429b2e1b13ec9b6e6c8f64b1098e637a3",
+      "modelID": "meta-audioseal-wm16",
+      "notice": "AudioSeal watermark generator weights (marking/audioseal_wm16_generator_fp16.safetensors) converted to fp16 from facebook/audioseal generator_base.pth (upstream SHA-256 7a845b5fbe9364a63a3909d8ab3fe064d13a76ae4c2e983573e08c69b7b51748). Bundled with each downloadable Qwen3-TTS model package for mandatory audio watermarking.",
+      "redistributionDecision": "attested-maintainer-asr04-2026-11-01",
+      "repo": "facebook/audioseal",
+      "revision": "3c19eba53390776cf2cc9ed5f6c9ac67ce72ecba",
+      "sourceURL": "https://github.com/facebookresearch/audioseal",
+      "variantID": "shared"
     }
   ],
   "schemaVersion": 1,
   "summary": {
     "componentCount": 20,
-    "modelArtifactCount": 3,
-    "pendingContentRightsCount": 4
+    "modelArtifactCount": 4,
+    "pendingContentRightsCount": 0
   }
 }

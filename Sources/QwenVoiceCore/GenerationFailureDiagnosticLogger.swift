@@ -196,6 +196,8 @@ public final class GenerationFailureDiagnosticLogger: Sendable {
                 return ErrorMetadata(code: "model.unavailable", classification: .model)
             case .unsupportedRequest:
                 return ErrorMetadata(code: "request.unsupported", classification: .invalidRequest)
+            case .disallowedVoiceImitation:
+                return ErrorMetadata(code: "request.disallowed_voice_imitation", classification: .invalidRequest)
             case .generationFailed:
                 return ErrorMetadata(code: "generation.failed", classification: .runtime)
             case .insufficientMemory:
@@ -207,6 +209,11 @@ public final class GenerationFailureDiagnosticLogger: Sendable {
             case .generationAdmissionRefused(.releasingMemory):
                 return ErrorMetadata(code: "engine.releasing_memory", classification: .runtime)
             }
+        }
+
+        if let profileError = error as? Qwen3TTSRuntimeProfileError,
+           case .disallowedVoiceImitation = profileError {
+            return ErrorMetadata(code: "request.disallowed_voice_imitation", classification: .invalidRequest)
         }
 
         if let preparationError = error as? AudioPreparationError {
@@ -462,6 +469,7 @@ public enum GenerationFailurePresentationReason: String, Sendable, CaseIterable 
     case preparationFailure = "runtime.preparation_failed"
     case generationLimit = "generation.incomplete"
     case scriptTooLongForTake = "generation.script_too_long"
+    case disallowedVoiceImitation = "request.disallowed_voice_imitation"
     case noAudioProduced = "generation.no_audio"
     case audioSilentGap = "audio.quality_rejected.silent_gap"
     case audioNoSpeech = "audio.quality_rejected.no_speech"
@@ -558,6 +566,7 @@ public enum GenerationFailurePresentationReason: String, Sendable, CaseIterable 
     private init?(typedCode code: String) {
         switch code {
         case "generation.no_audio": self = .noAudioProduced
+        case "request.disallowed_voice_imitation": self = .disallowedVoiceImitation
         case "memory.insufficient": self = .insufficientMemory
         case "engine.not_initialized": self = .engineNotReady
         case "engine.busy": self = .engineBusy

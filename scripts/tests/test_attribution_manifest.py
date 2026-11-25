@@ -90,7 +90,7 @@ class AttributionManifestTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertTrue("stale" in result.stderr or "drifts" in result.stderr, result.stderr)
 
-    def test_rebuild_is_deterministic_and_preserves_pending_rights(self) -> None:
+    def test_rebuild_is_deterministic_and_resolves_pending_rights(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.fixture(root)
@@ -104,13 +104,16 @@ class AttributionManifestTests(unittest.TestCase):
         self.assertEqual(first.returncode, 0, first.stderr)
         self.assertEqual(second.returncode, 0, second.stderr)
         self.assertEqual(first_bytes, second_bytes)
-        self.assertEqual(value["summary"]["pendingContentRightsCount"], 4)
+        self.assertEqual(value["summary"]["pendingContentRightsCount"], 0)
+        sparkle = next(row for row in value["components"] if row["id"] == "sparkle")
+        self.assertEqual(sparkle.get("platforms"), ["macOS"])
 
     def test_every_model_names_each_base_it_was_built_from(self) -> None:
-        """A hybrid takes tensors from two conversions; the manifest names both, pinned (RF-61)."""
+        """A hybrid takes tensors from two conversions; the manifest names both plus Meta AudioSeal (RF-61 / RF-73)."""
         manifest = json.loads((ROOT / "Sources/Resources/third_party_attributions.json").read_text())
-        self.assertEqual(len(manifest["modelArtifacts"]), 3)
-        for model in manifest["modelArtifacts"]:
+        qwen_models = [model for model in manifest["modelArtifacts"] if model["repo"].startswith("PowerBeef02/")]
+        self.assertEqual(len(qwen_models), 3)
+        for model in qwen_models:
             with self.subTest(model=model["repo"]):
                 bases = [(model["baseRepo"], model["baseRevision"])] + [
                     (row["baseRepo"], row["baseRevision"]) for row in model["additionalBases"]]
@@ -119,6 +122,15 @@ class AttributionManifestTests(unittest.TestCase):
                 self.assertTrue(all(row["contribution"] for row in model["additionalBases"]))
                 self.assertEqual(len(model["builtFrom"]), 2)
                 self.assertTrue(model["redistributionDecision"])
+                self.assertFalse(model["redistributionDecision"].startswith("pending"))
+
+        audioseal = next((m for m in manifest["modelArtifacts"] if m["id"] == "meta-audioseal-wm16"), None)
+        self.assertIsNotNone(audioseal)
+        assert audioseal is not None
+        self.assertEqual(audioseal["licenseID"], "MIT")
+        self.assertEqual(audioseal["repo"], "facebook/audioseal")
+        self.assertEqual(audioseal["copyrightNotice"], "Copyright (c) Meta Platforms, Inc. and affiliates.")
+        self.assertEqual(len(audioseal["modelCardSHA256"]), 64)
 
     def test_rejects_an_unpinned_duplicate_or_undecided_model_lineage(self) -> None:
         def short_revision(card: dict) -> None:
@@ -152,6 +164,43 @@ class AttributionManifestTests(unittest.TestCase):
                 value = json.loads(path.read_text())
                 mutate(value["modelCards"][0])
                 path.write_text(json.dumps(value), encoding="utf-8")
+                result = self.run_checker(root)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(expected, result.stderr)
+
+    def test_rejects_invalid_platforms_and_auxiliary_model_drift(self) -> None:
+        def bad_platform(root: Path) -> None:
+            path = root / "config/third-party-attribution-policy.json"
+            value = json.loads(path.read_text())
+            value["packages"][0]["platforms"] = ["visionOS"]
+            path.write_text(json.dumps(value), encoding="utf-8")
+
+        def missing_aux_file(root: Path) -> None:
+            path = root / "Sources/Resources/qwenvoice_production_model_catalog.json"
+            value = json.loads(path.read_text())
+            value["artifacts"][0]["files"] = [
+                f for f in value["artifacts"][0]["files"]
+                if f["relativePath"] != "marking/audioseal_wm16_generator_fp16.safetensors"
+            ]
+            path.write_text(json.dumps(value), encoding="utf-8")
+
+        def mismatched_aux_digest(root: Path) -> None:
+            path = root / "Sources/Resources/qwenvoice_production_model_catalog.json"
+            value = json.loads(path.read_text())
+            for row in value["artifacts"][0]["files"]:
+                if row["relativePath"] == "marking/audioseal_wm16_generator_fp16.safetensors":
+                    row["sha256"] = "0" * 64
+            path.write_text(json.dumps(value), encoding="utf-8")
+
+        for label, mutate, expected in [
+            ("bad-platform", bad_platform, "platforms"),
+            ("missing-aux", missing_aux_file, "missing from catalog artifact"),
+            ("mismatched-aux", mismatched_aux_digest, "digest differs across catalog artifacts"),
+        ]:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.fixture(root)
+                mutate(root)
                 result = self.run_checker(root)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(expected, result.stderr)

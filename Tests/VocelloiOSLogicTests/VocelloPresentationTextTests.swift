@@ -89,6 +89,15 @@ final class VocelloPresentationTextTests: XCTestCase {
             text.generationFailureMessage(TTSEngineError.generationAdmissionRefused(.releasingMemory)),
             text.generationFailureMessage(.engineReleasingMemory)
         )
+        // RF-73 / D2: impersonation refusals map to localized catalog copy without raw detail.
+        let imitationMessage = text.generationFailureMessage(
+            TTSEngineError.disallowedVoiceImitation("raw English refusal")
+        )
+        XCTAssertEqual(
+            imitationMessage,
+            "Voice instructions cannot request celebrity imitation or impersonation of a real person. Describe vocal qualities instead."
+        )
+        XCTAssertFalse(imitationMessage.contains("raw English refusal"))
     }
 
     /// PA-20 (IOS-12): one short VoiceOver sentence per generation state change.

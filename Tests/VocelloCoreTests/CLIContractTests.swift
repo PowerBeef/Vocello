@@ -1,5 +1,5 @@
 import Foundation
-import QwenVoiceCore
+@testable import QwenVoiceCore
 import Synchronization
 import System
 import XCTest
@@ -106,6 +106,22 @@ final class CLIContractTests: XCTestCase {
         XCTAssertEqual(classify(TTSEngineError.generationAdmissionRefused(.engineBusy)).code, .engineBusy)
         XCTAssertEqual(classify(TTSEngineError.savedVoiceStoreBusy).code, .storeBusy)
         XCTAssertEqual(classify(TTSEngineError.insufficientMemory("low")).code, .insufficientMemory)
+
+        // RF-73 / D2: impersonation refusals map to invalidInput both raw and via surfacedGenerationError.
+        let rawImitation = TTSEngineError.disallowedVoiceImitation(
+            "Voice Design descriptions cannot request celebrity imitation or voice impersonation."
+        )
+        let surfacedImitation = MLXTTSEngine.surfacedGenerationError(rawImitation, allocationRetryAttempted: false)
+        for error in [rawImitation as any Error, surfacedImitation as any Error] {
+            let classified = classify(error)
+            XCTAssertEqual(classified.code, .invalidInput)
+            XCTAssertEqual(classified.exitCode, 2)
+            XCTAssertFalse(classified.retryable)
+            XCTAssertEqual(classified.detail?["reason"], .string("request.disallowed_voice_imitation"))
+            XCTAssertNotNil(classified.hint)
+            XCTAssertFalse(classified.message.contains("could not start audio generation"))
+            XCTAssertEqual(CLIFailure.rowCode(for: error), .invalidInput)
+        }
 
         let unavailable = classify(HuggingFaceDownloader.DownloadError.httpError(statusCode: 503, path: "a/b", retryAfterSeconds: 2))
         XCTAssertEqual(unavailable.code, .networkUnavailable)

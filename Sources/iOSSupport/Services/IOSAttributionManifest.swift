@@ -21,6 +21,12 @@ public struct IOSAttributionManifest: Decodable, Equatable, Sendable {
         public let notice: String?
         public let origins: String?
         public let licenseTextOverride: String?
+        public let platforms: [String]?
+
+        public var appliesToIOS: Bool {
+            guard let platforms else { return true }
+            return platforms.contains("iOS")
+        }
     }
 
     public struct AdditionalBase: Decodable, Equatable, Sendable {
@@ -46,16 +52,23 @@ public struct IOSAttributionManifest: Decodable, Equatable, Sendable {
         public let baseRevision: String
         public let additionalBases: [AdditionalBase]?
         public let builtFrom: [BuiltFromSource]?
+        public let copyrightNotice: String?
+        public let notice: String?
         public let sourceURL: String
 
         /// Complete provenance notice including the 4-bit base, any 8-bit
         /// `additionalBases` (hybrid attention parents), and `builtFrom`
-        /// source repositories (RB-11).
+        /// source repositories (RB-11), or the auxiliary model's notice (RF-73 / E3).
         public var attributionNoticeText: String {
-            var sections: [String] = [
-                "Model card SHA-256: \(modelCardSHA256)",
-                "Base: \(baseRepo) @ \(baseRevision)",
-            ]
+            var sections: [String] = []
+            if let notice, !notice.isEmpty {
+                sections.append(notice)
+                sections.append("Artifact SHA-256: \(modelCardSHA256)")
+                sections.append("Upstream: \(baseRepo) @ \(baseRevision)")
+            } else {
+                sections.append("Model card SHA-256: \(modelCardSHA256)")
+                sections.append("Base: \(baseRepo) @ \(baseRevision)")
+            }
             if let additionalBases, !additionalBases.isEmpty {
                 let lines = additionalBases.map { extra in
                     if let contribution = extra.contribution, !contribution.isEmpty {
@@ -76,6 +89,11 @@ public struct IOSAttributionManifest: Decodable, Equatable, Sendable {
     public let licenses: [License]
     public let components: [Component]
     public let modelArtifacts: [ModelArtifact]
+
+    /// Components that ship in the iOS app (omits macOS-only dependencies such as Sparkle; RF-73 / E3).
+    public var iosComponents: [Component] {
+        components.filter(\.appliesToIOS)
+    }
 
     public static func load(from bundle: Bundle = .main) throws -> Self {
         guard let url = bundle.url(forResource: "third_party_attributions", withExtension: "json") else {

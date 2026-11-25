@@ -310,6 +310,26 @@ final class VocelloiOSLogicTests: XCTestCase {
                 XCTAssertTrue(notice.contains("- \(source.repo) @ \(source.revision)"))
             }
         }
+
+        // RF-73 / E3: Meta AudioSeal MIT model entry is bundled under Models and
+        // macOS-only Sparkle is omitted from iOS software components.
+        let audioseal = try XCTUnwrap(byID["meta-audioseal-wm16"], "missing Meta AudioSeal model entry")
+        XCTAssertEqual(audioseal.licenseID, "MIT")
+        XCTAssertEqual(audioseal.copyrightNotice, "Copyright (c) Meta Platforms, Inc. and affiliates.")
+        XCTAssertTrue(audioseal.attributionNoticeText.contains("audioseal_wm16_generator_fp16.safetensors"))
+        XCTAssertTrue(audioseal.attributionNoticeText.contains("Artifact SHA-256: \(audioseal.modelCardSHA256)"))
+
+        XCTAssertTrue(manifest.components.contains(where: { $0.id == "sparkle" }))
+        XCTAssertFalse(manifest.iosComponents.contains(where: { $0.id == "sparkle" }))
+        XCTAssertEqual(manifest.iosComponents.count, manifest.components.count - 1)
+        XCTAssertTrue(manifest.iosComponents.contains(where: { $0.id == "vocello" }))
+        XCTAssertTrue(manifest.iosComponents.contains(where: { $0.id == "mlx-swift" }))
+
+        let iosOnlyJSON = """
+        {"id":"ios-only","displayName":"iOS Only","version":"1.0","revision":null,"sourceURL":"https://example.com","licenseID":"MIT","copyrightNotice":null,"notice":null,"origins":null,"licenseTextOverride":null,"platforms":["iOS"]}
+        """
+        let iosOnly = try JSONDecoder().decode(IOSAttributionManifest.Component.self, from: Data(iosOnlyJSON.utf8))
+        XCTAssertTrue(iosOnly.appliesToIOS)
     }
 
     func testCancellationReasonIsTypedAndRoundTrips() throws {

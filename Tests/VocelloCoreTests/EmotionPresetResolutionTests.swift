@@ -315,13 +315,103 @@ final class EmotionPresetResolutionTests: XCTestCase {
             "Sound just like Morgan Freeman.",
             "It sounds exactly like my neighbour.",
             "Imitate the voice of the narrator.",
+            // RF-73 / D2: multilingual impersonation intent across all 10 languages.
+            "Imiter la voix de mon patron.",
+            "Avec la voix de Jean-Luc.",
+            "Dans la voix d'Emmanuel.",
+            "Imitar la voz de un famoso.",
+            "Con la voz de Pedro.",
+            "Die Stimme imitieren von meinem Chef.",
+            "Klingt genau wie mein Nachbar.",
+            "Imitare la voce di Marco.",
+            "Clonar a voz de uma celebridade.",
+            "模仿名人的声音",
+            "有名人の声真似で話して",
+            "유명인 성대모사로 말해줘",
+            "Имитировать голос диктора.",
+            "Точно как голос моего начальника.",
         ] {
-            XCTAssertThrowsError(try GenerationSemantics.validateQwenPromptContract(for: customRequest(refused)), refused)
+            XCTAssertThrowsError(try GenerationSemantics.validateQwenPromptContract(for: customRequest(refused)), refused) { error in
+                guard case TTSEngineError.disallowedVoiceImitation = error else {
+                    XCTFail("Expected TTSEngineError.disallowedVoiceImitation for '\(refused)', got \(error)")
+                    return
+                }
+            }
         }
-        XCTAssertThrowsError(try GenerationSemantics.validateQwenPromptContract(
-            for: designRequest("In the voice of Morgan Freeman, slow and deep.")))
-        XCTAssertThrowsError(try GenerationSemantics.validateQwenPromptContract(
-            for: designRequest("A celebrity radio host.")))
+        for multilingualAllowed in [
+            "Dans la voix d'un vieux capitaine de mer, chaleureux et grave.",
+            "Con la voz de un narrador tranquilo y cálido.",
+            "Mit der Stimme von einem ruhigen Erzähler.",
+            "Eine prominente Bassstimme mit ruhigem Tempo.",
+            "Con la voce di un narratore calmo e profondo.",
+            "Con la voce di un'anziana narratrice.",
+            "Con la voce di un’anziana narratrice.",
+            "Com a voz de um narrador acolhedor.",
+            "Personificar um narrador sábio e calmo.",
+            "温暖沉稳的男性旁白声音。",
+            "落ち着いた温かいナレーターの声。",
+            "海賊のふりをする陽気な声。",
+            "차분하고 따뜻한 내레이터 목소리.",
+            "Спокойный, тёплый голос рассказчика.",
+            "Точно как голос доброго рассказчика.",
+        ] {
+            XCTAssertNoThrow(
+                try GenerationSemantics.validateQwenPromptContract(for: designRequest(multilingualAllowed)),
+                multilingualAllowed
+            )
+        }
+        for refusedDesign in [
+            "In the voice of Morgan Freeman, slow and deep.",
+            "A celebrity radio host.",
+        ] {
+            XCTAssertThrowsError(
+                try GenerationSemantics.validateQwenPromptContract(for: designRequest(refusedDesign)),
+                refusedDesign
+            ) { error in
+                guard case TTSEngineError.disallowedVoiceImitation = error else {
+                    XCTFail("Expected TTSEngineError.disallowedVoiceImitation for '\(refusedDesign)', got \(error)")
+                    return
+                }
+            }
+        }
+        // Voice Design deliveryStyle is also checked alongside voiceDescription.
+        let designWithDisallowedDelivery = GenerationRequest(
+            mode: .design, modelID: "pro_design", text: "Guard fixture.",
+            outputPath: "/nonexistent/p02-10.wav", shouldStream: false,
+            payload: .design(voiceDescription: "Warm narrator.", deliveryStyle: "Impersonate a celebrity announcer.")
+        )
+        XCTAssertThrowsError(
+            try GenerationSemantics.validateQwenPromptContract(for: designWithDisallowedDelivery)
+        ) { error in
+            guard case TTSEngineError.disallowedVoiceImitation = error else {
+                XCTFail("Expected TTSEngineError.disallowedVoiceImitation, got \(error)")
+                return
+            }
+        }
+        // RF-73 / D3: spoken script (`request.text`) is never filtered in any mode.
+        let scriptWithImpersonationWords = "Do not impersonate a celebrity or sound just like Morgan Freeman in this documentary."
+        for request in [
+            GenerationRequest(
+                mode: .custom, modelID: "pro_custom", text: scriptWithImpersonationWords,
+                outputPath: "/nonexistent/d3-custom.wav", shouldStream: false,
+                payload: .custom(speakerID: "aiden", deliveryStyle: "Calm and measured.")
+            ),
+            GenerationRequest(
+                mode: .design, modelID: "pro_design", text: scriptWithImpersonationWords,
+                outputPath: "/nonexistent/d3-design.wav", shouldStream: false,
+                payload: .design(voiceDescription: "A calm documentary narrator.", deliveryStyle: nil)
+            ),
+            GenerationRequest(
+                mode: .clone, modelID: "pro_clone", text: scriptWithImpersonationWords,
+                outputPath: "/nonexistent/d3-clone.wav", shouldStream: false,
+                payload: .clone(reference: CloneReference(audioPath: "/nonexistent/ref.wav", transcript: "Hello."))
+            ),
+        ] {
+            XCTAssertNoThrow(
+                try GenerationSemantics.validateQwenPromptContract(for: request),
+                "Spoken script text must remain unfiltered in mode \(request.mode)"
+            )
+        }
     }
 
     private static func sha256(_ value: String) -> String {

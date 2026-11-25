@@ -4621,7 +4621,7 @@
 					"@executable_path/Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				OTHER_SWIFT_FLAGS = "$(inherited) $(QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG)";
+				OTHER_SWIFT_FLAGS = "$(inherited) $(QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG) $(QVOICE_DEVICE_DIAGNOSTICS_SWIFT_FLAG)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.qwenvoice.core;
 				PRODUCT_MODULE_NAME = QwenVoiceCore;
 				PRODUCT_NAME = QwenVoiceCore;
@@ -4740,7 +4740,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				OTHER_SWIFT_FLAGS = "$(inherited) $(QVOICE_DEVICE_DIAGNOSTICS_SWIFT_FLAG)";
+				OTHER_SWIFT_FLAGS = "$(inherited) $(QVOICE_DEVICE_DIAGNOSTICS_SWIFT_FLAG) $(QVOICE_INTERNAL_DIAGNOSTICS_SWIFT_FLAG)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.patricedery.vocello;
 				PRODUCT_MODULE_NAME = QVoiceiOS;
 				PRODUCT_NAME = Vocello;

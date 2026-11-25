@@ -40,6 +40,11 @@ PROHIBITED_RELEASE_STRING_PATTERNS = (
     re.compile(r"/private/var/folders/"),
     re.compile(r"VOCELLO_INTERNAL_DIAGNOSTICS"),
     re.compile(r"QVOICE_DEVICE_DIAGNOSTICS"),
+    re.compile(r"QVOICE_IOS_DEVICE_"),
+    re.compile(r"QWENVOICE_UIPERF_"),
+    re.compile(r"QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE"),
+    re.compile(r"IOSDeviceDiagnosticsRunner"),
+    re.compile(r"IOSStartupReliabilityRunner"),
 )
 # dlopen loads code at run time, which an App Store app may not do with code it
 # did not ship. dlsym and dladdr only look up symbols in images already loaded:
@@ -551,6 +556,8 @@ def validate_bundle_contract(
         )
     if info.get("LSSupportsGameMode") is not False:
         raise VerificationError(f"{label} must opt out of Game Mode (LSSupportsGameMode = NO)")
+    if info.get("UIFileSharingEnabled") is True:
+        raise VerificationError(f"{label} must not enable UIFileSharingEnabled in Info.plist")
     normalized_uuids = tuple(sorted(macho_uuids))
     if not normalized_uuids:
         raise VerificationError(f"{label} main executable has no Mach-O UUID")

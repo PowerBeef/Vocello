@@ -16,8 +16,7 @@ public enum BenchRunContext {
 
     public static var isActive: Bool {
         guard TelemetryGate.resolvedEnabled else { return false }
-        let env = ProcessInfo.processInfo.environment
-        return env[runIDKey]?.isEmpty == false
+        return RuntimeDebugGate.observabilityValue(for: runIDKey)?.isEmpty == false
     }
 
     public static var runID: String? {
@@ -140,7 +139,7 @@ public enum BenchRunContext {
     }
 
     private static func trimmedEnv(_ key: String) -> String? {
-        guard let raw = ProcessInfo.processInfo.environment[key]?
+        guard let raw = RuntimeDebugGate.observabilityValue(for: key)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
             !raw.isEmpty else {
             return nil

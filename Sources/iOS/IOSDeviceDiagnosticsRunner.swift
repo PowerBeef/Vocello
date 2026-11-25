@@ -1,3 +1,4 @@
+#if QVOICE_DEVICE_DIAGNOSTICS
 import AVFoundation
 import CryptoKit
 import Foundation
@@ -3166,3 +3167,4 @@ enum IOSDeviceDiagnosticsRunner {
         let frameCount: Int64
     }
 }
+#endif

@@ -192,6 +192,10 @@ public enum StartupReliabilityDiagnosticEvidence {
         environment: [String: String],
         telemetryEnabled: Bool
     ) -> String? {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        _ = (environment, telemetryEnabled)
+        return nil
+        #else
         guard telemetryEnabled else { return nil }
         var identity: String?
         for key in ["QVOICE_IOS_DEVICE_RUN_ID", "QVOICE_MAC_BENCH_RUN_ID"] {
@@ -202,6 +206,7 @@ public enum StartupReliabilityDiagnosticEvidence {
             identity = value
         }
         return identity
+        #endif
     }
 
     public static func evidenceDirectory(

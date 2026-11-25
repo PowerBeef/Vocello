@@ -1823,7 +1823,7 @@ struct IOSVoiceCloningView: View {
 
     @ViewBuilder
     private var longFormResumeChip: some View {
-        if appModel.longForm.canResume, appModel.longForm.lastMode == .clone {
+        if allowsExecution, appModel.longForm.canResume, appModel.longForm.lastMode == .clone {
             IOSStudioSetupChip(
                 eyebrow: IOSInterfaceText.longForm,
                 value: IOSInterfaceText.resumeProject,
@@ -2320,7 +2320,7 @@ struct IOSVoiceCloningView: View {
     /// memory-band and thermal gated; the generate task's own
     /// `ensureCloneReferencePrimed` remains the on-demand fallback.
     private func primeSelectedCloneVoiceProactively() {
-        guard !ttsEngine.hasActiveGeneration else { return }
+        guard allowsExecution, !ttsEngine.hasActiveGeneration else { return }
         guard draft.isReferenceReady, transcriptLoadError == nil,
               let model = TTSModel.model(for: .clone), modelManager.isAvailable(model) else { return }
         let reference = draft.referenceAudioPath.map { path in

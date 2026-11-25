@@ -1,3 +1,4 @@
+#if VOCELLO_INTERNAL_DIAGNOSTICS
 import Foundation
 import QuartzCore
 import QwenVoiceCore
@@ -354,3 +355,4 @@ final class IOSUIPerfFrameProbe: NSObject {
         }
     }
 }
+#endif

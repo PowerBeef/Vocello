@@ -271,6 +271,9 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
         if let reason = IOSNativeDeviceFeatureGate.unsupportedReason(for: request.mode) {
             return .unsupported(reason: reason)
         }
+        guard supportsMode(request.mode) else {
+            return .unsupported(reason: "Voice Cloning requires more available memory on this device.")
+        }
         return backend.supportDecision(for: request)
     }
 
@@ -332,6 +335,7 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
     }
 
     func ensureCloneReferencePrimed(modelID: String, reference: CloneReference) async throws {
+        guard supportsMode(.clone) else { return }
         guard await allowsProactiveWarmOperations(reason: "clone_reference_prime") else { return }
         inFlightPreparationDepth += 1
         defer { inFlightPreparationDepth -= 1 }

@@ -1,3 +1,4 @@
+import VocelloQwen3Core
 import XCTest
 @testable import QwenVoiceCore
 
@@ -233,5 +234,106 @@ final class RuntimeDebugGateTests: XCTestCase {
             "QWENVOICE_DEBUG": "yes",
             "QWENVOICE_NATIVE_TELEMETRY_MODE": "Disabled",
         ]))
+    }
+
+    func testWithoutCloneEncodersExplicitProfileIsNeverOverriddenToFullCapabilities() async throws {
+        XCTAssertEqual(
+            MLXTTSEngine.resolvedPreparedLoadProfile(
+                requestedCapabilityProfile: .cloneOnly,
+                explicitProfile: .withoutCloneEncoders
+            ),
+            .withoutCloneEncoders
+        )
+        XCTAssertEqual(
+            MLXTTSEngine.resolvedPreparedLoadProfile(
+                requestedCapabilityProfile: .fullCapabilities,
+                explicitProfile: .withoutCloneEncoders
+            ),
+            .withoutCloneEncoders
+        )
+        XCTAssertEqual(
+            MLXTTSEngine.resolvedPreparedLoadProfile(
+                requestedCapabilityProfile: .cloneOnly,
+                explicitProfile: .fullCapabilities
+            ),
+            .fullCapabilities
+        )
+        XCTAssertEqual(
+            MLXTTSEngine.resolvedPreparedLoadProfile(
+                requestedCapabilityProfile: .customOnly,
+                explicitProfile: .fullCapabilities
+            ),
+            .withoutCloneEncoders
+        )
+        XCTAssertEqual(
+            MLXTTSEngine.resolvedPreparedLoadProfile(
+                requestedCapabilityProfile: .designOnly,
+                explicitProfile: .fullCapabilities
+            ),
+            .withoutCloneEncoders
+        )
+
+        let loadBehavior = MLXTTSEngine.qwenPreparedLoadBehavior(
+            for: .withoutCloneEncoders,
+            trustPreparedCheckpoint: true,
+            preparedDirectoryAlreadyValidated: true
+        )
+        XCTAssertEqual(loadBehavior.loadSpeakerEncoder, false)
+        XCTAssertEqual(loadBehavior.loadSpeechTokenizerEncoder, false)
+
+        // End-to-end runtime check: a `.withoutCloneEncoders` engine refuses `.clone`
+        // generation while still admitting `.custom` and `.design`.
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vocello-p1-5-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let manifestURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Resources/qwenvoice_contract.json")
+        let runtime = try await MainActor.run {
+            try NativeRuntimeFactory.make(
+                manifestURL: manifestURL,
+                paths: .rooted(at: root),
+                storeVersionSeed: "p1-5-fallback",
+                qwenPreparedLoadProfile: .withoutCloneEncoders
+            )
+        }
+        defer { Task { @MainActor in runtime.engine.stop() } }
+
+        let cloneRequest = GenerationRequest(
+            mode: .clone,
+            modelID: "pro_clone_speed",
+            text: "Fallback test.",
+            outputPath: root.appendingPathComponent("clone.wav").path,
+            shouldStream: false,
+            payload: .clone(reference: CloneReference(audioPath: "/nonexistent/ref.wav", transcript: "Hi"))
+        )
+        let customRequest = GenerationRequest(
+            mode: .custom,
+            modelID: "pro_custom_speed",
+            text: "Fallback test.",
+            outputPath: root.appendingPathComponent("custom.wav").path,
+            shouldStream: false,
+            payload: .custom(speakerID: "aiden", deliveryStyle: nil)
+        )
+        let designRequest = GenerationRequest(
+            mode: .design,
+            modelID: "pro_design_speed",
+            text: "Fallback test.",
+            outputPath: root.appendingPathComponent("design.wav").path,
+            shouldStream: false,
+            payload: .design(voiceDescription: "Warm narrator", deliveryStyle: nil)
+        )
+
+        await MainActor.run {
+            if case .unsupported = runtime.engine.supportDecision(for: cloneRequest) {
+                // Expected refusal on `.withoutCloneEncoders`.
+            } else {
+                XCTFail("Expected .withoutCloneEncoders engine to refuse .clone requests")
+            }
+            XCTAssertEqual(runtime.engine.supportDecision(for: customRequest), .supported(.nativeMLX))
+            XCTAssertEqual(runtime.engine.supportDecision(for: designRequest), .supported(.nativeMLX))
+        }
     }
 }

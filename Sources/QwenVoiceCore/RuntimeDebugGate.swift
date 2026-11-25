@@ -1,4 +1,6 @@
+#if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
 import CryptoKit
+#endif
 import Foundation
 
 /// Privacy-safe provenance for an internal runtime override set. Values are
@@ -44,12 +46,17 @@ public enum RuntimeDebugGate {
     }
 
     private static func masterGateRequested(environment: [String: String]) -> Bool {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        _ = environment
+        return false
+        #else
         guard let raw = environment["QWENVOICE_DEBUG"]?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased() else {
             return false
         }
         return ["1", "true", "on", "yes"].contains(raw)
+        #endif
     }
 
     public static func value(
@@ -78,11 +85,17 @@ public enum RuntimeDebugGate {
     /// Reads a contract-classified observability-only key. These values may
     /// select bounded telemetry or correlation metadata, but may never change
     /// product policy, output bytes, storage roots, or model behavior.
+    /// Shipping iOS distribution builds omit diagnostic environment reads entirely.
     public static func observabilityValue(
         for key: String,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> String? {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        _ = (key, environment)
+        return nil
+        #else
         environment[key]
+        #endif
     }
 
     /// Captures only key names plus a digest of the exact key/value set. This
@@ -101,6 +114,15 @@ public enum RuntimeDebugGate {
         environment: [String: String],
         internalDiagnosticsAvailable: Bool
     ) -> RuntimeDebugProvenance {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        _ = (environment, internalDiagnosticsAvailable)
+        return RuntimeDebugProvenance(
+            internalDiagnosticsAvailable: false,
+            masterGateRequested: false,
+            activeOverrideKeys: [],
+            activeOverrideDigest: nil
+        )
+        #else
         let masterRequested = masterGateRequested(environment: environment)
         let active = isEnabled(
             environment: environment,
@@ -131,5 +153,6 @@ public enum RuntimeDebugGate {
             activeOverrideKeys: keys,
             activeOverrideDigest: digest
         )
+        #endif
     }
 }

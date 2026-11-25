@@ -55,6 +55,10 @@ final class IOSDeviceDiagnosticsRecorder {
             in: .userDomainMask
         ).first
     ) -> IOSDeviceDiagnosticsRecorder? {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        _ = (environment, appSupportDirectory, cachesDirectory)
+        return nil
+        #else
         guard NativeTelemetryMode.current(environment: environment) != .off else {
             return nil
         }
@@ -84,6 +88,7 @@ final class IOSDeviceDiagnosticsRecorder {
             directories.append((name: "app-container-cache", url: mirrorDirectory))
         }
         return IOSDeviceDiagnosticsRecorder(runID: safeRunID, diagnosticsDirectories: directories)
+        #endif
     }
 
     func recordMemoryContext(

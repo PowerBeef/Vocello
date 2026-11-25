@@ -12,9 +12,9 @@ import VocelloiOSPolicies
 /// `NativeRuntimeFactory` (see `IOSAppBootstrap.makeBackend`) — the app process gets
 /// the `com.apple.developer.kernel.increased-memory-limit` entitlement's raised limit,
 /// whereas the (since-removed) `VocelloEngineExtension` did not and was jetsam-killed
-/// loading the model. The headless `IOSDeviceDiagnosticsRunner` drives explicit
-/// non-UI device diagnostics, including generation and Speech-asset bootstrap;
-/// it ships inert unless a repository command supplies its purpose-specific environment.
+/// loading the model. In local `QVOICE_DEVICE_DIAGNOSTICS` builds, the headless
+/// `IOSDeviceDiagnosticsRunner` drives explicit non-UI device diagnostics;
+/// shipping App Store builds compile it out completely (Guideline 2.5.19).
 @main
 struct QVoiceiOSApp: App {
     private let appLanguage = IOSAppLanguage.shared
@@ -48,11 +48,12 @@ struct QVoiceiOSApp: App {
         IOSMetricKitMemoryReporter.shared.start()
         // IOS-22: the app-switcher privacy cover covers presented sheets too.
         IOSAppSwitcherPrivacyCoverWindows.shared.install()
-        // UI-perf lane hooks (both inert without QWENVOICE_DEBUG + their
-        // registered knobs): seed History before any navigation can reach it,
-        // then start the frame probe so its display link spans the launch.
+        // UI-perf lane hooks (compiled out of distribution builds under Guideline 2.5.19;
+        // active only when VOCELLO_INTERNAL_DIAGNOSTICS + QWENVOICE_DEBUG + registered knobs are set).
+        #if VOCELLO_INTERNAL_DIAGNOSTICS
         IOSUIPerfHistorySeeder.seedIfConfigured()
         IOSUIPerfFrameProbe.startIfConfigured()
+        #endif
     }
 
     var body: some Scene {
@@ -160,9 +161,11 @@ struct QVoiceiOSApp: App {
         // Evidence cleanup is a host-authorized diagnostics action and does not
         // require a native runtime. Perform it before engine startup so cleanup
         // remains reliable after memory-pressure or initialization failures.
+        #if QVOICE_DEVICE_DIAGNOSTICS
         if IOSStartupReliabilityRunner.runCleanupIfRequested() {
             return
         }
+        #endif
         // BG-01: the store may first exist after the scene already left (a
         // background relaunch, or leaving during startup); those phase changes
         // found no engine to tell.
@@ -177,9 +180,11 @@ struct QVoiceiOSApp: App {
                 if TelemetryGate.resolvedEnabled {
                     print("[QVoiceiOSApp] Engine initialized.")
                 }
-                // Headless, non-UI on-device diagnostics runner. No-op unless a
-                // purpose-specific environment key is set by scripts/ios_device.sh.
+                // Headless, non-UI on-device diagnostics runner. Compiled only into
+                // device-diagnostics builds (`scripts/ios_device.sh`).
+                #if QVOICE_DEVICE_DIAGNOSTICS
                 IOSDeviceDiagnosticsRunner.runIfRequested(engine: engine)
+                #endif
             } catch {
                 didInitializeEngine = false
                 engineStartFailed = true

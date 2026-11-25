@@ -54,6 +54,8 @@ def validate(root: Path = ROOT) -> dict[str, object]:
         raise EligibilityError("Swift eligibility policy does not admit both iPhone 15 Pro identifiers")
     if '(majorVersion ?? 0) >= 17' not in policy:
         raise EligibilityError("Swift eligibility policy does not admit later iPhone generations")
+    if 'identifier.hasPrefix("iPad")' not in policy:
+        raise EligibilityError("Swift eligibility policy does not admit eligible gaming-tier iPads")
     if 'minimumHardwareModel = "iPhone 15 Pro"' not in policy:
         raise EligibilityError("Swift minimum hardware model differs from the governed floor")
 

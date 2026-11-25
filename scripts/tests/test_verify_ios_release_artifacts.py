@@ -143,6 +143,10 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
                 with self.assertRaisesRegex(module.VerificationError, "Game Mode"):
                     self.snapshot(info=info)
 
+    def test_file_sharing_must_not_be_enabled_in_info_plist(self) -> None:
+        with self.assertRaisesRegex(module.VerificationError, "UIFileSharingEnabled"):
+            self.snapshot(info=dict(self.info, UIFileSharingEnabled=True))
+
     def test_archive_and_export_device_capabilities_must_match(self) -> None:
         archived = self.snapshot()
         exported = replace(
@@ -402,6 +406,11 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
             "/private/var/folders/fixture",
             "VOCELLO_INTERNAL_DIAGNOSTICS",
             "QVOICE_DEVICE_DIAGNOSTICS",
+            "QVOICE_IOS_DEVICE_DIAGNOSTICS_SPEC",
+            "QWENVOICE_UIPERF_FRAME_PROBE",
+            "QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE",
+            "IOSDeviceDiagnosticsRunner",
+            "IOSStartupReliabilityRunner",
         ]:
             with self.assertRaisesRegex(module.VerificationError, "prohibited release"):
                 module._validate_release_strings(leaked, "export")

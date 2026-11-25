@@ -645,6 +645,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     private var stopCleanupTask: Task<Void, Never>?
     private let latestEventCoalescer = LatestEventCoalescer()
     private var latestEventDrainTask: Task<Void, Never>?
+    private let qwenPreparedLoadProfile: NativeQwenPreparedLoadProfile
 
     public convenience init(
         modelRegistry: any ModelRegistry,
@@ -737,7 +738,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             streamingSessionFactory: Self.makeStreamingSessionFactory(
                 pcmScratchBuffer: PCM16ScratchBuffer(),
                 diagnosticAppSupportBox: diagnosticAppSupportBox
-            )
+            ),
+            qwenPreparedLoadProfile: qwenPreparedLoadProfile
         )
     }
 
@@ -786,7 +788,8 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         diagnosticAppSupportBox: DiagnosticAppSupportBox = DiagnosticAppSupportBox(),
         streamingSessionFactory: @escaping StreamingSessionFactory,
         idleUnloadDelayOverride: Double? = nil,
-        allocatorControl: NativeMLXAllocatorControl = .live
+        allocatorControl: NativeMLXAllocatorControl = .live,
+        qwenPreparedLoadProfile: NativeQwenPreparedLoadProfile = .fullCapabilities
     ) {
         self.modelRegistry = modelRegistry
         self.modelAssetStore = modelAssetStore
@@ -797,6 +800,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         self.diagnosticAppSupportBox = diagnosticAppSupportBox
         self.idleUnloadDelayOverride = idleUnloadDelayOverride
         self.allocatorControl = allocatorControl
+        self.qwenPreparedLoadProfile = qwenPreparedLoadProfile
         self.runtime = NativeEngineRuntime(
             loadCoordinator: loadCoordinator,
             audioPreparationService: audioPreparationService,
@@ -842,6 +846,15 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     public func supportDecision(for request: GenerationRequest) -> GenerationSupportDecision {
         guard request.batchIndex == nil, request.batchTotal == nil else {
             return .unsupported(reason: "Batch generation is not available in the native-only app.")
+        }
+
+        if request.mode == .clone || {
+            if case .clone = request.payload { return true }
+            return false
+        }() {
+            guard qwenPreparedLoadProfile == .fullCapabilities else {
+                return .unsupported(reason: "Voice Cloning requires more available memory on this device.")
+            }
         }
 
         switch request.payload {
@@ -2752,12 +2765,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
     ) -> NativeQwenPreparedLoadProfile {
         switch explicitProfile {
         case .withoutCloneEncoders, .streamingOnly:
-            switch requestedCapabilityProfile {
-            case .customOnly, .designOnly:
-                return .withoutCloneEncoders
-            case .cloneOnly, .fullCapabilities:
-                return .fullCapabilities
-            }
+            return .withoutCloneEncoders
         case .fullCapabilities:
             return NativeQwenPreparedLoadProfile(capabilityProfile: requestedCapabilityProfile)
         }
@@ -2841,6 +2849,10 @@ private actor NativeDiagnosticEventJSONLWriter {
         appSupportDirectoryURL: URL?,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        _ = (name, details, appSupportDirectoryURL, environment)
+        return
+        #else
         guard NativeTelemetryMode.current(environment: environment) != .off,
               TelemetryGate.resolvedEnabled else {
             return
@@ -2880,6 +2892,7 @@ private actor NativeDiagnosticEventJSONLWriter {
         } catch {
             print("[NativeDiagnosticEventJSONLWriter] Could not write native event '\(name)': \(DiagnosticPrivacy.summary(of: error))")
         }
+        #endif
     }
 
     private func append(_ data: Data, to url: URL) throws {

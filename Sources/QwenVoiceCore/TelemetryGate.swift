@@ -4,8 +4,10 @@ import Synchronization
 /// Process-portable runtime gate for durable generation telemetry.
 ///
 /// `TelemetryGate` is the Core-visible equivalent every process can read, so
-/// telemetry persistence is gated at runtime
-/// (never compiled out, no `#if DEBUG`): dev and shipped binaries run identical paths.
+/// telemetry persistence is gated at runtime (no `#if DEBUG`). Shipping iOS
+/// distribution builds omit the local diagnostic flags (`VOCELLO_INTERNAL_DIAGNOSTICS`
+/// and `QVOICE_DEVICE_DIAGNOSTICS`) and compile out environment reads under
+/// Guideline 2.5.19.
 ///
 /// Resolution sources:
 /// - `QWENVOICE_DEBUG` env var (`1` / `true` / `on` / `yes`) — mirrors `DebugMode`'s env
@@ -24,8 +26,10 @@ import Synchronization
 /// `QWENVOICE_DEBUG` says. `RuntimeDebugGate` itself is unchanged: overrides
 /// still need the internal-diagnostics build and the master switch.
 public enum TelemetryGate {
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
     private static let environmentKey = "QWENVOICE_DEBUG"
     private static let telemetryModeKey = "QWENVOICE_NATIVE_TELEMETRY_MODE"
+    #endif
 
     /// Resolved once per process from the environment.
     public static let isEnabled: Bool = resolve()
@@ -96,6 +100,10 @@ public enum TelemetryGate {
     static func resolve(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> Bool {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        _ = environment
+        return false
+        #else
         let mode = environment[telemetryModeKey]?.lowercased()
         // Same spellings `NativeTelemetryMode.current(environment:)` reads as off.
         if mode == "off" || mode == "disabled" {
@@ -113,5 +121,6 @@ public enum TelemetryGate {
         default:
             return false
         }
+        #endif
     }
 }

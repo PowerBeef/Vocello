@@ -47,6 +47,7 @@ final class IOSAppDependenciesContainer: nonisolated ObservableObject {
         startup.start()
     }
 
+    #if VOCELLO_INTERNAL_DIAGNOSTICS
     /// AUD-01 device proof: the registered internal-diagnostics knob
     /// `QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE` fails the first pass of the process
     /// before it touches anything, so a phone run can prove Retry. Distribution
@@ -61,12 +62,15 @@ final class IOSAppDependenciesContainer: nonisolated ObservableObject {
     private struct ForcedStartupFailure: LocalizedError {
         var errorDescription: String? { "Startup failed on purpose (internal diagnostics)." }
     }
+    #endif
 
     private static func makeDependencies() async throws -> Dependencies {
+        #if VOCELLO_INTERNAL_DIAGNOSTICS
         if forcedStartupFailurePending {
             forcedStartupFailurePending = false
             throw ForcedStartupFailure()
         }
+        #endif
         let protection = await Task.detached(priority: .userInitiated) { @concurrent in
             // MAC-25 on the iPhone: reference clips an earlier launch recorded
             // (a crash or jetsam kill stranded them) go before any sheet can
@@ -212,22 +216,26 @@ extension QVoiceiOSApp {
         // memory-conscious `.iOSProductionDefault` (= withoutCloneEncoders).
         // `.skipDedicatedCustomPrewarm` avoids a prewarm memory spike. Models resolve
         // from the same shared-container `models/` dir the user already downloaded into.
+        let loadProfile = cloneCapableLoadProfile()
         let runtime = try NativeRuntimeFactory.make(
             registry: registry,
             paths: .rooted(at: AppPaths.appSupportDir),
             storeVersionSeed: modelAssetStoreSeed(),
             customPrewarmPolicy: .skipDedicatedCustomPrewarm,
-            qwenPreparedLoadProfile: cloneCapableLoadProfile()
+            qwenPreparedLoadProfile: loadProfile
         )
         let engine = runtime.engine
         // PA-20: errors the engine surfaces read catalog copy in the interface language.
         engine.visibleErrorDescription = { IOSAppLanguage.shared.presentation.generationFailureMessage($0) }
+        let supportedModes: Set<GenerationMode> = loadProfile == .fullCapabilities
+            ? [.custom, .design, .clone]
+            : [.custom, .design]
         let engineStore = TTSEngineStore(
             backend: AnyTTSEngineBackend(
                 engine: engine,
                 supportsSavedVoiceMutation: true,
                 supportsModelManagementMutation: true,
-                supportedModes: [.custom, .design, .clone],
+                supportedModes: supportedModes,
                 // PA-17: the visible Settings acknowledgment (`@AppStorage` in
                 // `.standard`) is the recorded consent the core enforces.
                 voiceCloningConsent: {
@@ -258,7 +266,7 @@ enum IOSDeviceSupport {
         IOSDeviceEligibilityPolicy.isSupportedMachineIdentifier(machineIdentifier())
     }
 
-    /// Shown on hardware the guard refuses, including the iPads that can install the app (RF-42).
+    /// Shown on hardware the guard refuses (devices below the iPhone 15 Pro / 8 GB+ iPad floor).
     @MainActor static var unsupportedReason: String {
         IOSInterfaceText.unsupportedDeviceDetail(IOSDeviceEligibilityPolicy.minimumHardwareModel)
     }

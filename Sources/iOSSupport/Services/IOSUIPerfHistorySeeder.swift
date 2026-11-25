@@ -1,3 +1,4 @@
+#if VOCELLO_INTERNAL_DIAGNOSTICS
 import Foundation
 import QwenVoiceCore
 
@@ -94,3 +95,4 @@ enum IOSUIPerfHistorySeeder {
         return url.path
     }
 }
+#endif

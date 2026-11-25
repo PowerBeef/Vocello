@@ -1,3 +1,4 @@
+#if QVOICE_DEVICE_DIAGNOSTICS
 import CallKit
 import Foundation
 import UIKit
@@ -6,11 +7,10 @@ import UIKit
 /// (`CXCallObserver` — no special entitlement) and app lifecycle transitions (the
 /// user unlocking/using the phone backgrounds the app under test).
 ///
-/// **Runtime-gated, ships inert**: started only by `IOSDeviceDiagnosticsRunner` (which
-/// itself fires only when `QVOICE_IOS_DEVICE_DIAGNOSTICS_SPEC` is set by
-/// `scripts/ios_device.sh`).
-/// A normal user launch never creates it. Follows the repo's runtime-gate
-/// philosophy — no `#if DEBUG`.
+/// **Compiled only into `QVOICE_DEVICE_DIAGNOSTICS` builds**: started by
+/// `IOSDeviceDiagnosticsRunner` when `scripts/ios_device.sh` drives a local
+/// device run. Shipping iOS distribution builds omit this file and its
+/// `CallKit` import completely (Guideline 2.5.19; no `#if DEBUG`).
 ///
 /// Consumers: the diagnostics sentinel (`device-diagnostics-done.json` gains `interruptions`)
 /// so `ios_device.sh bench`/`gate` can report "failed because a call arrived at
@@ -113,3 +113,4 @@ extension IOSInterruptionRecorder: nonisolated CXCallObserverDelegate {
         }
     }
 }
+#endif

@@ -1216,7 +1216,14 @@ public enum NativeTelemetryMode: String, Hashable, Codable, Sendable {
     public var persistsRawSamples: Bool { self == .verbose }
 
     public static func current(environment: [String: String] = ProcessInfo.processInfo.environment) -> NativeTelemetryMode {
-        switch environment["QWENVOICE_NATIVE_TELEMETRY_MODE"]?.lowercased() {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        _ = environment
+        return .off
+        #else
+        switch RuntimeDebugGate.observabilityValue(
+            for: "QWENVOICE_NATIVE_TELEMETRY_MODE",
+            environment: environment
+        )?.lowercased() {
         case "off", "disabled":
             return .off
         case "verbose", "full", "deep":
@@ -1232,6 +1239,7 @@ public enum NativeTelemetryMode: String, Hashable, Codable, Sendable {
             }
             return TelemetryGate.resolvedEnabled ? .lightweight : .off
         }
+        #endif
     }
 }
 

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-23
+reviewed: 2026-11-24
 summary: Vocello's hybrid (mixed-precision) Qwen3-TTS model, RF-55 — the recipe and why, how it is built from the two 3.0 artifacts, the identity proof, the evidence that chose it, how it was delivered, and what one model means for the backend.
 sourceOfTruth:
   - scripts/build_hybrid_model.py
@@ -246,7 +246,7 @@ view: `attn` replaces both Speed and Quality, and the selector goes (RF-59). Its
   as `"hybrid"` rather than `"4-bit"`, and quality promotion's `quality-generation` capability applies
   nowhere.
 
-**iPhone qualification & Pack B/C progress (2026-11-23):** Wave 5 measured the shipped `attn` hybrid on
+**iPhone qualification & Pack B/C progress (2026-11-24):** Wave 5 measured the shipped `attn` hybrid on
 the canonical iPhone 17 Pro (`5cc8ed43`: UI benchmark 29/29 PASS in `f1e8631c`, retained memory 9/9
 PASS with 0 MB retained growth in `c2b75046` — warm Custom 1,969 MB, Design 1,949 MB, Clone 2,503 MB /
 3,584 MB cold peak; `cloneCapableMinimumProcessLimitBytes` aligned to 4,779 MiB in `1d8397f6`).
@@ -256,9 +256,13 @@ work & `RF-69`) landed bit-identical on the Mac (14/14 PCM takes, quiet-Mac reta
 `mac-memory-qualification-20261123-180900-4b639d73`: `0.0 MB` cross-model leak, Clone cold MLX peak
 `3,749.3 MB` / `3,084.5 MB` retained). Under Pack C (`RF-70`), Experiment 1 (`long-form-korean-d1-attn`,
 full-text conditioning `D1` on shipped `hybrid-attn`) was decisively `REJECT`ed on 2026-11-23 (2/3
-seed sets jumped `+0.152` and `+0.324` in paired error rate from 32–44 s of skipped text); Bundle A
-(`attn-io`, `+24.12 MB`) and Bundle B (`attn-io-edge`, `+99.61 MB`) remain next behind their
-pre-registered `RF-57` screens ahead of the 3.2 release and 3.2.0 iOS App Store submission.
+seed sets jumped `+0.152` and `+0.324` in paired error rate from 32–44 s of skipped text), and
+Experiment 2 (Bundle A `attn-io`, `+24.12 MB`) finished `INCONCLUSIVE` on 2026-11-24 (`attn` stays
+incumbent: clone non-inferiority `ADOPT` with `speakerSimilarity −0.0080`, long-form error rate
+regressed in all 3 seed sets with pooled 63-pair `+0.0331 [+0.0001, +0.0707]` and discordant
+completions `5 vs 1` sign test `p = 0.1094`; calibrated `RF-72` blinded dual-order audit independently
+favored `attn` `15–9`). Bundle B (`attn-io-edge`, `+99.61 MB`) awaits maintainer go/no-go before the
+3.2 release and 3.2.0 iOS App Store submission.
 
 ## 7. Licence and attribution
 

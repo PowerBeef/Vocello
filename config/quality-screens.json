@@ -957,7 +957,111 @@
             }
           },
           "expected": "Non-inferior or higher speaker similarity and lower error rate than attn, narrowing the -0.022 speaker-similarity gap to Quality without exceeding +24.12 MB.",
-          "decision": "ADOPT (Bundle A clears clone non-inferiority) when every requirement holds and no guard interval reaches past its margin on B's harmful side. REJECT when a guard's whole interval lies past its margin or B adds more than 4 gross failures. Otherwise INCONCLUSIVE. Promotion to a shipped artifact requires clearing hybrid-attn-io (improvement on long-form or clone) and hybrid-attn-io-single."
+          "decision": "ADOPT (Bundle A clears clone non-inferiority) when every requirement holds and no guard interval reaches past its margin on B's harmful side. REJECT when a guard's whole interval lies past its margin or B adds more than 4 gross failures. Otherwise INCONCLUSIVE. Promotion to a shipped artifact requires clearing hybrid-attn-io (improvement on long-form or clone) and hybrid-attn-io-single.",
+          "result": {
+            "decided": "2026-11-24",
+            "verdict": "ADOPT",
+            "toolVerdict": "ADOPT (non-inferiority cleared; no clone quality gain)",
+            "commit": "8f84ac97 (executable 25c6e733f7f38f15)",
+            "arms": {
+              "a": "attn (--stock, QWENVOICE_MIXED_PRECISION=attn)",
+              "b": "attn-io (--stock, QWENVOICE_MIXED_PRECISION=attn-io)",
+              "floor": "attn on seed set 16 against attn on seed set 17 (compare-attn-vs-attn.json)",
+              "runs": "pack-c-exp2-clone-seeds16, -seeds17"
+            },
+            "floor": {
+              "verdict": "NOISE-FLOOR",
+              "paired": 190,
+              "speakerSimilarity": {
+                "meanDifference": -0.0057,
+                "interval95": [
+                  -0.0119,
+                  0.0008
+                ]
+              },
+              "errorRateBetterFamily": {
+                "meanDifference": 0.0007,
+                "interval95": [
+                  -0.0078,
+                  0.0102
+                ]
+              },
+              "trailingSilenceMS": {
+                "meanDifference": -0.24,
+                "interval95": [
+                  -13.33,
+                  12.78
+                ]
+              }
+            },
+            "outcomes": {
+              "a": {
+                "generated": 190,
+                "refused": 0,
+                "failed": 2
+              },
+              "b": {
+                "generated": 191,
+                "refused": 1,
+                "failed": 0
+              }
+            },
+            "paired": 189,
+            "identicalPCM": 0,
+            "grossFailures": {
+              "a": 2,
+              "b": 3
+            },
+            "speakerSimilarity": {
+              "meanA": 0.7199,
+              "meanB": 0.7119,
+              "meanDifference": -0.008,
+              "interval95": [
+                -0.0185,
+                0.0009
+              ]
+            },
+            "speakerSimilarityWorstWindow": {
+              "meanA": 0.706,
+              "meanB": 0.6973,
+              "meanDifference": -0.0088,
+              "interval95": [
+                -0.0186,
+                0.0
+              ]
+            },
+            "errorRateBetterFamily": {
+              "meanA": 0.0211,
+              "meanB": 0.0219,
+              "meanDifference": 0.0007,
+              "interval95": [
+                -0.0065,
+                0.0081
+              ]
+            },
+            "trailingSilenceMS": {
+              "meanA": 66.86,
+              "meanB": 68.94,
+              "meanDifference": 2.08,
+              "interval95": [
+                -9.88,
+                13.4
+              ]
+            },
+            "rf72AdvisoryAudit": {
+              "session": "pack-c-exp2-clone-mm",
+              "pairs": 24,
+              "armWins": {
+                "attn": 9,
+                "attn-io": 4
+              },
+              "ties": 7,
+              "orderInconsistent": 4,
+              "orderFlipRate": 0.1667,
+              "neverGates": true
+            },
+            "note": "Cleared clone non-inferiority (floor well inside 0.71 of every margin, B differs on all 189 pairs, harms empty, gross failures 3 vs 2), but delivered zero clone improvement (speakerSimilarity -0.0080 [-0.0185, +0.0009], errorRateBetterFamily +0.0007). Calibrated RF-72 blinded dual-order pairwise listening (24 pairs, 48 tasks, report-only) independently favored incumbent attn 9 to 4 (7 ties, 4 order-inconsistent). Combined with hybrid-attn-io's INCONCLUSIVE/harmful long-form result, Bundle A is not adopted."
+          }
         },
         "hybrid-attn-io-edge-clone": {
           "recorded": "2026-11-23",
@@ -2520,7 +2624,171 @@
             }
           },
           "expected": "Lower long-form error rate and/or higher clone speaker similarity than attn by restoring 8-bit precision to text_projection, codec_head, small_to_mtp_projection, and all 15 code-predictor lm_heads for only +24.12 MB.",
-          "decision": "ADOPT (Bundle A beats attn as Experiment 2 winner) when B clears hybrid-attn-io-clone and hybrid-attn-io-single with no harmful guard interval past margin, loses <= 1 project per stratum, introduces no new failure class, keeps warm RTF <= 1.05x attn, AND delivers a statistically clear improvement over attn on at least one primary quality axis (paired 95% CI wholly on the beneficial side in >= 2 of 3 long-form seed sets for errorRateBetterFamily or speakerWindowSpread, OR one-sided sign test p < 0.05 on long-form completions, OR clone speakerSimilarity 95% CI wholly > 0 above noise floor). REJECT when B generates fewer long-form projects than A or a guard interval lies wholly past its harmful margin. Otherwise INCONCLUSIVE, and attn remains incumbent."
+          "decision": "ADOPT (Bundle A beats attn as Experiment 2 winner) when B clears hybrid-attn-io-clone and hybrid-attn-io-single with no harmful guard interval past margin, loses <= 1 project per stratum, introduces no new failure class, keeps warm RTF <= 1.05x attn, AND delivers a statistically clear improvement over attn on at least one primary quality axis (paired 95% CI wholly on the beneficial side in >= 2 of 3 long-form seed sets for errorRateBetterFamily or speakerWindowSpread, OR one-sided sign test p < 0.05 on long-form completions, OR clone speakerSimilarity 95% CI wholly > 0 above noise floor). REJECT when B generates fewer long-form projects than A or a guard interval lies wholly past its harmful margin. Otherwise INCONCLUSIVE, and attn remains incumbent.",
+          "result": {
+            "decided": "2026-11-24",
+            "verdict": "INCONCLUSIVE",
+            "toolVerdicts": {
+              "seedSet19": "INCONCLUSIVE (errorRateBetterFamily CI reaches +0.0417 past +0.04)",
+              "seedSet20": "INCONCLUSIVE (errorRateBetterFamily +0.0481 [+0.0090, +0.0956], speakerWindowSpread +0.0596 [-0.0101, +0.1385])",
+              "seedSet21": "INCONCLUSIVE (errorRateBetterFamily +0.0429 [-0.0449, +0.1362], speakerWindowSpread +0.0037 [-0.0871, +0.0910])"
+            },
+            "commit": "8f84ac97 (executable 25c6e733f7f38f15)",
+            "arms": {
+              "a": "attn (--stock, QWENVOICE_MIXED_PRECISION=attn)",
+              "b": "attn-io (--stock, QWENVOICE_MIXED_PRECISION=attn-io)",
+              "floor": "attn on seed set 19 against attn on seed set 20 (compare-attn-vs-attn.json)",
+              "runs": "pack-c-exp2-longform-seeds19, -seeds20, -seeds21"
+            },
+            "floor": {
+              "verdict": "NOISE-FLOOR",
+              "paired": 20,
+              "errorRateBetterFamily": {
+                "meanA": 0.0789,
+                "meanB": 0.0797,
+                "meanDifference": 0.0008,
+                "interval95": [
+                  -0.0372,
+                  0.0331
+                ]
+              },
+              "speakerWindowSpread": {
+                "meanA": 0.2906,
+                "meanB": 0.2763,
+                "meanDifference": -0.0143,
+                "interval95": [
+                  -0.073,
+                  0.0497
+                ]
+              }
+            },
+            "outcomes": {
+              "a": {
+                "generated": 64,
+                "refused": 8,
+                "failed": 0
+              },
+              "b": {
+                "generated": 68,
+                "refused": 4,
+                "failed": 0
+              }
+            },
+            "discordantPairs": {
+              "gained": 5,
+              "lost": 1,
+              "bothGenerated": 63,
+              "bothRefused": 3,
+              "oneSidedSignTestP": 0.1094
+            },
+            "strataGenerated": {
+              "custom-chinese": "11/12 vs 11/12",
+              "custom-english": "12/12 vs 12/12",
+              "custom-french": "12/12 vs 12/12",
+              "custom-japanese": "12/12 vs 12/12",
+              "custom-korean": "5/12 vs 10/12",
+              "design-english": "12/12 vs 11/12"
+            },
+            "pooledPaired63": {
+              "errorRateBetterFamily": {
+                "meanA": 0.0813,
+                "meanB": 0.1144,
+                "meanDifference": 0.0331,
+                "interval95": [
+                  0.0001,
+                  0.0707
+                ]
+              },
+              "speakerWindowSpread": {
+                "meanDifference": 0.0155,
+                "interval95": [
+                  -0.0285,
+                  0.0593
+                ]
+              }
+            },
+            "pairedBySeedSet": {
+              "seedSet19": {
+                "paired": 21,
+                "errorRateBetterFamily": {
+                  "meanA": 0.0753,
+                  "meanB": 0.0835,
+                  "meanDifference": 0.0082,
+                  "interval95": [
+                    -0.0244,
+                    0.0417
+                  ]
+                },
+                "speakerWindowSpread": {
+                  "meanA": 0.2877,
+                  "meanB": 0.271,
+                  "meanDifference": -0.0168,
+                  "interval95": [
+                    -0.0785,
+                    0.0391
+                  ]
+                },
+                "segmentsWarnedMeanDiff": 0.0952
+              },
+              "seedSet20": {
+                "paired": 21,
+                "errorRateBetterFamily": {
+                  "meanA": 0.0783,
+                  "meanB": 0.1264,
+                  "meanDifference": 0.0481,
+                  "interval95": [
+                    0.009,
+                    0.0956
+                  ]
+                },
+                "speakerWindowSpread": {
+                  "meanA": 0.2802,
+                  "meanB": 0.3398,
+                  "meanDifference": 0.0596,
+                  "interval95": [
+                    -0.0101,
+                    0.1385
+                  ]
+                },
+                "segmentsWarnedMeanDiff": 0.2857
+              },
+              "seedSet21": {
+                "paired": 21,
+                "errorRateBetterFamily": {
+                  "meanA": 0.0902,
+                  "meanB": 0.1332,
+                  "meanDifference": 0.0429,
+                  "interval95": [
+                    -0.0449,
+                    0.1362
+                  ]
+                },
+                "speakerWindowSpread": {
+                  "meanA": 0.2617,
+                  "meanB": 0.2654,
+                  "meanDifference": 0.0037,
+                  "interval95": [
+                    -0.0871,
+                    0.091
+                  ]
+                },
+                "segmentsWarnedMeanDiff": 0.1429
+              }
+            },
+            "rf72AdvisoryAudit": {
+              "session": "pack-c-exp2-longform-mm",
+              "pairs": 12,
+              "armWins": {
+                "attn": 6,
+                "attn-io": 5
+              },
+              "ties": 0,
+              "orderInconsistent": 1,
+              "orderFlipRate": 0.0833,
+              "neverGates": true
+            },
+            "note": "Do not adopt; attn remains incumbent. Although attn-io raised Korean completions (5/12 -> 10/12; total 68/72 vs 64/72, discordant 5 vs 1, one-sided sign test p = 0.1094), paired errorRateBetterFamily regressed in all 3 seed sets (+0.0082, +0.0481, +0.0429; pooled 63-pair diff +0.0331 [+0.0001, +0.0707], 95% CI excluding zero on the harmful side), segmentsWarned rose in all 3 seed sets, and speakerWindowSpread reached past +0.05 in 2 of 3 seed sets. Calibrated RF-72 blinded dual-order pairwise listening (12 seeds20 long-form pairs + 24 clone pairs, report-only) independently favored attn 15 to 9 (6-5 long-form, 9-4 clone) and caught major hallucinated coughing/gibberish regressions in attn-io. hybrid-attn-io-single and vocello bench were skipped because neither clone nor long-form cleared."
+          }
         },
         "hybrid-attn-io-edge": {
           "recorded": "2026-11-23",

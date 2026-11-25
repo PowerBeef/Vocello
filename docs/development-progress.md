@@ -45,11 +45,11 @@ unchanged for 3.2 (`f070f41a`).
     watermark (fixed non-identifying payload, all 3 modes) + `LIST/INFO` WAV provenance; defer C2PA
     to `BKL-41`; add localized watermark transparency note in `Settings → Privacy & Permissions` and
     `E1`; document open verification tools and external transcoding limits on website and Review Notes.
-  - **Visible labeling & territories (`C1`–`C4`, `D4`):** Add subtle localized `"AI-generated"` label
-    in full Player sheet and History rows across all 3 modes (keep Studio inline card uncluttered; no
-    spoken WAV intro); update disclosure copy to jurisdiction-neutral wording in Settings and `A1`;
-    keep **South Korea (`KR`)** enabled and exclude **China Mainland (`CN`)** (`147` of 175
-    territories on both app and export IAP).
+  - **In-app labeling & territories (`C1`–`C4`, `D4`):** No redundant `"AI-generated"` badges on
+    Player or History UI (rely on mandatory `AudioSeal` + `LIST/INFO` WAV provenance, `E1`/`A1`
+    advance notice, mode labels, and deployer disclosure reminder); update disclosure copy to
+    jurisdiction-neutral wording in Settings and `A1`; keep **South Korea (`KR`)** enabled and
+    exclude **China Mainland (`CN`)** (`147` of 175 territories on both app and export IAP).
   - **Guideline 1.2 & Age Rating (`D1`–`D4`, `RF-62`):** Add `Settings → About → Report an Issue`
     opening `vocello.vercel.app/support/#report` (zero auto-upload); localize and expand
     impersonation-intent patterns across all 10 languages (no celebrity-name list); keep spoken scripts

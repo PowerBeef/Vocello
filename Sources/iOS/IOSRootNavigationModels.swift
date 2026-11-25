@@ -342,7 +342,7 @@ import QwenVoiceCore
                    comment: "iOS complete message: languageAuto. Substitutions retain original user content and numeric values."), name)
     }
     static func languagePath(_ name: String) -> String {
-        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.languagePath", defaultValue: "Use Qwen3’s %1$@ path.",
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.languagePath", defaultValue: "Generate speech in %1$@.",
                    comment: "iOS complete message: languagePath. Substitutions retain original user content and numeric values."), name)
     }
     static func voiceBankDetail(_ name: String) -> String {
@@ -600,8 +600,8 @@ import QwenVoiceCore
                comment: "iOS interface: Clear search. Presentation only.")
     }
     static func unsupportedDeviceDetail(_ minimumModel: String) -> String {
-        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.unsupportedDeviceDetail", defaultValue: "Vocello requires %1$@ or later. It doesn't run on iPad or on earlier iPhone models.",
-                   comment: "Unsupported-device screen body (RF-42); substitution is the minimum iPhone model's product name, such as iPhone 15 Pro."), minimumModel)
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.unsupportedDeviceDetail", defaultValue: "Vocello requires %1$@ or later, or an eligible iPad with Apple silicon or A17 Pro.",
+                   comment: "Unsupported-device screen body (RF-42, RF-73); substitution is the minimum iPhone model's product name, such as iPhone 15 Pro."), minimumModel)
     }
     static var unsupportedDevice: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.unsupportedDevice", defaultValue: "Unsupported Device",
@@ -917,6 +917,54 @@ import QwenVoiceCore
     static var discardImport: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.discardImport", defaultValue: "Discard imported voice",
                comment: "iOS interface: Discard imported voice. Presentation only; never use as a model prompt or stored identity.")
+    }
+    static var discardDesignedVoice: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.discardDesignedVoice", defaultValue: "Discard voice",
+               comment: "iOS Voice Design quality-warning alert destructive action; discards the staged designed voice candidate.")
+    }
+    static var onboardingAINotice: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.onboardingAINotice", defaultValue: "Generated speech includes an inaudible AI watermark with no personal identifiers. By continuing, you agree to Vocello's Terms of Use and Privacy Policy.",
+               comment: "Concise notice on the final onboarding page before entering Studio.")
+    }
+    static var voiceCloningConsentTitle: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.voiceCloningConsentTitle", defaultValue: "Voice Cloning Permission",
+               comment: "Title of the one-time inline voice-cloning consent sheet.")
+    }
+    static var voiceCloningConsentSummary: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.voiceCloningConsentSummary", defaultValue: "Only clone voices you own or have explicit permission to use.",
+               comment: "Primary statement on the one-time inline voice-cloning consent sheet.")
+    }
+    static var voiceCloningConsentDetail: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.voiceCloningConsentDetail", defaultValue: "Generated speech carries an inaudible AI watermark. If you publish audio of a cloned real voice, applicable laws or platform rules may require you to disclose that it is AI-generated.",
+               comment: "Secondary transparency and disclosure note on the one-time inline voice-cloning consent sheet.")
+    }
+    static var voiceCloningConsentContinue: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.voiceCloningConsentContinue", defaultValue: "I Confirm, Continue",
+               comment: "Primary button confirming voice-cloning permission and continuing directly into the requested action.")
+    }
+    static var saveVoicePermissionReminder: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.saveVoicePermissionReminder", defaultValue: "Only save voices you own or have permission to clone.",
+               comment: "Passive one-line reminder above Save voice when cloning consent is already enabled.")
+    }
+    static var describeVoiceSetup: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.describeVoiceSetup", defaultValue: "Describe the voice you want before generating.",
+               comment: "Tappable Studio Voice Design setup prompt that opens the voice brief sheet.")
+    }
+    static var cloneConsentSetup: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.cloneConsentSetup", defaultValue: "Confirm voice-cloning permission to continue.",
+               comment: "Tappable Studio Voice Cloning setup prompt that opens the inline voice-cloning consent sheet.")
+    }
+    static var cloneUnavailableOnDevice: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.ui.cloneUnavailableOnDevice", defaultValue: "Voice Cloning isn't available in this memory profile.",
+               comment: "Notice shown in Studio Voice Cloning when the device memory profile runs without clone encoders.")
+    }
+    static func clonedVoicePreviewTranscript(_ name: String) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.clonedVoicePreviewTranscript", defaultValue: "Hi, I’m %1$@. Cloned reference.",
+                   comment: "Fallback transcript shown in the player when previewing a saved voice without a saved transcript; %1$@ is the saved voice name."), name)
+    }
+    static func builtInVoicePreviewTranscript(_ name: String, descriptor: String) -> String {
+        IOSAppLanguage.shared.format(IOSAppLanguage.shared.localized(localized: "vocello.ui.builtInVoicePreviewTranscript", defaultValue: "Hi, I’m %1$@. %2$@.",
+                   comment: "Transcript shown in the player when previewing a built-in speaker; %1$@ is the speaker name and %2$@ is their description."), name, descriptor)
     }
     static var playRecording: String {
         IOSAppLanguage.shared.localized(localized: "vocello.ui.playRecording", defaultValue: "Play recording",

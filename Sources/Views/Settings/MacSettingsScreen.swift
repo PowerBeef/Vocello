@@ -192,6 +192,28 @@ struct MacSettingsScreen: View {
                 .disabled(!softwareUpdater.canCheckForUpdates)
                 .accessibilityIdentifier("settings_checkForUpdates")
             }
+            MacSettingsDivider()
+            MacSettingsRow(symbol: "doc.text", title: MacInterfaceText.settingsSupportLinksTitle) {
+                MacSettingsDetailText(MacInterfaceText.settingsSupportLinksDetail)
+            } trailing: {
+                VStack(alignment: .trailing, spacing: MacTheme.Spacing.xs) {
+                    Button(MacInterfaceText.settingsTerms) {
+                        if let url = URL(string: "https://vocello.vercel.app/terms/") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .buttonStyle(MacSettingsActionButtonStyle(tint: MacTheme.Brand.silver))
+                    .accessibilityIdentifier("settings_termsOfUse")
+
+                    Button(MacInterfaceText.settingsReportIssue) {
+                        if let url = URL(string: "https://vocello.vercel.app/support/#report") {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .buttonStyle(MacSettingsActionButtonStyle(tint: MacTheme.Brand.silver))
+                    .accessibilityIdentifier("settings_reportIssue")
+                }
+            }
         }
         .onAppear { softwareUpdater.refresh() }
     }
@@ -383,13 +405,18 @@ struct MacSettingsScreen: View {
                 symbol: MacTheme.modeGlyph(for: .clone),
                 title: MacInterfaceText.settingsCloneConsent,
                 subtitle: MacInterfaceText.settingsCloneConsentDetail,
-                // CP-1 option D: the users' own EU AI Act Article 50(4)
-                // disclosure duty, beside the rights gate.
+                // CP-1 option D: jurisdiction-neutral AI-generated disclosure duty, beside the rights gate.
                 footnote: MacInterfaceText.settingsCloneDisclosure,
                 accessibilityIdentifier: "voiceCloning_consentAcknowledgment",
                 isOn: $cloneConsentAcknowledged,
                 tint: MacTheme.Brand.modeClone
             )
+            MacSettingsDivider()
+            MacSettingsRow(symbol: "waveform.badge.magnifyingglass", title: MacInterfaceText.settingsWatermarkTitle) {
+                MacSettingsDetailText(MacInterfaceText.settingsWatermarkTransparency)
+            } trailing: {
+                EmptyView()
+            }
         }
     }
 

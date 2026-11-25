@@ -178,4 +178,67 @@ final class VocelloPresentationTextTests: XCTestCase {
             }
         }
     }
+
+    /// RF-73: model download failures map through typed classes to localized,
+    /// path-free copy instead of leaking raw NSError/English descriptions.
+    func testModelDeliveryFailureMessagesAreLocalizedAndStripRawDetail() {
+        let bundle = Bundle(for: Self.self)
+        let english = VocelloPresentationText(localization: VocelloLocalization(bundle: bundle, language: "en"))
+        let privatePath = "/private/var/mobile/Containers/raw-download.bin"
+        let rawError = NSError(
+            domain: NSURLErrorDomain,
+            code: NSURLErrorTimedOut,
+            userInfo: [NSLocalizedDescriptionKey: "raw timeout at \(privatePath)"]
+        )
+        let networkMessage = english.modelDeliveryErrorMessage(rawError)
+        XCTAssertEqual(
+            networkMessage,
+            "The download couldn't complete over this network. Check your connection and try again."
+        )
+        XCTAssertFalse(networkMessage.contains(privatePath))
+        XCTAssertEqual(
+            english.modelDeliveryErrorMessage(CocoaError(.fileWriteOutOfSpace)),
+            "Not enough storage space to download this model. Free up space and try again."
+        )
+        XCTAssertEqual(
+            english.modelDeliveryErrorMessage(
+                HuggingFaceDownloader.DownloadError.integrityCheckFailed(path: "a.bin", reason: "mismatch")
+            ),
+            "The downloaded files could not be verified. Tap Retry to download again."
+        )
+        XCTAssertEqual(
+            english.modelDeliveryErrorMessage(.other),
+            "The model download couldn't finish. Tap Retry to try again."
+        )
+        XCTAssertEqual(
+            english.modelRemovalFailed,
+            "Couldn't remove this model's files. Try again."
+        )
+
+        for language in ["fr", "es", "de", "it", "pt-BR", "zh-Hans", "ja", "ko", "ru"] {
+            let localized = VocelloPresentationText(localization: VocelloLocalization(bundle: bundle, language: language))
+            for failureClass in [ModelUpdateFailure.space, .verification, .network, .other] {
+                XCTAssertNotEqual(
+                    localized.modelDeliveryErrorMessage(failureClass),
+                    english.modelDeliveryErrorMessage(failureClass),
+                    "\(language) \(failureClass.rawValue)"
+                )
+            }
+            XCTAssertNotEqual(localized.modelRemovalFailed, english.modelRemovalFailed, "\(language) removal")
+        }
+    }
+
+    /// RF-73 / P1-4: iOS cloning consent refusal copy names Settings → Privacy & Permissions
+    /// and stays translated across all 10 interface locales.
+    func testCloningConsentCopyNamesPrivacyAndPermissionsInEveryLocale() {
+        let bundle = Bundle(for: Self.self)
+        let english = VocelloPresentationText(localization: VocelloLocalization(bundle: bundle, language: "en"))
+        XCTAssertTrue(english.cloningConsentRequired.contains("Privacy & Permissions"))
+        XCTAssertTrue(english.cloningConsentRequiredToSaveVoice.contains("Privacy & Permissions"))
+        for language in ["fr", "es", "de", "it", "pt-BR", "zh-Hans", "ja", "ko", "ru"] {
+            let localized = VocelloPresentationText(localization: VocelloLocalization(bundle: bundle, language: language))
+            XCTAssertNotEqual(localized.cloningConsentRequired, english.cloningConsentRequired, language)
+            XCTAssertNotEqual(localized.cloningConsentRequiredToSaveVoice, english.cloningConsentRequiredToSaveVoice, language)
+        }
+    }
 }

@@ -16,6 +16,22 @@ private enum IOSStudioCanvasLayout {
     static let dockBottomPadding: CGFloat = 8
 }
 
+struct IOSStudioSetupPrompt {
+    let message: String
+    let symbol: String
+    let action: (@MainActor () -> Void)?
+
+    init(
+        message: String,
+        symbol: String = "sparkles",
+        action: (@MainActor () -> Void)? = nil
+    ) {
+        self.message = message
+        self.symbol = symbol
+        self.action = action
+    }
+}
+
 /// Unified Studio surface from design_references/Vocello iOS/studio.jsx.
 /// Lays out (top → bottom): composer pad, setup-chip row, dock area with
 /// idle / generating / complete states. The composer metadata indicates
@@ -38,6 +54,9 @@ struct IOSStudioCanvas<SetupChips: View>: View {
     /// Foreground-exit notice (PA-15): what leaving the app stopped. Shown in
     /// the idle dock until dismissed or a new attempt starts.
     let backgroundNotice: String?
+    /// Actionable setup guidance shown above the chips when a mode prerequisite
+    /// (voice brief, cloning permission, reference clip) still needs input.
+    let setupPrompt: IOSStudioSetupPrompt?
     let canGenerate: Bool
     let modelInstalled: Bool
     let modelDisplayName: String
@@ -45,14 +64,15 @@ struct IOSStudioCanvas<SetupChips: View>: View {
     let modelNeedsUpdate: Bool
     let selectedLanguage: Qwen3SupportedLanguage
     let setupChips: SetupChips
-    let onGenerate: () -> Void
-    let onCancel: () -> Void
-    let onInstallModel: () -> Void
-    let onPlayerDismiss: () -> Void
-    let onPlayerExpand: (() -> Void)?
+    let onGenerate: @MainActor () -> Void
+    let onCancel: @MainActor () -> Void
+    let onInstallModel: @MainActor () -> Void
+    let onPlayerDismiss: @MainActor () -> Void
+    let onPlayerExpand: (@MainActor () -> Void)?
     /// When provided (Voice Design), the completed player card shows a "Save as voice" button.
-    let onSaveAsVoice: (() -> Void)?
-    let onBackgroundNoticeDismiss: (() -> Void)?
+    let onSaveAsVoice: (@MainActor () -> Void)?
+    let onErrorDismiss: (@MainActor () -> Void)?
+    let onBackgroundNoticeDismiss: (@MainActor () -> Void)?
     // Batch generation was removed from iOS (2026-07-02): the affordance was dead UI —
     // `onBatch` was nil at every call site because the native in-process engine doesn't
     // support batch (Jetsam risk). macOS batch is unaffected. If it returns, it must be
@@ -67,19 +87,21 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         genState: IOSStudioGenState,
         errorMessage: String? = nil,
         backgroundNotice: String? = nil,
+        setupPrompt: IOSStudioSetupPrompt? = nil,
         canGenerate: Bool,
         modelInstalled: Bool,
         modelDisplayName: String,
         modelNeedsUpdate: Bool = false,
         selectedLanguage: Qwen3SupportedLanguage = .auto,
         @ViewBuilder setupChips: () -> SetupChips,
-        onGenerate: @escaping () -> Void,
-        onCancel: @escaping () -> Void,
-        onInstallModel: @escaping () -> Void,
-        onPlayerDismiss: @escaping () -> Void,
-        onPlayerExpand: (() -> Void)? = nil,
-        onSaveAsVoice: (() -> Void)? = nil,
-        onBackgroundNoticeDismiss: (() -> Void)? = nil
+        onGenerate: @escaping @MainActor () -> Void,
+        onCancel: @escaping @MainActor () -> Void,
+        onInstallModel: @escaping @MainActor () -> Void,
+        onPlayerDismiss: @escaping @MainActor () -> Void,
+        onPlayerExpand: (@MainActor () -> Void)? = nil,
+        onSaveAsVoice: (@MainActor () -> Void)? = nil,
+        onErrorDismiss: (@MainActor () -> Void)? = nil,
+        onBackgroundNoticeDismiss: (@MainActor () -> Void)? = nil
     ) {
         self.mode = mode
         self._script = script
@@ -89,6 +111,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         self.genState = genState
         self.errorMessage = errorMessage
         self.backgroundNotice = backgroundNotice
+        self.setupPrompt = setupPrompt
         self.canGenerate = canGenerate
         self.modelInstalled = modelInstalled
         self.modelDisplayName = modelDisplayName
@@ -101,6 +124,7 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         self.onPlayerDismiss = onPlayerDismiss
         self.onPlayerExpand = onPlayerExpand
         self.onSaveAsVoice = onSaveAsVoice
+        self.onErrorDismiss = onErrorDismiss
         self.onBackgroundNoticeDismiss = onBackgroundNoticeDismiss
     }
 
@@ -132,7 +156,16 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         VocelloStudioLayout {
             composerPad
         } setup: {
-            setupRow
+            VStack(alignment: .leading, spacing: 8) {
+                if let setupPrompt,
+                   genState == .idle,
+                   errorMessage == nil,
+                   backgroundNotice == nil,
+                   modelInstalled {
+                    setupMessageRow(setupPrompt)
+                }
+                setupRow
+            }
                 // Lock voice/delivery/language changes while a take is generating
                 // (the in-flight request already captured its config; mutating mid-
                 // generation is confusing). Re-enabled at .complete for the next take.
@@ -143,7 +176,11 @@ struct IOSStudioCanvas<SetupChips: View>: View {
             dockArea
                 .padding(.horizontal, 16)
                 .padding(.bottom, IOSStudioCanvasLayout.dockBottomPadding)
-                .frame(height: dockAreaHeight, alignment: .bottom)
+                .frame(
+                    minHeight: dockAreaHeight,
+                    maxHeight: usesFlexibleDockHeight ? nil : dockAreaHeight,
+                    alignment: .bottom
+                )
         }
         // Bottom clearance: NavigationStack inside RootView doesn't
         // propagate the bottom chrome's safeAreaInset reservation to
@@ -174,6 +211,10 @@ struct IOSStudioCanvas<SetupChips: View>: View {
         case .generating, .live: return true
         case .idle, .complete: return false
         }
+    }
+
+    private var usesFlexibleDockHeight: Bool {
+        genState == .idle && (errorMessage != nil || backgroundNotice != nil)
     }
 
     private var dockAreaHeight: CGFloat {
@@ -345,6 +386,61 @@ struct IOSStudioCanvas<SetupChips: View>: View {
 
     // MARK: - Setup row
 
+    @ViewBuilder
+    private func setupMessageRow(_ prompt: IOSStudioSetupPrompt) -> some View {
+        let content = HStack(spacing: 10) {
+            Image(systemName: prompt.symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 28, height: 28)
+                .background {
+                    Circle().fill(tint.opacity(0.14))
+                }
+                .accessibilityHidden(true)
+
+            Text(prompt.message)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Theme.Text.primary)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if prompt.action != nil {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .accessibilityHidden(true)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, minHeight: Theme.HitTarget.minimum, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Theme.accentSurface(tint))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Theme.accentStroke(tint), lineWidth: Theme.Stroke.hairline)
+        }
+        .padding(.horizontal, 16)
+
+        if let action = prompt.action {
+            Button {
+                IOSHaptics.selection()
+                action()
+            } label: {
+                content
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("textInput_setupAction")
+        } else {
+            content
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("textInput_setupNotice")
+        }
+    }
+
     private var setupRow: some View {
         // Equal-width selector pills that fill the row. The same horizontal
         // padding (16) as the dock area means the 2-or-3 pills together span
@@ -407,8 +503,13 @@ struct IOSStudioCanvas<SetupChips: View>: View {
 
     private var errorBar: some View {
         Button {
-            IOSHaptics.impact(.medium)
-            onGenerate()
+            if canGenerate {
+                IOSHaptics.impact(.medium)
+                onGenerate()
+            } else {
+                IOSHaptics.selection()
+                onErrorDismiss?()
+            }
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "exclamationmark.triangle.fill")
@@ -418,37 +519,41 @@ struct IOSStudioCanvas<SetupChips: View>: View {
                     .background {
                         Circle().fill(tint.opacity(0.14))
                     }
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(IOSAppLanguage.shared.presentation.status(.generationFailed))
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(Theme.Text.primary)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(errorMessage ?? IOSInterfaceText.tryAgain)
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundStyle(Theme.Text.secondary)
-                        .lineLimit(1)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                Spacer(minLength: 0)
-
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.Text.primary.opacity(canGenerate ? 1 : 0.45))
+                Image(systemName: canGenerate ? "arrow.clockwise" : "xmark")
+                    .font(.system(size: canGenerate ? 15 : 13, weight: .semibold))
+                    .foregroundStyle(canGenerate ? Theme.Text.primary : Theme.Text.secondary)
+                    .accessibilityHidden(true)
             }
             .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity)
-            .frame(height: 56)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 56)
             .background {
-                Capsule(style: .continuous)
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .fill(Color.white.opacity(0.04))
             }
             .overlay {
-                Capsule(style: .continuous)
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
                     .stroke(tint.opacity(0.30), lineWidth: 0.7)
             }
         }
         .buttonStyle(.plain)
-        .disabled(!canGenerate)
+        .accessibilityHint(canGenerate ? IOSInterfaceText.tryAgain : IOSInterfaceText.dismiss)
         .accessibilityIdentifier("textInput_generationError")
     }
 

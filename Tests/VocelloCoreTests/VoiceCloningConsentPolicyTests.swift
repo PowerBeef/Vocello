@@ -519,4 +519,43 @@ final class VoiceCloningConsentPolicyTests: XCTestCase {
         XCTAssertNoThrow(try policy.admitGeneration(request(.clone)))
         XCTAssertNoThrow(try policy.admit(.enrollment))
     }
+
+    /// RF-73: inline consent gate defers execution and keeps consent unrecorded until
+    /// confirmed, executes at most once on confirm (double-tap safe), and passes straight
+    /// through once recorded.
+    func testInlineConsentGateDefersPersistsOnceAndPassesThrough() throws {
+        let suiteName = "com.qwenvoice.tests.inline-consent.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        var executionCount = 0
+
+        // Unconsented + cancelled (discarded closure): does not persist or execute.
+        let cancelledConfirm = VoiceCloningConsentPolicy.gateInlineAction(defaults: defaults) {
+            executionCount += 1
+        }
+        XCTAssertNotNil(cancelledConfirm)
+        XCTAssertFalse(defaults.bool(forKey: VoiceCloningConsentPolicy.recordedConsentDefaultsKey))
+        XCTAssertEqual(executionCount, 0)
+
+        // Unconsented + confirmed: persists and runs once, ignoring duplicate taps.
+        let confirm = try XCTUnwrap(
+            VoiceCloningConsentPolicy.gateInlineAction(defaults: defaults) {
+                executionCount += 1
+            }
+        )
+        XCTAssertFalse(defaults.bool(forKey: VoiceCloningConsentPolicy.recordedConsentDefaultsKey))
+        XCTAssertEqual(executionCount, 0)
+        confirm()
+        confirm()
+        XCTAssertTrue(defaults.bool(forKey: VoiceCloningConsentPolicy.recordedConsentDefaultsKey))
+        XCTAssertEqual(executionCount, 1)
+
+        // Already consented: executes immediately and returns nil (no sheet needed).
+        let followUpConfirm = VoiceCloningConsentPolicy.gateInlineAction(defaults: defaults) {
+            executionCount += 1
+        }
+        XCTAssertNil(followUpConfirm)
+        XCTAssertEqual(executionCount, 2)
+    }
 }

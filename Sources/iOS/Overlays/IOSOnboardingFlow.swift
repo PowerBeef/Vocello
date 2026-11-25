@@ -252,6 +252,9 @@ private struct IOSOnboardingInstallPage: View {
 // MARK: - Page 3: Ready
 
 private struct IOSOnboardingReadyPage: View {
+    private static let termsURL = URL(string: "https://vocello.vercel.app/terms/")!
+    private static let privacyURL = URL(string: "https://vocello.vercel.app/privacy/")!
+
     var body: some View {
         VStack(spacing: 0) {
             IOSOnboardingIcon(symbol: "checkmark.circle.fill", colors: [Theme.Brand.modeClone, Theme.Brand.modeDesign])
@@ -303,8 +306,49 @@ private struct IOSOnboardingReadyPage: View {
                 }
             }
             .padding(.top, 32)
+
+            VStack(spacing: Theme.Spacing.xs) {
+                Text(IOSInterfaceText.onboardingAINotice)
+                    .iosScaledFont(size: 12, relativeTo: .caption)
+                    .foregroundStyle(Theme.Text.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 320)
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Theme.Spacing.md) {
+                        legalLink(IOSAppLanguage.shared.presentation.exportTerms, destination: Self.termsURL)
+                            .accessibilityIdentifier("onboarding_terms")
+                        Circle()
+                            .fill(Theme.Text.tertiary)
+                            .frame(width: 3, height: 3)
+                            .accessibilityHidden(true)
+                        legalLink(IOSAppLanguage.shared.presentation.exportPrivacy, destination: Self.privacyURL)
+                            .accessibilityIdentifier("onboarding_privacy")
+                    }
+                    VStack(spacing: 0) {
+                        legalLink(IOSAppLanguage.shared.presentation.exportTerms, destination: Self.termsURL)
+                            .accessibilityIdentifier("onboarding_terms")
+                        legalLink(IOSAppLanguage.shared.presentation.exportPrivacy, destination: Self.privacyURL)
+                            .accessibilityIdentifier("onboarding_privacy")
+                    }
+                }
+            }
+            .padding(.top, 24)
         }
         .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private func legalLink(_ title: String, destination: URL) -> some View {
+        Link(destination: destination) {
+            Text(title)
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(Theme.Text.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: Theme.HitTarget.minimum)
+                .contentShape(Rectangle())
+        }
     }
 }
 

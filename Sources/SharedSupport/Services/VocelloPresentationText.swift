@@ -663,14 +663,14 @@ struct VocelloPresentationText: Sendable {
 
     var cloningConsentRequired: String {
         localization.string(localized: "vocello.error.cloning_consent_required",
-            defaultValue: "Enable voice-cloning consent in Settings → Privacy before generating.",
+            defaultValue: "Enable voice-cloning consent in Settings → Privacy & Permissions before generating.",
             comment: "Studio error shown when Voice Cloning consent has not been acknowledged."
         )
     }
 
     var cloningConsentRequiredToSaveVoice: String {
         localization.string(localized: "vocello.error.cloning_consent_required_to_save_voice",
-            defaultValue: "Enable voice-cloning consent in Settings → Privacy before saving a voice.",
+            defaultValue: "Enable voice-cloning consent in Settings → Privacy & Permissions before saving a voice.",
             comment: "Saved-voice error shown when a voice is saved before Voice Cloning consent has been acknowledged."
         )
     }
@@ -899,6 +899,39 @@ struct VocelloPresentationText: Sendable {
     var modelDescriptorMissing: String {
         localization.string(localized: "vocello.ui.missingDescriptor", defaultValue: "Missing model descriptor.",
                comment: "iOS interface: Missing model descriptor.. Presentation only.")
+    }
+
+    /// Localized, path-free error copy for model download and installation failures.
+    func modelDeliveryErrorMessage(_ error: Error, failureClass: ModelUpdateFailure? = nil) -> String {
+        modelDeliveryErrorMessage(failureClass ?? ModelUpdateFailure.classify(error))
+    }
+
+    func modelDeliveryErrorMessage(_ failureClass: ModelUpdateFailure) -> String {
+        switch failureClass {
+        case .space:
+            return localization.string(localized: "vocello.error.model_download_space",
+                defaultValue: "Not enough storage space to download this model. Free up space and try again.",
+                comment: "Model download failure when the device does not have enough free storage.")
+        case .verification:
+            return localization.string(localized: "vocello.error.model_download_verification",
+                defaultValue: "The downloaded files could not be verified. Tap Retry to download again.",
+                comment: "Model download failure when integrity or SHA-256 verification fails.")
+        case .network:
+            return localization.string(localized: "vocello.error.model_download_network",
+                defaultValue: "The download couldn't complete over this network. Check your connection and try again.",
+                comment: "Model download failure caused by a network or server error.")
+        case .other:
+            return localization.string(localized: "vocello.error.model_download_failed",
+                defaultValue: "The model download couldn't finish. Tap Retry to try again.",
+                comment: "Generic model download failure fallback without raw system error text.")
+        }
+    }
+
+    /// Localized, path-free error copy when deleting an installed model's files fails on disk.
+    var modelRemovalFailed: String {
+        localization.string(localized: "vocello.error.model_removal_failed",
+            defaultValue: "Couldn't remove this model's files. Try again.",
+            comment: "Error copy when removing a downloaded model's files from disk fails.")
     }
 
     /// Representative plural contract. Product surfaces can adopt the same

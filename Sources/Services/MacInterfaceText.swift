@@ -1551,8 +1551,32 @@ enum MacInterfaceText {
                comment: "macOS interface: voice cloning consent detail. Presentation only.")
     }
     static var settingsCloneDisclosure: String {
-        localization.string(localized: "vocello.mac.settings.cloneDisclosure", defaultValue: "If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may require this.",
-               comment: "macOS interface: EU AI Act Article 50 disclosure reminder under the consent toggle. Presentation only.")
+        localization.string(localized: "vocello.mac.settings.cloneDisclosure", defaultValue: "If you publish audio of a cloned real voice, disclose that it is AI-generated. Applicable laws or platform rules may require this disclosure.",
+               comment: "macOS interface: AI-generated disclosure reminder under the consent toggle. Presentation only.")
+    }
+    static var settingsWatermarkTitle: String {
+        localization.string(localized: "vocello.mac.settings.watermarkTitle", defaultValue: "Audio watermark",
+               comment: "macOS Settings row title explaining AudioSeal watermarking and WAV provenance metadata. Presentation only.")
+    }
+    static var settingsWatermarkTransparency: String {
+        localization.string(localized: "vocello.mac.settings.watermarkTransparency", defaultValue: "Generated speech carries an inaudible AudioSeal watermark and WAV metadata identifying it as Vocello audio, with no personal identifiers. Reference clips and live previews are not marked.",
+               comment: "macOS Settings transparency explanation of AudioSeal watermarking and WAV provenance metadata. Presentation only.")
+    }
+    static var settingsTerms: String {
+        localization.string(localized: "vocello.mac.settings.terms", defaultValue: "Terms of Use",
+               comment: "macOS Settings link button opening Vocello Terms of Use. Presentation only.")
+    }
+    static var settingsReportIssue: String {
+        localization.string(localized: "vocello.mac.settings.reportIssue", defaultValue: "Report an Issue",
+               comment: "macOS Settings link button opening the Vocello issue and misuse reporting page. Presentation only.")
+    }
+    static var settingsSupportLinksTitle: String {
+        localization.string(localized: "vocello.mac.settings.supportLinksTitle", defaultValue: "Terms & Support",
+               comment: "macOS Settings row title grouping Terms of Use and Report an Issue links. Presentation only.")
+    }
+    static var settingsSupportLinksDetail: String {
+        localization.string(localized: "vocello.mac.settings.supportLinksDetail", defaultValue: "Review Terms of Use or report an issue or misuse online. Vocello never uploads audio or logs.",
+               comment: "macOS Settings row detail explaining Terms of Use and privacy-first issue reporting. Presentation only.")
     }
     static var settingsDeleteModel: String {
         localization.string(localized: "vocello.mac.settings.deleteModel", defaultValue: "Delete Model",

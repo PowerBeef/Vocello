@@ -27,6 +27,10 @@ extension VocelloPresentationText {
         localization.string(localized: "vocello.export.privacy", defaultValue: "Privacy Policy",
                comment: "Opens the published Vocello privacy policy.")
     }
+    var exportTerms: String {
+        localization.string(localized: "vocello.export.terms", defaultValue: "Terms of Use",
+               comment: "Opens the published Vocello Terms of Use.")
+    }
     var exportSupport: String {
         localization.string(localized: "vocello.export.support", defaultValue: "Help & Support",
                comment: "Opens the published Vocello support contact page.")
@@ -44,6 +48,21 @@ extension VocelloPresentationText {
     var exportUnlocked: String {
         localization.string(localized: "vocello.export.unlocked", defaultValue: "Export unlocked",
                comment: "iOS non-consumable export purchase; generation and internal playback remain free.")
+    }
+
+    var exportNow: String {
+        localization.string(localized: "vocello.export.now", defaultValue: "Export Now",
+               comment: "Primary action on the export purchase sheet after unlocking from a take; immediately opens export.")
+    }
+
+    var exportReadyToExport: String {
+        localization.string(localized: "vocello.export.ready_to_export", defaultValue: "You can now save and share Design and Clone audio.",
+               comment: "Shown below Export unlocked when the purchase sheet was opened from a take and Export Now is available.")
+    }
+
+    var exportUnlockedSettingsDetail: String {
+        localization.string(localized: "vocello.export.unlocked_settings_detail", defaultValue: "You can save and share audio from Built-in Voice, Voice Design, and Voice Cloning.",
+               comment: "Shown below Export unlocked when the purchase sheet was opened from Settings.")
     }
 
     var exportRetryAfterPurchase: String {
@@ -69,6 +88,16 @@ extension VocelloPresentationText {
     var exportChecking: String {
         localization.string(localized: "vocello.export.checking", defaultValue: "Checking purchase…",
                comment: "iOS non-consumable export purchase; generation and internal playback remain free.")
+    }
+
+    var exportPurchasing: String {
+        localization.string(localized: "vocello.export.purchasing", defaultValue: "Completing purchase…",
+               comment: "Progress label while StoreKit completes an in-app purchase.")
+    }
+
+    var exportRestoring: String {
+        localization.string(localized: "vocello.export.restoring", defaultValue: "Restoring purchases…",
+               comment: "Progress label while StoreKit syncs and restores previous purchases.")
     }
 
     var exportRestore: String {
@@ -159,15 +188,21 @@ extension VocelloPresentationText {
     static var exportOneTime: String { Self().exportOneTime }
     static var exportThanks: String { Self().exportThanks }
     static var exportPrivacy: String { Self().exportPrivacy }
+    static var exportTerms: String { Self().exportTerms }
     static var exportSupport: String { Self().exportSupport }
     static var exportUnlockTitle: String { Self().exportUnlockTitle }
     static var exportUnlockDetail: String { Self().exportUnlockDetail }
     static var exportUnlocked: String { Self().exportUnlocked }
+    static var exportNow: String { Self().exportNow }
+    static var exportReadyToExport: String { Self().exportReadyToExport }
+    static var exportUnlockedSettingsDetail: String { Self().exportUnlockedSettingsDetail }
     static var exportRetryAfterPurchase: String { Self().exportRetryAfterPurchase }
     static var exportProductUnavailable: String { Self().exportProductUnavailable }
     static var exportReloadProduct: String { Self().exportReloadProduct }
     static var exportOwnedProductUnavailable: String { Self().exportOwnedProductUnavailable }
     static var exportChecking: String { Self().exportChecking }
+    static var exportPurchasing: String { Self().exportPurchasing }
+    static var exportRestoring: String { Self().exportRestoring }
     static var exportRestore: String { Self().exportRestore }
     static var exportClose: String { Self().exportClose }
     static var exportViewOptions: String { Self().exportViewOptions }

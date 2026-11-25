@@ -8,13 +8,21 @@ import SwiftUI
 import UIKit
 #endif
 
-/// Owns a single, immutable export selection. Purchase completion does not
-/// silently export anything: the user closes the sheet and requests export again.
+/// Owns a single, immutable export selection. Purchase completion never
+/// silently exports anything without user action; when opened from a take,
+/// the unlocked sheet offers an explicit one-tap Export Now button that
+/// re-verifies access through this gate.
 @MainActor @Observable
 final class IOSExportGate {
     struct Presentation: Identifiable {
         let id = UUID()
         let urls: [URL]? // nil presents the purchase sheet, not an activity sheet.
+        let pendingExport: (@MainActor () -> Void)?
+
+        init(urls: [URL]?, pendingExport: (@MainActor () -> Void)? = nil) {
+            self.urls = urls
+            self.pendingExport = pendingExport
+        }
     }
     var presentation: Presentation?
     private var requestID = UUID()
@@ -46,8 +54,13 @@ final class IOSExportGate {
             let store = commerce()
             await store.refresh()
             guard let self, self.requestID == id else { return }
-            if store.permits(provenance) { action() }
-            else { self.presentation = Presentation(urls: nil) }
+            if store.permits(provenance) {
+                action()
+            } else {
+                self.presentation = Presentation(urls: nil, pendingExport: { [weak self] in
+                    self?.perform(provenance: provenance, action: action)
+                })
+            }
         }
     }
 }
@@ -61,12 +74,28 @@ extension View {
 
 private struct IOSExportPresentationModifier: ViewModifier {
     @Bindable var gate: IOSExportGate
+    @State private var queuedExportAfterDismiss: (@MainActor () -> Void)?
+
     func body(content: Content) -> some View {
-        content.sheet(item: $gate.presentation) { presentation in
+        content.sheet(
+            item: $gate.presentation,
+            onDismiss: {
+                guard let pending = queuedExportAfterDismiss else { return }
+                queuedExportAfterDismiss = nil
+                pending()
+            }
+        ) { presentation in
             if let urls = presentation.urls {
                 IOSExportActivitySheet(urls: urls)
             } else {
-                IOSExportPurchaseSheet()
+                IOSExportPurchaseSheet(
+                    onExportNow: presentation.pendingExport.map { pending in
+                        {
+                            queuedExportAfterDismiss = pending
+                            gate.presentation = nil
+                        }
+                    }
+                )
             }
         }
     }
@@ -86,15 +115,29 @@ private struct IOSExportActivitySheet: UIViewControllerRepresentable {
 /// actions pin to the bottom; at accessibility text sizes they scroll with the
 /// content instead of covering it.
 struct IOSExportPurchaseSheet: View {
+    var onExportNow: (() -> Void)? = nil
+
     private let store = IOSExportCommerce.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var hasAttemptedProductLoad = false
 
-    private static let privacyURL = URL(string: "https://vocello.vercel.app/privacy")!
+    private static let privacyURL = URL(string: "https://vocello.vercel.app/privacy/")!
+    private static let termsURL = URL(string: "https://vocello.vercel.app/terms/")!
     private static let supportURL = URL(string: "https://vocello.vercel.app/support/")!
 
     private var text: VocelloPresentationText { IOSAppLanguage.shared.presentation }
     private var isBusy: Bool { store.operation != .idle || store.access == .checking }
+    private var isShowingProductLoadingPlaceholder: Bool {
+        store.access != .unlocked && store.product == nil && (isBusy || !hasAttemptedProductLoad)
+    }
+    private var busyLabel: String {
+        switch store.operation {
+        case .purchasing: return text.exportPurchasing
+        case .restoring: return text.exportRestoring
+        case .loading, .idle: return text.exportChecking
+        }
+    }
     private var pinsActions: Bool { !dynamicTypeSize.isAccessibilitySize }
 
     var body: some View {
@@ -134,6 +177,7 @@ struct IOSExportPurchaseSheet: View {
         .task {
             await store.refresh()
             await store.loadProduct()
+            hasAttemptedProductLoad = true
         }
         // A12-04: a purchase or restore outcome appears below the buttons,
         // away from VoiceOver focus; say it once when it changes.
@@ -220,15 +264,17 @@ struct IOSExportPurchaseSheet: View {
                 // The lock glyph is decoration; VoiceOver hears only the title and price.
                 .accessibilityLabel(text.exportBuy(product.displayPrice))
                 .accessibilityIdentifier("exportPurchase_buy")
+            } else if isShowingProductLoadingPlaceholder {
+                loadingProductBar
             } else {
                 unavailable
             }
-            if isBusy {
+            if isBusy && !isShowingProductLoadingPlaceholder {
                 HStack(spacing: Theme.Spacing.sm) {
                     ProgressView()
                         .controlSize(.small)
                         .tint(Theme.Text.secondary)
-                    Text(text.exportChecking)
+                    Text(busyLabel)
                         .font(.subheadline)
                         .foregroundStyle(Theme.Text.secondary)
                 }
@@ -263,23 +309,61 @@ struct IOSExportPurchaseSheet: View {
         }
     }
 
-    private var unlockedCard: some View {
-        VStack(spacing: Theme.Spacing.xs) {
-            Label {
-                Text(text.exportUnlocked)
-                    .foregroundStyle(Theme.Text.primary)
-            } icon: {
-                Image(systemName: "checkmark.seal.fill")
-                    .foregroundStyle(Theme.Brand.gold)
-            }
-            .font(.headline)
-            .accessibilityIdentifier("exportPurchase_unlocked")
-
-            Text(text.exportRetryAfterPurchase)
-                .font(.subheadline)
+    private var loadingProductBar: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            ProgressView()
+                .controlSize(.small)
+                .tint(Theme.Text.secondary)
+            Text(busyLabel)
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(Theme.Text.secondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, minHeight: 56)
+        .background {
+            Capsule(style: .continuous)
+                .fill(Color.white.opacity(0.05))
+        }
+        .overlay {
+            Capsule(style: .continuous)
+                .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("exportPurchase_progress")
+    }
+
+    private var unlockedCard: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            VStack(spacing: Theme.Spacing.xs) {
+                Label {
+                    Text(text.exportUnlocked)
+                        .foregroundStyle(Theme.Text.primary)
+                } icon: {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundStyle(Theme.Brand.gold)
+                }
+                .font(.headline)
+                .accessibilityIdentifier("exportPurchase_unlocked")
+
+                Text(onExportNow != nil ? text.exportReadyToExport : text.exportUnlockedSettingsDetail)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.Text.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let onExportNow {
+                IOSPrimaryCTAButton(
+                    title: text.exportNow,
+                    symbol: "square.and.arrow.up",
+                    tint: Theme.Brand.gold,
+                    isEnabled: !isBusy
+                ) {
+                    IOSHaptics.impact(.medium)
+                    onExportNow()
+                }
+                .accessibilityLabel(text.exportNow)
+                .accessibilityIdentifier("exportPurchase_exportNow")
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(Theme.Spacing.lg)
@@ -301,7 +385,10 @@ struct IOSExportPurchaseSheet: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             Button {
-                Task { await store.loadProduct() }
+                Task {
+                    await store.loadProduct()
+                    hasAttemptedProductLoad = true
+                }
             } label: {
                 Text(text.exportReloadProduct)
                     .font(.headline)
@@ -324,20 +411,20 @@ struct IOSExportPurchaseSheet: View {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: Theme.Spacing.md) {
                     privacyLink
-                    Circle()
-                        .fill(Theme.Text.tertiary)
-                        .frame(width: 3, height: 3)
-                        .accessibilityHidden(true)
+                    linkSeparator
+                    termsLink
+                    linkSeparator
                     supportLink
                 }
                 VStack(spacing: 0) {
                     privacyLink
+                    termsLink
                     supportLink
                 }
             }
             Text(text.exportThanks)
                 .font(.footnote)
-                .foregroundStyle(Theme.Text.tertiary)
+                .foregroundStyle(Theme.Text.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: 320)
@@ -345,9 +432,21 @@ struct IOSExportPurchaseSheet: View {
         .frame(maxWidth: .infinity)
     }
 
+    private var linkSeparator: some View {
+        Circle()
+            .fill(Theme.Text.tertiary)
+            .frame(width: 3, height: 3)
+            .accessibilityHidden(true)
+    }
+
     private var privacyLink: some View {
         footerLink(text.exportPrivacy, destination: Self.privacyURL)
             .accessibilityIdentifier("exportPurchase_privacy")
+    }
+
+    private var termsLink: some View {
+        footerLink(text.exportTerms, destination: Self.termsURL)
+            .accessibilityIdentifier("exportPurchase_terms")
     }
 
     private var supportLink: some View {
@@ -362,6 +461,8 @@ struct IOSExportPurchaseSheet: View {
             Text(title)
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(Theme.Text.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(minHeight: Theme.HitTarget.minimum)
                 .contentShape(Rectangle())
         }

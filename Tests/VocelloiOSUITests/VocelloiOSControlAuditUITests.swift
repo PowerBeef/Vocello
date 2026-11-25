@@ -489,7 +489,13 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         XCTAssertTrue(revealSettingsElement(openSourceBack, swipingUp: false))
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: openSourceBack, timeout: 20))
 
-        for identifier in ["iosSettings_privacyPolicyRow", "iosSettings_supportRow", "iosSettings_sourceCodeRow"] {
+        for identifier in [
+            "iosSettings_privacyPolicyRow",
+            "iosSettings_termsRow",
+            "iosSettings_supportRow",
+            "iosSettings_reportIssueRow",
+            "iosSettings_sourceCodeRow"
+        ] {
             verifyExternalHandoff(identifier: identifier, expectedApplication: nil)
         }
         verifyExternalHandoff(identifier: "iosSettings_openIOSSettingsRow", expectedApplication: "com.apple.Preferences")

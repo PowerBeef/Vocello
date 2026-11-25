@@ -519,6 +519,7 @@ final class IOSModelInstallerViewModel {
         } catch {
             let generation = (lastAcceptedGeneration[model.id] ?? 0) + 1
             lastAcceptedGeneration[model.id] = generation
+            let failureClass = ModelUpdateFailure.classify(error)
             apply(
                 IOSModelDeliverySnapshot(
                     modelID: model.id,
@@ -526,8 +527,11 @@ final class IOSModelInstallerViewModel {
                     downloadedBytes: 0,
                     totalBytes: model.estimatedDownloadBytes,
                     estimatedBytes: model.estimatedDownloadBytes,
-                    message: error.localizedDescription,
-                    failureClass: ModelUpdateFailure.classify(error),
+                    message: IOSAppLanguage.shared.presentation.modelDeliveryErrorMessage(
+                        error,
+                        failureClass: failureClass
+                    ),
+                    failureClass: failureClass,
                     operationGeneration: generation
                 )
             )
@@ -601,6 +605,7 @@ final class IOSModelInstallerViewModel {
                 guard let removalError else { return }
                 let generation = (lastAcceptedGeneration[model.id] ?? 0) + 1
                 lastAcceptedGeneration[model.id] = generation
+                let failureClass = ModelUpdateFailure.classify(removalError)
                 apply(
                     IOSModelDeliverySnapshot(
                         modelID: model.id,
@@ -608,7 +613,8 @@ final class IOSModelInstallerViewModel {
                         downloadedBytes: 0,
                         totalBytes: nil,
                         estimatedBytes: model.estimatedDownloadBytes,
-                        message: removalError.localizedDescription,
+                        message: IOSAppLanguage.shared.presentation.modelRemovalFailed,
+                        failureClass: failureClass,
                         operationGeneration: generation
                     )
                 )

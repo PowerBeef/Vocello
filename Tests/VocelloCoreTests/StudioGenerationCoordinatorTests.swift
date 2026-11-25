@@ -86,6 +86,16 @@ final class StudioGenerationCoordinatorTests: XCTestCase {
         XCTAssertNil(coordinator.errorMessage, "A validation error cannot overwrite a running attempt")
     }
 
+    func testDismissErrorClearsVisibleErrorMessage() throws {
+        let coordinator = StudioGenerationCoordinator(mode: .design)
+        let attempt = try XCTUnwrap(coordinator.start())
+        XCTAssertTrue(coordinator.fail("Voice instructions cannot imitate a real person.", attempt: attempt))
+        XCTAssertEqual(coordinator.errorMessage, "Voice instructions cannot imitate a real person.")
+
+        coordinator.dismissError()
+        XCTAssertNil(coordinator.errorMessage)
+    }
+
     func testCompletionSurfacesTheTakeOnlyForTheCurrentRunningAttempt() throws {
         let coordinator = StudioGenerationCoordinator(mode: .custom)
         let attempt = try XCTUnwrap(coordinator.start(live: liveItem()))

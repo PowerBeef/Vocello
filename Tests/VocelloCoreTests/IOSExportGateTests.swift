@@ -169,4 +169,39 @@ final class IOSExportGateTests: XCTestCase {
         XCTAssertNil(gate.presentation, "A superseded check never presents the purchase sheet")
         XCTAssertEqual(premium.count, 0)
     }
+
+    /// RF-73: a locked paid export carries an explicit `pendingExport` continuation
+    /// for the one-tap Export Now action. Re-invoking it before unlock keeps the
+    /// export blocked (never bypassing StoreKit); after a verified unlock it
+    /// re-verifies through this gate and runs the export.
+    func testPendingExportReverifiesEntitlementBeforeRunning() async throws {
+        let client = GateFixtureExportClient()
+        let (gate, store) = makeGate(client: client)
+        let log = ExportActionLog()
+
+        gate.perform(provenance: [.generatedPremium]) { log.count += 1 }
+        await waitUntil("the purchase sheet") { gate.presentation != nil }
+        let presentation = try XCTUnwrap(gate.presentation)
+        XCTAssertNil(presentation.urls)
+        XCTAssertEqual(client.startedScans, 1)
+        let pendingExport = try XCTUnwrap(presentation.pendingExport)
+
+        // Calling pendingExport while still locked re-checks and stays blocked.
+        gate.presentation = nil
+        pendingExport()
+        await waitUntil("re-presented purchase sheet while still locked") { gate.presentation != nil }
+        XCTAssertNil(gate.presentation?.urls)
+        XCTAssertEqual(client.startedScans, 2)
+        XCTAssertEqual(log.count, 0)
+        XCTAssertEqual(store.access, .locked)
+
+        // Once verified entitlement arrives, Export Now succeeds through the same gate.
+        client.entitlements = [premiumReceipt]
+        gate.presentation = nil
+        pendingExport()
+        await waitUntil("unlocked pending export executes") { log.count == 1 }
+        XCTAssertEqual(client.startedScans, 3)
+        XCTAssertEqual(store.access, .unlocked)
+        XCTAssertNil(gate.presentation)
+    }
 }

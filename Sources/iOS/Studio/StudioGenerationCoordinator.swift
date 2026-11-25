@@ -272,6 +272,11 @@ final class StudioGenerationCoordinator {
         lastCompletedOutput = nil
     }
 
+    /// Clears a visible generation error (user dismissed it).
+    func dismissError() {
+        errorMessage = nil
+    }
+
     // MARK: - Foreground exit (PA-15)
 
     /// Records that the foreground exit cancelled this coordinator's attempt.

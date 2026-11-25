@@ -412,7 +412,7 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
         guard FileManager.default.fileExists(atPath: voice.wavPath) else {
             return nil
         }
-        let transcript = (try? voice.loadTranscript()) ?? "Hi, I'm \(voice.name). Cloned reference."
+        let transcript = (try? voice.loadTranscript()) ?? IOSInterfaceText.clonedVoicePreviewTranscript(voice.name)
         return IOSPlayerSheetItem(
             audioURL: URL(fileURLWithPath: voice.wavPath),
             transcript: transcript,
@@ -450,7 +450,7 @@ struct IOSPlayerSheetItem: Equatable, Identifiable {
             ?? speaker.group.capitalized
         return IOSPlayerSheetItem(
             audioURL: audioURL,
-            transcript: "Hi, I'm \(speaker.displayName). \(descriptor).",
+            transcript: IOSInterfaceText.builtInVoicePreviewTranscript(speaker.displayName, descriptor: descriptor),
             voiceName: speaker.displayName,
             modeLabel: IOSInterfaceText.modeBuiltIn,
             modeTint: Theme.Brand.modeCustom,

@@ -405,8 +405,8 @@ struct IOSStudioPlayerCard: View {
             // Download's share of the take.
             HStack(spacing: 8) {
                 iconButton(
-                    symbol: "arrow.down.to.line",
-                    label: IOSInterfaceText.download,
+                    symbol: "square.and.arrow.up",
+                    label: IOSInterfaceText.share,
                     accessibilityIdentifier: "studio_inlinePlayer_download"
                 ) { shareWAV() }
                 iconButton(

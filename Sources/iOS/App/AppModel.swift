@@ -13,6 +13,11 @@ struct IOSDeleteModelSheetPresentation: Identifiable {
     let onConfirm: @MainActor () -> Void
 }
 
+struct IOSVoiceCloningConsentPresentation: Identifiable {
+    let id = UUID()
+    let onConfirm: @MainActor () -> Void
+}
+
 struct IOSBottomPanelPresentation: Identifiable {
     let id: String
     let content: @MainActor (_ bottomSafeAreaInset: CGFloat, _ availableHeight: CGFloat, _ dismiss: @escaping @MainActor () -> Void) -> AnyView
@@ -148,6 +153,9 @@ final class AppModel {
     /// Edge-to-edge model-delete confirmation, hosted by `RootView` so it
     /// can fill the screen bottom instead of inheriting system sheet insets.
     var deleteModelSheetItem: IOSDeleteModelSheetPresentation?
+
+    /// Edge-to-edge one-time voice-cloning permission sheet hosted by `RootView`.
+    var voiceCloningConsentItem: IOSVoiceCloningConsentPresentation?
 
     /// Edge-to-edge bottom panel used by Studio and Settings sheets that
     /// need the reference backdrop + liquid-glass bottom surface.
@@ -288,7 +296,24 @@ final class AppModel {
 
     func dismissDeleteModelSheet() {
         deleteModelSheetItem = nil
-        isFocusBackdropPresented = false
+        isFocusBackdropPresented = bottomPanelItem != nil || voiceCloningConsentItem != nil
+    }
+
+    /// Runs `action` immediately if voice-cloning consent is already recorded;
+    /// otherwise presents the one-time inline consent sheet and continues straight
+    /// into `action` once confirmed.
+    func requireVoiceCloningConsent(_ action: @escaping @MainActor () -> Void) {
+        guard let confirm = VoiceCloningConsentPolicy.gateInlineAction(action: action) else {
+            return
+        }
+        bottomPanelItem = nil
+        isFocusBackdropPresented = true
+        voiceCloningConsentItem = IOSVoiceCloningConsentPresentation(onConfirm: confirm)
+    }
+
+    func dismissVoiceCloningConsent() {
+        voiceCloningConsentItem = nil
+        isFocusBackdropPresented = bottomPanelItem != nil || deleteModelSheetItem != nil
     }
 
     /// The panel's content is stored, so it is type-erased here, once, rather than at each caller.
@@ -304,7 +329,7 @@ final class AppModel {
 
     func dismissBottomPanel() {
         bottomPanelItem = nil
-        isFocusBackdropPresented = false
+        isFocusBackdropPresented = deleteModelSheetItem != nil || voiceCloningConsentItem != nil
     }
 
     /// Dismiss the reference picker, then present the recorder from `RootView`

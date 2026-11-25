@@ -177,13 +177,6 @@ struct IOSCustomVoiceView: View {
         isGenerationActive ? 0.76 : 1
     }
 
-    private var setupMessage: String? {
-        if !isModelAvailable, let activeModel {
-            return IOSAppLanguage.shared.presentation.installModel(named: activeModel.name)
-        }
-        return nil
-    }
-
     private var isLongFormActiveHere: Bool {
         appModel.longForm.isProcessing && appModel.longForm.lastMode == .custom
     }
@@ -254,6 +247,7 @@ struct IOSCustomVoiceView: View {
             },
             onPlayerDismiss: { coordinator.dismissInlinePlayer() },
             onPlayerExpand: expandInlinePlayer,
+            onErrorDismiss: { coordinator.dismissError() },
             onBackgroundNoticeDismiss: { coordinator.dismissBackgroundInterruptionNotice() }
         )
         .opacity(chromeOpacity)
@@ -700,13 +694,6 @@ struct IOSVoiceDesignView: View {
         isGenerationActive ? 0.76 : 1
     }
 
-    private var setupMessage: String? {
-        if !isModelAvailable, let activeModel {
-            return IOSAppLanguage.shared.presentation.installModel(named: activeModel.name)
-        }
-        return nil
-    }
-
     private var isLongFormActiveHere: Bool {
         appModel.longForm.isProcessing && appModel.longForm.lastMode == .design
     }
@@ -880,7 +867,7 @@ struct IOSVoiceDesignView: View {
                     }
                     .accessibilityIdentifier("voicesEnroll_keepDespiteWarning")
                 }
-                Button(IOSInterfaceText.discardRecord, role: .destructive) {
+                Button(IOSInterfaceText.discardDesignedVoice, role: .destructive) {
                     discardDesignedVoiceCandidate(candidate)
                 }
                 .accessibilityIdentifier("voicesEnroll_discardOnWarning")
@@ -1120,7 +1107,45 @@ struct IOSVoiceDesignView: View {
         .padding(.top, 8)
     }
 
-    @ViewBuilder
+    private var designSetupPrompt: IOSStudioSetupPrompt? {
+        guard isModelAvailable else { return nil }
+        if !IOSGenerationTextLimitPolicy.hasVoiceDescription(draft.voiceDescription) {
+            return IOSStudioSetupPrompt(
+                message: IOSInterfaceText.describeVoiceSetup,
+                symbol: "text.bubble.fill",
+                action: presentBriefEditor
+            )
+        }
+        return nil
+    }
+
+    private func requestSaveDesignedVoice() {
+        appModel.requireVoiceCloningConsent {
+            presentSaveDesignedVoice()
+        }
+    }
+
+    private func cancelDesignGeneration() {
+        if appModel.longForm.isProcessing {
+            appModel.longForm.cancel(
+                ttsEngine: ttsEngine,
+                audioPlayer: audioPlayer,
+                studioCoordinator: coordinator
+            )
+        } else {
+            IOSStudioGenerationActions.cancelGeneration(
+                coordinator: coordinator,
+                ttsEngine: ttsEngine,
+                audioPlayer: audioPlayer
+            )
+        }
+    }
+
+    private func installDesignModel() {
+        guard let model = activeModel else { return }
+        appModel.requestModelInstallation(model)
+    }
+
     private var pageContent: some View {
         IOSStudioCanvas(
             mode: .design,
@@ -1131,6 +1156,7 @@ struct IOSVoiceDesignView: View {
             genState: studioGenState,
             errorMessage: coordinator.errorMessage,
             backgroundNotice: coordinator.backgroundInterruptionNoticeMessage,
+            setupPrompt: designSetupPrompt,
             canGenerate: canGenerateInCurrentRuntime,
             modelInstalled: isModelAvailable,
             modelDisplayName: IOSSettingsText.design,
@@ -1138,28 +1164,12 @@ struct IOSVoiceDesignView: View {
             selectedLanguage: draft.selectedLanguage,
             setupChips: { designModeChips },
             onGenerate: generate,
-            onCancel: {
-                if appModel.longForm.isProcessing {
-                    appModel.longForm.cancel(
-                        ttsEngine: ttsEngine,
-                        audioPlayer: audioPlayer,
-                        studioCoordinator: coordinator
-                    )
-                } else {
-                    IOSStudioGenerationActions.cancelGeneration(
-                        coordinator: coordinator,
-                        ttsEngine: ttsEngine,
-                        audioPlayer: audioPlayer
-                    )
-                }
-            },
-            onInstallModel: {
-                guard let model = activeModel else { return }
-                appModel.requestModelInstallation(model)
-            },
+            onCancel: cancelDesignGeneration,
+            onInstallModel: installDesignModel,
             onPlayerDismiss: { coordinator.dismissInlinePlayer() },
             onPlayerExpand: expandInlinePlayer,
-            onSaveAsVoice: canSaveVoice ? { presentSaveDesignedVoice() } : nil,
+            onSaveAsVoice: canSaveVoice ? requestSaveDesignedVoice : nil,
+            onErrorDismiss: { coordinator.dismissError() },
             onBackgroundNoticeDismiss: { coordinator.dismissBackgroundInterruptionNotice() }
         )
         .opacity(chromeOpacity)
@@ -1646,32 +1656,6 @@ struct IOSVoiceCloningView: View {
             && !appModel.longForm.isProcessing
     }
 
-    private var setupMessage: String? {
-        if !cloneConsentAcknowledged {
-            return IOSAppLanguage.shared.presentation.cloningConsentRequired
-        }
-        if !isModelAvailable, let cloneModel {
-            return IOSAppLanguage.shared.presentation.installModel(named: cloneModel.name)
-        }
-        if draft.referenceAudioPath == nil {
-            return IOSInterfaceText.chooseReferenceDetail
-        }
-        if !draft.isReferenceReady { return draft.referenceReview.status.message }
-        if let cloneContextStatus {
-            switch cloneContextStatus {
-            case .waitingForHydration:
-                return IOSInterfaceText.loadingVoice
-            case .preparing:
-                return IOSInterfaceText.preparingReference
-            case .primed:
-                return nil
-            case .fallback(let message):
-                return message
-            }
-        }
-        return nil
-    }
-
     /// A compact, visible readiness state in the composer's existing metadata
     /// row. It gives users and XCUITest the same production signal without a
     /// hidden marker or making successful generation depend on proactive work.
@@ -1773,7 +1757,69 @@ struct IOSVoiceCloningView: View {
             }
     }
 
-    @ViewBuilder
+    private var cloneSetupPrompt: IOSStudioSetupPrompt? {
+        guard isModelAvailable else { return nil }
+        if !allowsExecution {
+            return IOSStudioSetupPrompt(
+                message: IOSInterfaceText.cloneUnavailableOnDevice,
+                symbol: "exclamationmark.triangle",
+                action: nil
+            )
+        }
+        if !cloneConsentAcknowledged {
+            return IOSStudioSetupPrompt(
+                message: IOSInterfaceText.cloneConsentSetup,
+                symbol: "hand.raised.fill",
+                action: {
+                    appModel.requireVoiceCloningConsent {}
+                }
+            )
+        }
+        if draft.referenceAudioPath == nil {
+            return IOSStudioSetupPrompt(
+                message: IOSInterfaceText.chooseReferenceDetail,
+                symbol: "waveform",
+                action: presentReferencePicker
+            )
+        }
+        if let transcriptLoadError {
+            return IOSStudioSetupPrompt(
+                message: transcriptLoadError,
+                symbol: "exclamationmark.triangle",
+                action: presentReferencePicker
+            )
+        }
+        if !draft.isReferenceReady {
+            return IOSStudioSetupPrompt(
+                message: draft.referenceReview.status.message,
+                symbol: "text.alignleft",
+                action: presentReferencePicker
+            )
+        }
+        return nil
+    }
+
+    private func cancelCloneGeneration() {
+        if appModel.longForm.isProcessing {
+            appModel.longForm.cancel(
+                ttsEngine: ttsEngine,
+                audioPlayer: audioPlayer,
+                studioCoordinator: coordinator
+            )
+        } else {
+            IOSStudioGenerationActions.cancelGeneration(
+                coordinator: coordinator,
+                ttsEngine: ttsEngine,
+                audioPlayer: audioPlayer
+            )
+        }
+    }
+
+    private func installCloneModel() {
+        guard let model = cloneModel else { return }
+        appModel.requestModelInstallation(model)
+    }
+
     private var pageContent: some View {
         VStack(alignment: .leading, spacing: 14) {
             IOSStudioCanvas(
@@ -1785,6 +1831,7 @@ struct IOSVoiceCloningView: View {
                 genState: studioGenState,
                 errorMessage: coordinator.errorMessage,
                 backgroundNotice: coordinator.backgroundInterruptionNoticeMessage,
+                setupPrompt: cloneSetupPrompt,
                 canGenerate: canGenerateInCurrentRuntime,
                 modelInstalled: isModelAvailable,
                 modelDisplayName: IOSSettingsText.clone,
@@ -1792,27 +1839,11 @@ struct IOSVoiceCloningView: View {
                 selectedLanguage: draft.selectedLanguage,
                 setupChips: { cloneModeChips },
                 onGenerate: generate,
-                onCancel: {
-                    if appModel.longForm.isProcessing {
-                        appModel.longForm.cancel(
-                            ttsEngine: ttsEngine,
-                            audioPlayer: audioPlayer,
-                            studioCoordinator: coordinator
-                        )
-                    } else {
-                        IOSStudioGenerationActions.cancelGeneration(
-                            coordinator: coordinator,
-                            ttsEngine: ttsEngine,
-                            audioPlayer: audioPlayer
-                        )
-                    }
-                },
-                onInstallModel: {
-                    guard let model = cloneModel else { return }
-                    appModel.requestModelInstallation(model)
-                },
+                onCancel: cancelCloneGeneration,
+                onInstallModel: installCloneModel,
                 onPlayerDismiss: { coordinator.dismissInlinePlayer() },
                 onPlayerExpand: expandInlinePlayer,
+                onErrorDismiss: { coordinator.dismissError() },
                 onBackgroundNoticeDismiss: { coordinator.dismissBackgroundInterruptionNotice() }
             )
             // The reference's transcript review lives in the Reference panel
@@ -1949,10 +1980,24 @@ struct IOSVoiceCloningView: View {
                         }
                     ),
                     onRequestRecord: {
-                        appModel.requestCloneReferenceRecording(afterDismiss: dismiss)
+                        let model = appModel
+                        if cloneConsentAcknowledged {
+                            model.requestCloneReferenceRecording(afterDismiss: dismiss)
+                        } else {
+                            model.requireVoiceCloningConsent { [weak model] in
+                                model?.requestCloneReferenceRecording(afterDismiss: {})
+                            }
+                        }
                     },
                     onRequestImport: {
-                        appModel.requestCloneReferenceImport(afterDismiss: dismiss)
+                        let model = appModel
+                        if cloneConsentAcknowledged {
+                            model.requestCloneReferenceImport(afterDismiss: dismiss)
+                        } else {
+                            model.requireVoiceCloningConsent { [weak model] in
+                                model?.requestCloneReferenceImport(afterDismiss: {})
+                            }
+                        }
                     },
                     onDismiss: dismiss,
                     presentation: .edgeToEdge(

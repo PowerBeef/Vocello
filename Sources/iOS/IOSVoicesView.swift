@@ -287,7 +287,9 @@ struct IOSVoicesView: View {
                 accessibilityIdentifier: "voices_saveNewVoice"
             ) {
                 IOSHaptics.selection()
-                onRecordNewVoice()
+                appModel.requireVoiceCloningConsent {
+                    onRecordNewVoice()
+                }
             }
 
             Divider()
@@ -301,7 +303,9 @@ struct IOSVoicesView: View {
                 accessibilityIdentifier: "voices_importAudioFile"
             ) {
                 IOSHaptics.selection()
-                isAudioImporterPresented = true
+                appModel.requireVoiceCloningConsent {
+                    isAudioImporterPresented = true
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

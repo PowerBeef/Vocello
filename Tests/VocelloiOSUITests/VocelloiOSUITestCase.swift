@@ -557,9 +557,9 @@ class VocelloiOSUITestCase: XCTestCase {
         switch identifier {
         case "iosSettings_autoPlayToggle": category = "audio"
         case "iosSettings_voiceModelsRow", "iosSettings_savedOutputsRow": category = "modelsFiles"
-        case "voiceCloning_consentAcknowledgment", "iosSettings_privacyPolicyRow", "iosSettings_openIOSSettingsRow": category = "privacyPermissions"
+        case "voiceCloning_consentAcknowledgment", "iosSettings_privacyPolicyRow", "iosSettings_termsRow", "iosSettings_openIOSSettingsRow": category = "privacyPermissions"
         case "iosSettings_reduceMotionToggle", "iosSettings_reduceTransparencyToggle": category = "accessibility"
-        case "iosSettings_supportRow", "iosSettings_openSourceRow", "iosSettings_sourceCodeRow", "iosSettings_versionLabel": category = "about"
+        case "iosSettings_supportRow", "iosSettings_reportIssueRow", "iosSettings_openSourceRow", "iosSettings_sourceCodeRow", "iosSettings_versionLabel": category = "about"
         case "iosSettings_cellularDownloadsToggle": openVoiceModels(); return
         default: openSettingsRoot(); return
         }
@@ -660,8 +660,10 @@ class VocelloiOSUITestCase: XCTestCase {
         XCTAssertTrue(revealSettingsElement(consent, swipingUp: true))
         for identifier in [
             "iosSettings_privacyPolicyRow",
+            "iosSettings_termsRow",
             "iosSettings_openIOSSettingsRow",
             "iosSettings_supportRow",
+            "iosSettings_reportIssueRow",
             "iosSettings_openSourceRow",
             "iosSettings_sourceCodeRow",
             "iosSettings_versionLabel",

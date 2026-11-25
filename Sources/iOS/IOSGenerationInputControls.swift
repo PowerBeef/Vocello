@@ -357,10 +357,11 @@ struct IOSSaveVoiceSheet: View {
     let onSave: () -> Void
 
     @State private var clipPlayer = ClipReviewPlayer()
-    /// PA-17: the store refuses enrollment until the Settings acknowledgment is on,
-    /// so the sheet says so up front and keeps Save disabled instead of failing
-    /// after the user named and reviewed the voice.
+    /// PA-17: the store refuses enrollment until the consent acknowledgment is on.
+    /// Tapping the inline prompt opens the one-time consent sheet without leaving
+    /// the flow (RF-73 / A1).
     @AppStorage(VoiceCloningConsentPolicy.recordedConsentDefaultsKey) private var cloneConsentAcknowledged = false
+    @State private var isConsentSheetPresented = false
     @FocusState private var isNameFocused: Bool
     // Real focus binding for the transcript editor — without it the field would resign first
     // responder on every parent re-render (keystroke). The coordinator keeps it in sync.
@@ -406,12 +407,36 @@ struct IOSSaveVoiceSheet: View {
             IOSScrollView(bottomFadeHeight: 0) {
                 VStack(alignment: .leading, spacing: 18) {
                     if !cloneConsentAcknowledged {
-                        IOSCompactInlineNotice(
-                            message: IOSAppLanguage.shared.presentation.cloningConsentRequiredToSaveVoice,
-                            symbolName: "hand.raised",
-                            tint: tint,
-                            lineLimit: nil
-                        )
+                        Button {
+                            IOSHaptics.selection()
+                            dismissKeyboard()
+                            isConsentSheetPresented = true
+                        } label: {
+                            HStack(spacing: 10) {
+                                IOSCompactInlineNotice(
+                                    message: IOSAppLanguage.shared.presentation.cloningConsentRequiredToSaveVoice,
+                                    symbolName: "hand.raised.fill",
+                                    tint: tint,
+                                    lineLimit: nil
+                                )
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(tint)
+                                    .accessibilityHidden(true)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity, minHeight: Theme.HitTarget.minimum, alignment: .leading)
+                            .background {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(Theme.accentSurface(tint))
+                            }
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Theme.accentStroke(tint), lineWidth: Theme.Stroke.hairline)
+                            }
+                        }
+                        .buttonStyle(.plain)
                         .accessibilityElement(children: .combine)
                         .accessibilityIdentifier("saveVoice_consentRequired")
                     }
@@ -493,6 +518,15 @@ struct IOSSaveVoiceSheet: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
+                    if cloneConsentAcknowledged && !generatedReference {
+                        Text(IOSInterfaceText.saveVoicePermissionReminder)
+                            .font(.caption)
+                            .foregroundStyle(Theme.Text.tertiary)
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity)
+                    }
+
                     IOSPrimaryCTAButton(
                         title: IOSInterfaceText.saveVoice,
                         symbol: "checkmark",
@@ -511,6 +545,21 @@ struct IOSSaveVoiceSheet: View {
                 .padding(.bottom, 24)
             }
             .scrollDismissesKeyboard(.interactively)
+        }
+        .sheet(isPresented: $isConsentSheetPresented) {
+            IOSVoiceCloningConsentSheet(
+                presentation: .system,
+                onConfirm: {
+                    cloneConsentAcknowledged = true
+                    isConsentSheetPresented = false
+                },
+                onCancel: {
+                    isConsentSheetPresented = false
+                }
+            )
+            .presentationDetents([.fraction(0.72), .large])
+            .presentationDragIndicator(.hidden)
+            .presentationCornerRadius(28)
         }
         .presentationDragIndicator(.hidden)
         .interactiveDismissDisabled(true)

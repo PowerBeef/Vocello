@@ -201,7 +201,7 @@ import VocelloiOSPolicies
                comment: "Voice Models switch (RF-35): lets model downloads use cellular data. Off by default.")
     }
     static var cellularDownloadsDetail: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.cellularDownloadsDetail", defaultValue: "About 2 GB per model, which may count against your data plan. A change applies to downloads you start afterwards.",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.cellularDownloadsDetail", defaultValue: "About 2.2 GB per model, which may count against your data plan. A change applies to downloads you start afterwards.",
                comment: "Subtitle of the Download over cellular switch: the data cost, and that turning it on or off applies to downloads started afterwards.")
     }
     static var cellularDownloadsAllowed: String {
@@ -405,17 +405,41 @@ import VocelloiOSPolicies
         IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.cloneConsentDetail", defaultValue: "Required for Voice Cloning.",
                comment: "Settings cloneConsentDetail; preserve product and consent meaning.")
     }
+    static var cloneConsentRevocation: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.cloneConsentRevocation", defaultValue: "Turning this off stops new voice cloning and saving. Existing saved voices stay on this device and can be deleted anytime in Voices.",
+               comment: "Explains what happens when the voice-cloning consent toggle is turned off.")
+    }
     static var cloneDisclosure: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.cloneDisclosure", defaultValue: "If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may require this.",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.cloneDisclosure", defaultValue: "If you publish audio of a cloned real voice, disclose that it is AI-generated. Applicable laws or platform rules may require this disclosure.",
                comment: "Settings cloneDisclosure; preserve product and consent meaning.")
     }
     static var cloneDisclosureHint: String {
-        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.cloneDisclosureHint", defaultValue: "AI-generated audio disclosure. If you publish audio of a cloned real voice, disclose that it is AI-generated. EU law may require this.",
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.cloneDisclosureHint", defaultValue: "AI-generated audio disclosure. If you publish audio of a cloned real voice, disclose that it is AI-generated. Applicable laws or platform rules may require this disclosure.",
                comment: "Settings cloneDisclosureHint; preserve product and consent meaning.")
+    }
+    static var watermarkTransparency: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.watermarkTransparency", defaultValue: "Generated speech carries an inaudible AudioSeal watermark and WAV metadata identifying it as Vocello audio, with no personal identifiers. Reference clips and live previews are not marked.",
+               comment: "Settings transparency note explaining AudioSeal watermarking and WAV provenance metadata.")
     }
     static var privacyHint: String {
         IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.privacyHint", defaultValue: "Opens the Vocello Privacy Policy",
                comment: "Settings privacyHint; preserve product and consent meaning.")
+    }
+    static var termsHint: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.termsHint", defaultValue: "Opens the Vocello Terms of Use",
+               comment: "VoiceOver hint for the Settings Terms of Use row.")
+    }
+    static var reportIssue: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.reportIssue", defaultValue: "Report an Issue",
+               comment: "Settings About row title for reporting bugs or AI misuse on the support page.")
+    }
+    static var reportIssueDetail: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.reportIssueDetail", defaultValue: "Opens the support page to report a problem or misuse. Vocello never uploads audio or logs.",
+               comment: "Settings About row subtitle explaining privacy-first issue and misuse reporting.")
+    }
+    static var reportIssueHint: String {
+        IOSAppLanguage.shared.localized(localized: "vocello.settings.reportIssueHint", defaultValue: "Opens the Vocello support and issue reporting page",
+               comment: "VoiceOver hint for the Settings Report an Issue row.")
     }
     static var permissions: String {
         IOSAppLanguage.shared.localized(localized: "vocello.settings.refinement.permissions", defaultValue: "Permissions",
@@ -937,8 +961,12 @@ struct SettingsScreen: View {
                 )
             }
 
+            contextNote(IOSSettingsText.cloneConsentRevocation)
+
             contextNote(IOSSettingsText.cloneDisclosure)
                 .accessibilityLabel(IOSSettingsText.cloneDisclosureHint)
+
+            contextNote(IOSSettingsText.watermarkTransparency)
 
             IOSSettingsSection {
                 IOSSettingsValueRow(
@@ -948,7 +976,18 @@ struct SettingsScreen: View {
                     accessibilityIdentifier: "iosSettings_privacyPolicyRow",
                     value: "",
                     accessibilityHint: IOSSettingsText.privacyHint,
-                    action: { open("https://vocello.vercel.app/privacy") }
+                    action: { open("https://vocello.vercel.app/privacy/") }
+                )
+
+                IOSSettingsDivider()
+                IOSSettingsValueRow(
+                    symbol: "doc.text.fill",
+                    title: IOSAppLanguage.shared.presentation.exportTerms,
+                    subtitle: nil,
+                    accessibilityIdentifier: "iosSettings_termsRow",
+                    value: "",
+                    accessibilityHint: IOSSettingsText.termsHint,
+                    action: { open("https://vocello.vercel.app/terms/") }
                 )
 
                 IOSSettingsDivider()
@@ -984,6 +1023,17 @@ struct SettingsScreen: View {
                     value: "",
                     accessibilityHint: IOSAppLanguage.shared.localized(localized: "vocello.settings.help_support.hint"),
                     action: { open("https://vocello.vercel.app/support/") }
+                )
+
+                IOSSettingsDivider()
+                IOSSettingsValueRow(
+                    symbol: "exclamationmark.bubble.fill",
+                    title: IOSSettingsText.reportIssue,
+                    subtitle: IOSSettingsText.reportIssueDetail,
+                    accessibilityIdentifier: "iosSettings_reportIssueRow",
+                    value: "",
+                    accessibilityHint: IOSSettingsText.reportIssueHint,
+                    action: { open("https://vocello.vercel.app/support/#report") }
                 )
 
                 IOSSettingsDivider()

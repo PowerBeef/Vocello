@@ -818,10 +818,14 @@ final class IOSModelDownloadCoordinator {
         } catch {
             if await finalizeCancelledStartIfNeeded(for: model) { return }
             markLedgerTerminal(modelID: model.id, status: .failed)
+            let failureClass = ModelUpdateFailure.classify(error)
             publishFailed(
                 modelID: model.id,
-                message: error.localizedDescription,
-                failureClass: ModelUpdateFailure.classify(error)
+                message: IOSAppLanguage.shared.presentation.modelDeliveryErrorMessage(
+                    error,
+                    failureClass: failureClass
+                ),
+                failureClass: failureClass
             )
         }
     }
@@ -935,10 +939,16 @@ final class IOSModelDownloadCoordinator {
             // A transfer the downloader ended as cancelled although no Cancel asked for it
             // (E-02) is a failure offered for Retry, never a silent cancellation. It carries
             // no message, so the row shows the localized delivery failure.
+            let failureClass: ModelUpdateFailure = isCancellation ? .other : ModelUpdateFailure.classify(error)
             publishFailed(
                 modelID: model.id,
-                message: isCancellation ? nil : error.localizedDescription,
-                failureClass: isCancellation ? .other : ModelUpdateFailure.classify(error)
+                message: isCancellation
+                    ? nil
+                    : IOSAppLanguage.shared.presentation.modelDeliveryErrorMessage(
+                        error,
+                        failureClass: failureClass
+                    ),
+                failureClass: failureClass
             )
             stopDiagnosticsHeartbeat(for: model.id)
         }

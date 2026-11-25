@@ -31,6 +31,7 @@ struct RootView: View {
     @State private var performanceGate: IOSGenerationPerformanceGateModel
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage(IOSAppDefaults.reduceMotionEnabledKey) private var appReduceMotion = false
     @AppStorage(IOSAppDefaults.reduceTransparencyEnabledKey) private var appReduceTransparency = false
     @State private var importedVoicePresentation: ImportedVoicePresentation?
@@ -110,6 +111,7 @@ struct RootView: View {
         .overlay {
             bottomPanelOverlay
             deleteModelSheetOverlay
+            voiceCloningConsentSheetOverlay
         }
         // App-switcher privacy is a window above every presentation
         // (`IOSAppSwitcherPrivacyCoverWindows`, IOS-22), not an overlay here:
@@ -336,6 +338,43 @@ struct RootView: View {
     }
 
     @ViewBuilder
+    private var voiceCloningConsentSheetOverlay: some View {
+        if let item = appModel.voiceCloningConsentItem {
+            GeometryReader { proxy in
+                ZStack(alignment: .bottom) {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            dismissVoiceCloningConsent()
+                        }
+
+                    IOSVoiceCloningConsentSheet(
+                        presentation: .edgeToEdge(
+                            bottomSafeAreaInset: proxy.safeAreaInsets.bottom,
+                            height: dynamicTypeSize >= .xxLarge
+                                ? IOSBottomSheetChrome.expandedHeight(forScreenHeight: proxy.size.height)
+                                : nil
+                        ),
+                        onConfirm: {
+                            let action = item.onConfirm
+                            dismissVoiceCloningConsent()
+                            action()
+                        },
+                        onCancel: {
+                            dismissVoiceCloningConsent()
+                        }
+                    )
+                    .frame(maxWidth: .infinity)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                .ignoresSafeArea()
+            }
+            .ignoresSafeArea()
+            .zIndex(21)
+        }
+    }
+
+    @ViewBuilder
     private var bottomPanelOverlay: some View {
         if let item = appModel.bottomPanelItem {
             GeometryReader { proxy in
@@ -365,10 +404,15 @@ struct RootView: View {
         appModel.isFocusBackdropPresented
             || appModel.bottomPanelItem != nil
             || appModel.deleteModelSheetItem != nil
+            || appModel.voiceCloningConsentItem != nil
     }
 
     private func dismissDeleteModelSheet() {
         appModel.dismissDeleteModelSheet()
+    }
+
+    private func dismissVoiceCloningConsent() {
+        appModel.dismissVoiceCloningConsent()
     }
 
     private func dismissBottomPanel() {
@@ -421,6 +465,7 @@ struct RootView: View {
         appModel.cancelCloneReferenceImport()
         appModel.dismissBottomPanel()
         appModel.dismissDeleteModelSheet()
+        appModel.dismissVoiceCloningConsent()
         importedVoicePresentation = nil
         appModel.tab = .voices
         while !IOSRootPresentation.isIdle {

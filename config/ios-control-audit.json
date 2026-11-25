@@ -38,7 +38,7 @@
       "path": "Sources/iOS/Commerce/IOSExportGate.swift",
       "screen": "Export purchase and share sheet",
       "scenario": "stateful",
-      "reason": "Visible purchase, restore, status, privacy/support and dismissal. Buy is the shared primary CTA (VocelloPrimaryCTAButton, separately bound by export-purchase-actions); close, restore and Try Again are trailing-closure buttons, counted since BKL-24, and the two footer links share one Link. Transactions require separately approved StoreKit/sandbox acceptance; no general audit purchases.",
+      "reason": "Visible purchase, restore, status, privacy/terms/support and dismissal. Buy is the shared primary CTA (VocelloPrimaryCTAButton, separately bound by export-purchase-actions); close, restore and Try Again are trailing-closure buttons, counted since BKL-24, and the three footer links share one Link. Transactions require separately approved StoreKit/sandbox acceptance; no general audit purchases.",
       "interactiveOccurrenceCount": 4
     },
     {
@@ -52,8 +52,8 @@
       "path": "Sources/iOS/App/RootView.swift",
       "screen": "App root and system alerts",
       "scenario": "stateful",
-      "reason": "Root-owned alerts and permission recovery are observed through their visible labels; the RF-59 model update prompt (Update, Later) appears once after an app update from an earlier Vocello.",
-      "interactiveOccurrenceCount": 8
+      "reason": "Root-owned alerts, permission recovery, and the one-time inline voice-cloning consent backdrop dismissal (RF-73) are observed through their visible labels; the RF-59 model update prompt (Update, Later) appears once after an app update from an earlier Vocello.",
+      "interactiveOccurrenceCount": 9
     },
     {
       "path": "Sources/iOS/IOSAppBootstrap.swift",
@@ -101,8 +101,8 @@
       "path": "Sources/iOS/IOSGenerationInputControls.swift",
       "screen": "Voice enrollment",
       "scenario": "stateful",
-      "reason": "Name, transcript and reference-language review, audio-only fallback, and Save Voice controls are test-owned.",
-      "interactiveOccurrenceCount": 5
+      "reason": "Name, transcript and reference-language review, tappable inline consent prompt (RF-73), audio-only fallback, and Save Voice controls are test-owned.",
+      "interactiveOccurrenceCount": 6
     },
     {
       "path": "Sources/iOS/IOSGenerationModeViews.swift",
@@ -136,8 +136,8 @@
       "path": "Sources/iOS/Overlays/IOSOnboardingFlow.swift",
       "screen": "Onboarding",
       "scenario": "inventory",
-      "reason": "Skip and Continue actions are visible production onboarding controls.",
-      "interactiveOccurrenceCount": 1
+      "reason": "Skip, Continue, and the final page Terms/Privacy links (RF-73) are visible production onboarding controls.",
+      "interactiveOccurrenceCount": 2
     },
     {
       "path": "Sources/iOS/Overlays/IOSRecordingOverlay.swift",
@@ -171,8 +171,8 @@
       "path": "Sources/iOS/Sheets/IOSBottomSheets.swift",
       "screen": "Studio selector sheets",
       "scenario": "inventory",
-      "reason": "All speaker, delivery, language, reference, and model selector options, and the reference picker's Saved Voices load-failure Retry use stable families; the Reference panel also carries Clone's transcript review and audio-only decisions (RF-24), identified voiceCloning_* and checked by ios smoke --scenario studio-layout.",
-      "interactiveOccurrenceCount": 20
+      "reason": "All speaker, delivery, language, reference, inline voice-cloning consent (RF-73), and model selector options, and the reference picker's Saved Voices load-failure Retry use stable families; the Reference panel also carries Clone's transcript review and audio-only decisions (RF-24), identified voiceCloning_* and checked by ios smoke --scenario studio-layout.",
+      "interactiveOccurrenceCount": 22
     },
     {
       "path": "Sources/iOS/Sheets/IOSPlayerSheet.swift",
@@ -227,8 +227,8 @@
       "path": "Sources/iOS/IOSStudioCanvas.swift",
       "screen": "Studio",
       "scenario": "generation",
-      "reason": "Clear, the generation-error retry, the background-notice dismissal and live Cancel carry the composer family's textInput_ identifiers.",
-      "interactiveOccurrenceCount": 4
+      "reason": "Clear, the tappable setup prompt (RF-73), the generation-error retry/dismiss, the background-notice dismissal and live Cancel carry the composer family's textInput_ identifiers.",
+      "interactiveOccurrenceCount": 5
     },
     {
       "path": "Sources/iOS/Sheets/IOSVoiceDesignBriefSheet.swift",
@@ -286,7 +286,7 @@
     },
     {
       "id": "export-purchase-actions",
-      "identifierPattern": "exportPurchase_(buy|reload|restore|close|privacy|support|status|progress|unlocked)",
+      "identifierPattern": "exportPurchase_(buy|reload|restore|close|privacy|terms|support|status|progress|unlocked|exportNow)",
       "sourceToken": "exportPurchase_buy",
       "screen": "Export purchase",
       "prerequisite": "Separately authorized StoreKit/sandbox purchase session",
@@ -361,7 +361,7 @@
     },
     {
       "id": "composer",
-      "identifierPattern": "textInput_(textEditor|clearButton|longFormIndicator|generateButton|cancelButton|generationError|backgroundNotice|installModelButton)",
+      "identifierPattern": "textInput_(textEditor|clearButton|longFormIndicator|generateButton|cancelButton|generationError|backgroundNotice|installModelButton|setupAction)",
       "sourceToken": "textInput_",
       "screen": "Studio",
       "prerequisite": "Any generation mode",
@@ -620,7 +620,7 @@
     },
     {
       "id": "settings-links",
-      "identifierPattern": "iosSettings_(privacyPolicyRow|openIOSSettingsRow|supportRow|openSourceRow|sourceCodeRow)",
+      "identifierPattern": "iosSettings_(privacyPolicyRow|termsRow|openIOSSettingsRow|supportRow|reportIssueRow|openSourceRow|sourceCodeRow)",
       "sourceToken": "iosSettings_openSourceRow",
       "screen": "Settings",
       "prerequisite": "Privacy or About section revealed",
@@ -711,7 +711,7 @@
     },
     {
       "id": "onboarding-controls",
-      "identifierPattern": "onboarding_(skip|cta)",
+      "identifierPattern": "onboarding_(skip|cta|terms|privacy)",
       "sourceToken": "onboarding_",
       "screen": "Onboarding",
       "prerequisite": "First-run onboarding visible",
@@ -726,7 +726,7 @@
     },
     {
       "id": "sheet-navigation",
-      "identifierPattern": "(bottomSheet_close|deliveryPicker_confirm|languagePicker_confirm|voicePicker_confirm|iosSettings_voiceModelsBackButton|iosSettings_openSourceBackButton)",
+      "identifierPattern": "(bottomSheet_close|deliveryPicker_confirm|languagePicker_confirm|voicePicker_confirm|iosSettings_voiceModelsBackButton|iosSettings_openSourceBackButton|voiceCloning_inlineConsent(Continue|Cancel|Terms))",
       "sourceToken": "bottomSheet_close",
       "screen": "Sheets and destinations",
       "prerequisite": "Owning surface visible",

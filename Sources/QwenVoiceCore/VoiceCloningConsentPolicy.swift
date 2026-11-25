@@ -113,4 +113,27 @@ public struct VoiceCloningConsentPolicy: Hashable, Sendable {
         guard Self.requiresConsent(mode) else { return }
         try admit(.generation)
     }
+
+    /// Inline-consent gate for UI entry points (RF-73).
+    /// When consent is already recorded in `defaults`, runs `action` immediately
+    /// and returns `nil`. Otherwise returns a one-shot confirmation closure that
+    /// persists consent in `defaults` and runs `action`; discarding the closure
+    /// leaves consent unrecorded and never runs `action`.
+    @MainActor
+    public static func gateInlineAction(
+        defaults: UserDefaults = .standard,
+        action: @escaping @MainActor () -> Void
+    ) -> (@MainActor () -> Void)? {
+        if defaults.bool(forKey: recordedConsentDefaultsKey) {
+            action()
+            return nil
+        }
+        var didConfirm = false
+        return {
+            guard !didConfirm else { return }
+            didConfirm = true
+            defaults.set(true, forKey: recordedConsentDefaultsKey)
+            action()
+        }
+    }
 }

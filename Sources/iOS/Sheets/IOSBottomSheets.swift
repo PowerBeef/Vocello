@@ -1630,3 +1630,135 @@ struct IOSDeleteModelSheet: View {
         .buttonStyle(.plain)
     }
 }
+
+// MARK: - Inline voice-cloning consent sheet (RF-73 / A1)
+
+/// One-time inline permission sheet surfaced on the first voice-cloning action
+/// (Record, Import, Save as voice, or Studio Clone setup) when consent is not
+/// yet recorded. Matches `IOSDeleteModelSheet`'s compact bottom-sheet chrome
+/// with Voice Cloning's terracotta tint and shared `IOSPrimaryCTAButton`.
+struct IOSVoiceCloningConsentSheet: View {
+    var presentation: IOSBottomSheetPresentationStyle = .system
+    var onConfirm: () -> Void
+    var onCancel: () -> Void
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private static let termsURL = URL(string: "https://vocello.vercel.app/terms/")!
+    private let tint = Theme.Brand.modeClone
+
+    private var usesScrollContainer: Bool {
+        switch presentation {
+        case .system:
+            return true
+        case .edgeToEdge(_, let height):
+            return height != nil || dynamicTypeSize >= .xxLarge
+        }
+    }
+
+    var body: some View {
+        IOSBottomSheetSurface(
+            title: IOSInterfaceText.voiceCloningConsentTitle,
+            tint: tint,
+            presentation: presentation,
+            onDismiss: onCancel
+        ) {
+            if usesScrollContainer {
+                IOSScrollView(bottomFadeHeight: 0) {
+                    sheetContent
+                }
+            } else {
+                sheetContent
+            }
+        }
+    }
+
+    private var sheetContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            summaryRow
+                .padding(.top, 4)
+                .padding(.bottom, 12)
+
+            Link(destination: Self.termsURL) {
+                Text(IOSAppLanguage.shared.presentation.exportTerms)
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(tint)
+                    .frame(minHeight: Theme.HitTarget.minimum, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityIdentifier("voiceCloning_inlineConsentTerms")
+            .padding(.bottom, 12)
+
+            VStack(spacing: 10) {
+                IOSPrimaryCTAButton(
+                    title: IOSInterfaceText.voiceCloningConsentContinue,
+                    symbol: "checkmark",
+                    tint: tint,
+                    isEnabled: true
+                ) {
+                    IOSHaptics.success()
+                    onConfirm()
+                }
+                .accessibilityLabel(IOSInterfaceText.voiceCloningConsentContinue)
+                .accessibilityIdentifier("voiceCloning_inlineConsentContinue")
+
+                cancelButton
+            }
+            .padding(.bottom, 8)
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
+    }
+
+    private var summaryRow: some View {
+        HStack(alignment: .top, spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(tint.opacity(0.14))
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(tint.opacity(0.34), lineWidth: 0.5)
+                Image(systemName: "hand.raised.fill")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(tint)
+            }
+            .frame(width: 44, height: 44)
+            .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(IOSInterfaceText.voiceCloningConsentSummary)
+                    .iosScaledFont(size: 16, weight: .semibold, relativeTo: .callout)
+                    .tracking(-0.08)
+                    .foregroundStyle(Theme.Text.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(IOSInterfaceText.voiceCloningConsentDetail)
+                    .iosScaledFont(size: 13, relativeTo: .footnote)
+                    .foregroundStyle(Theme.Text.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var cancelButton: some View {
+        Button {
+            onCancel()
+        } label: {
+            Text(IOSInterfaceText.cancel)
+                .iosScaledFont(size: 17, weight: .semibold, relativeTo: .headline)
+                .foregroundStyle(Theme.Text.primary)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 56)
+                .background {
+                    Capsule(style: .continuous)
+                        .fill(Color.white.opacity(0.05))
+                }
+                .overlay {
+                    Capsule(style: .continuous)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 0.5)
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("voiceCloning_inlineConsentCancel")
+    }
+}

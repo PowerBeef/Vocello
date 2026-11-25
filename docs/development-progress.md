@@ -31,12 +31,15 @@ unchanged for 3.2 (`f070f41a`).
   compatibility mode (remove the non-iPhone block in `IOSDeviceEligibilityPolicy.swift` and
   `scripts/ios_device_eligibility.py`; keep `TARGETED_DEVICE_FAMILY: "1"`).
 - **D2 — Granular AI Safeguards (`A1`–`F1`, strictly sample-preserving):**
-  - **Consent & terms (`A1`–`A4`, `E1`):** One combined localized one-time sheet (AI-generated local
-    voices + AudioSeal/metadata transparency + zero-tolerance Acceptable Use) before first Model
-    Install or Generate (not blocking cold launch); inline Voice Cloning consent sheet before
-    Record, Import, Save, or Generate (+ render `setupMessage`, fix `"Settings → Privacy & Permissions"`);
-    lightweight one-tap per-voice confirmation on Save Voice and new Studio clips (zero extra taps on
-    already-saved voices); non-destructive Settings revocation caption; Terms/Acceptable Use page on
+  - **Consent & terms (`A1`–`A4`, `E1` — streamlined low-friction flow):** Never interrupt cold
+    launch or Model Install (`RF-41` download alert stands alone); show **at most one** compact
+    one-time inline sheet: either the merged `A1` Voice Cloning consent sheet (AI-generated local
+    voices + AudioSeal/metadata + zero-tolerance Acceptable Use + voice permission + disclosure line)
+    before first Record, Import, Save, or Generate (marking both `E1` and cloning consent accepted so
+    Built-in/Design shows 0 sheets later), OR a compact `E1` sheet once before first Built-in/Design
+    Generate if Cloning was not used first; **0 extra toggles after `A1`** (`A2` is a passive 1-line
+    reminder caption on Save Voice/Import); render `setupMessage` and fix `"Settings → Privacy & Permissions"`;
+    non-destructive Settings revocation caption (`A4`); Terms/Acceptable Use page on
     `vocello.vercel.app` linked from `Settings → About`.
   - **Watermarking & provenance (`B1`–`B4`):** Keep mandatory, fail-closed AudioSeal 16-bit PCM
     watermark (fixed non-identifying payload, all 3 modes) + `LIST/INFO` WAV provenance; defer C2PA

@@ -31,14 +31,15 @@ unchanged for 3.2 (`f070f41a`).
   compatibility mode (remove the non-iPhone block in `IOSDeviceEligibilityPolicy.swift` and
   `scripts/ios_device_eligibility.py`; keep `TARGETED_DEVICE_FAMILY: "1"`).
 - **D2 — Granular AI Safeguards (`A1`–`F1`, strictly sample-preserving):**
-  - **Consent & terms (`A1`–`A4`, `E1` — streamlined low-friction flow):** Never interrupt cold
-    launch or Model Install (`RF-41` download alert stands alone); show **at most one** compact
-    one-time inline sheet: either the merged `A1` Voice Cloning consent sheet (AI-generated local
-    voices + AudioSeal/metadata + zero-tolerance Acceptable Use + voice permission + disclosure line)
-    before first Record, Import, Save, or Generate (marking both `E1` and cloning consent accepted so
-    Built-in/Design shows 0 sheets later), OR a compact `E1` sheet once before first Built-in/Design
-    Generate if Cloning was not used first; **0 extra toggles after `A1`** (`A2` is a passive 1-line
-    reminder caption on Save Voice/Import); render `setupMessage` and fix `"Settings → Privacy & Permissions"`;
+  - **Consent, onboarding & low-friction UX (`A1`–`A4`, `E1`, `P0-5`, `BKL-38`, `IOSExportGate`):**
+    Fold the concise local AI + AudioSeal watermark (no personal IDs) + zero-tolerance Acceptable Use
+    notice and Terms/Privacy links directly onto existing `IOSOnboardingFlow` Page 3 above `"Open
+    Studio"` (**0 separate general-use modal sheets**; `RF-41` download alert stands alone); show **1**
+    compact inline `A1` Voice Cloning consent sheet once before first Record, Import, Save, or
+    Generate; **0 extra toggles after `A1`** (`A2` is a passive 1-line reminder caption on Save
+    Voice/Import); render `IOSStudioCanvas` `setupMessage` as a **1-tap shortcut** opening Voice
+    Brief (`BKL-38`), inline `A1` consent, or Voices/Record directly; add a **1-tap `"Export Now"`**
+    button on `IOSExportPurchaseSheet` after purchasing from a take (`"Done"` from Settings);
     non-destructive Settings revocation caption (`A4`); Terms/Acceptable Use page on
     `vocello.vercel.app` linked from `Settings → About`.
   - **Watermarking & provenance (`B1`–`B4`):** Keep mandatory, fail-closed AudioSeal 16-bit PCM

@@ -9,4 +9,4 @@ export const SITE_PAGES = Object.freeze([
 ]);
 
 // Static pages served from public/ (no React).
-export const STATIC_PAGES = Object.freeze(["/support/", "/privacy/"]);
+export const STATIC_PAGES = Object.freeze(["/support/", "/privacy/", "/terms/"]);

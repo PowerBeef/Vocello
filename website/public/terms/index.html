@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="robots" content="index,follow" />
+    <title>Vocello Terms of Use</title>
+    <meta name="description" content="Terms of Use and acceptable use guidelines for Vocello for Mac, iPhone, and the vocello command line." />
+    <link rel="canonical" href="https://vocello.vercel.app/terms/" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png" />
+    <style>
+      :root {
+        --bg: #0e0f14;
+        --surface: #16181e;
+        --ink: #f4f5f7;
+        --muted: #c5c2bb;
+        --faint: #9598a4;
+        --accent: #e5c47f;
+        --rule: rgba(255, 255, 255, 0.1);
+      }
+      * { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(ellipse 80% 50% at 50% -8%, rgba(229, 196, 127, 0.10), transparent 60%),
+          linear-gradient(180deg, #0e0f14 0%, #131520 45%, #16181e 100%);
+        background-attachment: fixed;
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Helvetica Neue", system-ui, sans-serif;
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 720px; margin: 0 auto; padding: 64px 24px 96px; }
+      a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+      a:hover { text-decoration-thickness: 2px; }
+      a:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+      .back { font-size: 14px; color: var(--faint); display: inline-block; margin-bottom: 28px; }
+      h1 { font-size: clamp(30px, 6vw, 42px); line-height: 1.1; letter-spacing: -0.01em; margin: 0 0 6px; }
+      .updated { color: var(--faint); font-size: 14px; margin: 0 0 8px; }
+      .lede { color: var(--muted); font-size: 18px; margin: 18px 0 8px; text-wrap: pretty; }
+      h2 { font-size: 20px; margin: 40px 0 10px; letter-spacing: -0.01em; }
+      p, li { color: var(--muted); font-size: 16px; }
+      strong { color: var(--ink); font-weight: 600; }
+      ul { padding-left: 20px; }
+      li { margin: 6px 0; }
+      code { color: var(--ink); overflow-wrap: anywhere; }
+      hr { border: none; border-top: 1px solid var(--rule); margin: 40px 0; }
+      .summary {
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: 14px;
+        padding: 18px 20px;
+        margin: 24px 0 8px;
+      }
+      .summary p { margin: 0; color: var(--ink); }
+      footer { color: var(--faint); font-size: 13px; margin-top: 56px; }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <a class="back" href="/">&larr; Vocello</a>
+      <h1>Terms of Use</h1>
+      <p class="updated">Last updated: November 25, 2026</p>
+      <p class="lede">
+        These Terms of Use apply to Vocello for Mac, Vocello for iPhone (including eligible Apple
+        silicon and A17 Pro iPads running in compatibility mode), and the <code>vocello</code>
+        command line. By using Vocello, you agree to these terms.
+      </p>
+
+      <div class="summary">
+        <p>
+          <strong>The short version:</strong> Vocello runs locally on your device. Only clone
+          voices you own or have explicit permission to use, do not impersonate others or use
+          generated speech unlawfully, and disclose AI-generated audio where laws or platform
+          rules require it.
+        </p>
+      </div>
+
+      <h2>Software license</h2>
+      <p>
+        Vocello's own source code is released under the
+        <a href="https://github.com/PowerBeef/Vocello/blob/main/LICENSE" target="_blank" rel="noreferrer">MIT License</a>.
+        When you install Vocello for iPhone from the Apple App Store, Apple's Standard Licensed
+        Application End User License Agreement also applies alongside these terms.
+      </p>
+
+      <h2>Acceptable use and voice cloning rights</h2>
+      <p>
+        Vocello is a local creative and productivity tool. You are solely responsible for the
+        scripts you write, the reference audio you record or import, and the generated audio you
+        save, share, or publish.
+      </p>
+      <ul>
+        <li><strong>Consent required for cloning:</strong> use Voice Cloning and Saved Voices only with your own voice or with explicit permission from the person whose voice appears in the reference clip.</li>
+        <li><strong>No impersonation or deception:</strong> do not use Vocello to impersonate real people, public figures, or organizations without authorization, or to create fraudulent, deceptive, defamatory, or harassing audio.</li>
+        <li><strong>Lawful use only:</strong> comply with all applicable copyright, publicity, privacy, consumer-protection, and AI disclosure laws in your jurisdiction.</li>
+      </ul>
+
+      <h2>Audio watermarking and AI disclosure</h2>
+      <p>
+        Every generated WAV take carries an inaudible AudioSeal watermark with a fixed,
+        non-identifying Vocello payload and WAV <code>LIST/INFO</code> provenance metadata marking
+        it as AI-generated. Reference clips you record or import and live preview audio heard
+        before saving are not marked.
+      </p>
+      <ul>
+        <li>Do not remove, alter, or bypass the watermark or provenance metadata to misrepresent synthetic speech as genuine human audio.</li>
+        <li>When you publish or distribute audio made with Vocello, particularly audio of a cloned real voice, disclose that it is AI-generated wherever applicable laws or platform policies require it.</li>
+        <li>Open-source AudioSeal tools can inspect exported WAV files for the Vocello watermark, though external transcoding, heavy compression, or re-encoding after export may degrade watermark detectability.</li>
+      </ul>
+
+      <h2>Third-party AI models and open-source components</h2>
+      <p>
+        Voice models are not bundled inside the app. When you choose to install a model, Vocello
+        downloads immutable model weight files directly from Hugging Face and verifies their
+        cryptographic SHA-256 digests locally before activation. Third-party models and libraries
+        remain subject to their own licenses, including Qwen3-TTS (Apache License 2.0) and Meta
+        AudioSeal (MIT License). Full notices are available in Settings under Open Source &amp;
+        Licenses and in the repository's attribution manifest.
+      </p>
+
+      <h2>Optional iOS export purchase</h2>
+      <p>
+        Generating speech, listening, History, Saved Voices, and exporting Built-in Voice takes are
+        free in Vocello for iPhone. An optional one-time, non-consumable purchase
+        (<strong>Design &amp; Clone Export</strong>) unlocks exporting Voice Design and Voice
+        Cloning takes on iOS. Purchases, restoration, and refunds are processed solely by Apple
+        through the App Store under Apple's terms. The Mac app and the <code>vocello</code>
+        command line are free with unrestricted local export.
+      </p>
+
+      <h2>Disclaimer and limitation of liability</h2>
+      <p>
+        Vocello is provided "as is", without warranty of any kind, to the maximum extent permitted
+        by law. Generated speech comes from local AI models verified by automated checks rather
+        than human listening and may contain pronunciation, pacing, or delivery errors. Review any
+        generated audio before publishing or relying on it.
+      </p>
+
+      <h2>Reporting misuse and contact</h2>
+      <p>
+        To report a product issue, concern, or suspected misuse, visit
+        <a href="https://vocello.vercel.app/support/#report">Vocello Help and Support</a> or email
+        <a href="mailto:patricedery02@gmail.com">patricedery02@gmail.com</a>. Vocello never
+        uploads your scripts, recordings, or generated audio automatically. See the
+        <a href="https://vocello.vercel.app/privacy/">Vocello Privacy Policy</a> for full privacy
+        details.
+      </p>
+
+      <h2>Changes to these terms</h2>
+      <p>
+        If these terms are updated, the revised version will be posted on this page with an
+        updated date.
+      </p>
+
+      <hr />
+      <footer>Vocello. Released under the MIT License. See also the <a href="https://vocello.vercel.app/privacy/">Privacy Policy</a> and <a href="https://vocello.vercel.app/support/">Help and Support</a>.</footer>
+    </main>
+  </body>
+</html>

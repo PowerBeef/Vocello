@@ -1,8 +1,8 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-21
-summary: App Store listing draft for Vocello for iPhone 3.2.0 (en-US), reconciled from the 2026-11-01/10 App Store Connect 3.0.0 entry against the shipped 3.1.0 hybrid baseline (to be reconciled again if RF-70 updates model sizes before 3.2.0 submission). Pushing updates to App Store Connect needs a separate explicit request.
+reviewed: 2026-11-25
+summary: App Store listing draft for Vocello for iPhone 3.2.0 (en-US), reconciled from the 2026-11-01/10 App Store Connect 3.0.0 entry against the shipped 3.1.0 hybrid baseline and RF-73 App Store readiness safeguards (to be reconciled again if RF-70 updates model sizes before 3.2.0 submission). Pushing updates to App Store Connect needs a separate explicit request.
 sourceOfTruth:
   - config/public-product-facts.json
   - Sources/Resources/qwenvoice_contract.json
@@ -42,7 +42,10 @@ Apple's limit.
 |---|---|---|
 | Name (30) | Vocello | Already set; unchanged (7). |
 | Subtitle (30) | Local AI voice studio | 21. Alternatives: "Text to speech, made locally" (28), "Private AI text to speech" (25). |
-| Privacy Policy URL | https://vocello.vercel.app/privacy | Already set; matches the runbook. |
+| Privacy Policy URL | https://vocello.vercel.app/privacy/ | Matches the website canonical URL and in-app Settings link. |
+| Terms of Use URL | https://vocello.vercel.app/terms/ | Linked from onboarding, inline cloning consent, Export Purchase, and Settings → About. |
+| Age Rating | 13+ (target before 3.2.0 submission) | Raise from 4+ in App Store Connect before initial 3.2.0 submission (`RF-73`); set Nov 16 descriptors `Shared Location = No`, `Dating and Relationships = No`. |
+| Territories | 147 of 175 (target before 3.2.0 submission) | Exclude the 27 EU territories (`BKL-41`) and China Mainland (`CN`, `RF-73`); keep South Korea (`KR`) enabled on both app and export IAP. |
 
 ## Version 3.2.0
 
@@ -81,7 +84,7 @@ Private by design
 
 Before you start
 
-- Vocello requires an iPhone 15 Pro or later. Generation is fastest on the newest iPhones; on an iPhone 15 Pro, a take can take longer to generate than it lasts, so the live preview may pause while it catches up. That is normal, and the finished take plays without pauses. Each voice mode uses its own model of about 2.2 GB, downloaded once over Wi-Fi, or over cellular data if you allow it in Settings; keep at least 5 GB free while a model installs.
+- Vocello requires an iPhone 15 Pro or later, or an eligible Apple silicon or A17 Pro iPad with 8 GB+ memory (in portrait compatibility mode). Generation is fastest on the newest devices; on an iPhone 15 Pro, a take can take longer to generate than it lasts, so the live preview may pause while it catches up. That is normal, and the finished take plays without pauses. Each voice mode uses its own model of about 2.2 GB, downloaded once over Wi-Fi, or over cellular data if you allow it in Settings; keep at least 5 GB free while a model installs.
 - Generation, listening, History and Saved Voices are free in every mode, and so is exporting Built-in Voice takes. One optional in-app purchase, Design & Clone Export, unlocks exporting Voice Design and Voice Cloning audio.
 - Takes come from an AI model and can contain mistakes, such as a missing word or a delivery that misses the request. Vocello rejects takes that fail its audio check instead of saving them; generate again for a different take.
 ```
@@ -115,17 +118,17 @@ For App Review Information → Notes. No demo account is needed. The download re
 spelled out so the app is not judged non-functional under Guideline 2.1.
 
 ```text
-Vocello generates speech locally on the iPhone. It ships with no bundled model weights, to keep the app small, and needs no account or login.
+Vocello generates speech locally on your device. It ships with no bundled model weights, to keep the app small, and needs no account or login.
 
-Please review on an iPhone 15 Pro or later. Recent iPad models meet the same hardware capability, so the app installs on them, but Vocello does not run on iPad: it shows an unsupported-device message there.
+Please review on an iPhone 15 Pro or later, or on an eligible Apple silicon or A17 Pro iPad with 8 GB+ memory (runs in portrait compatibility mode). Unsupported devices with less memory show a localized unsupported-device screen.
 
-1. On first launch, go through the three onboarding pages.
-2. Open Settings → Models & Files → Voice Models and tap Install for the mode you want to review, then Download in the confirmation that shows the download's size. Built-in Voice is 2,225,870,484 bytes, Voice Design 2,225,869,991 bytes and Voice Cloning 2,249,887,307 bytes; one model is enough for its mode. Downloads use Wi-Fi unless the Download over cellular switch on that screen is turned on. Each one needs at least 5 GB of free space and can take several minutes. Progress shows the exact bytes downloaded, and the final verification and installation show as an indeterminate finishing step. A download can be cancelled and restarted, and one interrupted in the background is picked up after relaunch. Once a model shows Ready, its mode works without a network connection.
-3. In Studio, type a short line, choose a speaker where the mode has one, and tap Generate. Voice Design also needs a voice description first: tap the speech-bubble chip marked + above Generate and describe the voice, for example "a warm, deep narrator". Generate stays dimmed until the description and the line are both filled. Speed depends on the iPhone: on iPhone 17 Pro a take generates in about half its own length, while on the oldest supported model, iPhone 15 Pro, it takes about one and a half to a little over two times as long as the audio it produces. While generating, the live preview starts playing early; on slower iPhones it may pause while generation catches up, then continue. This is expected behavior, not a hang. The finished take plays without pauses and is saved to History.
-4. Voice Cloning needs the switch "I own or have permission to clone the voices I use" in Settings → Privacy & Permissions. Its reference is recorded with the microphone or imported from an audio file the user has rights to. Microphone and Speech Recognition are requested only to record a reference and transcribe it locally.
-5. In-app purchase: Design & Clone Export (non-consumable) unlocks exporting Voice Design and Voice Cloning audio through the share sheet. Generation, listening, History and Built-in Voice export are free. Open it from Settings → Design & Clone Export, or by exporting a Voice Design or Voice Cloning take; Restore Purchases is on the same sheet.
+1. On first launch, go through the three onboarding pages (Page 3 notes local AI speech, AudioSeal watermarking, and links to Privacy Policy and Terms of Use).
+2. Open Settings → Models & Files → Voice Models and tap Install for the mode you want to review, then Download in the confirmation that shows the download's size. Built-in Voice is 2,225,870,484 bytes, Voice Design 2,225,869,991 bytes and Voice Cloning 2,249,887,307 bytes; one model is enough for its mode. Downloads use Wi-Fi unless Download over cellular is turned on. Each model needs at least 5 GB of free space and can take several minutes. Progress shows exact bytes downloaded, followed by SHA-256 verification and activation. Downloads can be cancelled and resumed across launches. Once Ready, the mode works completely offline.
+3. In Studio, type a short line, pick a voice where applicable, and tap Generate. Voice Design needs a voice description first: tap the Voice Brief chip (or the inline setup prompt above the chips) and enter e.g. "a warm, deep narrator". Speed depends on hardware: iPhone 17 Pro generates faster than audio length, while iPhone 15 Pro takes roughly 1.5x to 2x audio length so live preview may pause while catching up; this is expected and the saved take plays smoothly.
+4. Voice Cloning: the first time you record, import, save, or clone a voice, an inline permission sheet confirms you own or have permission to clone the voices you use and links to Terms of Use. The same permission toggle lives in Settings → Privacy & Permissions and can be turned off at any time without deleting saved voices or history. Microphone and Speech Recognition are requested only to record and transcribe a reference clip locally.
+5. In-app purchase: Design & Clone Export (non-consumable) unlocks exporting Voice Design and Voice Cloning audio via the share sheet (with a one-tap Export Now button after unlocking from a take). Generation, listening, History, Saved Voices, and Built-in Voice export are free. Reach it via Settings → Design & Clone Export or by tapping Share on a Voice Design or Voice Cloning take; Restore Purchases is on the same sheet.
 
-Safeguards. Vocello is a single-user tool that runs locally: it has no accounts, no feed, no posting and no messaging. Generated audio leaves the iPhone only when the user exports it, or in their own iPhone backups. A Voice Design description or Built-in Voice delivery instruction that explicitly requests celebrity imitation or voice impersonation is refused. The permission switch in step 4 gates clone generation and saving a cloned voice. Every generated take, including exported files, carries an inaudible watermark and provenance metadata marking it as AI-generated. The model list ships inside the app, every downloaded file is checked against a pinned SHA-256 checksum before use, and no feature is enabled remotely. Each model's download size is shown in Settings → Models & Files → Voice Models before Install is tapped, and a confirmation asks before any download starts. Contact: Settings → About → Help & Support opens https://vocello.vercel.app/support/, which lists an email address. If a pinned model host is temporarily unavailable, retry later on stable Wi-Fi; Vocello never substitutes a different model artifact.
+Safeguards and Guideline 5.1.2(i). Vocello is a single-user local tool with no accounts, no feed, no posting, and no third-party AI inference APIs. Hugging Face serves immutable static model files verified against bundled SHA-256 digests before use; zero scripts, voice descriptions, recordings, transcripts, or generated audio ever leave the device unless exported by the user or backed up by iOS. Voice Design descriptions and Built-in delivery instructions that request celebrity imitation or voice impersonation are refused across all 10 supported languages. Spoken scripts themselves are intentionally unfiltered because Vocello is a private local text-to-speech editor, not a chatbot or UGC platform. Every generated WAV take carries a mandatory inaudible AudioSeal watermark (fixed non-identifying Vocello payload) and WAV LIST/INFO provenance metadata inspectable with open-source AudioSeal tools (external transcoding after export may degrade it), disclosed in Settings → Privacy & Permissions. Settings → About provides Terms of Use (https://vocello.vercel.app/terms/), Help & Support (https://vocello.vercel.app/support/), and Report an Issue (https://vocello.vercel.app/support/#report, privacy-first with zero automatic upload).
 ```
 
 Before pasting, recheck the three byte counts against the candidate's catalog, and close ASR-09's
@@ -136,15 +139,16 @@ fresh North America download proof (see [`ios-appstore-submission.md`](ios-appst
 
 Entered in App Store Connect on 2026-11-10 at the maintainer's request and read back:
 
-- **Availability:** the same 148 territories as the app, with new territories included
-  automatically, as the app has it. The purchase had no availability record before. When the EU
-  territories return to the app (BKL-41), add them to the purchase too.
-- **Review note (4000):** read back byte-identical (689 characters).
+- **Availability:** update both the app and the export purchase from 148 to **147 territories**
+  ahead of 3.2.0 submission (`RF-73`: exclude China Mainland `CN` alongside the 27 EU territories,
+  keeping South Korea `KR` enabled). When the EU territories return (`BKL-41`), add them to the
+  purchase too.
+- **Review note (4000):** updated for 3.2.0 Share label and one-tap Export Now.
 
 ```text
-Design & Clone Export is a one-time, non-consumable purchase. It unlocks exporting audio made with Voice Design and Voice Cloning through the share sheet. Generation, listening, History and exporting Built-in Voice takes are free and need no purchase.
+Design & Clone Export is a one-time, non-consumable purchase. It unlocks exporting audio made with Voice Design and Voice Cloning through the share sheet. Generation, listening, History, Saved Voices and exporting Built-in Voice takes are free and need no purchase.
 
-To reach it: open Settings → Design & Clone Export. It also appears when you tap Share or Download on a Voice Design or Voice Cloning take. To make such a take, install the Voice Design model first (Settings → Models & Files → Voice Models → Install, then Download; about 2.2 GB), then in Studio choose Voice Design, describe a voice, type a line and tap Generate.
+To reach it: open Settings → Design & Clone Export. It also appears when you tap Share on a Voice Design or Voice Cloning take (after unlocking, tap Export Now to open the share sheet). To make such a take, install the Voice Design model first (Settings → Models & Files → Voice Models → Install, then Download; about 2.2 GB), then in Studio choose Voice Design, describe a voice, type a line and tap Generate.
 
 Restore Purchases is on the same sheet. No account or sign-in is needed.
 ```

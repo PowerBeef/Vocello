@@ -14,7 +14,7 @@ export const IphoneBeta = () => (
           microphone recording and local history.
         </p>
         <p className="iphone-status">
-          The public beta runs Vocello 3.0. The iPhone app's 3.1 version, on the same engine as
+          The public beta runs Vocello 3.0. The iPhone app's 3.2 version, on the same engine as
           the Mac app, follows through TestFlight and the App Store.
         </p>
         <div className="hero-ctas iphone-ctas">
@@ -23,7 +23,7 @@ export const IphoneBeta = () => (
             Join the beta on TestFlight
           </a>
         </div>
-        <p className="iphone-meta">iPhone 15 Pro or newer · iOS 26 or later</p>
+        <p className="iphone-meta">iPhone 15 Pro or newer (and eligible 8 GB+ iPads) · iOS 26 or later</p>
       </div>
       <figure className="iphone-stage">
         <div className="iphone-aura" aria-hidden="true" />

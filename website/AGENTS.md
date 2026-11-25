@@ -46,7 +46,7 @@ The site has three React pages, listed in `scripts/site-pages.mjs`:
 | `/cli/` | `cli/index.html` | the full command line guide |
 | `/engineering/` | `engineering/index.html` | engine, speed and every current limitation |
 
-The support and privacy pages (`/support/`, `/privacy/`) are static HTML under `public/`, listed as
+The support, privacy and terms pages (`/support/`, `/privacy/`, `/terms/`) are static HTML under `public/`, listed as
 `STATIC_PAGES` in the same file; the layout matrix covers them too.
 
 - Each entry names its page on `<div id="root" data-page="...">`. `src/App.jsx` composes the

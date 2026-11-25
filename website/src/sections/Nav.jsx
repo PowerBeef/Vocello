@@ -178,6 +178,7 @@ export const Nav = ({ page = "home" }) => {
             <li><a href={REPO} target="_blank" rel="noreferrer">Open source</a></li>
             <li><a href="/support/">Support</a></li>
             <li><a href="/privacy/">Privacy policy</a></li>
+            <li><a href="/terms/">Terms of use</a></li>
           </ul>
           <div className="menu-ctas">
             <a className="btn btn-primary" href="#download" onClick={followMenuLink}>

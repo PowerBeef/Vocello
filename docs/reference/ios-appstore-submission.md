@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-21
+reviewed: 2026-11-25
 summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store — account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.
 sourceOfTruth:
   - project.yml
@@ -78,13 +78,15 @@ download it automatically.
       builds 24–27 and 29–30 and the superseded internal 3.1.0 train held `v3.1.0-ios.1`–`v3.1.0-ios.3`
       (build 33); the next candidate train is `v3.2.0-ios.N`. Every new candidate needs an unused build
       number (§4, ASR-08).
-- [x] App Store installation eligibility is as close to the app's runtime hardware floor as the
-      capability allows. The built bundle requires exactly `arm64` and Apple's
-      `iphone-performance-gaming-tier`; the runtime guard independently enforces iPhone 15 Pro or
-      newer. Apple also lists 13 iPad models for that capability, so they can install the app; by
-      the maintainer's decision of 2026-11-10 (RF-42) Vocello does not run on iPad and shows a
-      localized unsupported-device screen there, and the App Review notes ask for review on an
-      iPhone 15 Pro or later. Deterministic source and archive/IPA verification reject future drift (ASR-01).
+- [x] App Store installation eligibility matches the runtime hardware floor. The built bundle
+      requires `arm64` and Apple's `iphone-performance-gaming-tier`; the runtime guard admits
+      iPhone 15 Pro or newer **and** eligible 8 GB+ Apple silicon (M-series) / A17 Pro iPads in
+      portrait compatibility mode (`RF-73`, superseding the historical 2026-11-10 `RF-42` iPad
+      refusal so App Review on iPad compatibility mode is never blocked by Guideline 2.1).
+      Unsupported devices with less memory still show the localized unsupported-device screen.
+      Deterministic source and archive/IPA verification (`verify_ios_release_artifacts.py`) reject
+      future eligibility drift (ASR-01) and verify zero dormant device-runner / `QWENVOICE_*`
+      debug strings or `UIFileSharingEnabled` in the shipping binary (`RF-73`).
       The bundle also sets `LSSupportsGameMode` to NO, because the gaming-tier capability otherwise
       shows the Game Mode banner at every launch; build 27 is the first candidate with it (RF-37).
 
@@ -194,24 +196,28 @@ owner/web checks; record an unavailable answer as pending, never as PASS. Keep o
 (states and counts), never credentials or account identifiers. ASR-11 remains open until that pass
 is complete.
 
-- [x] **Privacy Policy URL** = `https://vocello.vercel.app/privacy` (hosted by this repo's website; the in-app
-      Settings → Privacy & Permissions → Privacy Policy row links to the same URL).
+- [x] **Privacy Policy URL** = `https://vocello.vercel.app/privacy/` (hosted by this repo's website;
+      in-app onboarding, Export Purchase, and Settings → Privacy & Permissions → Privacy Policy link
+      to the same URL). **Terms of Use URL** = `https://vocello.vercel.app/terms/` (linked from
+      onboarding, inline voice-cloning consent, Export Purchase, and Settings → About).
 - [x] **App Privacy "nutrition label"**: published as **Data Not Collected** on 2026-10-12 (the
       maintainer's ASR-02 decision of the same day). The rationale and the source facts it rests on are in the
       [content-rights review](content-rights-review.md#asr-02-app-privacy-label-is-data-not-collected).
-      Mic audio, transcripts, prompts and generated audio stay local; Hugging Face's request logging
-      during model downloads is its own processing as the host and is disclosed in the privacy
-      policy. `PrivacyInfo.xcprivacy`, the policy and the review notes already agree; revisit the
-      decision if the app adds network code, an SDK, an account, analytics or a non-Apple purchase path.
+      Mic audio, transcripts, prompts and generated audio stay local; Hugging Face serves immutable
+      static model weights only (no third-party AI inference APIs, Guideline 5.1.2(i)) and its
+      standard HTTP request logging is disclosed in the privacy policy. `PrivacyInfo.xcprivacy`,
+      the policy and the review notes agree; revisit the decision if the app adds network code, an
+      SDK, an account, analytics or a non-Apple purchase path.
 - [x] **Encryption**: `ITSAppUsesNonExemptEncryption=false` is already in `Sources/iOS/Info.plist`,
       and the 2026-09-04 API read returned no separate encryption-declaration resource (only HTTPS +
       CryptoKit SHA-256 for download integrity). The processed build 30 reads back `VALID` with
       `usesNonExemptEncryption` false and asks for no further export-compliance information
       (2026-11-10; build 29 read the same on 2026-11-01). Repeat the read for any later candidate.
-- [x] **Age rating**: 4+, set in App Store Connect on 2026-10-12 (RF-02). Every content answer is
-      None and every capability answer is no (read 2026-11-04), including User-Generated Content,
-      which Apple defines as broad distribution of users' content. Revisit it if the product's
-      content behavior changes.
+- [ ] **Age rating**: currently `4+` in App Store Connect (2026-10-12, RF-02). Under `RF-73`,
+      **raise to `13+` before the initial 3.2.0 App Store submission** (given user-authored
+      unfiltered scripts + local voice cloning) and complete Apple's Nov 16 descriptors
+      (`Shared Location = No`, `Dating and Relationships = No`). Every write to App Store Connect
+      requires an explicit maintainer request.
 - [ ] **Accessibility declaration** (Accessibility Nutrition Labels): none is entered. It does not
       block the submission. Apple's App Store Connect help (read 2026-11-10) says the labels are
       voluntary for now, and that support can be published only for a device with a live App Store
@@ -234,9 +240,10 @@ is complete.
       | Reduced Motion | Not claimed | Source honors the setting in two places; never checked on a device |
       | Captions | Not claimed | A take's script is shown, but not as time-synchronized text |
       | Audio Descriptions | Not claimed | The app has no video |
-- [x] **Pricing and availability**: free, iPhone only (2026-10-12, RF-02), in 148 territories: the
-      27 EU territories were removed on 2026-10-27. Review the release behavior and new-territory
-      policy at submission.
+- [ ] **Pricing and availability**: free, iPhone only (2026-10-12, RF-02), currently 148
+      territories (27 EU territories removed 2026-10-27). Under `RF-73`, exclude **China Mainland
+      (`CN`)** ahead of the initial 3.2.0 submission (**147 territories** on both the app and the
+      export IAP; keep South Korea `KR` enabled). Review new-territory policy at submission.
 - [ ] **Account deletion / Sign in with Apple**: N/A — there is no account and no third-party login.
 - [x] **EU DSA status**: set on 2026-10-27 (details in the maintainer's private record), and the
       EU territories are unavailable. An EU release needs the trader step first (BKL-41).

@@ -28,8 +28,8 @@ const FACTS = [
 ];
 
 const COMPARE = [
-  { k: "Price", vocello: "Free", cloud: "Subscription or credits" },
-  { k: "Where speech is made", vocello: "On your Mac", cloud: "On the provider's servers" },
+  { k: "Price", vocello: "Mac & CLI: Free; iPhone: Free + optional export unlock", cloud: "Subscription or credits" },
+  { k: "Where speech is made", vocello: "On your Mac or iPhone", cloud: "On the provider's servers" },
   { k: "Your script", vocello: "Stays in local storage", cloud: "Uploaded to generate" },
   { k: "Account", vocello: "None", cloud: "Required" },
   { k: "English naturalness", vocello: "Varies by take; hear the samples", cloud: "The best cloud voices still lead" },
@@ -78,10 +78,12 @@ export const Privacy = () => (
           </tbody>
         </table>
         <p className="privacy-footnote">
-          Vocello uses the internet for two things: each mode's model downloads once from
-          Hugging Face, and the Mac app checks GitHub for updates when you allow it. After an
-          update from 3.0, the Mac app also updates the models you had installed, on its own on
-          an unmetered network, and Not Now stops it. Generation itself runs locally.
+          Vocello uses no third-party AI inference APIs. Network activity is limited to downloading
+          each mode's static model files once from Hugging Face, optional Mac update checks on
+          GitHub when you allow them, and on iPhone, Apple App Store purchases if you unlock
+          Design &amp; Clone Export. After an update from 3.0, the Mac app also updates the models
+          you had installed, on its own on an unmetered network, and Not Now stops it. Generation
+          itself runs locally.
         </p>
       </div>
     </div>

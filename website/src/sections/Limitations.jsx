@@ -41,7 +41,7 @@ const LIMITATIONS = [
   },
   {
     k: "iPhone is in beta",
-    v: "The iPhone app is a public TestFlight beta that runs Vocello 3.0; its 3.1 version follows through TestFlight and the App Store. It needs an iPhone 15 Pro or newer with iOS 26 or later.",
+    v: "The iPhone app is a public TestFlight beta that runs Vocello 3.0; its 3.2 version follows through TestFlight and the App Store. It needs an iPhone 15 Pro or newer (or an eligible Apple silicon or A17 Pro iPad with 8 GB+ memory in portrait compatibility mode) with iOS 26 or later.",
   },
   {
     k: "Cloning varies",
@@ -49,7 +49,7 @@ const LIMITATIONS = [
   },
   {
     k: "AI disclosure",
-    v: "From 3.0, generated takes are saved with an inaudible watermark marking them as AI-generated (on iPhone, from its 3.0 version). Reference clips you record or import are not marked, and neither is live preview audio heard before the file is written. If you publish audio of a cloned real voice, tell your audience it is AI-generated. EU law may require this disclosure.",
+    v: "From 3.0, generated takes are saved with an inaudible AudioSeal watermark and WAV provenance metadata marking them as AI-generated (on iPhone, from its 3.0 version). Reference clips you record or import are not marked, and neither is live preview audio heard before the file is written. If you publish audio of a cloned real voice, tell your audience it is AI-generated; applicable laws or platform rules may require this disclosure. Standard open-source AudioSeal tools can inspect exported WAV files, though external transcoding or heavy compression after export may degrade the watermark.",
   },
 ];
 

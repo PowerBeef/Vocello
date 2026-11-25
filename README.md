@@ -32,7 +32,7 @@ There is no account, no credits and no cloud. Your scripts, recordings, voices a
 
 - **Built-in Voice.** Nine voices in ten languages, with a delivery preset (calm, whisper, happy and more) or a few words of your own about how it should sound.
 - **Voice Design.** Describe a voice, such as "a warm, clear narrator with a gentle British accent", hear it, and save the ones you like.
-- **Voice Cloning.** Record or import a short clip of a voice you own or have permission to use. Voice Cloning follows the reference voice, so the clip sets its character, and it waits for your consent in Settings.
+- **Voice Cloning.** Record or import a short clip of a voice you own or have permission to use. Voice Cloning follows the reference voice, so the clip sets its character, and asks once to confirm permission (also manageable in Settings).
 
 <picture>
   <source media="(max-width: 700px)" srcset="docs/readme/features-narrow.svg">
@@ -74,7 +74,7 @@ The real-time factor is the time it takes to generate one second of audio: at 0.
 
 **On a Mac.** [Download Vocello](https://github.com/PowerBeef/Vocello/releases/download/v3.1.0/Vocello-macos26.dmg), drag it to Applications and open it. Then open **Settings > Models & Files** and download the model of each mode you want to use.
 
-**On iPhone.** [Join the public beta on TestFlight](https://testflight.apple.com/join/Cvp6yCv7). The beta still runs Vocello 3.0; the 3.1 update follows there.
+**On iPhone.** [Join the public beta on TestFlight](https://testflight.apple.com/join/Cvp6yCv7). The beta still runs Vocello 3.0; the 3.2 update follows there and on the App Store.
 
 **In Terminal.** Install the signed [command-line package](https://github.com/PowerBeef/Vocello/releases/download/v3.1.0/Vocello-macos26-cli.pkg), which asks for an administrator password. From a new Terminal window, check it, download the Built-in Voice model (its id still says `speed`, a name kept from earlier versions) and play a first take:
 
@@ -94,7 +94,7 @@ claude mcp add --scope user vocello -- /usr/local/bin/vocello mcp
 | --- | --- | --- |
 | Mac | macOS 26.0 or newer, Apple Silicon, 8 GB of memory (16 GB or more recommended for long projects) | One model per mode |
 | Command line | macOS 26.0 or newer, Apple Silicon | Shared with the Mac app |
-| iPhone | iPhone 15 Pro or newer, iOS 26.0 or newer | One model per mode |
+| iPhone | iPhone 15 Pro or newer (or eligible 8 GB+ iPad in portrait compatibility mode), iOS 26.0 or newer | One model per mode |
 
 Models are never bundled. Each mode's model downloads once from Hugging Face, about 2.2 GB, and is verified before it is used. → [What's new in 3.1.0](docs/releases/v3.1.0.md) · [CLI reference](docs/reference/cli.md) · [All releases](https://github.com/PowerBeef/Vocello/releases)
 

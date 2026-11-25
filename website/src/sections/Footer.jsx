@@ -13,6 +13,7 @@ const PRODUCT_LINKS = [
   { hash: "#download", label: "Download", everyPage: true },
   { path: "/support/", label: "Support" },
   { path: "/privacy/", label: "Privacy policy" },
+  { path: "/terms/", label: "Terms of use" },
 ];
 
 /** @param {{ page?: string }} props */

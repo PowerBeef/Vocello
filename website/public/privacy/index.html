@@ -61,12 +61,13 @@
     <main class="wrap">
       <a class="back" href="/">&larr; Vocello</a>
       <h1>Privacy Policy</h1>
-      <p class="updated">Last updated: November 15, 2026</p>
+      <p class="updated">Last updated: November 25, 2026</p>
       <p class="lede">
-        Vocello is a local, on-device voice studio for Apple Silicon: a Mac app, an iPhone app,
-        and the <code>vocello</code> command line. It is built so your work stays on your
-        device. Vocello does not collect, track, or sell your personal data, and Vocello itself
-        never sends your work off your device.
+        Vocello is a local voice studio for Apple Silicon: a Mac app, an iPhone app (also
+        supported on eligible Apple silicon and A17 Pro iPads in compatibility mode), and the
+        <code>vocello</code> command line. It is built so your work stays on your device. Vocello
+        does not collect, track, or sell your personal data, and Vocello itself never sends your
+        work off your device.
       </p>
 
       <div class="tldr">
@@ -134,10 +135,12 @@
         downloads only when you choose to install it.
       </p>
       <p>
-        These are ordinary anonymous file downloads over
-        HTTPS: Vocello sends no account, identifier, script, recording, or generated audio, and
-        receives nothing back except the model files. As with any web server, Hugging Face
-        receives your IP address and standard request details, which it handles under its own
+        Vocello uses no third-party AI inference APIs. These are ordinary anonymous static file
+        downloads over HTTPS: Vocello sends no account, identifier, script, voice description,
+        recording, transcript, or generated audio, and receives nothing back except immutable
+        model weight files verified locally against bundled SHA-256 digests before activation. As
+        with any web server, Hugging Face receives your IP address and standard request details,
+        which it handles under its own
         <a href="https://huggingface.co/privacy" target="_blank" rel="noreferrer">privacy policy</a>;
         Vocello does not receive or keep them. On iPhone, the optional export purchase and
         Restore Purchases go through Apple's App Store. Voice generation itself runs entirely
@@ -166,8 +169,10 @@
         file can be identified as AI-generated. The marking is the same for everyone: it holds
         no account, device, or personal identifier, and nothing about it is sent anywhere. Only
         generated takes are marked: reference clips you record or import are not, and neither
-        is live preview audio heard before the file is written. Vocello 3.1 marks its files
-        the same way; files made with versions before 3.0 are not marked.
+        is live preview audio heard before the file is written. Standard open-source AudioSeal
+        tools can inspect exported WAV files for the Vocello watermark, though external
+        transcoding, heavy compression, or re-encoding after export may degrade detectability.
+        Files made with versions before 3.0 are not marked.
       </p>
 
       <h2>The vocello command line</h2>
@@ -246,7 +251,8 @@
       <h2>Contact</h2>
       <p>
         Email <a href="mailto:patricedery02@gmail.com">patricedery02@gmail.com</a> for privacy
-        questions, or visit <a href="https://vocello.vercel.app/support/">Vocello Help and Support</a> for product help.
+        questions, visit <a href="https://vocello.vercel.app/support/">Vocello Help and Support</a>
+        for product help, or review the <a href="https://vocello.vercel.app/terms/">Vocello Terms of Use</a>.
       </p>
 
       <hr />

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-23
+reviewed: 2026-11-25
 summary: The offline, report-only audio QC v2 harness — its models, detectors, norms, calibration, levels, lanes, labels, data layout, coverage/qualification contract, and the calibrated Gemini 4 Neon multimodal audio QC complement (RF-72).
 sourceOfTruth:
   - scripts/qc.py
@@ -578,7 +578,11 @@ PY="$(python3 scripts/select_python.py)"
   ([guide, section 8.3](qwen3-tts-guide.md#83-identity-and-caching)).
 - **Limits.** The references are read speech from corpora with corpus transcripts, not users'
   recordings with recognized transcripts; Japanese, Russian, Italian and Portuguese have no
-  reference clips; nobody listens.
+  reference clips; nobody listens. On long-form takes (`long-form` screen), QC v2's per-take phone
+  model stops at 120 s, Whisper fixes its language from the first 30 s, and normal segment-seam
+  pauses can read as dropouts—so `quality_screen.py`'s long-form decisions rely on the two ASR
+  families over the joined audio, speaker-window spread, Fast QC refusals/warnings, and end reasons
+  rather than QC v2's phone or dropout detectors (`RF-57`).
 
 ## Labels
 

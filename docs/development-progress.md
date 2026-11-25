@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-24
+reviewed: 2026-11-25
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -17,6 +17,49 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 `a0597deb` every checkpoint before them.
 
 ## Resume now
+
+### November 25 (Phase 3 complete — pause checkpoint): `RF-70`, `RF-54`, and `RF-57` closed; shipped `attn` retained for 3.2; resume at Phase 4 (`RF-71` Mac/CLI 3.2.0) when Mac is quiet
+
+**Workspace & Git state:** Clean local `main` (3 commits ahead of `origin/main` `8f84ac97`,
+**unpushed**; `8f84ac97` CI, Release rehearsal, Nightly, and Swift dependency watch all passed),
+0 linked worktrees, 0 active subagents or background tasks. Paused before Phase 4's quiet-Mac
+gate-bench reseed because the Mac was busy.
+
+**Phase 3 closures completed (`1b228307` + this commit):**
+
+- **Maintainer decision (2026-11-25):** Keep shipped `attn` unchanged for 3.2 and skip Experiment 3
+  (Bundle B `attn-io-edge`, `+99.61 MB`), avoiding a 2.2 GB/mode user redownload and preserving
+  iPhone 17 Pro cold-Clone memory headroom after Exp 1 (`D1` `REJECT`, `8f84ac97`) and Exp 2 (Bundle A
+  `attn-io` `INCONCLUSIVE`, pooled 63-pair long-form error rate `+0.0331 [+0.0001, +0.0707]`,
+  calibrated `RF-72` blinded dual-order audit `15–9` for `attn`, `1b228307`).
+- **Closed `RF-70` (`done`):** Pack C screening completed under pre-registered `RF-57` rules with
+  incumbent `attn` retained for 3.2 (`4a42d25d`, `8f84ac97`, `1b228307`).
+- **Closed `RF-54` (`declined`):** Decoder 72-frame attention window (`QWENVOICE_DECODER_WINDOW=on`,
+  `c4bfee76`) screened `INCONCLUSIVE` under `decoder-window-72`; unwindowed default retained per D5.
+- **Closed `RF-57` (`done`):** Recorded the observed long-form QC v2 caveat in
+  `docs/reference/qc.md` (phone model stops at 120 s, Whisper fixes language from first 30 s, seam
+  pauses read as dropouts).
+
+**Resume next session directly at Phase 4 (`RF-71` — Mac/CLI 3.2.0 & iOS 3.2.0 prep):**
+
+1. **Step 4.1 — Quiet-Mac gate-bench baseline reseed (`benchmarks/baselines/mac-gate-bench.json`):**
+   Currently still carries legacy `"quantization": "4-bit"` from 3.1 (`mac-gate-bench-20261114-*`).
+   Once the Mac is quiet (`QVOICE_LEAD_ONLY=1`, 0 workers), run `QWENVOICE_GATE_BENCH_SEED=1
+   scripts/macos_test.sh gate` for **>= 3 consecutive clean runs** on one clean commit to reseed for
+   the 3.2.0 `"hybrid"` lineage (`RF-71: Reseed Mac gate-bench baseline for 3.2.0 lineage`).
+2. **Step 4.2 — 3.2.0 version bump & release prep (can run even before/alongside Step 4.1):**
+   - Bump `project.yml` (`MARKETING_VERSION: "3.2.0"`, `CURRENT_PROJECT_VERSION: "34"` — above
+     TestFlight `v3.1.0-ios.3` build `33`) and `config/third-party-attribution-policy.json` (`"3.2.0"`),
+     add `candidateRelease` (`3.2.0`, `v3.2.0`, `unpublished`) in `config/public-product-facts.json`,
+     update `config/cli-contract/v1/examples/*.json` if validated against version, and run
+     `./scripts/regenerate_project.sh --fast`, `scripts/attribution_manifest.py rebuild`, `scripts/dev.sh regen`.
+   - Author `docs/releases/v3.2.0.md` (`check_release_notes.py v3.2.0` PASS), reconcile
+     `docs/reference/app-store-listing.md` (`RF-63`, byte counts stay unchanged since `attn` stays
+     shipped), check `RF-44`/`RF-52` Mac tails, and verify `scripts/dev.sh check` + `scripts/dev.sh ios --ui`.
+3. **Steps 4.3–4.4 & Phase 5:** Push `main` on maintainer go → green Push CI → Mac UI smoke & release
+   rehearsal → signed `v3.2.0` tag & 7-lane Mac promotion sitting (`RF-71`) → `v3.2.0-ios.1`
+   TestFlight candidate → grouped iPhone window (`RF-68`/`RF-15`/`RF-17` + `RF-72` 30-take audit) →
+   AWS Device Farm iPhone 15 Pro (`RF-65` Option A) → `ASR-09` → `RF-16` App Review submission.
 
 ### November 24 (Exp 2 verdict checkpoint): Pack C Exp 2 (Bundle A `attn-io`) `INCONCLUSIVE` — `attn` stays incumbent; awaiting maintainer call on Exp 3 (Bundle B `attn-io-edge`) vs keeping `attn` for 3.2
 

@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 55/95 (58%) |
+| `release-first-3-0-2026-09` | active | release-qa | 58/95 (61%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 13/17 (76%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (79)
+### Mac, remotely (76)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -117,13 +117,10 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `RF-46` (planned) Core overhaul, stage 2a: the frame pipeline, identity-preserving
 - `RF-47` (planned) Core overhaul, stage 3: memory (also: iPhone)
 - `RF-52` (planned) Quality remediation, stage 2: clone conditioning parity
-- `RF-54` (planned) Quality remediation, stage 4: the decoder's 72-frame attention window
-- `RF-57` (planned) Audit the tooling the quality remediation relies on
-- `RF-70` (planned) Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B) (also: At the keyboard, iPhone)
 - `RF-71` (planned) Ship Vocello and the vocello CLI 3.2 on the Mac (also: At the keyboard)
 - `UIF-08` (parked) Native acceptance of the iOS-derived screens on current source
 
-### At the keyboard (19)
+### At the keyboard (18)
 
 Needs the maintainer present: a permission prompt, a keychain or password, a release or account action only they may perform.
 
@@ -144,10 +141,9 @@ Needs the maintainer present: a permission prompt, a keychain or password, a rel
 - `RF-48` (planned) Core overhaul, stage 4: finalization, preview and the heat pause (also: iPhone)
 - `RF-62` (planned) Answer the new App Store age-rating descriptors when filing 3.2.0
 - `RF-63` (planned) Fit the 3.2 App Review notes into what is left of the 4,000 characters
-- `RF-70` (planned) Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B) (also: Mac, remotely, iPhone)
 - `RF-71` (planned) Ship Vocello and the vocello CLI 3.2 on the Mac (also: Mac, remotely)
 
-### iPhone (61)
+### iPhone (60)
 
 Needs the paired iPhone, in a window the maintainer announces.
 
@@ -210,7 +206,6 @@ Needs the paired iPhone, in a window the maintainer announces.
 - `RF-65` (planned) Measure the shipped hybrid on an iPhone 15 Pro
 - `RF-66` (planned) Record a demo video of the shipping flow on a physical iPhone
 - `RF-68` (in-flight) Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance
-- `RF-70` (planned) Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B) (also: Mac, remotely, At the keyboard)
 - `VLR-07` (parked) Complete physical-device closure and publish the privacy-safe report
 
 ## Vocello 3.2 — Pack B/C engine upgrades, the 3.2 Mac and CLI release, and the iOS App Store submission
@@ -252,16 +247,13 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-48` | planned | Core overhaul, stage 4: finalization, preview and the heat pause | `RF-44` |
 | `RF-51` | planned | Quality remediation, stage 1: clone input correctness | — |
 | `RF-52` | planned | Quality remediation, stage 2: clone conditioning parity | `RF-50` |
-| `RF-54` | planned | Quality remediation, stage 4: the decoder's 72-frame attention window | `RF-50` |
 | `RF-55` | planned | Quality remediation, stage 5: model precision and the hybrid model | `RF-50` |
-| `RF-57` | planned | Audit the tooling the quality remediation relies on | — |
 | `RF-59` | planned | One model: the attn hybrid replaces Speed and Quality, and the model selector is retired | `RF-55` |
 | `RF-62` | planned | Answer the new App Store age-rating descriptors when filing 3.2.0 | — |
 | `RF-63` | planned | Fit the 3.2 App Review notes into what is left of the 4,000 characters | — |
 | `RF-65` | planned | Measure the shipped hybrid on an iPhone 15 Pro | — |
 | `RF-66` | planned | Record a demo video of the shipping flow on a physical iPhone | — |
 | `RF-68` | in-flight | Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance | — |
-| `RF-70` | planned | Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B) | `RF-68` |
 | `RF-71` | planned | Ship Vocello and the vocello CLI 3.2 on the Mac | `RF-68`, `RF-69`, `RF-70`, `RF-72` |
 
 ### Open items in detail
@@ -358,14 +350,8 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-52`** (planned) — Quality remediation, stage 2: clone conditioning parity.
   gate: Each change sits behind the stage-0 clone screen and is adopted only by its recorded rule: reference preparation that gives the same samples every time (the audio file reader and one converter call in place of the asset reader, found 2026-11-11), then the two-channel mixdown by the average in place of the sum over the square root of two; the encoder's split-half rotary with an encoder version in the speaker-feature identifier so stored prompts rebuild once (A-02, G-03); streamed transcript-backed clones decode with primed reference history (A-04, A-26); the reference's edges are trimmed and faded and the half-second padding is screened against none (A-12, G-07); the leading space on the clone target is screened per script family (A-11); a punctuated recognized transcript is screened against the unpunctuated one Apple's recognizer returns today (G-15).
 
-- **`RF-54`** (planned) — Quality remediation, stage 4: the decoder's 72-frame attention window.
-  gate: The speech-tokenizer decoder applies its 72-frame attention window with a bounded cache, pinned by a parity fixture against the reference decoder, and passes the stage-0 screens and the gate bench with no regression. The encoder keeps full causal attention, as the reference runs it.
-
 - **`RF-55`** (planned) — Quality remediation, stage 5: model precision and the hybrid model.
   gate: A hybrid recipe is chosen by screens recorded before their takes, against both shipped models on clones, long-form projects and single takes; its built artifact reproduces its screened arm take for take; its speed is measured by the formal lane on a quiet Mac and its memory and speed on an iPhone (a farm run or an announced phone window). Publishing an artifact is the maintainer's step; the selector's removal is RF-59.
-
-- **`RF-57`** (planned) — Audit the tooling the quality remediation relies on.
-  gate: Each instrument a remediation screen uses is shown to be trustworthy before it decides anything: the same build and seeds run twice give the same takes and the same verdicts, and each metric's run-to-run noise is measured and recorded as the floor a difference must exceed; the deterministic test suite is run repeatedly and every test that fails without a code change is fixed or quarantined with a reason; the benchmark and QC lanes the screens call are read for defects that would bias a comparison, and what is found is fixed or recorded. Tooling the remediation does not touch stays in its own plans.
 
 - **`RF-59`** (planned) — One model: the attn hybrid replaces Speed and Quality, and the model selector is retired.
   gate: The maintainer publishes the three hybrid artifacts and receipts pin them with exact sizes and SHA-256 digests; the catalog offers one model per mode on both platforms, and neither app shows a Speed/Quality choice; every mode's installed Speed and Quality folders are removed once any mode's model verifies (maintainer decision 2026-11-13); vocello accepts --variant quality, models use and prefer-lower-memory with a notice; memory bands follow the hybrid's measured peak; the formal speed lane and the iPhone's memory and speed (a farm run or an announced phone window) are recorded before the iOS submission; public facts, the README, website copy and benchmark baselines (a new lineage) follow with the release.
@@ -384,9 +370,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-68`** (in-flight) — Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance.
   gate: With bit-identical fixed-seed PCM digests (scripts/pcm_identity.py) across Custom, Design and Clone: eliminate one-shot MLX Error::check() double-eval consumption in Qwen3TTS and AudioSealGenerator via a single try evalForReadback(...); replace silent try? BaseConfiguration quantization fallback with explicit parse errors, [.noUnusedKeys, .shapeMismatch] weight verification and fused projection logging; fix A-08 Mimi encoder KV retention and super-linear concatenation growth with per-encode local caches; replace A-27's 16.8 MB square decoder causal mask with a rectangular [seqLen, totalLen] mask; hoist and prewarm CodePredictorCompiledPlan across takes (dropping the 10 unused KV buffers), telemetry-gate per-frame introspectionStepScalars, deduplicate back-to-back cache clears and evaluate AudioSeal weight caching (H2) or lazy repetition penalty (A3) only where memory-neutral and bit-identical; land minor package hygiene (streaming tensor rank, control-token-only clone refText, validateChatTemplateTokenCount, mixed-precision sibling check). Verified by VocelloCoreTests, Qwen3RuntimeTests, vocello-swift-review, Mac benchmark/memory lanes and an announced iPhone check.
-
-- **`RF-70`** (planned) — Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B).
-  gate: Every sample-changing candidate sits behind a pre-registered RF-57 paired machine screen with a measured self-test noise floor before takes are generated (nobody listens). In order: (1) re-screen zero-weight full-text conditioning (D1, QWENVOICE_FULL_TEXT_CONDITIONING=on) for Korean/CJK long-form under Expressive + attn; (2) screen Bundle A (attn-io, +24.12 MB zero-requantization: 8-bit talker.text_projection, talker.codec_head, code_predictor.small_to_mtp_projection and code_predictor.lm_head[0..14]); (3) screen Bundle B (attn-io-edge, +99.62 MB zero-requantization: Bundle A + 8-bit layers.{0,1,26,27}.mlp) after RF-68's memory savings; screen 8-bit code_predictor.codec_embedding (-58.7 MB) or 6-bit MLPs (Bundle C) only if BF16 requantization is separately authorized. Adopt only winners that clear their recorded rules and iPhone memory headroom (staying clear of the 5,000 MiB floor's 3,662 MiB guarded band); publishing any new model artifacts requires explicit maintainer authorization, followed by exact SHA-256 catalog/receipt updates and 3.1-to-3.2 model update proof.
 
 - **`RF-71`** (planned) — Ship Vocello and the vocello CLI 3.2 on the Mac.
   gate: Vocello and the vocello CLI 3.2.0 are public on the Mac. Before the tag: MARKETING_VERSION 3.2.0 with a build number above the last release tag's; Mac benchmark, memory, language and UI-perf lanes recorded on the 3.2 engine (and reseeded baselines/lineage if RF-70 updates model artifacts or alters samples); docs/releases/v3.2.0.md passes check_release_notes.py; README charts, website copy/numbers and config/public-product-facts.json describe 3.2; push CI, release rehearsal, full macOS smoke and engine bench pass on the release commit. Then the maintainer's signed v3.2.0 tag builds a verified draft through release.yml; the macOS promotion lanes and signed CLI qualification pass on the tag checkout; the maintainer promotes the release and the website deploys with it.

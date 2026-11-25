@@ -6820,6 +6820,69 @@
         "run:mac-test-20261123-130512",
         "run:post-pack-b-final-20261123-181128"
       ]
+    },
+    {
+      "id": "RF-57",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Audit the tooling the quality remediation relies on",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "Each instrument a remediation screen uses is shown to be trustworthy before it decides anything: the same build and seeds run twice give the same takes and the same verdicts, and each metric's run-to-run noise is measured and recorded as the floor a difference must exceed; the deterministic test suite is run repeatedly and every test that fails without a code change is fixed or quarantined with a reason; the benchmark and QC lanes the screens call are read for defects that would bias a comparison, and what is found is fixed or recorded. Tooling the remediation does not touch stays in its own plans.",
+      "sourceOfTruth": [
+        "scripts/macos_test.sh",
+        "scripts/qc.py",
+        "scripts/clone_fidelity_lane.py",
+        "docs/reference/qc.md"
+      ],
+      "updated": "2026-11-25",
+      "notes": "Opened 2026-11-11 at the maintainer's request. Done 2026-11-11. The deterministic suites repeated at a6e501eb: XCTest 8 of 8 runs clean; Python 5 of 5 with one failure that is environmental (BKL-72); BKL-71's test did not fail again. Two read-only audits of the take lanes found them unfit to decide: qc-takes passes when scoring fails, no lane scores both speaker and content, refused takes leave the averages, arms share a data directory, asr.edit_rate_min counts no substitutions, WAV digests include a timestamp. scripts/quality_screen.py replaces them for decisions (RF-50); the lane's resume after a QC refusal is fixed (317bd340). The screen's own evidence reader had a bug its guard exposed (identifier case), fixed. Left for the long-form screen: QC v2 has never scored a long take (the phone model stops at 120 s, Whisper fixes the language from the first 30 s, seam pauses read as dropouts). Long-form QC v2 caveat recorded in docs/reference/qc.md (phone model stops at 120 s, Whisper fixes language from first 30 s, seam pauses read as dropouts); quality_screen.py self-tests and noise floors verified across RF-51..RF-55 and RF-70.",
+      "evidence": [
+        "doc:docs/reference/qc.md",
+        "file:config/quality-screens.json",
+        "commit:1b228307"
+      ]
+    },
+    {
+      "id": "RF-54",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Quality remediation, stage 4: the decoder's 72-frame attention window",
+      "status": "declined",
+      "blockedBy": [
+        "RF-50"
+      ],
+      "gate": "The speech-tokenizer decoder applies its 72-frame attention window with a bounded cache, pinned by a parity fixture against the reference decoder, and passes the stage-0 screens and the gate bench with no regression. The encoder keeps full causal attention, as the reference runs it.",
+      "sourceOfTruth": [
+        "docs/audits/2026-11-11-qwen3-tts-quality-report-review.md",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift"
+      ],
+      "updated": "2026-11-25",
+      "notes": "Opened 2026-11-11 at the maintainer's request: output quality is remediated before the iOS submission, from the findings verified in the review of 2026-11-11. Takes up PA-16's decoder half (A-03); PA-16's encoder-window clause is not taken up. The window is selectable behind QWENVOICE_DECODER_WINDOW=on (c4bfee76); the clone-long screen (2236c3cb: 48 references, two four-sentence takes each) decided it under decoder-window-72: INCONCLUSIVE, default stays unwindowed. Every take kept its length; similarity +0.002 whole, -0.0015 late; trailing silence -0.1 ms. Open: the error-rate interval, carried by one take that is a gross failure in both arms (german-07, both recognizers running away), and the screen's own trailing-silence floor (34 ms, over 0.71 of 40). Next if pursued: fresh seeds, a bounded per-take edit rate and a decoder-only floor, recorded first.",
+      "reason": "Decoder 72-frame attention window (QWENVOICE_DECODER_WINDOW=on, c4bfee76) screened INCONCLUSIVE under decoder-window-72; unwindowed default retained for 3.2 per maintainer decision D5 (2026-11-22)."
+    },
+    {
+      "id": "RF-70",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Engine Pack C: RF-57-screened quality upgrades (Korean D1, Bundle A and Bundle B)",
+      "status": "done",
+      "blockedBy": [
+        "RF-68"
+      ],
+      "gate": "Every sample-changing candidate sits behind a pre-registered RF-57 paired machine screen with a measured self-test noise floor before takes are generated (nobody listens). In order: (1) re-screen zero-weight full-text conditioning (D1, QWENVOICE_FULL_TEXT_CONDITIONING=on) for Korean/CJK long-form under Expressive + attn; (2) screen Bundle A (attn-io, +24.12 MB zero-requantization: 8-bit talker.text_projection, talker.codec_head, code_predictor.small_to_mtp_projection and code_predictor.lm_head[0..14]); (3) screen Bundle B (attn-io-edge, +99.62 MB zero-requantization: Bundle A + 8-bit layers.{0,1,26,27}.mlp) after RF-68's memory savings; screen 8-bit code_predictor.codec_embedding (-58.7 MB) or 6-bit MLPs (Bundle C) only if BF16 requantization is separately authorized. Adopt only winners that clear their recorded rules and iPhone memory headroom (staying clear of the 5,000 MiB floor's 3,662 MiB guarded band); publishing any new model artifacts requires explicit maintainer authorization, followed by exact SHA-256 catalog/receipt updates and 3.1-to-3.2 model update proof.",
+      "sourceOfTruth": [
+        "scripts/build_hybrid_model.py",
+        "scripts/quality_screen.py",
+        "config/quality-screens.json",
+        "docs/reference/hybrid-model.md",
+        "Sources/Resources/qwenvoice_contract.json"
+      ],
+      "updated": "2026-11-25",
+      "notes": "Pack C screened under RF-57 rules (4a42d25d: 7 fresh-seed >=16 rules, attn-io/+24.12 MB and attn-io-edge/+99.61 MB recipes, build_hybrid_model.py .bias parity). Exp 1 Korean D1 (long-form-korean-d1-attn, seeds 16-18): decisive REJECT (8f84ac97). Exp 2 Bundle A attn-io (seeds 16-17 clone, 19-21 long-form): INCONCLUSIVE/do not adopt (1b228307: clone flat -0.0080 sim; long-form pooled error rate +0.0331 [+0.0001, +0.0707], sign test p=0.1094; RF-72 blinded audit 15-9 for attn). 2026-11-25 maintainer decision: skip Exp 3 (Bundle B attn-io-edge) and keep shipped attn unchanged for 3.2.",
+      "evidence": [
+        "commit:4a42d25d",
+        "commit:8f84ac97",
+        "commit:1b228307",
+        "file:config/quality-screens.json"
+      ]
     }
   ]
 }

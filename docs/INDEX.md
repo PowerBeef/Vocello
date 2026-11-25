@@ -11,7 +11,7 @@
 
 ## docs/reference
 
-- [app-store-listing.md](reference/app-store-listing.md): App Store listing draft for Vocello for iPhone 3.2.0 (en-US), reconciled from the 2026-11-01/10 App Store Connect 3.0.0 entry against the shipped 3.1.0 hybrid baseline (to be reconciled again if RF-70 updates model sizes before 3.2.0 submission). Pushing updates to App Store Connect needs a separate explicit request.
+- [app-store-listing.md](reference/app-store-listing.md): App Store listing draft for Vocello for iPhone 3.2.0 (en-US), reconciled from the 2026-11-01/10 App Store Connect 3.0.0 entry against the shipped 3.1.0 hybrid baseline and RF-73 App Store readiness safeguards (to be reconciled again if RF-70 updates model sizes before 3.2.0 submission). Pushing updates to App Store Connect needs a separate explicit request.
 - [cli.md](reference/cli.md): The vocello CLI, the user-facing generation surface and deterministic benchmark/test driver over the same in-process MLX engine as the app.
 - [content-rights-review.md](reference/content-rights-review.md): The maintainer's recorded privacy, region and content-rights decisions for the 3.1 App Store submission, with the evidence behind them for model artifacts, built-in voice previews, marketing audio, product artwork and the App Store Connect declarations.
 - [development-history.md](reference/development-history.md): Forensic development history and institutional memory from v1.0.0 through v3.1.0: architectural eras, releases, harness transitions, development-hell postmortems, measurement traps and anti-regression rules.

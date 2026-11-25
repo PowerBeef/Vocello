@@ -18,6 +18,75 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
+### November 25 (`RF-73` App Store 3.2.0 readiness & streamlined AI safeguard pack implemented and phone-free verified): 5 commits ahead of `origin/main` `1363da5c`; physical iPhone & push pending maintainer permission
+
+**Workspace & Git state:** Local `main` ahead of `origin/main` `1363da5c` (**unpushed** — awaiting
+explicit push request), 0 linked worktrees, 0 active builds/tests/benchmarks. Phase 3 (`RF-70`,
+`RF-54`, `RF-57`) is closed with shipped `attn` retained unchanged for 3.2 (`f070f41a`).
+
+**Landed `RF-73` implementation commits on local `main` (strictly sample-preserving, `vocello-swift-review` approved on every Swift commit):**
+
+1. **`4703237c`** (`RF-73: admit 8 GB+ iPads, harden iOS binary hygiene and enforce clone fallback`,
+   `Reviewed-by: vocello-swift-review`): admitted eligible 8 GB+ M-series / A17 Pro iPads in portrait
+   compatibility mode (`IOSDeviceEligibilityPolicy`, `scripts/ios_device_eligibility.py`, superseding
+   `RF-42`); compiled out dormant device/perf runners (`QVOICE_DEVICE_DIAGNOSTICS`) and shipping
+   `QWENVOICE_*` env-var reads (`Guideline 2.5.19`, enforced by `verify_ios_release_artifacts.py`);
+   enforced `.withoutCloneEncoders` fallback; dropped `UIFileSharingEnabled`.
+2. **`b896fce1`** (`RF-73: localize 10-language impersonation guardrails and update attributions`,
+   `Reviewed-by: vocello-swift-review`): added typed `.disallowedVoiceImitation` refusal across all
+   10 languages (`Qwen3TTSRuntimeProfile`, `MLXTTSEngine`, `GenerationSemantics`,
+   `GenerationFailureDiagnosticLogger`, `VocelloPresentationText`, `CLIFailure`); scoped `Sparkle`
+   to macOS only; resolved `"pending-qualified-review"` to attested ASR-04 status; added Meta
+   AudioSeal (`MIT`) auxiliary model attribution verified against all 3 catalogs.
+3. **`da5ce80d`** (`RF-73: add streamlined iOS safeguards, inline clone consent, and UX fixes`,
+   `Reviewed-by: vocello-swift-review`): folded concise AI watermark + Terms/Privacy notice onto
+   `IOSOnboardingFlow` Page 3; added one-time inline `IOSVoiceCloningConsentSheet` (scrollable across
+   detents and Dynamic Type) + `VoiceCloningConsentPolicy.gateInlineAction` with passive 1-line
+   Save Voice reminder (0 extra toggles, 0 `"AI-generated"` Player/History badges); made
+   `IOSStudioCanvas` setup prompt a 1-tap shortcut (`IOSStudioSetupPrompt`) and fixed multi-line
+   `errorBar` clipping/dismiss; eliminated `IOSExportPurchaseSheet` loading flash, raised contrast
+   (`BKL-31` slice), added 1-tap `Export Now` re-verifying StoreKit entitlement, fixed `/privacy/`
+   trailing slash and added `Terms of Use`; added `Settings → Privacy & Permissions` revocation
+   caption, jurisdiction-neutral disclosure, AudioSeal watermark transparency note, and
+   `Settings → About → Terms of Use` / `Report an Issue`; routed iOS download and removal errors to
+   localized path-free catalog copy; aligned macOS Settings watermark/Terms/Report rows; updated
+   `config/ios-control-audit.json` and `VocelloiOSControlAuditUITests`.
+4. **`9afcbefe`** (`RF-73: add website Terms of Use, privacy/support updates, and App Store 3.2.0 docs`):
+   added `website/public/terms/index.html` (linked in Footer, Nav, sitemap, `STATIC_PAGES`);
+   updated `privacy/index.html` (Guideline `5.1.2(i)` static CDN clarification, `B4` open AudioSeal
+   inspection & transcoding note), `support/index.html` (`#report` privacy-first section),
+   `Privacy.jsx` (iOS export purchase pricing), `Limitations.jsx`, `IphoneBeta.jsx`, `README.md`,
+   `docs/reference/app-store-listing.md` (`RF-63`, all char limits verified), and
+   `docs/reference/ios-appstore-submission.md` (iPad compatibility, `13+` Age Rating target, `147`
+   territories excluding `CN` while keeping `KR`).
+5. **Final verification & checkpoint commit (HEAD):** fixed SwiftLint doc-comment false positive in
+   `IOSInterruptionRecorder.swift`, refreshed `docs/INDEX.md`, recorded `RF-73` progress in roadmap
+   and this checkpoint.
+
+**Phone-free verification (all PASS on `main`):** `scripts/dev.sh check --since 1363da5c` exited 0
+across all 11 stages (`git diff --check`, `privacy_scan.py` on 1,942 paths, `ruff`, `pyright`,
+`swiftlint --strict`, all 28 contract validators + `repo_invariants.sh`, full `VocelloCoreTests` +
+`VocelloiOSLogicTests` + selected pytest suites, CLI build, iOS device-SDK build + binary scan,
+website lint/unit/SSR/build + 52/52 Playwright Chromium & WebKit layout-matrix tests including
+`/terms/`, and all 4 macOS/iOS XCUITest bundle compiles).
+
+**Remaining before closing `RF-73` and entering Phase 4 (`RF-71`):**
+
+1. **Await maintainer permission** before running any physical iPhone tests (`scripts/ui_test.sh ios
+   smoke`, `purchase`, `control-audit`), macOS UI lane, or `git push`.
+2. **Phase 4 (`RF-71` — Mac/CLI 3.2.0):** quiet-Mac `mac-gate-bench.json` reseed (`>= 3` clean runs
+   with `QWENVOICE_GATE_BENCH_SEED=1 scripts/macos_test.sh gate`, `QVOICE_LEAD_ONLY=1`), bump
+   `project.yml` (`3.2.0` / build `34`) + contracts + `docs/releases/v3.2.0.md`, push on go → CI →
+   signed `v3.2.0` tag & 7-lane Mac promotion sitting.
+3. **Phase 5 (`v3.2.0-ios.1` → `RF-16`):** Cut `v3.2.0-ios.1` → grouped iPhone window
+   (`RF-68`/`RF-15`/`RF-17` + `RF-72` 30-take audit + 6.3-inch screenshots + `RF-66` demo video) →
+   AWS Device Farm iPhone 15 Pro (`RF-65`) → authorized ASC updates (`3.2.0`, `13+`, `147`
+   territories, Nov 16 descriptors, IAP attach, `RF-63` Review Notes) → `ASR-09` 24h proof → `RF-16`
+   submission.
+
+<details>
+<summary>Archived November 25 pause checkpoint (RF-73 decision matrix)</summary>
+
 ### November 25 (App Store 3.2.0 readiness & AI safeguard plan locked — pause checkpoint): `RF-73` opened ahead of Phase 4 (`RF-71`); zero builds/tests run while Mac is busy
 
 **Workspace & Git state:** Local `main` ahead of `origin/main` `8f84ac97` (**unpushed**; `8f84ac97`
@@ -89,6 +158,8 @@ unchanged for 3.2 (`f070f41a`).
    AWS Device Farm iPhone 15 Pro (`RF-65`) → authorized ASC updates (`3.2.0`, `13+`, `147`
    territories, Nov 16 descriptors, IAP attach, `RF-63` Review Notes) → `ASR-09` 24h proof → `RF-16`
    submission ahead of the Dec 20–26 holiday backlog (coordinating `RF-02` Paid Apps Active 24h+ prior).
+
+</details>
 
 ### November 25 (Phase 3 complete — pause checkpoint): `RF-70`, `RF-54`, and `RF-57` closed; shipped `attn` retained for 3.2; resume at Phase 4 (`RF-71` Mac/CLI 3.2.0) when Mac is quiet
 

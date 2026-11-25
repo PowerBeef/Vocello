@@ -741,7 +741,7 @@
         "iphone"
       ],
       "updated": "2026-11-25",
-      "notes": "Opened 2026-11-25 from the exhaustive App Store 3.2.0 readiness audit and granular AI deep-dive (decisions D1-D6 and A1-F1 locked by maintainer). Sample-preserving (zero change to AudioSeal PCM or model weights). Accompanied by ASC prep updates in RF-62 (13+ age rating + Nov 16 descriptors), ASR-11 (147 territories: exclude CN, keep KR), RF-63 (Review Notes <= 4,000 chars) and BKL-91 (deferred macOS consent-sheet/badge parity)."
+      "notes": "Opened 2026-11-25 from the exhaustive App Store 3.2.0 readiness audit and granular AI deep-dive (decisions D1-D6 and A1-F1 locked by maintainer). Sample-preserving (zero change to AudioSeal PCM or model weights). Accompanied by ASC prep updates in RF-62 (13+ age rating + Nov 16 descriptors), ASR-11 (147 territories: exclude CN, keep KR), RF-63 (Review Notes <= 4,000 chars) and BKL-91 (deferred macOS consent-sheet/badge parity). Landed all 4 implementation commits on local main (4703237c iPad eligibility + 2.5.19 binary hygiene; b896fce1 10-language impersonation guardrails + attributions; da5ce80d streamlined iOS safeguards, inline clone consent & UX fixes; 9afcbefe website /terms/, privacy/support/README & App Store 3.2.0 docs), all Swift commits vocello-swift-review approved. Full phone-free scripts/dev.sh check --since 1363da5c passed 11/11 stages (including 52/52 Playwright Chromium+WebKit checks & all 4 XCUITest bundle compiles). Remains in-flight pending maintainer permission for physical iPhone verification and push."
     },
     {
       "id": "RF-16",

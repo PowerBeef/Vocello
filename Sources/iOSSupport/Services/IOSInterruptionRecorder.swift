@@ -10,7 +10,7 @@ import UIKit
 /// **Compiled only into `QVOICE_DEVICE_DIAGNOSTICS` builds**: started by
 /// `IOSDeviceDiagnosticsRunner` when `scripts/ios_device.sh` drives a local
 /// device run. Shipping iOS distribution builds omit this file and its
-/// `CallKit` import completely (Guideline 2.5.19; no `#if DEBUG`).
+/// `CallKit` import completely (Guideline 2.5.19; Release-only build configuration).
 ///
 /// Consumers: the diagnostics sentinel (`device-diagnostics-done.json` gains `interruptions`)
 /// so `ios_device.sh bench`/`gate` can report "failed because a call arrived at

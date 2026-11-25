@@ -18,6 +18,74 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
+### November 25 (App Store 3.2.0 readiness & AI safeguard plan locked — pause checkpoint): `RF-73` opened ahead of Phase 4 (`RF-71`); zero builds/tests run while Mac is busy
+
+**Workspace & Git state:** Local `main` ahead of `origin/main` `8f84ac97` (**unpushed**; `8f84ac97`
+CI, Release rehearsal, Nightly, and Swift dependency watch all passed), 0 linked worktrees, 0 active
+builds/tests/benchmarks. Phase 3 (`RF-70`, `RF-54`, `RF-57`) is closed with shipped `attn` retained
+unchanged for 3.2 (`f070f41a`).
+
+**Locked App Store 3.2.0 readiness & granular AI safeguard decisions (2026-11-25, tracked in `RF-73`, `RF-42`, `RF-62`, `RF-63`, `ASR-11`, `BKL-31`, `BKL-91`):**
+
+- **D1 (`RF-42`):** Admit the 13 eligible 8 GB+ M-series/A17 Pro iPads in portrait iPhone
+  compatibility mode (remove the non-iPhone block in `IOSDeviceEligibilityPolicy.swift` and
+  `scripts/ios_device_eligibility.py`; keep `TARGETED_DEVICE_FAMILY: "1"`).
+- **D2 — Granular AI Safeguards (`A1`–`F1`, strictly sample-preserving):**
+  - **Consent & terms (`A1`–`A4`, `E1`):** One combined localized one-time sheet (AI-generated local
+    voices + AudioSeal/metadata transparency + zero-tolerance Acceptable Use) before first Model
+    Install or Generate (not blocking cold launch); inline Voice Cloning consent sheet before
+    Record, Import, Save, or Generate (+ render `setupMessage`, fix `"Settings → Privacy & Permissions"`);
+    lightweight one-tap per-voice confirmation on Save Voice and new Studio clips (zero extra taps on
+    already-saved voices); non-destructive Settings revocation caption; Terms/Acceptable Use page on
+    `vocello.vercel.app` linked from `Settings → About`.
+  - **Watermarking & provenance (`B1`–`B4`):** Keep mandatory, fail-closed AudioSeal 16-bit PCM
+    watermark (fixed non-identifying payload, all 3 modes) + `LIST/INFO` WAV provenance; defer C2PA
+    to `BKL-41`; add localized watermark transparency note in `Settings → Privacy & Permissions` and
+    `E1`; document open verification tools and external transcoding limits on website and Review Notes.
+  - **Visible labeling & territories (`C1`–`C4`, `D4`):** Add subtle localized `"AI-generated"` label
+    in full Player sheet and History rows across all 3 modes (keep Studio inline card uncluttered; no
+    spoken WAV intro); update disclosure copy to jurisdiction-neutral wording in Settings and `A1`;
+    keep **South Korea (`KR`)** enabled and exclude **China Mainland (`CN`)** (`147` of 175
+    territories on both app and export IAP).
+  - **Guideline 1.2 & Age Rating (`D1`–`D4`, `RF-62`):** Add `Settings → About → Report an Issue`
+    opening `vocello.vercel.app/support/#report` (zero auto-upload); localize and expand
+    impersonation-intent patterns across all 10 languages (no celebrity-name list); keep spoken scripts
+    unfiltered (explain user-authored local TTS in Review Notes); raise initial Age Rating from `4+`
+    to **`13+`** before initial 3.2.0 submission and answer Nov 16 descriptors (`Shared Location = No`,
+    `Dating and Relationships = No`).
+  - **Privacy `5.1.2(i)` & Licensing `5.2` (`E2`–`E3`, `F1`):** Strengthen `website/public/privacy/index.html`
+    and Review Notes (`RF-63`) to state explicitly that Hugging Face is a static read-only weight CDN
+    with zero third-party AI APIs and refresh `3.1 → 3.2`; resolve `"pending-qualified-review"` in
+    `config/third-party-attribution-policy.json`, strip macOS-only `Sparkle` from iOS Licenses, add
+    Meta AudioSeal (`MIT`) under Models, keep `USES_THIRD_PARTY_CONTENT = true`; align macOS Settings
+    copy in `RF-73` and park larger macOS UI consent sheets/badges in `BKL-91`.
+- **D5 & D6 (Code, `2.5.19` binary hygiene, `BKL-31` purchase contrast, website/README):** Fix
+  `IOSExportGate` loading flash + `IOSExportPurchaseSheet` contrast & link Dynamic Type (`BKL-31`
+  slice under iOS 27 Liquid Glass); `#if`-strip 4,145+ lines of Release diagnostics runners + Release
+  env-var reads (`TelemetryGate` / `RuntimeDebugGate`) and tighten `verify_ios_release_artifacts.py`;
+  fix `errorBar` clipping/lock, wrong Settings paths, `.withoutCloneEncoders` override, drop
+  `UIFileSharingEnabled`; clean up P2 copy/localization/error text and update website + `README.md`
+  off `"TestFlight public beta"` / `"Price: Free"`.
+
+**Resume next session once the Mac is quiet:**
+
+1. **Land `RF-73` (`D1` + `A1`–`F1` + `D5` + `D6`)** in clean, `vocello-swift-review`-verified,
+   sample-preserving commits on `main`, verified with `scripts/dev.sh check`, `scripts/dev.sh ios --ui`,
+   and the website Playwright check.
+2. **Run Phase 4 (`RF-71` — Mac/CLI 3.2.0):**
+   - Quiet-Mac `benchmarks/baselines/mac-gate-bench.json` reseed (`>= 3` consecutive clean runs with
+     `QWENVOICE_GATE_BENCH_SEED=1 scripts/macos_test.sh gate`, `QVOICE_LEAD_ONLY=1`) for the 3.2.0
+     `"hybrid"` lineage.
+   - Bump `project.yml` (`3.2.0` / build `34`), `config/third-party-attribution-policy.json`,
+     `config/public-product-facts.json`, regenerate project/attributions, author
+     `docs/releases/v3.2.0.md`, push `main` on maintainer go → green CI → signed `v3.2.0` tag &
+     7-lane Mac promotion sitting.
+3. **Run Phase 5 (`v3.2.0-ios.1` → `RF-16`):** Cut `v3.2.0-ios.1` → grouped iPhone window
+   (`RF-68`/`RF-15`/`RF-17` + `RF-72` 30-take audit + 6.3-inch screenshots + `RF-66` demo video) →
+   AWS Device Farm iPhone 15 Pro (`RF-65`) → authorized ASC updates (`3.2.0`, `13+`, `147`
+   territories, Nov 16 descriptors, IAP attach, `RF-63` Review Notes) → `ASR-09` 24h proof → `RF-16`
+   submission ahead of the Dec 20–26 holiday backlog (coordinating `RF-02` Paid Apps Active 24h+ prior).
+
 ### November 25 (Phase 3 complete — pause checkpoint): `RF-70`, `RF-54`, and `RF-57` closed; shipped `attn` retained for 3.2; resume at Phase 4 (`RF-71` Mac/CLI 3.2.0) when Mac is quiet
 
 **Workspace & Git state:** Clean local `main` (3 commits ahead of `origin/main` `8f84ac97`,

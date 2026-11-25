@@ -316,7 +316,7 @@ private struct IOSOnboardingReadyPage: View {
                     .frame(maxWidth: 320)
 
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: Theme.Spacing.md) {
+                    HStack(spacing: Theme.Spacing.sm) {
                         legalLink(IOSAppLanguage.shared.presentation.exportTerms, destination: Self.termsURL)
                             .accessibilityIdentifier("onboarding_terms")
                         Circle()
@@ -342,7 +342,7 @@ private struct IOSOnboardingReadyPage: View {
     private func legalLink(_ title: String, destination: URL) -> some View {
         Link(destination: destination) {
             Text(title)
-                .font(.footnote.weight(.medium))
+                .font(.caption.weight(.medium))
                 .foregroundStyle(Theme.Text.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)

@@ -174,8 +174,34 @@ enum VocelloUISettingsReveal {
                     frames: anchors.map(\.frame), visible: visible, desiredDelta: delta)
             }
             guard let index = chosen else {
-                observations.append("no fully visible bounded touch anchor in owning scroll view")
-                return false
+                // At doubled-string AX-XXXL, a single row's text can span most of the
+                // visible viewport above the tab dock, leaving no second visible text to
+                // drag toward. Swipe the tall visible text element directly (never raw
+                // coordinates and never a short caption).
+                let tallVisible = (freeEntries + textEntries).first { entry in
+                    guard entry.frame.height >= 80 else { return false }
+                    let swipeStartY = delta < 0
+                        ? entry.frame.minY + entry.frame.height * 0.75
+                        : entry.frame.minY + entry.frame.height * 0.25
+                    return visible.contains(CGPoint(x: entry.frame.midX, y: swipeStartY))
+                }
+                guard let fallback = tallVisible else {
+                    observations.append("no fully visible bounded touch anchor in owning scroll view")
+                    return false
+                }
+                observations.append("fallbackTallTextSwipe; frame=\(fallback.frame); desiredDeltaY=\(delta)")
+                XCTContext.runActivity(named: "Settings bounded touch scroll") { activity in
+                    let attachment = XCTAttachment(string: observations.joined(separator: "\n"))
+                    attachment.name = "settings-touch-scroll-observations"
+                    attachment.lifetime = .keepAlways
+                    activity.add(attachment)
+                    if delta < 0 {
+                        fallback.element.swipeUp(velocity: .slow)
+                    } else {
+                        fallback.element.swipeDown(velocity: .slow)
+                    }
+                }
+                continue
             }
             let anchor = anchors[index]
             observations.append("desiredDeltaY=\(delta); touchAnchorFrame=\(anchor.frame); containerFrame=\(container.frame)")

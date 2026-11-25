@@ -18,7 +18,7 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 25 (`RF-73` App Store 3.2.0 readiness & streamlined AI safeguard pack implemented and phone-free verified): 5 commits ahead of `origin/main` `1363da5c`; physical iPhone & push pending maintainer permission
+### November 25 (`RF-73` App Store 3.2.0 readiness & streamlined AI safeguard pack implemented, phone-free & physical-iPhone verified): 6 commits ahead of `origin/main` `1363da5c`; push & ASC writes pending maintainer go
 
 **Workspace & Git state:** Local `main` ahead of `origin/main` `1363da5c` (**unpushed** — awaiting
 explicit push request), 0 linked worktrees, 0 active builds/tests/benchmarks. Phase 3 (`RF-70`,
@@ -59,21 +59,36 @@ explicit push request), 0 linked worktrees, 0 active builds/tests/benchmarks. Ph
    `docs/reference/app-store-listing.md` (`RF-63`, all char limits verified), and
    `docs/reference/ios-appstore-submission.md` (iPad compatibility, `13+` Age Rating target, `147`
    territories excluding `CN` while keeping `KR`).
-5. **Final verification & checkpoint commit (HEAD):** fixed SwiftLint doc-comment false positive in
-   `IOSInterruptionRecorder.swift`, refreshed `docs/INDEX.md`, recorded `RF-73` progress in roadmap
-   and this checkpoint.
+5. **`6cee422e`** (`RF-73: record phone-free verification and update checkpoint`): fixed SwiftLint
+   doc-comment false positive in `IOSInterruptionRecorder.swift`, refreshed `docs/INDEX.md`, and
+   recorded full 11/11 phone-free verification.
+6. **Physical-iPhone polish & iOS 27.2 verification commit (HEAD):** tightened Export Purchase and
+   Onboarding Page 3 footer link spacing (`Theme.Spacing.sm`, `.caption.weight(.medium)`) so
+   `Privacy Policy · Terms of Use · Help & Support` stay on one crisp horizontal row on-device
+   without bottom-fade clipping; updated `VocelloiOSPurchaseUITests` failure injection to
+   `.generic(.unknown)` (iOS 27.2 delivers `.userCancelled` accurately), settled post-Safari return
+   window frame in `VocelloiOSControlAuditUITests`, and added tab-dock-safe tall-text swipe fallback
+   in `VocelloUIAutomationSupport` for doubled-string `Pseudo-AX-XXXL`.
 
-**Phone-free verification (all PASS on `main`):** `scripts/dev.sh check --since 1363da5c` exited 0
-across all 11 stages (`git diff --check`, `privacy_scan.py` on 1,942 paths, `ruff`, `pyright`,
-`swiftlint --strict`, all 28 contract validators + `repo_invariants.sh`, full `VocelloCoreTests` +
-`VocelloiOSLogicTests` + selected pytest suites, CLI build, iOS device-SDK build + binary scan,
-website lint/unit/SSR/build + 52/52 Playwright Chromium & WebKit layout-matrix tests including
-`/terms/`, and all 4 macOS/iOS XCUITest bundle compiles).
+**Verification (all PASS on `main`):**
+- **Phone-free:** `scripts/dev.sh check --since 1363da5c` exited 0 across all 11 stages (including
+  1,942-path privacy scan, all 28 contract validators, full `VocelloCoreTests` +
+  `VocelloiOSLogicTests` + pytest, CLI build, iOS device-SDK build + binary scan, 52/52 Playwright
+  Chromium & WebKit website layout-matrix tests including `/terms/`, and all 4 macOS/iOS XCUITest
+  bundle compiles).
+- **Physical iPhone (4/4 targeted XCUITest lanes PASS + screenshot visual QA clean):**
+  - `ios smoke --scenario studio-layout`: PASS (`ios-xcui-smoke-20261125-171558-719509a0`, 48.0 s)
+  - `ios purchase --scenario exports`: PASS (`ios-xcui-purchase-20261125-173317-6570050a`, 200.0 s,
+    all 26+ StoreKit/export phases + verified 1-row footer & unlocked card)
+  - `ios control-audit --scenario external`: PASS (`ios-xcui-control-audit-20261125-174101-5e0f34ca`,
+    428.1 s, Open Source & Licenses + all 5 Settings links + iOS Settings + Clone Import)
+  - `ios localization`: PASS (`ios-xcui-localization-20261125-180114-8f09bdd2`, 500.4 s, all 10
+    languages + relaunch persistence + Default, French, AX-L, AX-XXXL, and `Pseudo-AX-XXXL`)
 
 **Remaining before closing `RF-73` and entering Phase 4 (`RF-71`):**
 
-1. **Await maintainer permission** before running any physical iPhone tests (`scripts/ui_test.sh ios
-   smoke`, `purchase`, `control-audit`), macOS UI lane, or `git push`.
+1. **Await maintainer go** for `git push origin main` (triggers CI + Vercel deploy of `/terms/` and
+   updated Privacy/Support pages) and any optional macOS UI lane.
 2. **Phase 4 (`RF-71` — Mac/CLI 3.2.0):** quiet-Mac `mac-gate-bench.json` reseed (`>= 3` clean runs
    with `QWENVOICE_GATE_BENCH_SEED=1 scripts/macos_test.sh gate`, `QVOICE_LEAD_ONLY=1`), bump
    `project.yml` (`3.2.0` / build `34`) + contracts + `docs/releases/v3.2.0.md`, push on go → CI →

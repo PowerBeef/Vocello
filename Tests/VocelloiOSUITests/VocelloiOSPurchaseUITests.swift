@@ -166,12 +166,11 @@ final class VocelloiOSPurchaseUITests: XCTestCase {
         try locked()
         record("restore_not_owned")
 
-        // An injected purchase error reaches the app as StoreKitError.unknown on the
-        // physical local StoreKit environment (observed 2026-09-24), whatever case the
-        // runner injects, so this arm proves the failure path: the failure notice,
-        // still locked, nothing finished. User cancellation (returned or thrown) is
-        // proven by IOSExportPurchaseTests.
-        try await store.setSimulatedError(.generic(.userCancelled), forAPI: .purchase)
+        // Inject a genuine StoreKit failure so the failure arm verifies the
+        // failure notice, locked state, and zero stored transactions across both
+        // iOS 26 and iOS 27+ (iOS 27.2 delivers `.generic(.userCancelled)` as a
+        // real user cancellation instead of `StoreKitError.unknown`).
+        try await store.setSimulatedError(.generic(.unknown), forAPI: .purchase)
         try tap("exportPurchase_buy")
         try notice("could not complete")
         try locked()

@@ -1434,7 +1434,9 @@ final class VocelloiOSControlAuditUITests: VocelloiOSUITestCase {
         }
         app.activate()
         XCTAssertTrue(VocelloUIWait.condition("Vocello to return", timeout: 30) {
-            self.app.state == .runningForeground
+            guard self.app.state == .runningForeground else { return false }
+            let window = self.app.windows.firstMatch
+            return window.exists && abs(window.frame.minX) < 1 && abs(window.frame.minY) < 1
         })
         XCTAssertTrue(VocelloUIWait.exists(control, timeout: 20), "Return to the same Settings destination")
     }

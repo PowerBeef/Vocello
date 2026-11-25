@@ -409,7 +409,7 @@ struct IOSExportPurchaseSheet: View {
     private var footer: some View {
         VStack(spacing: Theme.Spacing.xs) {
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: Theme.Spacing.md) {
+                HStack(spacing: Theme.Spacing.sm) {
                     privacyLink
                     linkSeparator
                     termsLink
@@ -455,11 +455,11 @@ struct IOSExportPurchaseSheet: View {
     }
 
     /// The 44 pt frame and content shape live inside the label, so the whole
-    /// target opens the link, not only the footnote's words.
+    /// target opens the link, not only the caption's words.
     private func footerLink(_ title: String, destination: URL) -> some View {
         Link(destination: destination) {
             Text(title)
-                .font(.footnote.weight(.medium))
+                .font(.caption.weight(.medium))
                 .foregroundStyle(Theme.Text.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)

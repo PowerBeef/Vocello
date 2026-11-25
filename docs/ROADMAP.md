@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 58/96 (60%) |
+| `release-first-3-0-2026-09` | active | release-qa | 59/96 (61%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 13/17 (76%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (79)
+### Mac, remotely (78)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -120,7 +120,6 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `RF-47` (planned) Core overhaul, stage 3: memory (also: iPhone)
 - `RF-52` (planned) Quality remediation, stage 2: clone conditioning parity
 - `RF-71` (planned) Ship Vocello and the vocello CLI 3.2 on the Mac (also: At the keyboard)
-- `RF-73` (in-flight) App Store 3.2.0 readiness: iPad compatibility, granular AI safeguards (A1-F1), 2.5.19/bugfix pack and purchase-sheet contrast (also: iPhone)
 - `UIF-08` (parked) Native acceptance of the iOS-derived screens on current source
 
 ### At the keyboard (18)
@@ -146,7 +145,7 @@ Needs the maintainer present: a permission prompt, a keychain or password, a rel
 - `RF-63` (planned) Fit the 3.2 App Review notes into what is left of the 4,000 characters
 - `RF-71` (planned) Ship Vocello and the vocello CLI 3.2 on the Mac (also: Mac, remotely)
 
-### iPhone (61)
+### iPhone (60)
 
 Needs the paired iPhone, in a window the maintainer announces.
 
@@ -209,7 +208,6 @@ Needs the paired iPhone, in a window the maintainer announces.
 - `RF-65` (planned) Measure the shipped hybrid on an iPhone 15 Pro
 - `RF-66` (planned) Record a demo video of the shipping flow on a physical iPhone
 - `RF-68` (in-flight) Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance
-- `RF-73` (in-flight) App Store 3.2.0 readiness: iPad compatibility, granular AI safeguards (A1-F1), 2.5.19/bugfix pack and purchase-sheet contrast (also: Mac, remotely)
 - `VLR-07` (parked) Complete physical-device closure and publish the privacy-safe report
 
 ## Vocello 3.2 — Pack B/C engine upgrades, the 3.2 Mac and CLI release, and the iOS App Store submission
@@ -259,7 +257,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-66` | planned | Record a demo video of the shipping flow on a physical iPhone | — |
 | `RF-68` | in-flight | Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance | — |
 | `RF-71` | planned | Ship Vocello and the vocello CLI 3.2 on the Mac | `RF-68`, `RF-69`, `RF-70`, `RF-72`, `RF-73` |
-| `RF-73` | in-flight | App Store 3.2.0 readiness: iPad compatibility, granular AI safeguards (A1-F1), 2.5.19/bugfix pack and purchase-sheet contrast | — |
 
 ### Open items in detail
 
@@ -378,9 +375,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-71`** (planned) — Ship Vocello and the vocello CLI 3.2 on the Mac.
   gate: Vocello and the vocello CLI 3.2.0 are public on the Mac. Before the tag: MARKETING_VERSION 3.2.0 with a build number above the last release tag's; Mac benchmark, memory, language and UI-perf lanes recorded on the 3.2 engine (and reseeded baselines/lineage if RF-70 updates model artifacts or alters samples); docs/releases/v3.2.0.md passes check_release_notes.py; README charts, website copy/numbers and config/public-product-facts.json describe 3.2; push CI, release rehearsal, full macOS smoke and engine bench pass on the release commit. Then the maintainer's signed v3.2.0 tag builds a verified draft through release.yml; the macOS promotion lanes and signed CLI qualification pass on the tag checkout; the maintainer promotes the release and the website deploys with it.
-
-- **`RF-73`** (in-flight) — App Store 3.2.0 readiness: iPad compatibility, granular AI safeguards (A1-F1), 2.5.19/bugfix pack and purchase-sheet contrast.
-  gate: Strictly sample-preserving commits (vocello-swift-review, scripts/dev.sh check, scripts/dev.sh ios --ui, website Playwright check) land before RF-71 and v3.2.0-ios.1: (1) D1/RF-42 admit 13 eligible 8 GB+ iPads in portrait compatibility mode; (2) D2 granular low-friction AI safeguards A1-F1 (E1/A3 fold concise local AI + AudioSeal watermark + zero-tolerance Acceptable Use notice and Terms/Privacy links onto existing IOSOnboardingFlow Page 3 above Open Studio — zero separate E1 modal sheet and RF-41 download alert stands alone; A1 single compact inline Voice Cloning consent sheet before first Record/Import/Save/Generate + render tappable Studio setupMessage opening Voice Brief, inline A1 consent, or Voices/Record directly + fix Settings > Privacy & Permissions path; publish Terms page linked in Settings > About; A2 passive 1-line reminder caption on Save Voice/Import with zero extra toggles after A1; A4 non-destructive Settings revocation caption; B1-B4 keep mandatory fail-closed AudioSeal + LIST/INFO, defer C2PA to BKL-41, add Settings watermark transparency note, document open verification & external transcoding limits on web/Review Notes; C1-C3 no redundant AI-generated badges on Player/History UI — rely on AudioSeal + LIST/INFO, onboarding notice and jurisdiction-neutral deployer disclosure copy in Settings and A1; D1 Settings > About > Report an Issue opening vocello.vercel.app/support/#report; D2 10-language impersonation-intent filter & localized refusal; D3 keep scripts unfiltered; E2 Privacy Policy 5.1.2(i) static-CDN wording & 3.2 refresh; E3 resolve pending-qualified-review, strip macOS Sparkle from iOS Licenses, add Meta AudioSeal MIT row under Models; F1 lightweight macOS Settings copy alignment); (3) D5 verified bugfix & 2.5.19 pack (IOSExportGate loading-flash fix + 1-tap Export Now on unlocked card when opened from a take and Done from Settings, #if-strip 4,145+ lines of Release diagnostics + env-var reads + verify_ios_release_artifacts.py guard, errorBar wrap/unlock, Settings paths, .withoutCloneEncoders honor, drop UIFileSharingEnabled, P2 copy/localization/error-text polish, website/README off TestFlight Beta & Price: Free); (4) D6 IOSExportPurchaseSheet contrast & link Dynamic Type slice from BKL-31.
 
 ## Specialist-audit remediation
 

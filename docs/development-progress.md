@@ -18,13 +18,15 @@ Older checkpoints live in git history (`git log -p -- docs/development-progress.
 
 ## Resume now
 
-### November 25 (`RF-73` App Store 3.2.0 readiness & streamlined AI safeguard pack implemented, phone-free & physical-iPhone verified): 6 commits ahead of `origin/main` `1363da5c`; push & ASC writes pending maintainer go
+### November 25 (`RF-73` closed, CI & Release rehearsal green on `71dd7d53`, live ASC prep applied): ready for Phase 4 (`RF-71` Mac/CLI 3.2.0)
 
-**Workspace & Git state:** Local `main` ahead of `origin/main` `1363da5c` (**unpushed** — awaiting
-explicit push request), 0 linked worktrees, 0 active builds/tests/benchmarks. Phase 3 (`RF-70`,
-`RF-54`, `RF-57`) is closed with shipped `attn` retained unchanged for 3.2 (`f070f41a`).
+**Workspace & Git state:** Local `main` synced with `origin/main` through `71dd7d53` (plus this
+tracking update, unpushed), 0 linked worktrees, 0 active builds/tests/benchmarks. Phase 3 (`RF-70`,
+`RF-54`, `RF-57`) is closed with shipped `attn` retained unchanged for 3.2 (`f070f41a`), and
+**`RF-73` is closed (`done`)** after full phone-free, physical-iPhone, CI, Release rehearsal,
+Vercel production, and manual macOS verification.
 
-**Landed `RF-73` implementation commits on local `main` (strictly sample-preserving, `vocello-swift-review` approved on every Swift commit):**
+**Landed & pushed `RF-73` implementation commits on `origin/main` (`1363da5c..71dd7d53`, strictly sample-preserving, `vocello-swift-review` approved on every Swift commit):**
 
 1. **`4703237c`** (`RF-73: admit 8 GB+ iPads, harden iOS binary hygiene and enforce clone fallback`,
    `Reviewed-by: vocello-swift-review`): admitted eligible 8 GB+ M-series / A17 Pro iPads in portrait
@@ -57,47 +59,64 @@ explicit push request), 0 linked worktrees, 0 active builds/tests/benchmarks. Ph
    inspection & transcoding note), `support/index.html` (`#report` privacy-first section),
    `Privacy.jsx` (iOS export purchase pricing), `Limitations.jsx`, `IphoneBeta.jsx`, `README.md`,
    `docs/reference/app-store-listing.md` (`RF-63`, all char limits verified), and
-   `docs/reference/ios-appstore-submission.md` (iPad compatibility, `13+` Age Rating target, `147`
-   territories excluding `CN` while keeping `KR`).
+   `docs/reference/ios-appstore-submission.md`.
 5. **`6cee422e`** (`RF-73: record phone-free verification and update checkpoint`): fixed SwiftLint
    doc-comment false positive in `IOSInterruptionRecorder.swift`, refreshed `docs/INDEX.md`, and
    recorded full 11/11 phone-free verification.
-6. **Physical-iPhone polish & iOS 27.2 verification commit (HEAD):** tightened Export Purchase and
-   Onboarding Page 3 footer link spacing (`Theme.Spacing.sm`, `.caption.weight(.medium)`) so
-   `Privacy Policy · Terms of Use · Help & Support` stay on one crisp horizontal row on-device
-   without bottom-fade clipping; updated `VocelloiOSPurchaseUITests` failure injection to
-   `.generic(.unknown)` (iOS 27.2 delivers `.userCancelled` accurately), settled post-Safari return
-   window frame in `VocelloiOSControlAuditUITests`, and added tab-dock-safe tall-text swipe fallback
-   in `VocelloUIAutomationSupport` for doubled-string `Pseudo-AX-XXXL`.
+6. **`71dd7d53`** (`RF-73: tighten iOS purchase/onboarding footer layout and update iOS 27.2 XCUITests`):
+   tightened Export Purchase and Onboarding Page 3 footer link spacing (`Theme.Spacing.sm`,
+   `.caption.weight(.medium)`) so `Privacy Policy · Terms of Use · Help & Support` stay on one crisp
+   horizontal row on-device without bottom-fade clipping; updated `VocelloiOSPurchaseUITests`
+   failure injection to `.generic(.unknown)`, settled post-Safari return window frame in
+   `VocelloiOSControlAuditUITests`, and added tab-dock-safe tall-text swipe fallback in
+   `VocelloUIAutomationSupport` for doubled-string `Pseudo-AX-XXXL`.
 
-**Verification (all PASS on `main`):**
-- **Phone-free:** `scripts/dev.sh check --since 1363da5c` exited 0 across all 11 stages (including
-  1,942-path privacy scan, all 28 contract validators, full `VocelloCoreTests` +
-  `VocelloiOSLogicTests` + pytest, CLI build, iOS device-SDK build + binary scan, 52/52 Playwright
-  Chromium & WebKit website layout-matrix tests including `/terms/`, and all 4 macOS/iOS XCUITest
-  bundle compiles).
+**Verification & live App Store Connect prep (2026-11-25):**
+- **Phone-free:** `scripts/dev.sh check --since 1363da5c` exited 0 across all 11 stages (1,942-path
+  privacy scan, all 28 contract validators, full `VocelloCoreTests` + `VocelloiOSLogicTests` +
+  pytest, CLI build, iOS device-SDK build + binary scan, 52/52 Playwright Chromium & WebKit website
+  tests, and all 4 macOS/iOS XCUITest bundle compiles).
 - **Physical iPhone (4/4 targeted XCUITest lanes PASS + screenshot visual QA clean):**
   - `ios smoke --scenario studio-layout`: PASS (`ios-xcui-smoke-20261125-171558-719509a0`, 48.0 s)
-  - `ios purchase --scenario exports`: PASS (`ios-xcui-purchase-20261125-173317-6570050a`, 200.0 s,
-    all 26+ StoreKit/export phases + verified 1-row footer & unlocked card)
-  - `ios control-audit --scenario external`: PASS (`ios-xcui-control-audit-20261125-174101-5e0f34ca`,
-    428.1 s, Open Source & Licenses + all 5 Settings links + iOS Settings + Clone Import)
-  - `ios localization`: PASS (`ios-xcui-localization-20261125-180114-8f09bdd2`, 500.4 s, all 10
-    languages + relaunch persistence + Default, French, AX-L, AX-XXXL, and `Pseudo-AX-XXXL`)
+  - `ios purchase --scenario exports`: PASS (`ios-xcui-purchase-20261125-173317-6570050a`, 200.0 s)
+  - `ios control-audit --scenario external`: PASS (`ios-xcui-control-audit-20261125-174101-5e0f34ca`, 428.1 s)
+  - `ios localization`: PASS (`ios-xcui-localization-20261125-180114-8f09bdd2`, 500.4 s)
+- **GitHub CI, Release rehearsal, Website & Mac manual check:**
+  - GitHub **CI** (`45674571446`, `71dd7d53`): **PASS (9/9 jobs)** on pinned CI toolchain.
+  - GitHub **Release rehearsal** (`45674571439`, `71dd7d53`): **PASS (4/4 jobs)** (iOS archive
+    prerequisites, macOS ad-hoc package, Sparkle signatures, release evidence).
+  - Production website (`vocello.vercel.app`): `/terms/`, `/privacy/`, `/support/` all live HTTP `200`.
+  - Signed local macOS `build/Vocello.app` built and verified cleanly in manual testing.
+- **App Store Connect read-only audit & authorized updates (`RF-62`, `ASR-11`, verified via readback):**
+  - **Territories (148 → 147):** excluded China Mainland (`CHN`) on both app and export IAP
+    (`com.patricedery.vocello.design_clone_export`); readback verified identical **147** territories
+    on both (27 EU + `CHN` excluded; South Korea `KOR` kept; `availableInNewTerritories: true`).
+  - **Privacy Policy URL:** updated `en-US` App Info localization to `https://vocello.vercel.app/privacy/`
+    and verified readback (`supportUrl` already `https://vocello.vercel.app/support/`).
+  - **Age Rating (`4+ → 13+`):** raised `ageRatingOverride` and `ageRatingOverrideV2` to
+    `THIRTEEN_PLUS` (`territoryAgeRatings` read back `THIRTEEN_PLUS`). Apple's two Nov 16
+    descriptors (`sharedLocation`, `datingAndRelationships`) still read back `null` because `asc`
+    v7.4.0 has no CLI flags for them — 2 web-portal clicks (`No`/`No`) remain to close `RF-62`.
+  - **Remaining ASC gaps observed:** version still `3.0.0` (`PREPARE_FOR_SUBMISSION`, 0 screenshot
+    sets); export IAP `MISSING_METADATA` (0 review screenshot uploaded + `RF-02` Paid Apps pending).
+- **Disk check:** `python3 scripts/build_cleanup.py --qc-v1 --yes` ran cleanly and reclaimed `0 B`
+  because QC v2 hard-links both 6.67 GiB ASR weights in `build/cache/delivery-analysis`; host volume
+  has ~17 GiB free ahead of Phase 4 (`RF-71`).
 
-**Remaining before closing `RF-73` and entering Phase 4 (`RF-71`):**
+**Next — Phase 4 (`RF-71` Mac/CLI 3.2.0) & Phase 5 (`v3.2.0-ios.1` → `RF-16`):**
 
-1. **Await maintainer go** for `git push origin main` (triggers CI + Vercel deploy of `/terms/` and
-   updated Privacy/Support pages) and any optional macOS UI lane.
+1. **Maintainer web-portal items (can happen anytime before submission):** activate Paid Apps
+   Agreement + tax/banking (`RF-02`, active 24h+ before submit) and set `Shared Location = No` /
+   `Dating and Relationships = No` in App Store Connect Age Rating (`RF-62`).
 2. **Phase 4 (`RF-71` — Mac/CLI 3.2.0):** quiet-Mac `mac-gate-bench.json` reseed (`>= 3` clean runs
    with `QWENVOICE_GATE_BENCH_SEED=1 scripts/macos_test.sh gate`, `QVOICE_LEAD_ONLY=1`), bump
    `project.yml` (`3.2.0` / build `34`) + contracts + `docs/releases/v3.2.0.md`, push on go → CI →
    signed `v3.2.0` tag & 7-lane Mac promotion sitting.
 3. **Phase 5 (`v3.2.0-ios.1` → `RF-16`):** Cut `v3.2.0-ios.1` → grouped iPhone window
    (`RF-68`/`RF-15`/`RF-17` + `RF-72` 30-take audit + 6.3-inch screenshots + `RF-66` demo video) →
-   AWS Device Farm iPhone 15 Pro (`RF-65`) → authorized ASC updates (`3.2.0`, `13+`, `147`
-   territories, Nov 16 descriptors, IAP attach, `RF-63` Review Notes) → `ASR-09` 24h proof → `RF-16`
-   submission.
+   AWS Device Farm iPhone 15 Pro (`RF-65`) → remaining authorized ASC updates (`3.2.0`, screenshots,
+   IAP review screenshot + attach, `RF-63` Review Notes, `RF-62` Nov 16 readback) → `ASR-09` 24h
+   proof → `RF-16` submission.
 
 <details>
 <summary>Archived November 25 pause checkpoint (RF-73 decision matrix)</summary>

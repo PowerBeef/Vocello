@@ -6883,6 +6883,42 @@
         "commit:1b228307",
         "file:config/quality-screens.json"
       ]
+    },
+    {
+      "id": "RF-73",
+      "plan": "release-first-3-0-2026-09",
+      "title": "App Store 3.2.0 readiness: iPad compatibility, granular AI safeguards (A1-F1), 2.5.19/bugfix pack and purchase-sheet contrast",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "Strictly sample-preserving commits (vocello-swift-review, scripts/dev.sh check, scripts/dev.sh ios --ui, website Playwright check) land before RF-71 and v3.2.0-ios.1: (1) D1/RF-42 admit 13 eligible 8 GB+ iPads in portrait compatibility mode; (2) D2 granular low-friction AI safeguards A1-F1 (E1/A3 fold concise local AI + AudioSeal watermark + zero-tolerance Acceptable Use notice and Terms/Privacy links onto existing IOSOnboardingFlow Page 3 above Open Studio — zero separate E1 modal sheet and RF-41 download alert stands alone; A1 single compact inline Voice Cloning consent sheet before first Record/Import/Save/Generate + render tappable Studio setupMessage opening Voice Brief, inline A1 consent, or Voices/Record directly + fix Settings > Privacy & Permissions path; publish Terms page linked in Settings > About; A2 passive 1-line reminder caption on Save Voice/Import with zero extra toggles after A1; A4 non-destructive Settings revocation caption; B1-B4 keep mandatory fail-closed AudioSeal + LIST/INFO, defer C2PA to BKL-41, add Settings watermark transparency note, document open verification & external transcoding limits on web/Review Notes; C1-C3 no redundant AI-generated badges on Player/History UI — rely on AudioSeal + LIST/INFO, onboarding notice and jurisdiction-neutral deployer disclosure copy in Settings and A1; D1 Settings > About > Report an Issue opening vocello.vercel.app/support/#report; D2 10-language impersonation-intent filter & localized refusal; D3 keep scripts unfiltered; E2 Privacy Policy 5.1.2(i) static-CDN wording & 3.2 refresh; E3 resolve pending-qualified-review, strip macOS Sparkle from iOS Licenses, add Meta AudioSeal MIT row under Models; F1 lightweight macOS Settings copy alignment); (3) D5 verified bugfix & 2.5.19 pack (IOSExportGate loading-flash fix + 1-tap Export Now on unlocked card when opened from a take and Done from Settings, #if-strip 4,145+ lines of Release diagnostics + env-var reads + verify_ios_release_artifacts.py guard, errorBar wrap/unlock, Settings paths, .withoutCloneEncoders honor, drop UIFileSharingEnabled, P2 copy/localization/error-text polish, website/README off TestFlight Beta & Price: Free); (4) D6 IOSExportPurchaseSheet contrast & link Dynamic Type slice from BKL-31.",
+      "sourceOfTruth": [
+        "Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift",
+        "Sources/QwenVoiceCore/VoiceCloningConsentPolicy.swift",
+        "Sources/QwenVoiceCore/Qwen3TTSRuntimeProfile.swift",
+        "Sources/iOS/IOSStudioCanvas.swift",
+        "Sources/iOS/Commerce/IOSExportGate.swift",
+        "Sources/iOS/Settings/SettingsScreen.swift",
+        "Sources/iOS/Settings/OpenSourceLicensesScreen.swift",
+        "Sources/QwenVoiceCore/TelemetryGate.swift",
+        "config/third-party-attribution-policy.json",
+        "website/public/privacy/index.html"
+      ],
+      "updated": "2026-11-25",
+      "notes": "All 6 sample-preserving commits (4703237c..71dd7d53) landed, pushed to origin/main, passed scripts/dev.sh check (11/11 stages, 52/52 Playwright checks), physical-iPhone 4/4 XCUITest lanes with visual QA, GitHub CI (45674571446, 9/9), Release rehearsal (45674571439, 4/4), Vercel live /terms/, /privacy/, /support/ (HTTP 200), and manual macOS app verification. Authorized ASC prep (13+, 147 territories, /privacy/) applied and read back; RF-62, ASR-11, and RF-63 track remaining ASC items.",
+      "evidence": [
+        "commit:4703237c",
+        "commit:b896fce1",
+        "commit:da5ce80d",
+        "commit:9afcbefe",
+        "commit:6cee422e",
+        "commit:71dd7d53",
+        "run:45674571446",
+        "run:45674571439",
+        "run:ios-xcui-smoke-20261125-171558-719509a0",
+        "run:ios-xcui-purchase-20261125-173317-6570050a",
+        "run:ios-xcui-control-audit-20261125-174101-5e0f34ca",
+        "run:ios-xcui-localization-20261125-180114-8f09bdd2"
+      ]
     }
   ]
 }

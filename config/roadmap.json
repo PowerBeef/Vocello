@@ -612,7 +612,7 @@
         "keyboard"
       ],
       "updated": "2026-11-25",
-      "notes": "Opened 2026-11-16 (Nov 16 descriptors due 2027-01-12). 2026-11-25 maintainer decision (D3, re-confirmed after AI deep-dive D4): raise initial Age Rating from 4+ to 13+ before initial 3.2.0 launch (matches peer local AI utilities Locally AI / Private LLM, avoids 4+ Guideline 2.3.6 scrutiny and 18+ adult-tier blocks, and prevents triggering post-launch TX SB 2420 / UT / LA Significant Change parental re-consent). ASC write requires explicit authorization."
+      "notes": "Opened 2026-11-16 (Nov 16 descriptors due 2027-01-12). 2026-11-25 authorized ASC write & readback: raised ageRatingOverride and ageRatingOverrideV2 from NONE to THIRTEEN_PLUS (territoryAgeRatings read back THIRTEEN_PLUS; legacy appStoreAgeRating maps to TWELVE_PLUS, Brazil SELF_RATED_TWELVE). Remaining to close RF-62: answer Apple's two Nov 16 descriptors (Shared Location = No, Dating and Relationships = No) in App Store Connect web portal (both currently read back null; asc v7.4.0 has no CLI flags for them) and confirm readback."
     },
     {
       "id": "RF-63",
@@ -716,32 +716,6 @@
       ],
       "updated": "2026-11-25",
       "notes": "Opened 2026-11-21 at the maintainer's request: Mac and CLI 3.1.0 shipped on 2026-11-17 (RF-61); 3.2.0 carries Pack A, Pack B (RF-68, RF-69), Pack C (RF-70 closed keeping shipped attn unchanged) and RF-73's shared core/attribution/website/Mac Settings copy alignment, aligned with the 3.2.0 iOS App Store submission."
-    },
-    {
-      "id": "RF-73",
-      "plan": "release-first-3-0-2026-09",
-      "title": "App Store 3.2.0 readiness: iPad compatibility, granular AI safeguards (A1-F1), 2.5.19/bugfix pack and purchase-sheet contrast",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "Strictly sample-preserving commits (vocello-swift-review, scripts/dev.sh check, scripts/dev.sh ios --ui, website Playwright check) land before RF-71 and v3.2.0-ios.1: (1) D1/RF-42 admit 13 eligible 8 GB+ iPads in portrait compatibility mode; (2) D2 granular low-friction AI safeguards A1-F1 (E1/A3 fold concise local AI + AudioSeal watermark + zero-tolerance Acceptable Use notice and Terms/Privacy links onto existing IOSOnboardingFlow Page 3 above Open Studio — zero separate E1 modal sheet and RF-41 download alert stands alone; A1 single compact inline Voice Cloning consent sheet before first Record/Import/Save/Generate + render tappable Studio setupMessage opening Voice Brief, inline A1 consent, or Voices/Record directly + fix Settings > Privacy & Permissions path; publish Terms page linked in Settings > About; A2 passive 1-line reminder caption on Save Voice/Import with zero extra toggles after A1; A4 non-destructive Settings revocation caption; B1-B4 keep mandatory fail-closed AudioSeal + LIST/INFO, defer C2PA to BKL-41, add Settings watermark transparency note, document open verification & external transcoding limits on web/Review Notes; C1-C3 no redundant AI-generated badges on Player/History UI — rely on AudioSeal + LIST/INFO, onboarding notice and jurisdiction-neutral deployer disclosure copy in Settings and A1; D1 Settings > About > Report an Issue opening vocello.vercel.app/support/#report; D2 10-language impersonation-intent filter & localized refusal; D3 keep scripts unfiltered; E2 Privacy Policy 5.1.2(i) static-CDN wording & 3.2 refresh; E3 resolve pending-qualified-review, strip macOS Sparkle from iOS Licenses, add Meta AudioSeal MIT row under Models; F1 lightweight macOS Settings copy alignment); (3) D5 verified bugfix & 2.5.19 pack (IOSExportGate loading-flash fix + 1-tap Export Now on unlocked card when opened from a take and Done from Settings, #if-strip 4,145+ lines of Release diagnostics + env-var reads + verify_ios_release_artifacts.py guard, errorBar wrap/unlock, Settings paths, .withoutCloneEncoders honor, drop UIFileSharingEnabled, P2 copy/localization/error-text polish, website/README off TestFlight Beta & Price: Free); (4) D6 IOSExportPurchaseSheet contrast & link Dynamic Type slice from BKL-31.",
-      "sourceOfTruth": [
-        "Sources/iOSSupport/Services/IOSDeviceEligibilityPolicy.swift",
-        "Sources/QwenVoiceCore/VoiceCloningConsentPolicy.swift",
-        "Sources/QwenVoiceCore/Qwen3TTSRuntimeProfile.swift",
-        "Sources/iOS/IOSStudioCanvas.swift",
-        "Sources/iOS/Commerce/IOSExportGate.swift",
-        "Sources/iOS/Settings/SettingsScreen.swift",
-        "Sources/iOS/Settings/OpenSourceLicensesScreen.swift",
-        "Sources/QwenVoiceCore/TelemetryGate.swift",
-        "config/third-party-attribution-policy.json",
-        "website/public/privacy/index.html"
-      ],
-      "needs": [
-        "mac",
-        "iphone"
-      ],
-      "updated": "2026-11-25",
-      "notes": "Landed RF-73 on local main (4703237c iPad eligibility + 2.5.19 binary hygiene; b896fce1 10-language impersonation guardrails + attributions; da5ce80d streamlined iOS safeguards, inline clone consent & UX fixes; 9afcbefe website /terms/, privacy/support/README & App Store 3.2.0 docs; 6cee422e phone-free checkpoint; plus on-device Export Purchase footer layout & iOS 27.2 XCUITest fixes). Phone-free scripts/dev.sh check --since 1363da5c passed 11/11 stages (52/52 Playwright checks). Physical iPhone verified 4/4 PASS with visual QA: studio-layout (ios-xcui-smoke-20261125-171558-719509a0), purchase exports (ios-xcui-purchase-20261125-173317-6570050a), control-audit external (ios-xcui-control-audit-20261125-174101-5e0f34ca), localization (ios-xcui-localization-20261125-180114-8f09bdd2). Remains in-flight pending push/CI and Phase 5 ASC writes (13+, 147 territories, Review Notes)."
     },
     {
       "id": "RF-16",
@@ -1288,7 +1262,7 @@
         "doc:docs/reference/content-rights-review.md"
       ],
       "updated": "2026-11-25",
-      "notes": "Read-only, no payload values; by web portal or asc. Earlier 2026-10-30..11-10 checks verified bundle identity, USES_THIRD_PARTY_CONTENT, secondary category Utilities, support URL, usesNonExemptEncryption false, and 148 territories on both app and export IAP (history: git log -p). 2026-11-25 maintainer decisions (D3/D4/C4/E3): bump ASC version to 3.2.0; exclude China Mainland (CN, CAC/ICP blocker) and keep South Korea (KR, Art. 31 covered in ko) on both app and export IAP -> 147 of 175 territories; raise initial age rating from 4+ to 13+ with Nov 16 descriptors No/No (RF-62); keep USES_THIRD_PARTY_CONTENT true with proactive Apache-2.0/MIT license list in Review Notes (RF-63). Accessibility declaration (Dark Interface only) stays post-launch. Still open: screenshots, IAP review screenshot + version attachment, RF-02 active Paid Apps, and App Privacy browser readback (ASR-02)."
+      "notes": "Read-only audit & redacted post-write readback (2026-11-25 via asc): bundle com.patricedery.vocello, categories PRODUCTIVITY/UTILITIES, USES_THIRD_PARTY_CONTENT, Made for Kids false; en-US Privacy Policy URL updated & read back as https://vocello.vercel.app/privacy/ (Support URL https://vocello.vercel.app/support/, Marketing URL https://vocello.vercel.app); China Mainland (CHN) excluded on both app and export IAP (com.patricedery.vocello.design_clone_export) -> exact parity at 147 of 175 territories (27 EU + CHN excluded, South Korea KOR kept, availableInNewTerritories true on both); Age Rating raised 4+ -> 13+ (THIRTEEN_PLUS across territories; Nov 16 sharedLocation & datingAndRelationships still null, web portal pending under RF-62). Still open: bump ASC version 3.0.0 -> 3.2.0, iPhone screenshots (0 sets), export IAP review screenshot (0 uploaded; state MISSING_METADATA, USD 19.99 base, en-US/fr-CA/fr-FR present, familySharable false) + version attachment, RF-02 active Paid Apps, RF-63 Review Notes, and App Privacy web readback."
     },
     {
       "id": "ASR-12",

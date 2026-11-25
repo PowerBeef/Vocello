@@ -114,7 +114,10 @@ The local-only `Tests/Fixtures/VocelloExports.storekit` fixture carries an arbit
 an approved live offer and is never bundled in the app or activated in shipping schemes. RF-02 owns
 the remaining account and product metadata work. On 2026-11-10 the purchase's availability was set to
 the app's 148 territories and its review note was entered
-([`app-store-listing.md`](app-store-listing.md) carries both). Settings → Design & Clone Export
+([`app-store-listing.md`](app-store-listing.md) carries both); on 2026-11-25 China Mainland (`CHN`)
+was excluded on both the app and the export IAP (`147` territories, keeping South Korea `KOR` and
+`availableInNewTerritories: true`), and readback confirmed 0 IAP review screenshots uploaded
+(`state: MISSING_METADATA` pending the screenshot and RF-02 Paid Apps activation). Settings → Design & Clone Export
 provides the StoreKit-localized price, Restore, status, privacy/support links and dismissal.
 See the [app guide](ios-app-guide.md#ios-export-purchase) for routes and compatibility.
 
@@ -148,8 +151,9 @@ for the release acceptance (RF-15) or the 201-take campaign.
 - [x] Approve product identifier/reference name, USD 19.99 and automatic regional pricing; create
       the non-consumable and price schedule under explicit authorization, leaving Family Sharing off.
 - [x] Complete localized product details (en-US, fr-CA, fr-FR) and territory availability (free
-      and iPhone only; 148 territories since the EU removal of 2026-10-27); Family Sharing confirmed
-      off (2026-10-12, RF-02). No submission is authorized.
+      and iPhone only; 148 territories since the EU removal of 2026-10-27, narrowed to 147 on
+      2026-11-25 by excluding China Mainland `CHN` on both app and IAP while keeping `KOR`); Family
+      Sharing confirmed off (2026-10-12, RF-02). No submission is authorized.
 - [x] Verify purchase/cancellation/pending/failure, restore, relaunch/offline owned access and
       refund/revocation, including every output export surface and Built-in free-export controls,
       in the local StoreKit session (RF-13, `ios-xcui-purchase-20261016-175234-5cbdbead`; the
@@ -167,14 +171,22 @@ Apple references: [purchase types](https://developer.apple.com/help/app-store-co
 [IAP configuration](https://developer.apple.com/help/app-store-connect/configure-in-app-purchase-settings/overview-for-configuring-in-app-purchases),
 [review rules](https://developer.apple.com/app-store/review/guidelines/#in-app-purchase).
 
-Current account state (2026-10-12, set in the web portal with the maintainer's approval; RF-02):
-- version 3.0.0, which replaced the unreleased 1.0 draft;
+Current account state (2026-10-12 baseline set in the web portal under RF-02; refreshed via
+authorized `asc` read/write readback on 2026-11-25):
+- version 3.0.0 (`PREPARE_FOR_SUBMISSION`, 0 screenshot sets), which replaced the unreleased 1.0
+  draft (will bump to `3.2.0` on explicit request ahead of submission);
 - category Productivity, secondary Utilities (changed from Music on 2026-11-04, maintainer decision);
-- free and iPhone only (Apple-silicon Mac and Vision Pro availability off), in 148 territories
-  since 2026-10-27, when the 27 EU territories were removed (maintainer decision; BKL-41);
-- age rating 4+;
-- App Privacy published as Data Not Collected, with the privacy policy URL;
-- the export purchase entered as above;
+- free and iPhone only (Apple-silicon Mac and Vision Pro availability off), in **147 territories**
+  on both app and export IAP (`availableInNewTerritories: true`): 27 EU territories excluded
+  2026-10-27 (BKL-41) and China Mainland (`CHN`) excluded 2026-11-25, with South Korea (`KOR`) kept;
+- age rating raised from `4+` to **`13+`** on 2026-11-25 (`ageRatingOverrideV2: THIRTEEN_PLUS`,
+  territory age ratings read back `THIRTEEN_PLUS`; legacy `appStoreAgeRating` enum maps to
+  `TWELVE_PLUS`, Brazil `SELF_RATED_TWELVE`); Apple's two Nov 16 descriptors (`sharedLocation`,
+  `datingAndRelationships`) still read back `null` and need a 2-click web-portal finish (`RF-62`);
+- App Privacy published as Data Not Collected, with the `en-US` Privacy Policy URL updated and read
+  back on 2026-11-25 as `https://vocello.vercel.app/privacy/`;
+- the export purchase entered as above (`state: MISSING_METADATA`; 0 review screenshot uploaded,
+  Paid Apps agreement still open under RF-02);
 - EU Digital Services Act status set on 2026-10-27 (details in the maintainer's private record);
 - export compliance answered: build 30, attached to version 3.0.0 since 2026-11-10, reads back
   VALID with `usesNonExemptEncryption` false, as build 29 did on 2026-11-01, and App Store
@@ -213,11 +225,13 @@ is complete.
       CryptoKit SHA-256 for download integrity). The processed build 30 reads back `VALID` with
       `usesNonExemptEncryption` false and asks for no further export-compliance information
       (2026-11-10; build 29 read the same on 2026-11-01). Repeat the read for any later candidate.
-- [ ] **Age rating**: currently `4+` in App Store Connect (2026-10-12, RF-02). Under `RF-73`,
-      **raise to `13+` before the initial 3.2.0 App Store submission** (given user-authored
-      unfiltered scripts + local voice cloning) and complete Apple's Nov 16 descriptors
-      (`Shared Location = No`, `Dating and Relationships = No`). Every write to App Store Connect
-      requires an explicit maintainer request.
+- [ ] **Age rating**: raised from `4+` to **`13+`** on 2026-11-25 (`ageRatingOverrideV2:
+      THIRTEEN_PLUS`, territory ratings `THIRTEEN_PLUS`, authorized `asc` write & readback under
+      `RF-62`/`RF-73`). Still open to close `RF-62`: complete Apple's two Nov 16 descriptors
+      (`Shared Location = No`, `Dating and Relationships = No`) in the App Store Connect web portal
+      (`asc` v7.4.0 does not yet expose CLI flags for those two fields; both currently read back
+      `null`) and verify readback. Every write to App Store Connect requires an explicit maintainer
+      request.
 - [ ] **Accessibility declaration** (Accessibility Nutrition Labels): none is entered. It does not
       block the submission. Apple's App Store Connect help (read 2026-11-10) says the labels are
       voluntary for now, and that support can be published only for a device with a live App Store
@@ -240,10 +254,10 @@ is complete.
       | Reduced Motion | Not claimed | Source honors the setting in two places; never checked on a device |
       | Captions | Not claimed | A take's script is shown, but not as time-synchronized text |
       | Audio Descriptions | Not claimed | The app has no video |
-- [ ] **Pricing and availability**: free, iPhone only (2026-10-12, RF-02), currently 148
-      territories (27 EU territories removed 2026-10-27). Under `RF-73`, exclude **China Mainland
-      (`CN`)** ahead of the initial 3.2.0 submission (**147 territories** on both the app and the
-      export IAP; keep South Korea `KR` enabled). Review new-territory policy at submission.
+- [x] **Pricing and availability**: free, iPhone only (2026-10-12, RF-02), updated and read back
+      on 2026-11-25 at **147 territories** on both the app and the export IAP (27 EU territories
+      removed 2026-10-27 + China Mainland `CHN` excluded 2026-11-25; South Korea `KOR` kept;
+      `availableInNewTerritories: true`). Review new-territory policy at submission.
 - [ ] **Account deletion / Sign in with Apple**: N/A — there is no account and no third-party login.
 - [x] **EU DSA status**: set on 2026-10-27 (details in the maintainer's private record), and the
       EU territories are unavailable. An EU release needs the trader step first (BKL-41).

@@ -110,7 +110,7 @@ Keep MLX dependency versions synchronized with `project.yml`; the lockstep rule 
 .package(path: "Packages/VocelloQwen3Core")
 ```
 
-The package requires Swift 6.1, macOS 14 or newer, or iOS 17 or newer. Vocello's application deployment
+The package requires Swift 6.2, macOS 14 or newer, or iOS 17 or newer. Vocello's application deployment
 targets are stricter and remain authoritative for the shipped products.
 
 ## Verification

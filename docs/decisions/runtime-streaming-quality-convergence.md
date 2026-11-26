@@ -2,7 +2,7 @@
 status: historical
 owner: backend-and-platform
 reviewed: 2026-10-20
-summary: The living convergence ADR — interprets config/runtime-refactor-contract.json (the sole phase-status authority), records the promotion history, and defines the streaming/quality invariants.
+summary: Historical/completed convergence ADR — interprets config/runtime-refactor-contract.json (the sole phase-status authority), records the promotion history, and defines the streaming/quality invariants.
 sourceOfTruth:
   - config/runtime-refactor-contract.json
 ---

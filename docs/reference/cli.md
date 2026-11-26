@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-15
+reviewed: 2026-11-25
 summary: The vocello CLI, the user-facing generation surface and deterministic benchmark/test driver over the same in-process MLX engine as the app.
 sourceOfTruth:
   - project.yml
@@ -86,8 +86,7 @@ resources, and existing governed license/NOTICE material. It rejects missing/sta
 extra executable code, symlinks, digest drift, or mismatched source/version/build identity. Packaging
 explicitly copies the catalogs because Xcode's tool product does not reliably emit those resource
 files; any present built catalog must match the source before staging. Where files this process
-creates carry macOS's `com.apple.provenance` tag (a shell started from a downloaded app, the Claude
-desktop app included), the installer package's payload, scripts and resources are recreated by a
+creates carry macOS's `com.apple.provenance` tag (for example, a shell started from a downloaded GUI app), the installer package's payload, scripts and resources are recreated by a
 one-shot launchd job, whose data-only copies carry no tag: `pkgbuild` would archive the tag as
 AppleDouble `._` entries, which the Bom check refuses. Release runners never take that path (BKL-72).
 `verify_packaged_dmg.sh … --include-cli` also verifies the signed/stapled CLI DMG, copies its folder
@@ -99,7 +98,7 @@ operator check against an already copied payload:
 ```sh
 python3 scripts/cli_package.py qualify \
   --directory "/path with spaces/Vocello CLI" \
-  --version 3.0.0 --build <unused-build> --commit <exact-sha> \
+  --version 3.1.0 --build <unused-build> --commit <exact-sha> \
   --model-store "/existing/model/store" \
   --clone-reference "/test-owned/reference.wav" \
   --report build/artifacts/macos/release/cli-generation-qualification.json
@@ -307,6 +306,9 @@ of kind `app`, the workspace's list of running applications, and, when both find
 table, where it looks for the `Vocello` executable inside a `Vocello.app` bundle. The last one covers
 a session the workspace list does not reach, such as ssh, cron or a launchd job; a bundle renamed on
 disk is found only by the first two. Process paths are compared in memory and written nowhere.
+`RF-69` (`052f7fb9`) hardened `EngineHostLease`, `MacEngineHostCoordinator`, the cross-process
+model-deletion gate, and 8 GB admission; `RF-73` (`b896fce1`) maps localized 10-language
+`.disallowedVoiceImitation` refusals through `CLIFailure` to `invalid_input` (exit 2).
 
 Streaming is the default for `vocello generate`. It mirrors the app's engine streaming path (same
 `streamingInterval` and chunk delivery) and reports the user-perceived first-chunk latency, but it does
@@ -341,8 +343,10 @@ names the file in `detail.joinedPath`; a `batch --long-form` row keeps it there 
 pause, seed, generation id, path, duration, finish reason and QC warnings) and `longFormAssembly`;
 `finishReason` is `max_tokens` when any segment was truncated. A rejected segment or join fails with
 `qc_rejected` (`detail.segment` names the segment); a stopped project keeps its completed segments and
-says where (warning `long_form_segments_kept`). A project Auto sends as Korean adds the warning
-`long_form_korean` before any model work, as the apps warn before such a project starts: Korean
+says where (warning `long_form_segments_kept`). A project sent as Korean — whether resolved from
+Auto or explicitly requested with `--language korean` (`RF-69`, `b1a560e2`,
+`CLILongFormProject.swift:84-106`) — adds the warning `long_form_korean` before any model work, as
+the apps warn before such a project starts: Korean
 long-form projects stop at a failed segment far more often than any other language (RF-60; in a
 `batch --long-form`, `detail.lines` names the 1-based lines). Projects write no History rows until the
 History lock lands (RF-30). `--no-stream` does not apply to a project and is refused with one.
@@ -716,13 +720,16 @@ immediately usable in the app, and vice versa. Before it fetches anything, `inst
 space on the model store's volume: it needs the bytes still to download (each planned file's size,
 less what an earlier attempt's kept staging really holds of that file) plus 256 MB, and with less it fails with `storage_full`
 (74), naming `detail.requiredBytes` and `detail.availableBytes` as decimal strings. A volume that
-fills during a download is `storage_full` too, not `download_failed`. The variant-scoped ids are
+fills during a download or audio write — including CoreAudio/Carbon `dskFulErr` (`-34`) and POSIX
+`ENOSPC`/`EDQUOT` classified by `CLIFailure.isStorageFull` (`RF-69`, `b1a560e2`) — is `storage_full`
+too, not `download_failed` or `io_error`. The variant-scoped ids are
 `pro_custom_speed`, `pro_design_speed` and `pro_clone_speed`: each mode's one model, the hybrid,
 keeps the `speed` id, and no `…_quality` id exists since RF-59. `generate --variant quality` warns
 `variant_retired` and uses that model. Foreground sessions are invalidated on every terminal path;
 durable staging precedes terminal continuation, bounded progress retains the exact final count,
-transient retries preserve valid staging, explicit cancellation discards it, and compact local
-metrics are bounded under `diagnostics/model-downloads/`. See
+transient retries preserve valid staging, explicit cancellation discards it, `RF-69` (`cbe52fc2`)
+hardened `HuggingFaceDownloader` and `SharedModelComponentStore` activation/staging hygiene, and
+compact local metrics are bounded under `diagnostics/model-downloads/`. See
 [`model-delivery.md`](model-delivery.md).
 
 For test/bench lanes with `QWENVOICE_DEBUG=1`, weights live under `QwenVoice-Debug/`; the test

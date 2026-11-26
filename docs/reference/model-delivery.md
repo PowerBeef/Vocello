@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-15
+reviewed: 2026-11-25
 summary: The shared model downloader — chunked-transfer defaults, iOS background session and restoration ledger, retry/cancel, verification, diagnostics, and the isolated live proof lane.
 sourceOfTruth:
   - Sources/QwenVoiceCore/HuggingFaceDownloader.swift
@@ -142,13 +142,17 @@ read-compatible but cannot claim shared-component reuse.
 macOS, CLI, and iOS now resolve `ProductionModelCatalog.deliveryPlan(...)` rather than enumerating a
 live repository. `validate --require-complete` proves this static contract. It does not replace the
 isolated Mac/iPhone lifecycle proofs, which must be refreshed after redirect, restoration,
-delivery-routing, or shared-component changes. The latest passing Mac proof is the 2026-08-08
-isolated `pro_custom_speed` install at the 2026.08.06.1 marking re-pin ("Shared component
-store"); the latest passing iPhone acceptance is the 2026-08-29 run
-`ios-xcui-model-download-20260829-182534-91d70526` ("Diagnostics and acceptance" below). Both
-predate the 2026.09.14.1 fp32-tokenizer re-pin; the 2026-09-23 PA-29 iPhone runs delivered the
-current artifacts but are not acceptance. The 2026-07-23 six-artifact Mac run and three-artifact iPhone run described below remain exact
-history for the prior artifact generation.
+delivery-routing, or shared-component changes. Under `RF-69` (`cbe52fc2`, 2026-11-23),
+`HuggingFaceDownloader`, `SharedModelComponentStore`, and iOS versioned staging (`E-03`/`ER-10`)
+were hardened against stale staging collisions and partial-activation hazards; under `RF-73`
+(2026-11-25), `4703237c` admitted eligible 8 GB+ M-series / A17 Pro iPads in portrait compatibility
+mode, `da5ce80d` routed iOS model download and removal failures through localized path-free catalog
+copy, and `b896fce1` attested Meta AudioSeal (`MIT`) auxiliary watermark weights across all three
+catalogs. Historical pre-`2026.11.13.1` proofs retained for lineage include the 2026-08-08 isolated
+Mac `pro_custom_speed` install at the 2026.08.06.1 marking re-pin ("Shared component store"), the
+2026-08-29 iPhone acceptance run `ios-xcui-model-download-20260829-182534-91d70526` ("Diagnostics
+and acceptance" below), the 2026-09-23 PA-29 iPhone runs (non-acceptance), and the 2026-07-23
+six-artifact Mac / three-artifact iPhone runs described below.
 
 ## Artifact provenance
 

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-23
+reviewed: 2026-11-25
 summary: Project-specific MLX reference for the Qwen3-TTS engine on mlx-swift 0.32.3 — lazy evaluation and the pipelined per-frame step, MLX error scopes, quantization mechanics and the per-layer recipe, the KV cache, sampler and seed behaviour, cache clearing and memory posture, the version pins and the pin-move procedure (§9).
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Package.swift
@@ -14,7 +14,7 @@ sourceOfTruth:
 # MLX Guide for Vocello
 
 > **Living document.** When this guide disagrees with the code, the code wins: fix this file.
-> Reviewed 2026-11-23 against the shipping pins (mlx-swift 0.32.3, mlx-swift-lm 3.32.3,
+> Reviewed 2026-11-25 against the shipping pins (mlx-swift 0.32.3, mlx-swift-lm 3.32.3,
 > swift-transformers 1.3.5 and swift-huggingface 1.0.0, moved together by CONV-21 on 2026-10-16),
 > the RF-18 sampling changes of 2026-10-20, the RF-55/RF-59 `attn` hybrid artifacts of 2026-11-13,
 > and Pack B (`RF-68`: hoisted `CodePredictorCompiledPlan` with `compile(inputs: [weightInputs])`,
@@ -93,7 +93,7 @@ both, and lazy timings are never kernel attribution (§8).
 
 MLX runs operations on a stream; the default is the GPU. Vocello runs model work on that one global
 GPU stream (audit F). The only explicit CPU-stream work is the speaker embedding's finite check
-(`Qwen3TTSVoiceClonePrompt.swift:448`), so adopting a stored clone artifact submits no Metal work iOS could refuse
+(`Qwen3TTSVoiceClonePrompt.swift:537`), so adopting a stored clone artifact submits no Metal work iOS could refuse
 in the background (BG-01).
 
 ### 2.5 Unified memory
@@ -135,7 +135,7 @@ threw on a Metal thread and aborted the process: BG-1's crash class (DEP-1).
   half-evaluated state. A file error from mlx-swift's own I/O (`MLX.save`, `loadArrays`) during
   artifact adoption or persistence fails the operation without an unload.
 - **Lazy work stays inside its scope.** The clone reference encode is evaluated inside
-  `createVoiceClonePrompt` (`Qwen3TTS.swift:1030-1033`, F-07) instead of later, in persistence or the
+  `createVoiceClonePrompt` (`Qwen3TTS.swift:1135`, F-07) instead of later, in persistence or the
   first take.
 - **Not captured.** MLX work on a detached task, on a thread outside the task tree, or on MLX's CPU
   scheduler thread still reaches mlx-swift's process-wide fallback.
@@ -172,7 +172,7 @@ not used.
   `model.text_embedding` (originally written by `scripts/convert_text_embedding_8bit.py` on 2026-07-26)
   plus the 112 talker attention projections `model.layers.{0..27}.self_attn.{q,k,v,o}_proj`
   (assembled by `scripts/build_hybrid_model.py` in RF-55).
-- **What the loader does** (`Qwen3TTSLoading.swift:359-372`). `quantize(model: talker)` runs a per-path
+- **What the loader does** (`Qwen3TTSLoading.swift:474`). `quantize(model: talker)` runs a per-path
   closure that quantizes a module only when the checkpoint holds `<path>.scales`, and uses the
   per-layer entry when one names the path, the global entry otherwise. The artifact therefore decides
   which modules are quantized; the code holds no list.
@@ -305,11 +305,12 @@ The model itself (the talker, the 15-pass code predictor, the codec) is describe
   (`Qwen3TTSCodePredictor.swift:88-95`); this fused RoPE replaced a hand-rolled rotate-half chain
   (§7.2).
 - **The compiled plan** (`Qwen3TTSCodePredictorCompiled.swift`; `SEMANTIC_DELTAS.json` DECODE-001,
-  active). The 15 passes are compiled once per generation, keyed by pass index, and own their K/V
-  buffers. `Qwen3CodePredictorCompiledTests` compares the compiled and eager paths within
-  `accuracy: 2e-6` on a small fp32 model, not byte for byte (F-15); the file's own comment claims
-  more. The adoption A/B measured 12/12 fixed-seed byte-identical takes on its cells, a one-time
-  result that the unit test does not guarantee.
+  active). The 15 passes are keyed by pass index; originally compiled per generation, the plan is
+  now hoisted onto `Qwen3TTSModel` and prewarmed at model warmup (see below), with lazy per-pass
+  K/V buffers allocated only for the eager-sampler path. `Qwen3CodePredictorCompiledTests` compares
+  the compiled and eager paths within `accuracy: 2e-6` on a small fp32 model, not byte for byte
+  (F-15); the file's own comment claims more. The adoption A/B measured 12/12 fixed-seed
+  byte-identical takes on its cells, a one-time result that the unit test does not guarantee.
 - **The frame as one function** (RF-46, DECODE-005). When the subtalker stage is the plain
   temperature and top-k sampler, which production uses, `runFrame` runs the fifteen passes, each
   followed by its sampler, and the sum of the frame's code embeddings in one compiled function; the
@@ -343,7 +344,7 @@ Each frame builds one graph (talker forward, the 15 code-predictor passes, sampl
 step's input embedding) and submits it once. Production uses the `.pipelined` step policy
 (`Qwen3StreamStepEvalPolicy`, `Qwen3TTSGenerationProfiles.swift:285-298`):
 
-1. `asyncEval(inputEmbeds, isEOS)` submits the step (`Qwen3TTS.swift:2802-2816`);
+1. `asyncEval(inputEmbeds, isEOS)` submits the step (`Qwen3TTS.swift:2986-2988`);
 2. the previous chunk's materialization and channel sends run while it computes;
 3. the sampled-token `item` read is the step's first blocking read.
 
@@ -440,8 +441,8 @@ so one generation cannot change another's.
 ### 5.4 Cache clearing and what it costs
 
 The runtime clears MLX's buffer cache at three policy points: after a generation (per tier), after
-each streamed chunk when `clearCacheOnStreamChunkEmit` is set (`Qwen3TTS.swift:1926-1996`), and
-every N generated tokens (`tokenMemoryClearCadence`, `Qwen3TTS.swift:2189`). Outside that policy,
+each streamed chunk when `clearCacheOnStreamChunkEmit` is set (`Qwen3TTS.swift:2079-2149`), and
+every N generated tokens (`tokenMemoryClearCadence`, `Qwen3TTS.swift:2343`). Outside that policy,
 marking clears the cache four times per take: before the pass, after its frame-rate stage, after
 the pass and once the generator is dropped (B-09; its per-window clears went with RF-48, see
 `Packages/VocelloQwen3Core/PERFORMANCE.md`, Publication marking). The sources hold 29
@@ -475,7 +476,10 @@ The engine runs in-process, so the app and the engine share one Jetsam budget. T
   October 14 and 16 smoke diagnostics, D-06); the Game Mode opt-out (RF-37) lies between, and a
   non-game may not enable Game Mode
   ([the research report](../audits/2026-11-10-apple-silicon-performance-research.md), card E1).
-  Peak use is 2.1–3.2 GB on Speed, about half of the limit.
+  Peak use on the shipped `attn` hybrid (Wave 5, `5cc8ed43`) is 1,949–2,503 MB warm (Custom
+  1,969 MB, Design 1,949 MB, Clone 2,503 MB) and 3,584 MB on a Clone cold peak — roughly a third to
+  slightly over half of the limit, with 0 MB retained growth across switches (earlier 3.0 4-bit
+  Speed peaked at 2.1–3.2 GB).
 - **iOS 26:** about 6 GB on the same phone (the historical figure in
   [`ios-engine-optimization.md`](ios-engine-optimization.md)).
 - **8 GB phones under iOS 27:** the entitled limit is unmeasured (research open question 9).
@@ -663,7 +667,7 @@ Couplings:
   those two move together (F-19). Review the swift-transformers pin in every mlx move: tokenizer
   behaviour is engine behaviour.
 - The clone-artifact identity names the mlx-swift build
-  (`Qwen3TTSVoiceClonePrompt.mlxNumericsVersion`, `Qwen3TTSVoiceClonePrompt.swift:206`, F-06), and
+  (`Qwen3TTSVoiceClonePrompt.mlxNumericsVersion`, `Qwen3TTSVoiceClonePrompt.swift:289-295`, F-06), and
   `scripts/qwen3_core_contract.py` fails when it differs from the pin. An mlx-swift move therefore
   rebuilds every saved voice's prompt once.
 
@@ -772,8 +776,10 @@ A proposal is only a review input; authorization and §9.3 still apply.
 Do not regress these without a maintainer decision:
 
 - **No hard `Memory.memoryLimit` in production.** Use `cacheLimit`, the clears and the pressure bands.
-- **No Quality→Speed OOM fallback.** The iPhone is Speed-only by contract; load the chosen variant and
-  surface the real error.
+- **No silent tier downgrade on OOM.** Since RF-59 both macOS and iPhone ship a single `attn` hybrid
+  model per mode (retiring the 3.0 Quality tier); never add a silent fallback model on memory
+  pressure — surface the real error (or the documented `.withoutCloneEncoders` clone-gate refusal on
+  constrained iOS devices).
 - **MLX work runs inside an error scope, and every `asArray` readback follows `evalForReadback`**
   (§2.6).
 - **Keep MLX callers single-flight** (§4.2).

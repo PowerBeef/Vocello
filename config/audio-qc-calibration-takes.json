@@ -3,7 +3,7 @@
   "kind": "audio-qc-calibration-takes-policy",
   "version": 2,
   "population": "N3",
-  "authority": "docs/audits/2026-09-25-audio-qc-speech-analysis-audit.md sections 5.1, 5.4, 5.5 and 5.7; config/audio-qc-qualification-policy.json",
+  "authority": "docs/reference/qc.md; config/audio-qc-qualification-policy.json",
   "description": "The take plan of the natural calibration takes (population N3), in cells that each exercise one of the product's generation paths over one split of config/audio-qc-script-pool.json. standard: every script spoken by one primary voice, rotating over the language's two Built-in speakers and one Voice Design brief, plus a deterministic donor subset spoken by a second voice (same-script, different-voice pairs for the class E identity swap); the version 1 layout and seed identity. clone: Voice Clone takes conditioned on human reference clips of the pinned speaker corpora, same-language and cross-language. cross-lingual: every Built-in speaker of the split and Voice Design briefs written in English and in the target language speaking each language. long-form: multi-segment projects that the product's long-form planner splits and its bounded assembler joins, with their seams. scripts/audio_qc_calibration_takes.py plans, binds and validates the takes; scripts/macos_test.sh qc-takes generates them. Takes are calibration data, never a benchmark: nothing is published and no history record is written.",
   "generation": {
     "customMode": "custom",

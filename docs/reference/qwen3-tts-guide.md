@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-23
+reviewed: 2026-11-25
 summary: Model reference for the Qwen3-TTS checkpoints Vocello ships — the upstream family, the shipped artifacts and conversion recipe, the architecture, generation semantics as shipped after RF-18 and CONV-21, languages and speakers, the failure catalogue and the parity ledger.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift
@@ -339,8 +339,11 @@ What each mode accepts and what the host sends (`GenerationSemantics.qwen3Prompt
 | Design | the instruction | the brief and the delivery, as one instruction | — | `auto` |
 | Clone | the reference: x-vector, plus reference codes for ICL | none; the request type has no field for it | inline or saved-voice transcript | `auto` |
 
-Custom and Design instructions are refused if they ask for celebrity imitation or voice impersonation
-(`validateQwenPromptContract`, `GenerationSemantics.swift:891`).
+Custom and Design instructions are refused across all 10 supported languages if they ask for
+celebrity imitation or voice impersonation (`validateQwenPromptContract`,
+`GenerationSemantics.swift:916-932`), throwing the typed
+`MLXTTSEngineError.disallowedVoiceImitation` refusal (`RF-73`, `b896fce1`, localized across all
+10 languages and mapped to `invalid_input` in the CLI).
 
 ### 5.1 Built-in Voice (CustomVoice)
 
@@ -693,8 +696,8 @@ The long-form planner fills each segment up to a 300-unit budget (`LongFormPlann
 867 characters, about 60 s; C-02), and each segment is one streamed take, so long segments meet A-01's
 text exhaustion. The RF-18 screens kept that budget: a 200-unit budget (C2) failed 15 of 56 projects
 under Consistent against 9 for the control, so C-02 was not adopted. Consistent is retired (RF-58);
-the long-form refusals left under Expressive, mostly in Chinese, Japanese and Korean, are RF-55's
-subject (§11.2; the hybrid candidate is in [`hybrid-model.md`](hybrid-model.md)). Shipping behavior is in
+the long-form refusals left under Expressive, mostly in Chinese, Japanese and Korean, were RF-55's
+subject (§11.2; the shipped `attn` hybrid model is in [`hybrid-model.md`](hybrid-model.md)). Shipping behavior is in
 [`long-form-generation.md`](long-form-generation.md).
 
 ---
@@ -805,7 +808,7 @@ updated for RF-18. The upstream readings in the clone, loop and number rows were
 - **Clone references.** The gaps in §8.2 and §8.3. "Use audio only" on a saved voice with a
   transcript no longer conditions on that transcript (G-02, fixed 2026-11-11, RF-51).
 - **No human listening for 3.x.** Machine screens catch gross failures only; subtle defects ship as a
-  documented limitation ([v3.0.0 release notes](../releases/v3.0.0.md)).
+  documented limitation ([v3.0.0](../releases/v3.0.0.md) and [v3.1.0](../releases/v3.1.0.md) release notes).
 
 ### 11.3 Model limits Qwen states
 
@@ -833,8 +836,8 @@ Every verified place Vocello's runtime departs from Qwen's reference implementat
 | — | Subtalker sampling | 0.9 / top-k 50 / top-p 1.0 for every request | same, for every take | **adopted** 2026-10-20 (RF-18's C1 arm) | — |
 | D5 / A-04 | Decoder history for streamed clones | decodes reference plus generated codes, then trims | primed with the reference since 2026-11-12 | matches; adopted by `clone-decoder-history-primed-confirm`; the primed state is reused since A-26 | RF-52 |
 | D6 | Custom with no detected language | `nothink`, no language id | English plus the English diction sentence | open, by design; `QWENVOICE_CUSTOM_AUTO_LANGUAGE=on` is the A/B arm | ER-05 |
-| A-02 | Mimi encoder RoPE | `rotate_half` on permuted q/k weights | `traditional: true` | open; ships with G-03's version bump; measured 2026-11-11 with no detectable effect on clone output (below) | ER-04 |
-| A-03 | Decoder attention | 72-frame window in all 8 layers; batch decode in 300-frame chunks with 25 of context | full causal; KV grows for the whole take | open | PA-16 |
+| A-02 | Mimi encoder RoPE | `rotate_half` on permuted q/k weights | `traditional: true` | open (default stays adjacent-pair); selectable behind `QWENVOICE_ENCODER_ROTARY=split-half`; Swift clone screen `encoder-rotary-split-half` (RF-52, 2026-11-11) was INCONCLUSIVE pointing at harm (ASR error +0.021, gross failures 2→5; [`mimi-codec-guide.md` §2.2](mimi-codec-guide.md#22-the-rotary-embedding-bug-a-02)) | ER-04 |
+| A-03 | Decoder attention | 72-frame window in all 8 layers; batch decode in 300-frame chunks with 25 of context | full causal; KV grows for the whole take | open (default unchanged for 3.2; `QWENVOICE_DECODER_WINDOW=on` diagnostic; `RF-54` declined 2026-11-24 in `f070f41a`) | PA-16 |
 | — | Encoder attention | full causal (the window applies only under FlashAttention-2) | full causal | matches; do not add the 250-frame window | PA-16 wording |
 | A-11 | ICL target text | no separator after the reference text | none before a Han or kana target since 2026-11-12; one leading space otherwise (French first-word drops) | matches for Han and kana; adopted by the `clone-cjk` screen's rule `icl-target-space-unspaced-scripts`; `every-target` restores the space | RF-52 |
 | A-12 | ICL reference padding | none | none since 2026-11-11 (`icl-ref-unpadded-v3`; 0.5 s of silence before) | matches; adopted by the clone screen's rule `reference-padding-none` | RF-52 |
@@ -866,9 +869,12 @@ The finding stays open, and its effect is no longer unmeasured:
   the start; it did not fix a measured defect. mlx-audio-swift `main` still has the wrong
   convention.
 
-The pre-screen does not cover other languages, cross-language or noisy references, long targets or
-the Swift runtime. The fix is for parity, with G-03's version bump, and no audible change is
-expected from it.
+The Python pre-screen did not cover other languages, cross-language or noisy references, long targets
+or the Swift runtime. The subsequent Swift clone screen (`encoder-rotary-split-half`, RF-52,
+2026-11-11, [`mimi-codec-guide.md` §2.2](mimi-codec-guide.md#22-the-rotary-embedding-bug-a-02))
+finished INCONCLUSIVE with the direction pointing at harm (better-ASR error rate `+0.021 [+0.005,
++0.041]`, gross failures `2 → 5`, speaker similarity `−0.007`), so the default stays the
+adjacent-pair convention behind the `QWENVOICE_ENCODER_ROTARY=split-half` diagnostic toggle.
 
 The audit's A-06 and A-07 are D2 and D6. One constraint follows from D1 (A-05): a talker KV window
 would evict the unspoken script under the streaming text layout, so a window is allowed only with a

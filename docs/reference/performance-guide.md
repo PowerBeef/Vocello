@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-11
+reviewed: 2026-11-25
 summary: Swift 6 and Metal performance reference for the apps and CLI — build settings, isolation, value types, dispatch, allocation and ARC; profiling and GPU capture; how MLX drives Metal (command buffers, kernel caching, compile(), no MPS, unified memory, Metal memory telemetry); direct-Metal patterns for future custom kernels; iOS Metal limits, troubleshooting and the performance-change checklist.
 sourceOfTruth:
   - project.yml
@@ -88,7 +88,7 @@ these areas in `Sources/`, update this guide with the new rationale and measured
 
 ### 2.2 Swift 6 language mode
 
-All Swift targets use `SWIFT_VERSION: "6"`, whose language mode gives data-race safety (`Sendable`, `actor`, `@MainActor`). `project.yml` also turns on, at project level, strict memory safety (`SWIFT_STRICT_MEMORY_SAFETY`) and the upcoming features NonisolatedNonsendingByDefault, InferIsolatedConformances and MemberImportVisibility. Under NonisolatedNonsendingByDefault a nonisolated async function runs on its caller's actor unless it is marked `@concurrent` ([§3.5](#35-task-and-taskdetached)). Only the three XCUITest bundles (`VocelloMacUITests`, `VocelloiOSUITests`, `VocelloiOSCandidateUITests`) also set `SWIFT_STRICT_CONCURRENCY: complete` explicitly in `project.yml`.
+All Swift targets use `SWIFT_VERSION: "6"`, whose language mode gives data-race safety (`Sendable`, `actor`, `@MainActor`). `project.yml` also turns on, at project level, strict memory safety (`SWIFT_STRICT_MEMORY_SAFETY`) and the upcoming features NonisolatedNonsendingByDefault, InferIsolatedConformances and MemberImportVisibility. Under NonisolatedNonsendingByDefault a nonisolated async function runs on its caller's actor unless it is marked `@concurrent` ([§3.5](#35-task-and-taskdetached)). Only the four XCUITest bundles (`VocelloMacUITests`, `VocelloiOSUITests`, `VocelloiOSPurchaseUITests`, `VocelloiOSCandidateUITests`) also set `SWIFT_STRICT_CONCURRENCY: complete` explicitly in `project.yml`.
 
 ### 2.3 Compilation-condition switches
 
@@ -558,11 +558,14 @@ That is one reason prewarm matters.
 `compile()` traces a function and fuses its operations into fewer kernels. A change of input shape,
 dtype or input count retraces it unless the function is compiled `shapeless: true`.
 `MLX_DISABLE_COMPILE` turns compilation off process-wide (`compile.cpp:218-226`). Vocello compiles
-the talker and code-predictor SwiGLU (`Qwen3TTSTalker.swift:33-37`,
-`Qwen3TTSCodePredictor.swift:8-12` in the owned package) and the pass-indexed code-predictor plan
-([mlx-guide §4.2](mlx-guide.md#42-the-code-predictor-and-its-compiled-plan)); declaring quantized
-weights as compile `inputs:` was measured and rejected
-([mlx-guide §7.4](mlx-guide.md#74-compile-quantized-parameters-as-inputs-rejected-and-the-pass-indexed-plan-shipped)).
+the talker and code-predictor SwiGLU (`Qwen3TTSTalker.swift:42-46`,
+`Qwen3TTSCodePredictor.swift:8-12` in the owned package) and the hoisted, pass-indexed code-predictor
+plan ([mlx-guide §4.2](mlx-guide.md#42-the-code-predictor-and-its-compiled-plan)), which passes
+flattened quantized weights through fixed-shape `compile(inputs: [weightInputs])` (`RF-68`,
+`87d6a4b0`) so `mlx-swift 0.32.3`'s `thread_local` `CompileCache` retains no weights across model
+switches; only per-call `shapeless: true` talker-MLP compilation with packed weights as `inputs:`
+was measured and rejected
+([mlx-guide §7.4](mlx-guide.md#74-compile-per-call-shapeless-true-talker-mlp-rejected-vs-hoisted-code-predictor-plan-shipped)).
 
 `MLXFast.metalKernel` JIT-compiles a custom kernel from a source string; Vocello uses none. It
 returns an `MLXFastKernel`, and the launch geometry goes on the call

@@ -1,23 +1,34 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
-reviewed: 2026-11-21
-summary: Forensic development history and institutional memory from v1.0.0 through v3.1.0: architectural eras, releases, harness transitions, development-hell postmortems, measurement traps and anti-regression rules.
+reviewed: 2026-11-25
+summary: Point-in-time forensic development history and institutional memory from v1.0.0 through v3.1.0 (dea8ec6e, Nov 20, 2026) — architectural eras, releases, harness transitions, development-hell postmortems, measurement traps and anti-regression rules (predates the Nov 21-25 3.2.0 pivot).
 sourceOfTruth:
   - config/roadmap.json
   - config/roadmap-archive.json
   - benchmarks/HISTORY.md
 ---
-# Vocello Development History & Institutional Memory (`v1.0.0` → `v3.1.0` / `dea8ec6e`)
+# Vocello Development History & Institutional Memory (`v1.0.0` → `v3.1.0` / `dea8ec6e`, Historical Snapshot)
+
+> [!NOTE]
+> **Historical snapshot (frozen at `dea8ec6e`, 2026-11-20):** After this snapshot was written, the
+> maintainer pivoted iOS submission from `3.1.0` to **`3.2.0`** (no further 3.1 TestFlight builds
+> after `v3.1.0-ios.3`). Between Nov 21 and Nov 25, Pack B (`RF-68` MLX `CompileCache` leak fix /
+> GPU `seenMask` / `captureIntrospection` gating, `RF-69` engine/store hardening), `RF-72`
+> (calibrated offline multimodal audio QC complement), `RF-70` (closed retaining shipped `attn`
+> unchanged for 3.2, `RF-54` declined), and `RF-73` (App Store 3.2.0 readiness: 8 GB+ iPads,
+> `QVOICE_DEVICE_DIAGNOSTICS` binary hygiene, 10-language impersonation guardrails, inline clone
+> consent, Terms/Privacy updates) all landed on `main` ahead of Phase 4 (`RF-71` Mac/CLI 3.2.0 and
+> `v3.2.0-ios.N`). For live status see `docs/development-progress.md` and `config/roadmap.json`.
 
 > [!IMPORTANT]
-> **Purpose & Authority:** This document is a forensic reconstruction of Vocello's entire nine-month engineering history—**3,294 commits**, **38 signed/annotated tags**, **411 validated benchmark records**, **34+ technical audits**, and **481 tracked roadmap items** (`347` closed, `134` open) from initial commit `083bdbd6` (`2026-02-21`) through `dea8ec6e` (`2026-11-20`). Every metric, failure root cause, harness switch, and architectural pivot below was verified directly from Git objects, release notes, and retained audit ledgers so that hard-won lessons are never repeated as Vocello enters final iOS 3.1.0 App Store submission and post-3.1 evolution.
+> **Purpose & Authority:** This document is a point-in-time forensic reconstruction of Vocello's first nine months of engineering history—**3,294 commits**, **38 signed/annotated tags**, **411 validated benchmark records**, **34+ technical audits**, and **481 tracked roadmap items** (`347` closed, `134` open at the snapshot) from initial commit `083bdbd6` (`2026-02-21`) through `dea8ec6e` (`2026-11-20`). Every metric, failure root cause, harness switch, and architectural pivot below was verified directly from Git objects, release notes, and retained audit ledgers so that hard-won lessons are never repeated.
 
 ---
 
 ## 1. Executive Overview & Quantitative Arc
 
-Vocello began on **February 21, 2026** as **QwenVoice**—a 58-file macOS 14 SwiftUI wrapper around a first-boot Python `.venv` and an `mlx-audio` JSON-RPC subprocess—built as a first flagship software project. Over the next nine months, it survived **four major "development hell" stalls**, **21 coding-harness transitions across 7 agent tools**, **two complete runtime rewrites**, **two full UI resets**, and **12 iOS TestFlight candidate tags**, emerging on **November 20, 2026** as a **2,048-file, zero-cloud, in-process Swift 6.4 + MLX monorepo** shipping notarized macOS + CLI `v3.1.0`, an owned Qwen3-TTS runtime ([VocelloQwen3Core](../../Packages/VocelloQwen3Core/Package.swift)), a custom `attn` 4-bit/8-bit hybrid quantization recipe ([hybrid-model.md](hybrid-model.md)), a 39-validator contract gate ([contract_gate.py](../../scripts/lib/contract_gate.py)), and an iPhone 15 Pro+ release candidate (`v3.1.0-ios.3`) on the threshold of App Store Review.
+Vocello began on **February 21, 2026** as **QwenVoice**—a 58-file macOS 14 SwiftUI wrapper around a first-boot Python `.venv` and an `mlx-audio` JSON-RPC subprocess—built as a first flagship software project. Over the next nine months, it survived **four major "development hell" stalls**, **21 coding-harness transitions across 7 agent tools**, **two complete runtime rewrites**, **two full UI resets**, and **12 iOS TestFlight candidate tags**, emerging on **November 20, 2026** as a **2,048-file, zero-cloud, in-process Swift 6.4 + MLX monorepo** shipping notarized macOS + CLI `v3.1.0`, an owned Qwen3-TTS runtime ([VocelloQwen3Core](../../Packages/VocelloQwen3Core/Package.swift)), a custom `attn` 4-bit/8-bit hybrid quantization recipe ([hybrid-model.md](hybrid-model.md)), a 39-validator contract gate ([contract_gate.py](../../scripts/lib/contract_gate.py)), and the `v3.1.0-ios.3` iPhone TestFlight candidate (subsequently superseded by the Nov 21–25 3.2.0 pivot noted above).
 
 ### 1.1 Monthly Commit Velocity (`3,294` Commits)
 
@@ -44,7 +55,7 @@ xychart-beta
 | **`v2.4.0`** (`ed04a28a`) | Aug 01 | 1,117 | 347 | 121 | 121 | 3 | 8-bit text embeddings + compiled predictor + R1 delivery presets |
 | **`v3.0.0`** (`946c469f`) | Oct 23 | 1,903 | 618 | 315 | 334 | 8 | **In-process Mac+iOS+CLI** + `VocelloDesktopCore`/`VocelloCLICore` + `focusLock` |
 | **`v3.1.0`** (`65530ffd`) | Nov 16 | 2,037 | 649 | 333 | 359 | 8 | Core MLX overhaul + single `attn` hybrid model + 7-lane tag promotion |
-| **`HEAD`** (`dea8ec6e`) | Nov 20 | 2,048 | 650 | 342 | 362 | 8 | Antigravity + Gemini 4 harness + `VocelloSharedPolicies` + GA `xcode-27` (`27.2`) |
+| **`dea8ec6e`** *(snapshot head)* | Nov 20 | 2,048 | 650 | 342 | 362 | 8 | Antigravity + Gemini 4 harness + `VocelloSharedPolicies` + GA `xcode-27` (`27.2`) |
 
 ### 1.3 Five-Era Architectural Evolution
 
@@ -112,7 +123,7 @@ Every tagged release and candidate in repository history, what it shipped, and w
 | **`v3.1.0`** (`65530ffd` → `693f13d1`) | Nov 16 | 31 | **SHIPPED (Mac DMG + CLI `.pkg`)** | Single `attn` hybrid model, automatic 3.0→3.1 model update, **first-ever end-to-end 7-lane quality promotion on tag checkout**, published Nov 17 07:17 UTC (`44036811898`). |
 | **`v3.1.0-ios.1`** (`c5b30287`) | Nov 17 | 31 | **BLOCKED (`security.yml`)** | Same-day Vite dev-dependency `picomatch` ReDoS advisory (`GHSA-fc5q-39xc-vjpf`, no upstream patch) failed un-scoped `npm audit` before `archive-ios` (`165bd1c7` added time-boxed `npm-audit-exceptions.json`). |
 | **`v3.1.0-ios.2`** (`165bd1c7`) | Nov 17 | 31 | **ABANDONED (`security.yml`)** | GitHub macOS arm64 queue **abandoned** Swift CodeQL (`result: "abandoned"`), exposing that `CI required` & `Security required` used deny-lists (`failure`/`cancelled`) that **falsely passed on `abandoned`** (`source-authority` caught it!). |
-| **`v3.1.0-ios.3`** (`a551aa4b`) | Nov 18 | 31 | **VALID (Current Candidate)** | Replaced `CI required` & `Security required` deny-lists with strict `jq` allow-lists (`success`). Current iOS 3.1.0 TestFlight candidate awaiting final phone window (`RF-35`, `RF-41`, `RF-42`). |
+| **`v3.1.0-ios.3`** (`a551aa4b`) | Nov 18 | 31 | **VALID (Final 3.1 Candidate; Superseded by 3.2.0)** | Replaced `CI required` & `Security required` deny-lists with strict `jq` allow-lists (`success`). Final 3.1.0 TestFlight candidate as of the Nov 20 snapshot; later superseded by the 3.2.0 pivot (`RF-68`..`RF-73`). |
 
 ---
 
@@ -175,7 +186,7 @@ Every tagged release and candidate in repository history, what it shipped, and w
   3. **Aborted Forge Migration:** On July 1, the primary forge was migrated to GitLab with GitHub Actions disabled (`5f89d8ab`), then triple-reverted the same afternoon (`aa63ccb8`, `073777fc`, `4a4d86eb`).
 
 ### 4.3 Dev Hell #3: The 83-Day Release Drought & Tooling-Over-Product Inversion (`2026-08-02` – `2026-10-23`)
-- **Metrics:** **1,514 commits** between `v2.4.0` and `v3.0.0` (`809` in Sept alone). Between Sept 4 (when `release-first-3-0-2026-09` opened) and Oct 12, **fewer than 60 of 975 commits touched a release item** ([release-first-execution-2026-09.md](release-first-execution-2026-09.md)). By Sept 22 ([2026-09-22-project-audit.md](../audits/2026-09-22-project-audit.md)), **verification/governance code (`~125K LOC` across 159 scripts + 51 JSON contracts) equaled the entire product codebase (`~125K LOC`)**, reference docs peaked at **65 files** (`917856c3`), and `development-progress.md` hit **187 KB (~47K tokens/session)**.
+- **Metrics:** **1,514 commits** between `v2.4.0` and `v3.0.0` (`809` in Sept alone). Between Sept 4 (when `release-first-3-0-2026-09` opened) and Oct 12, **fewer than 60 of 975 commits touched a release item** ([release-first-execution-2026-09.md](release-first-execution-2026-09.md)). By Sept 22 (`2026-09-22-project-audit.md`, archived in git history), **verification/governance code (`~125K LOC` across 159 scripts + 51 JSON contracts) equaled the entire product codebase (`~125K LOC`)**, reference docs peaked at **65 files** (`917856c3`), and `development-progress.md` hit **187 KB (~47K tokens/session)**.
 - **Four structural causes:**
   1. **Unprotected `primaryPlan`:** The active roadmap plan was hijacked **4 times** across 12 newly opened audit/QC plans, parking the release every time.
   2. **Self-Invalidating SHA-Bound Device Campaigns:** Pre-Oct 12 release gates required an exact-commit **201-take physical-iPhone campaign** (`RF-11`); a single bugfix commit invalidated all 201 takes, voiding the first freeze **85 commits later**.
@@ -216,8 +227,8 @@ Every tagged release and candidate in repository history, what it shipped, and w
 | 16 | Sept 18 | `ca5a10cd` | **Dual Claude + Codex** | Codex `0.154.0` marked all 5 project hooks **`untrusted` (inert)** until manually clicked. |
 | 17 | Sept 20 | `bb82e209` | **Codex-only** | Lasted 48 hours. |
 | 18 | Sept 22 | `91e521ff`, `fe50f658` | **Claude Code Takeover** | Added `.claude/worktrees/` parallel agents + host-wide `native-build.lock`. |
-| 19 | Oct 10 | `dc17631b` | **Codex Workflow Takeover** ([2026-10-10-codex-workflow-audit.md](../audits/2026-10-10-codex-workflow-audit.md)) | Added `project_generation.py` signature, `active_workers.py` leases, `select_python.py`; lasted 48 hours, leaving 11 dead `~/.codex/worktrees` & 25 unmerged branches (`TK-10`). |
-| 20 | Oct 12 | `14ad9393`, `8139af14` | **Claude Code Takeover #2** ([2026-10-12-claude-code-takeover-audit.md](../audits/2026-10-12-claude-code-takeover-audit.md)) | **39-day stable run:** `agent_guard.py` subagent screening, fixed `.mobilebuildmcp/config.yaml` (`4c4a051d`), retired computer-use (`42a8789b`), shipped `v3.0.0` & `v3.1.0`. |
+| 19 | Oct 10 | `dc17631b` | **Codex Workflow Takeover** (`2026-10-10-codex-workflow-audit.md`, archived in git history) | Added `project_generation.py` signature, `active_workers.py` leases, `select_python.py`; lasted 48 hours, leaving 11 dead `~/.codex/worktrees` & 25 unmerged branches (`TK-10`). |
+| 20 | Oct 12 | `14ad9393`, `8139af14` | **Claude Code Takeover #2** (`2026-10-12-claude-code-takeover-audit.md`, archived in git history) | **39-day stable run:** `agent_guard.py` subagent screening, fixed `.mobilebuildmcp/config.yaml` (`4c4a051d`), retired computer-use (`42a8789b`), shipped `v3.0.0` & `v3.1.0`. |
 | 21 | Nov 20 | `8e2c0497`..`dea8ec6e` | **Google Antigravity + Gemini 4** (`RF-67`) | Unified `AGENTS.md` + `.agents/hooks.json` (`force_ask`, `PostInvocation`, `Stop`) + `.agents/plugins/vocello/` + `.agents/workflows/` (`run_workflow` adversarial Swift review & 3-worker `share`-worktree burndowns). |
 
 ### 5.2 Frontier AI Model Progression in Git Trailers
@@ -303,7 +314,7 @@ Every tagged release and candidate in repository history, what it shipped, and w
 ## 9. The "Never Again" Playbook — 20 Commandments for iOS Launch & 3.2+
 
 > [!TIP]
-> Treat these 20 rules—distilled directly from Vocello's costliest mistakes—as the standing pre-flight checklist for the upcoming iOS 3.1.0 App Store submission and every release cycle after it.
+> Treat these 20 rules—distilled directly from Vocello's costliest mistakes through `v3.1.0`—as the standing pre-flight checklist for iOS App Store submission (`3.2.0` onward) and every release cycle after it.
 
 ### Pillar I: Scope, Release & App Store Governance
 1. **Gates, Never Arbitrary Dates — Under Hard `focusLock`:** Never open competing plans during a release push or set artificial calendar targets; keep `focusLock` active until submission, routing non-blockers as single uninvestigated backlog lines and fixing phone-free items in-commit.

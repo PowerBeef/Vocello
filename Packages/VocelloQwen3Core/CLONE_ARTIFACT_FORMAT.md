@@ -69,9 +69,14 @@ public `VocelloQwen3Core` facade; they must be rebuilt from their reference audi
 - **A-02, G-03: the encoder's RoPE convention.** The reference codes in transcript-backed artifacts
   come from a speech-tokenizer encoder that applies `RoPE(traditional: true)` (adjacent pairs,
   `Sources/MLXAudioCodecs/Mimi/Transformer.swift:130`) to weights stored for the split-half
-  `rotate_half` layout, so they differ from the official tokenizer's codes. mlx-audio fixed the same
-  port. The identifier does not name the encoder implementation yet; the fix adds an encoder version
-  to it, so every transcript-backed artifact rebuilds once (ER-04).
+  `rotate_half` layout, so they differ from the official tokenizer's codes. mlx-audio used
+  `rope_traditional=False` from the start (not a fix of a measured defect). Behind the diagnostic
+  knob `QWENVOICE_ENCODER_ROTARY=split-half` (which appends `+mimi-encoder-rope-split-half` to the
+  identifier), the Swift clone screen (`encoder-rotary-split-half`, RF-52, 2026-11-11) finished
+  INCONCLUSIVE pointing at harm (better-ASR error `+0.021`, gross failures `2 → 5`, speaker
+  similarity `−0.007`), so the default stays adjacent-pair. The default identifier does not name the
+  encoder implementation yet; if the default convention ever changes, it bumps the encoder version
+  in the identifier so every transcript-backed artifact rebuilds once (ER-04).
 
 ## Integrity
 

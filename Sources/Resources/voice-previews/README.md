@@ -36,7 +36,7 @@ These samples are already bundled. Replacing them is an explicit asset-generatio
 not part of ordinary documentation or app builds. Use the repository XCUITest/macOS generation
 route in **Built-in Voice** mode (internal mode id `custom`) with the approved catalog and recorded
 seed/model identity. That route runs through `scripts/ui_test.sh`. Local validation lanes like it
-are authorized and reuse installed models (CLAUDE.md); a new model download or install still needs a
+are authorized and reuse installed models (AGENTS.md); a new model download or install still needs a
 specific request, and ordinary CI never runs the lane. The project has only a Release
 configuration; internal diagnostics are a separate compile capability and runtime gate, not a
 Debug configuration.

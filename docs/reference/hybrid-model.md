@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-24
+reviewed: 2026-11-25
 summary: Vocello's hybrid (mixed-precision) Qwen3-TTS model, RF-55 — the recipe and why, how it is built from the two 3.0 artifacts, the identity proof, the evidence that chose it, how it was delivered, and what one model means for the backend.
 sourceOfTruth:
   - scripts/build_hybrid_model.py
@@ -19,13 +19,13 @@ model may ship if it beats the stock artifacts at a similar footprint, accepting
 generation time. This guide records the model the screens chose, how it is built, and how it was
 delivered.
 
-**Status (2026-11-15).** `attn` is the single model (`hybrid-single-model`): every rule it was
+**Status (2026-11-25).** `attn` is the single model (`hybrid-single-model`): every rule it was
 screened by is ADOPT, and it has 176 MB more weights than Speed. In the formal speed lane its median
 real-time factor on the M6 is 0.303, against 0.279 for Speed and 0.412 for Quality: about 9% more
 generation time than Speed and about 27% less than Quality (per cell, 4 to 6% more than Speed; §4).
 It beats Speed in every screen and does not match Quality everywhere (§4, Known limits). The three
 artifacts were published on 2026-11-13 and the contract, catalog and apps moved to them the same day
-(§5, §6). What is left is listed at the end of §6.
+(§5, §6). iPhone qualification, Pack B/C outcomes, and the final 3.2 status are recorded at the end of §6.
 
 ## 1. The recipe: `attn`
 
@@ -158,9 +158,12 @@ and the prewarm about 160 ms, so the idle-unload timings stand as they are.
 - **Korean long-form still refuses half its projects** (6 of 12), against Quality's 3 of 12. The
   maintainer chose on 2026-11-13 to document it and warn before such a project starts (RF-60;
   [qwen3-tts-guide.md §11.2](qwen3-tts-guide.md#112-vocellos-known-limitations)), not a richer recipe.
-- **The iPhone is unmeasured.** Expected on the iPhone 15 Pro: peak about Speed's 2.5 GB plus 0.18 GB,
-  and up to the byte growth in time (about +12%) where memory bandwidth bounds a frame. Measure before
-  publication (§5).
+- **iPhone memory and performance (measured on iPhone 17 Pro; 8 GB phones still unmeasured under
+  entitlement).** Wave 5 measured shipped `attn` on the canonical iPhone 17 Pro (`5cc8ed43`, §6):
+  UI benchmark 29/29 PASS and retained memory 9/9 PASS with 0 MB retained growth (warm Custom
+  1,969 MB, Design 1,949 MB, Clone 2,503 MB / 3,584 MB cold peak). Smaller 8 GB phones (e.g.
+  iPhone 15 Pro) remain unmeasured with the entitlement (estimated ~+0.18 GB peak and up to ~+12%
+  time where memory bandwidth bounds a frame).
 
 ## 5. Delivery (the maintainer's decisions are marked ★)
 
@@ -246,7 +249,7 @@ view: `attn` replaces both Speed and Quality, and the selector goes (RF-59). Its
   as `"hybrid"` rather than `"4-bit"`, and quality promotion's `quality-generation` capability applies
   nowhere.
 
-**iPhone qualification & Pack B/C progress (2026-11-24):** Wave 5 measured the shipped `attn` hybrid on
+**iPhone qualification & Pack B/C outcomes (2026-11-25):** Wave 5 measured the shipped `attn` hybrid on
 the canonical iPhone 17 Pro (`5cc8ed43`: UI benchmark 29/29 PASS in `f1e8631c`, retained memory 9/9
 PASS with 0 MB retained growth in `c2b75046` — warm Custom 1,969 MB, Design 1,949 MB, Clone 2,503 MB /
 3,584 MB cold peak; `cloneCapableMinimumProcessLimitBytes` aligned to 4,779 MiB in `1d8397f6`).
@@ -261,8 +264,9 @@ Experiment 2 (Bundle A `attn-io`, `+24.12 MB`) finished `INCONCLUSIVE` on 2026-1
 incumbent: clone non-inferiority `ADOPT` with `speakerSimilarity −0.0080`, long-form error rate
 regressed in all 3 seed sets with pooled 63-pair `+0.0331 [+0.0001, +0.0707]` and discordant
 completions `5 vs 1` sign test `p = 0.1094`; calibrated `RF-72` blinded dual-order audit independently
-favored `attn` `15–9`). Bundle B (`attn-io-edge`, `+99.61 MB`) awaits maintainer go/no-go before the
-3.2 release and 3.2.0 iOS App Store submission.
+favored `attn` `15–9`). On 2026-11-24 (`f070f41a`), the maintainer closed `RF-70` (along with
+`RF-54` declined and `RF-57` done) without running Bundle B (`attn-io-edge`), retaining the shipped
+`attn` hybrid artifacts unchanged for the 3.2 release and 3.2.0 iOS App Store submission.
 
 ## 7. Licence and attribution
 
@@ -291,9 +295,11 @@ manifest (`scripts/attribution_manifest.py rebuild`) follows the catalog and
 - `builtFrom`: the two Vocello 3.0 artifacts the builder read.
 
 The manifest carries the same fields for each model, and the tool refuses an entry whose base or
-parent is not pinned to an exact revision, or that carries no `redistributionDecision`. That decision
-reads `pending-qualified-review` for all three hybrids, as it did for the 3.0 artifacts when they
-shipped: it is a standing item, not a change of 3.1. Since `f269200d` (Pack A `RB-11`, extracted
-into `VocelloiOSPolicies` and visually verified on iPhone 17 Pro in `6da29045`), the iPhone's Open
-Source Licenses screen renders `baseRepo`/`baseRevision`, `additionalBases` (the 8-bit parent), and
-`builtFrom` lineage directly from the bundled manifest.
+parent is not pinned to an exact revision, or that carries no `redistributionDecision`. Since
+`b896fce1` (`RF-73`, 2026-11-25), `config/third-party-attribution-policy.json` records
+`redistributionDecision: "attested-maintainer-asr04-2026-11-01"` for all three hybrids as well as
+for the bundled Meta AudioSeal (`MIT`, `facebook/audioseal`) auxiliary watermark generator weights
+(`auxiliaryModelWeights`, verified across all three model catalogs). Since `f269200d` (Pack A
+`RB-11`, extracted into `VocelloiOSPolicies` and visually verified on iPhone 17 Pro in `6da29045`),
+the iPhone's Open Source Licenses screen renders `baseRepo`/`baseRevision`, `additionalBases` (the
+8-bit parent), and `builtFrom` lineage directly from the bundled manifest.

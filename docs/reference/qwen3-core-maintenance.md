@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-10-28
+reviewed: 2026-11-25
 summary: Maintaining the owned Qwen3 core package — first-party posture, the authority order of its contracts, the production contracts it must keep, the selective upstream-intake procedure (moved here from UPSTREAM.md) and the review checklist guarded by `scripts/qwen3_core_contract.py`.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Package.swift
@@ -54,17 +54,30 @@ app coordination. Keep the change focused and:
 
 Do not mass-format, add a nested `.git`, create a package-local `.build` or replace the snapshot
 with a fresh upstream tree. Direct SwiftPM work uses
-`--scratch-path build/cache/swiftpm/mlx-audio-runtime`.
+`--scratch-path build/cache/swiftpm/mlx-audio-runtime`. Since `cc305197` (2026-11-20), the package
+uses `swift-tools-version:6.2` with warnings-as-errors enabled on 4 of its 5 targets, and since
+`RF-46` (`76fa18e7`) the Qwen3-TTS model implementation is split across 8 focused files under
+`Sources/MLXAudioTTS/Models/Qwen3TTS/`.
 
 ## Production contracts
 
+- Single hybrid model per mode (`RF-55`/`RF-59`): all platforms run the `attn` mixed-precision
+  hybrid checkpoints (4-bit base + 8-bit `text_embedding` and talker `self_attn` projections),
+  verified with `[.noUnusedKeys, .shapeMismatch]` on trusted prepared loads (`RF-68`, `5984499b`).
 - Custom, Design and Clone use the bounded streaming pipeline. Non-final chunk evaluation may
   overlap token generation; the final chunk is synchronized before terminal completion.
+- Hoisted compiled code predictor (`RF-68`, `4445adcf`, `87d6a4b0`): `CodePredictorCompiledPlan` is
+  hoisted onto `Qwen3TTSModel` and must pass flattened predictor weights via fixed-shape
+  `compile(inputs: [weightInputs])` — never captured inside a Swift closure — so cross-thread
+  `CompiledFunction.deinit` releases 100% of weights on `mlx-swift 0.32.3`'s `thread_local`
+  `CompileCache` (`testCrossThreadPlanDeinitReleasesPredictorWeightsWhileTraceThreadStaysAlive`).
 - Sampling: both the talker and the code predictor (subtalker) sample at the reference's 0.9 /
-  top-k 50 / top-p 1.0 for every take (the take variation is retired, RF-58), and the talker filters
+  top-k 50 / top-p 1.0 for every take (the take variation is retired, RF-58), talker repetition
+  penalty uses the fixed-shape GPU `seenMask` (`RF-68`, `3852e8c7`), and the talker filters
   EOS like any token (D2), as the reference does since the RF-18 follow-up screen (2026-10-20). Both
   stages sample from float32 logits (D3). An explicit internal-diagnostics override can change any
-  of these.
+  of these. Per-step talker introspection scalars are gated behind `captureIntrospection`
+  (`RF-68`, `dc9d6898`/`1513b744`) so non-telemetry product takes skip ~31 GPU-scalar `.item()` reads.
 - `maxTokens` is a quality failure, not a successful truncated result.
 - MLX work runs inside the facade's error scopes and surfaces as typed failures
   ([`mlx-guide.md` §2.6](mlx-guide.md#26-errors-and-error-scopes)).

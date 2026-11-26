@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: backend-mlx
 reviewed: 2026-11-10
 summary: Read-only research into the runtime's speed and memory on Apple silicon: what bounds a frame on each device, what the pinned MLX does on these chips, what other MLX and Core ML ports of Qwen3-TTS measured, and ranked levers with the measurement that decides each; nothing was built, run or changed.

@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
 reviewed: 2026-11-11
 summary: Exhaustive read-only audit of the engine runtime (numerics and reference parity, lifecycle, output path and Fast QC, performance, delivery and persistence, dependencies, the clone pipeline) with adversarial verification, and the approved remediation plan — pre-freeze release items RF-18, RF-19, BG-01 and the MLX refresh (CONV-21), the engine-remediation-2026-10 programme (ER-01…ER-13) and the Qwen3-TTS reference-documentation overhaul.

@@ -64,9 +64,10 @@ v1 changes only by addition.
   same change: `python3 scripts/cli_contract.py record --change "<what it adds>"`. `record` refuses a
   breaking change. The CLI reports the revision it implements in `meta.contractRevision`.
 - A breaking change is v2: a new `config/cli-contract/v2/`, while v1 stays available.
-- Until the first release that ships the CLI with this contract (RF-31), revision 1 is still being
-  built: additions re-record revision 1 (delete `baseline.json`, then `record`) instead of bumping it.
-  The additive-only rule still applies to everything already recorded.
+- Revision 1 shipped with the v3.0.0 (2026-10-23) and v3.1.0 (2026-11-17, `RF-61`) macOS/CLI
+  releases (independent of the parked `RF-31` follow-up), so v1 is frozen at revision 1 and every
+  subsequent additive change bumps `contractRevision` via `record --change` rather than rewriting
+  revision 1.
 
 `cli_contract.py validate` fails when the tables, schemas or examples disagree, when anything in
 `baseline.json` was removed or reclassified, when something new is not recorded there, and when the

@@ -15,7 +15,7 @@ width folding, alphanumeric token boundaries). Both share the stable diagonal
 
 Thresholds are facts about the product gate, not tunables: 15 % normalized edit
 rate and a 0.5 language-match score. Change them in one place, with the
-threshold-change authority described in `docs/reference/audio-qc-engineering.md`.
+threshold-change authority described in `docs/reference/qc.md`.
 """
 
 from __future__ import annotations

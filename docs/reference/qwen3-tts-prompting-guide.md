@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-11
+reviewed: 2026-11-25
 summary: Sourced reference for everything Qwen3-TTS reads as text — the ChatML wire format and prefill layouts, the script, the delivery instruction, the voice description, the presets, and the transcript and reference rules for clones — every claim labeled OFFICIAL/RESEARCH/MEASURED-HERE/COMMUNITY/UNVERIFIED.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift
@@ -127,7 +127,7 @@ Which layout a take uses:
 | Vocello take | Vocello layout | Upstream default |
 | --- | --- | --- |
 | Streamed Custom and Design single takes (Studio) | non-streaming (D1, adopted 2026-10-20, RF-21) | non-streaming (WM L642, L738, since `0c6a7cb`) |
-| Long-form segments, Custom and Design | streaming: the **D1** divergence, kept by RF-18 (§3.1) | non-streaming |
+| Long-form segments, Custom and Design | streaming: the **D1** divergence, kept by RF-18 and re-confirmed by RF-70 Exp 1 REJECT on Korean `hybrid-attn` (§3.1) | non-streaming |
 | Quality-first (non-streamed) Custom and Design | non-streaming | non-streaming |
 | Clone with a transcript (ICL) | non-streaming ICL | streaming (WM L478): **G-14**, deliberate (§2.3) |
 | Clone without a transcript (speaker only) | streaming | streaming |
@@ -449,6 +449,11 @@ measurement in §2.3), and upstream defaults Custom and Design to the full-text 
   (5 against 10 of 251 takes) and recovered a take that had stranded its script; a two-family ASR
   pass over the saved takes halved wrong-content takes (16 against 31 of 248). Long-form segments
   keep the trailing-text layout (qwen3-tts-guide §11.2).
+- **RF-70 Exp 1 decisively rejected D1 on Korean long-form `hybrid-attn`, 2026-11-23 (`8f84ac97`).**
+  Under pre-registered rule `long-form-korean-d1-attn`, enabling full-text conditioning (`D1`) on
+  Korean long-form segments caused 2 of 3 seed sets to spike `+0.152` and `+0.324` in paired ASR
+  error rate from 32–44 s of skipped text, confirming that long-form segments stay on the
+  trailing-text layout.
 - **The follow-up screen, 2026-10-17 to 2026-10-20**, 56 long-form projects per arm. Restoring the
   reference subtalker sampling cut Consistent's failed projects from 9 to 2; lowering the planner's
   segment budget from 300 to 200 made it worse (15); Expressive failed none in any arm. The subtalker
@@ -614,7 +619,7 @@ is best, or that Chinese instructions improve French output.
 `UNVERIFIED`. Comparative EN/FR/ZH adherence with the speech held constant remains unqualified.
 Keep canonical English as the operational baseline, preserve freeform text, and do not expand
 translation/routing based on cross-dataset scores. The
-[dated instruction-language research](../audits/2026-09-21-instruction-language-research.md) contains the
+dated 2026-09-21 instruction-language research (archived in git history) contains the
 primary sources, French recommendations, mode distinctions and proposed controlled experiment.
 
 `MEASURED-HERE`, **maintainer-directed routing checkpoint, 2026-08-26.** Vocello now uses the
@@ -901,7 +906,7 @@ in ReDimNet2+ similarity (95% interval +0.016 to +0.034, 48 pairs). An 8-bit cod
 the 4-bit talker gives +0.010 (+0.002 to +0.019) for 56 MB (189.0 MB to 245.1 MB), and the 8-bit
 talker alone gives +0.007 for 712 MB. Speed was not measured; the runs used the Python port, in
 English, and nobody listened. The local model files confirm 51 quantized code-predictor modules in
-both tiers.
+the shipped `attn` hybrid (and in both retired 3.0 tiers).
 
 ---
 
@@ -919,7 +924,7 @@ both tiers.
 | Control tokens in user text | replaced with a space before tokenizing (§1) |
 | Clone receives an instruction | **no** — structurally impossible, no `deliveryStyle` on the clone payload or identity |
 | 0.6B instruction guard | present and matches upstream; defensive, since no 0.6B checkpoint ships |
-| Text layout of streamed Custom and Design takes | full text for single takes (D1, RF-21); streaming trailing text for long-form segments (RF-18; §1.1, §3.1) |
+| Text layout of streamed Custom and Design takes | full text for single takes (D1, RF-21); streaming trailing text for long-form segments (RF-18, re-confirmed by RF-70 Exp 1 REJECT on Korean `hybrid-attn`; §1.1, §3.1) |
 | ICL layout | upstream's non-streaming clone layout, plus one leading space on a target whose first letter is not Han or kana (G-14, A-11; §2.3) |
 | Subtalker sampler | its own stage, at upstream's 0.9 / 50 / 1.0 for every variation since 2026-10-20 |
 | EOS | filtered like any token since 2026-10-20 (D2) |
@@ -1152,7 +1157,8 @@ things rather than disagreeing: `VoiceDesignBriefCatalog.descriptionLimit` in
 caps the UI voice-description brief at 500 characters (a comment there records the 2,048-character
 Model Studio `voice_prompt` ceiling it sits under), 1,600 tokens is the hosted instruction ceiling,
 and the 240-character check in
-[`IOSDeviceDiagnosticsRunner.swift`](../../Sources/iOS/IOSDeviceDiagnosticsRunner.swift) is a
+[`IOSDeviceDiagnosticsRunner.swift`](../../Sources/iOS/IOSDeviceDiagnosticsRunner.swift) (compiled
+out of shipping iOS builds behind `QVOICE_DEVICE_DIAGNOSTICS` since `RF-73`, `4703237c`) is a
 diagnostics-harness guard on one environment override, not a product limit. The "500-character cap"
 the `EmotionPreset` canon cites for *delivery instructions* matches none of these and has no
 traceable origin.

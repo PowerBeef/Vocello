@@ -1,6 +1,7 @@
 ---
 status: active
 owner: release-qa
+reviewed: 2026-11-25
 summary: What the benchmark registry may hold, how successful runs are published into it, the privacy and size rules on committed records, and the canonical hardware and run classes.
 sourceOfTruth:
   - scripts/benchmark_history.py
@@ -12,9 +13,11 @@ sourceOfTruth:
 
 Validated, privacy-safe benchmark **summaries** live here. Raw telemetry, audio, screenshots, traces,
 and result bundles are never tracked. A successful profile publishes its trace digest, capture
-settings, extracted evidence, original path, and retention status first. A CPU profile's raw trace is
-then discarded unless `--keep-trace` was given; a memory profile keeps its raw trace locally by
-default (`keptByDefault`), because the trace is its only allocation and VM evidence.
+settings, extracted evidence, original path, and retention status first. A CPU or timing-witness
+(`--kind witness`) profile's raw trace is then discarded unless `--keep-trace` was given;
+`--kind memory` and `--kind metal` (Metal System Trace + `os_signpost`) keep their raw traces
+locally by default (`keptByDefault`), because the trace is their primary allocation/VM or GPU
+command-buffer evidence.
 
 ## What may live here
 
@@ -32,8 +35,9 @@ default (`keptByDefault`), because the trace is its only allocation and VM evide
   against, and older JSON baselines kept as reference artifacts. Baselines are never converted into
   schema-v3 evidence; comparisons against them stay local model-dependent QA, never an ordinary CI or
   packaging gate.
-- **`qc/`** — QC v2 threshold evaluations (`eval-v<N>.json`, aggregates only; see
-  [`docs/reference/qc.md`](../docs/reference/qc.md)).
+- **`qc/`** — QC v2 threshold evaluations (`eval-v<N>.json`) and the calibrated Q1/Q2 Gemini 4 Neon
+  multimodal audio QC evaluation receipt (`multimodal-eval-v1.json`, `RF-72`, strictly offline and
+  report-only; aggregates only; see [`docs/reference/qc.md`](../docs/reference/qc.md)).
 - **`OPTIMIZATION.md`** — a dated historical optimization decision ledger. Current performance truth
   comes from validated records in `runs/`, the generated `HISTORY.md`, and current telemetry documentation.
 

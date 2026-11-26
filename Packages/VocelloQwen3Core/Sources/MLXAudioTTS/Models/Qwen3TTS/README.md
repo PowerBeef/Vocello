@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-09-06
+reviewed: 2026-11-25
 summary: Owned Qwen3 implementation API routing; compatibility examples are not production catalog or facade instructions.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift

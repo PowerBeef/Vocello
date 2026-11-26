@@ -25,7 +25,7 @@ calibration and qualification apply to individual dimensions and exact scoring i
 
 The maintainer cannot label a hundred clips by ear, so on 2026-10-05 the calibration moved from labels to human controls; the supervised fit stays for later.
 
-**Historical evaluation (2026-10-06): report-only diagnostic.** Thirty-nine blind confirmations (confirm-1 to confirm-7, `benchmarks/qc/eval-v1.json`) did not establish useful defect discrimination. Flagged takes were unusable 9 of 29 times (31%, 95% bounds 15-51%): lone flags 4 of 16 and agreeing flags 5 of 13. Unflagged takes shuffled in blind were unusable 2 of 5 times. About a third of the decisive judgments in this enriched heard sample were unusable; this is not population prevalence. What makes a take unusable to the maintainer (a whispered syllable, a false start, over-linking, delivery, a heavy accent) can sit inside the human range, while the detectors mostly catch accent and pacing the maintainer often accepts. Those historical warnings meant "unusual for human read speech", not "defective"; no release decision leans on them. The maintainer closed the confirmation work there, and on 2026-10-13 chose not to listen to 3.0 takes at all: 3.0 take quality is screened by machine for gross failures only (RF-14, RF-15), and subtle defects ship as a documented known limitation. The product follow-ups are open roadmap items. The October 10 contract below governs current coverage and qualification.
+**Historical evaluation (2026-10-06): report-only diagnostic.** Thirty-nine blind confirmations (confirm-1 to confirm-7, `benchmarks/qc/eval-v1.json`) did not establish useful defect discrimination. Flagged takes were unusable 9 of 29 times (31%, 95% bounds 15-51%): lone flags 4 of 16 and agreeing flags 5 of 13. Unflagged takes shuffled in blind were unusable 2 of 5 times. About a third of the decisive judgments in this enriched heard sample were unusable; this is not population prevalence. What makes a take unusable to the maintainer (a whispered syllable, a false start, over-linking, delivery, a heavy accent) can sit inside the human range, while the detectors mostly catch accent and pacing the maintainer often accepts. Those historical warnings meant "unusual for human read speech", not "defective"; no release decision leans on them. The maintainer closed the confirmation work there, and on 2026-10-13 chose not to listen to 3.x takes at all: 3.x (3.0/3.1/3.2) take quality is screened by machine for gross failures only (RF-14, RF-15), and subtle defects ship as a documented known limitation. The product follow-ups are open roadmap items. The October 10 contract below governs current coverage and qualification.
 
 Everything runs locally on the Mac, one model at a time, and no model weights enter Git.
 
@@ -40,7 +40,7 @@ execution errors 2 and qualified warnings 3. `--legacy-exit` explicitly requests
 Scoring identity now includes coverage and narrow phonetic evidence code. Frozen thresholds
 are unchanged; their old scoring hashes do not qualify the new implementation. Recalibration
 requires a new threshold/evaluation identity and held-out evidence, never an edited old hash.
-The [generation investigation](../audits/2026-10-10-generation-quality-investigation.md) explains
+The 2026-10-10 generation quality investigation (archived in git history) explains
 the calibration, domain and human-confirmation limits.
 
 Clone reports retain signed output-minus-reference register offset, two-tracker agreeing voiced
@@ -134,7 +134,7 @@ are checked by the normal lane before feature extraction.
 
 ### Held-out event evaluation
 
-The [retained regression-panel experiment](../audits/2026-10-10-retained-audio-regression-panel.md)
+The 2026-10-10 retained regression-panel experiment (archived in git history)
 recovered three timed human annotations on the exact Dylan WAV from private `batch-1`. It is an
 already exposed training example, not held-out truth. Later whole-clip confirmations do not supply
 complete local-defect negatives. Acceptable French comparisons produce as many generic candidates
@@ -223,7 +223,7 @@ All commands go through `python3 scripts/qc.py`.
 | `norms --takes <qc-takes runs…> [--min-count 100] [--dry-run]` | Measures per-language pause, pace and ending percentiles from the pool's audio and cached results, and writes `config/qc/norms-v<N>.json` (see [Per-language norms](#per-language-norms)). |
 | `controls build [--sources <corpus>:<language> …] [--per-language 200] [--per-speaker 5]` | Writes a takes manifest of human read speech from the speaker corpora, each take marked `control`; score it with `run --lane controls`. The [corpora per language](#calibration-on-human-controls) cover eight languages. |
 | `controls report --runs <controls runs…> [--generated <runs…>]` | Each detector's flag rate on the human controls (with bounds) beside the generated takes', and every feature's p50 and p90. |
-| `multimodal prepare\|workflow\|aggregate\|qualify` | Offline, report-only Gemini 4 Neon blinded listening complement (`RF-72`): stages 16 kHz mono / stitched audio under `build/private/qc/multimodal/`, emits a resumable Antigravity `run_workflow` script, reconciles dual-order `AB`/`BA` verdicts, and scores Q1/Q2 calibration (`benchmarks/qc/multimodal-eval-v1.json`). Never gates CI or releases and does not alter QC v2 `scoring_identity()`. |
+| `multimodal prepare\|prepare-screen\|prepare-q1\|prepare-q2\|workflow\|aggregate\|qualify\|report` | Offline, report-only Gemini 4 Neon blinded listening complement (`RF-72`): stages 16 kHz mono / stitched audio under `build/private/qc/multimodal/` (`prepare`, `prepare-screen`, `prepare-q1`, `prepare-q2`), emits a resumable Antigravity `run_workflow` script (`workflow`), reconciles dual-order `AB`/`BA` verdicts (`aggregate`), scores Q1/Q2 calibration (`qualify`, `benchmarks/qc/multimodal-eval-v1.json`), and inspects completed session reports (`report`). Never gates CI or releases and does not alter QC v2 `scoring_identity()`. |
 
 ## Models and runtimes
 
@@ -656,7 +656,7 @@ Re-labelling appends a new line, and the latest line per rater and token wins; a
 
 **Hard boundaries:**
 - **Strictly report-only (`neverGates: true`):** never gates CI, never alters `qc.py gate` exit codes or `SCORING_SOURCES` / `scoring_identity()`, never runs inside the shipped app or CLI, and never replaces QC v2 or `quality_screen.py` quantitative gates.
-- **Privacy fail-closed:** staging refuses paths outside `build/private/qc/`, `build/cache/qc/` and `benchmarks/`, rejects clone confirm audio and personal recordings, requires explicit `--allow-synthetic-confirm` for non-clone synthetic confirm WAVs, strips all path/model/seed/score metadata behind opaque hex tokens, and writes all audio, manifests, transcripts and per-take verdicts exclusively under git-ignored `build/private/qc/multimodal/<session>/`. Only aggregate counts, Wilson/Clopper-Pearson bounds and rubric digests enter Git (`benchmarks/qc/multimodal-eval-v1.json`).
+- **Privacy fail-closed:** staging refuses paths outside `build/private/qc/`, `build/cache/qc/` and `benchmarks/`, rejects clone confirm audio and personal recordings, requires explicit `--allow-synthetic-confirm-batches` for non-clone synthetic confirm WAVs, strips all path/model/seed/score metadata behind opaque hex tokens, and writes all audio, manifests, transcripts and per-take verdicts exclusively under git-ignored `build/private/qc/multimodal/<session>/`. Only aggregate counts, Wilson/Clopper-Pearson bounds and rubric digests enter Git (`benchmarks/qc/multimodal-eval-v1.json`).
 - **Two-pass blinded protocol:** every take goes through Pass 1 (audio-only blind audition: verbatim transcription, language/accent cues, tone, audible defects without seeing the script, mode or scores) before Pass 2 targeted audits (diction, delivery-brief compliance, or dual-order `AB`/`BA` pairwise comparison). Audio is resampled to 16 kHz mono PCM16; multi-clip comparisons stitch clips with 440 Hz cosine-ramped tone markers, long-form clips stitch three deterministic slices (`start`, `middle`, `end`), and flagged QC v2 spans receive 2.5 s local zoom crops. Pairwise comparisons require `AB` and `BA` order agreement to record a win; opposite orders reconcile to `tie_order_unstable`.
 
 **Empirical qualification (`benchmarks/qc/multimodal-eval-v1.json`, 2026-11-23, rubric SHA-256 `89acedc0…`):**
@@ -672,7 +672,7 @@ Re-labelling appends a new line, and the latest line per rater and token wins; a
 | **Q2 Blind confirm strict `unusable` precision (`n=34` decisive)** | `8/9` (**88.9%**, 95% CI `[51.8%, 99.7%]`; strict recall `8/11 = 72.7%`, broad recall `11/11 = 100.0%`, unflagged unusable `0/11 = 0.0%`) | `>= 55%` (vs 31% QC v2 baseline) & separation `>= +15 pp` (`+88.9 pp` observed) | `diction` + `delivery`: **`active_advisory`** |
 | **Q2 Clean human controls false-alarm rate** | `1/30` (**3.3%**, 95% CI `[0.1%, 17.2%]`) | `<= 10%` | `diction` + `delivery`: **`active_advisory`** |
 
-**Scope of calibrated use:** `diction`, `delivery` and dual-order `pairwise` (`screen-ab`) are calibrated for report-only advisory use (including Pack C `RF-70` candidate screens). Static clone speaker verification (`clone`) stays fail-closed at `abstain_uncalibrated`: Q1 C4 showed 100% rejection of impostors alongside 50% false rejection of valid same-speaker clips across prosodic/F0 register shifts (`|ΔF0| >= ~1.5–3.5 st`), so static speaker identity and register remain owned by QC v2's `ReDimNet2+` + `FCPE`/`SwiftF0`.
+**Scope of calibrated use:** `diction`, `delivery` and dual-order `pairwise` (`screen-ab`) are calibrated for report-only advisory use (as used during Pack C `RF-70` candidate screening, now closed with shipped `attn` retained unchanged for 3.2). Static clone speaker verification (`clone`) stays fail-closed at `abstain_uncalibrated`: Q1 C4 showed 100% rejection of impostors alongside 50% false rejection of valid same-speaker clips across prosodic/F0 register shifts (`|ΔF0| >= ~1.5–3.5 st`), so static speaker identity and register remain owned by QC v2's `ReDimNet2+` + `FCPE`/`SwiftF0`.
 
 `build/cache/qc` (`qc-cache`) is re-creatable from the registry and pins; `qc.py models prune` removes what the registry no longer lists. `build/private/qc` (`qc-private`) is preserved by every cleanup. Both are registered in `config/build-output-policy.json` and git-ignored under `build/`. Labels, transcripts and take paths never enter Git; only aggregates and digests are committed.
 

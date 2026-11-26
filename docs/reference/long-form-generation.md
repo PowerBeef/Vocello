@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-11
+reviewed: 2026-11-25
 summary: The shipping long-form v4 path on both platforms — planner-owned segmentation, sequential streaming execution, manifest/resume, grouped History — and what remains open.
 sourceOfTruth:
   - Sources/QwenVoiceCore/LongFormPlanning.swift
@@ -27,12 +27,17 @@ check and `vocello generate` use the same predicate:
 1. **Planning.** `SpokenTextPlanner` + `LongFormPlanner` produce a schema-v4 plan: normalization
    with typed transformation risks, protected spans (decimals, versions, URLs, abbreviations),
    CJK-aware boundary precedence, a delivery-validated 300-unit runtime token ceiling per segment,
-   and per-segment stable IDs with deterministic sub-seeds derived from the base seed.
+   unspeakable-paragraph folding (`RF-69`, `C-04`, `3ee599b4`, folding punctuation-only paragraphs
+   so they never emit empty takes), and per-segment stable IDs with deterministic sub-seeds derived
+   from the base seed. Under `RF-60`/`RF-69` (`bb006502`, `b1a560e2`), Korean long-form projects
+   surface an upfront caution in both apps' UIs and emit `long_form_korean` in the CLI for both
+   Auto-detected and explicit `--language korean` requests.
 2. **Sequential streaming execution.** The shared `IOSLongFormProjectRunner`
    (`Sources/iOS/Studio/IOSLongFormProject.swift`, driven on the desktop by the batch sheet through
    `IOSLongFormCoordinator` with `MacStudioLongFormPlatformHooks`) runs one ordinary streaming take
    per planned segment — the same shipping path as a single take, with mandatory per-segment engine
-   Fast QC, standard streaming telemetry, app-layer timeline rows, and live segment preview
+   pre-watermark Fast QC v10 (since `RF-69`, `b1a560e2`, the redundant post-watermark Fast QC pass
+   on already-checked segments is removed), standard streaming telemetry, app-layer timeline rows, and live segment preview
    (auto-play-gated; the request-local `suppressStreamingPreview` flag remains available for silent
    contexts). Batch markers are never sent; the legacy XPC `generateBatch` route was retired
    2026-07-24 and the caller-less in-process engine batch API was removed on 2026-09-24 (the CLI
@@ -163,12 +168,12 @@ disclosure. Full iOS smoke runs the long-form journey; `--scenario long-form` ru
 - **Segment-count scaling evidence at audiobook scale** — the 12-segment run above proves flat
   steady-state memory through ~10 minutes of joined audio; a ~100-segment (multi-hour) proof
   remains open, and the scaled smoke journey currently caps at 12 segments per run.
-- **Candidate acceptance.** RF-15's long-form row (a project, then one segment regenerated)
-  passed on TestFlight build 24 (`ios-xcui-candidate-smoke-20261024-200402-db93f093`), and the
-  full Mac smoke on the published 3.0.0 source passed long-form and its recovery Discard
-  (`macos-xcui-smoke-20261024-205357-0952e758`, RF-10). Interruption, recovery export and
-  retained-output deletion have no recorded candidate run yet. Older measured runs above are
-  historical, not evidence for changed source.
+- **Candidate acceptance.** Historical 3.0 proofs — RF-15's long-form row on TestFlight build 24
+  (`ios-xcui-candidate-smoke-20261024-200402-db93f093`) and the 3.0.0 Mac smoke including recovery
+  Discard (`macos-xcui-smoke-20261024-205357-0952e758`, RF-10) — were superseded by the 3.1.0 Mac/CLI
+  release (`RF-61`) and subsequent 3.2.0 (`RF-71`/`RF-73`) verification. Interruption, recovery
+  export and retained-output deletion have no recorded candidate run yet. Older measured runs above
+  are historical, not evidence for changed source.
 
 Single-take spoken-text normalization is already implemented at the shared generation entry;
 it is not an outstanding long-form task.

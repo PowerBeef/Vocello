@@ -1,6 +1,7 @@
 ---
 status: historical
 owner: backend-mlx
+reviewed: 2026-11-25
 summary: Dated backend/MLX optimization decision ledger through 2026-08-01; its RTF figures predate the 2026-09-12 standard and use the inverted decodeSpeedupX semantics.
 ---
 # Historical optimization decision ledger
@@ -340,7 +341,7 @@ dormant dev/insurance capability that activates only if the token ceiling is eve
 - Don't pipeline the autoregressive 15-pass Code Predictor loop; don't quantize TTS KV; keep macOS
   event delivery lossless. The original unbounded-stream implementation recorded by this ledger has
   since been superseded by the current bounded, measured backpressure contract; see
-  `.claude/rules/native.md` ("Lossless core audio") and `config/runtime-refactor-contract.json`
+  `.agents/plugins/vocello/rules/native.md` ("Lossless core audio") and `config/runtime-refactor-contract.json`
   rather than restoring the historical buffer choice.
 - Don't "fix" the phantom 1.7B arch bugs (projection / speaker-dim / MRoPE are correct).
 

@@ -1,8 +1,8 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
 reviewed: 2026-10-13
-summary: Read-only, Axiom-led review of the core engine backend (runtime, model lifecycle, generation, persistence, model delivery, storage, memory, energy, performance, security, serialization and tests) with an architecture map; one crash-class candidate, not reproduced by its first device check, awaits the maintainer's classification, three findings attach to release items, and the rest is parked in the post-3.0 backlog.
+summary: Historical read-only, Axiom-led review of the core engine backend (runtime, model lifecycle, generation, persistence, model delivery, storage, memory, energy, performance, security, serialization and tests) with an architecture map; crash-class candidate BG-1 (closed in Oct 2026 under BG-01/CONV-21), three findings attached to release items, and the rest parked in the post-3.0 backlog.
 sourceOfTruth:
   - Sources/QwenVoiceCore/MLXTTSEngine.swift
   - Sources/QwenVoiceCore/NativeEngineRuntime.swift

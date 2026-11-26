@@ -37,19 +37,20 @@ tokenizer through a platform-bounded LRU (one entry on iOS, three on macOS). Wei
 is batched to bound transient unified-memory peaks. Clone-capable profiles include the learned
 encoders, while ordinary synthesis may load the decoder-only tokenizer surface.
 
-The talker's text embedding is not loaded (RF-47, LOAD-002). It is 151,936 rows and about a quarter
-of a Speed checkpoint (315 MB of 1,272 MB), and a take reads a few hundred of its rows, once, to
+The talker's text embedding is not loaded (RF-47, LOAD-002). It is 151,936 8-bit rows (315 MB;
+about a quarter of the retired 3.0 4-bit Speed checkpoint's 1,272 MB and ~21% of the shipped 1.51 GB
+`attn` hybrid weights), and a take reads a few hundred of its rows, once, to
 build its prompt. `Qwen3TextEmbeddingRows` keeps the checkpoint file open and reads those rows from
 it, then dequantizes them with the call the embedding layer uses, so the result is the layer's bit
-for bit (fixed-seed PCM identity on the Speed and Quality models) and the table never enters the
-process: MLX's active memory after a load fell from 1,271.6 MB to 956.3 MB on the M6, and every
-take's peak by the same 315 MB. A checkpoint that is not the single `model.safetensors`, or holds
-the table in a layout the reader does not know, loads it as a parameter as before
-(`talker_text_embedding_from_file` on the load's telemetry says which).
+for bit (fixed-seed PCM identity on the shipped `attn` hybrid and retired 3.0 models) and the table
+never enters the process: MLX's active memory after a load fell by 315 MB (originally measured
+1,271.6 MB → 956.3 MB on the M6), and every take's peak by the same 315 MB. A checkpoint that is not
+the single `model.safetensors`, or holds the table in a layout the reader does not know, loads it as
+a parameter as before (`talker_text_embedding_from_file` on the load's telemetry says which).
 
 The speech tokenizer stays resident across generations on macOS and, gated by device class
-(physical memory of 7 GB or more), on iOS (`speechTokenizerResidencySupported`,
-`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCaches.swift:59-82`; status in
+(physical memory of 7 GB or more), on iOS (`speechTokenizerResidencyEnabled`,
+`Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSCaches.swift:64-93`; status in
 `config/runtime-refactor-contract.json` `phaseStatus.runtimeComponentReuse`;
 `QWENVOICE_TOKENIZER_RESIDENCY` is the registered diagnostic override). **The iOS gate was qualified
 on the withdrawn f16 codec** (A-19): the gate was adopted because artifact version 2026.08.01.1's
@@ -60,9 +61,11 @@ tokenizer's residency on iOS is recorded. Residency never bypasses
 engine-operation isolation or reset: a critical trim and a full unload invalidate the resident
 cache, and every loaded model still owns its mutable decoder state.
 
-Known gaps: the conditioning-prefix and text-tokenizer caches are keyed by install path, so they
-survive a Mac unload, delete or in-session model update (A-10); a trusted prepared load checks only
-for unused keys (A-20); and every quantized load leaks its initialization graph (mlx-guide §3.5).
+Known gaps & recent hardening: the conditioning-prefix and text-tokenizer caches are keyed by
+install path, so they survive a Mac unload, delete or in-session model update (A-10); since `RF-68`
+(`5984499b`, 2026-11-23), a trusted prepared load verifies `[.noUnusedKeys, .shapeMismatch]`
+(closing A-20's shape-mismatch gap while skipping redundant missing-key checks on trusted
+checkpoints); and every quantized load still leaks its initialization graph (mlx-guide §3.5).
 
 Cold-load evidence must include the model-loading lifecycle boundaries. A warm generation is not
 evidence that the loader or the prepared-state trust path is correct.
@@ -104,10 +107,15 @@ task-local state and never advance the process-global RNG.
 - **Order and EOS.** Temperature is applied before probability filtering. The talker's EOS is
   filtered by top-k/top-p like any token (D2, production since 2026-10-20);
   `QWENVOICE_TALKER_FILTER_EOS=off` restores the older re-insertion after the filters.
-- **Hot-loop state.** Repetition state is maintained incrementally (constant-time membership over a
-  first-seen token order), and reusable sampler and mask scratch avoids rebuilding equivalent arrays
-  each step. The prewarm draws once through the production sampler on a private random state, so its
-  kernels are compiled before the first take without changing any output.
+- **Hot-loop state.** Since `RF-68` (`3852e8c7`, narrow `A3`), `Qwen3SamplerScratch` maintains a
+  fixed-shape 3 KiB `[1, vocabSize]` GPU `Bool` `seenMask` updated in-graph via `MLX.where` instead
+  of re-uploading a growing `[N]` token array each talker step (14/14 bit-identical PCM, −3.56% host
+  CPU, −9 ms warm first chunk on Custom short/medium), and reusable sampler and mask scratch avoids
+  rebuilding equivalent arrays each step. Per-step talker introspection scalars are gated behind
+  `captureIntrospection` (`RF-68`, `dc9d6898`/`1513b744`) so non-telemetry product takes skip ~31
+  GPU-scalar `.item()` reads. The prewarm draws once through the production sampler on a private
+  random state, so its kernels (including the `seenMask` scatter) are compiled before the first take
+  without changing any output.
 
 - **Kernel launches per frame.** Two rewrites remove about 400 of a frame's kernel launches without
   changing a sample (RF-46; fixed-seed PCM identity on the custom, design and clone matrix):
@@ -133,11 +141,19 @@ task-local state and never advance the process-global RNG.
   earlier in the same frame. The random keys are inputs the loop resolves from the request's
   random state, one per pass in pass order, where the eager sampler resolved them, so a seed draws
   the same keys in the same order. Any other stage, and a take with a sampler observer, keeps the
-  per-pass plan and the eager sampler. On the M6: PCM-identical on 39 fixed-seed takes (Speed,
-  Quality, instruct-bearing and long); 8.5% faster in all where the host bounds a frame (6.3% from
+  per-pass plan and the eager sampler. On the M6: PCM-identical on 39 fixed-seed takes (across the
+  retired 3.0 Speed/Quality tiers and verified bit-identical on the shipped `attn` hybrid,
+  instruct-bearing and long); 8.5% faster in all where the host bounds a frame (6.3% from
   sampling inside the passes, 2.3% from making the frame one function) and under 1% where the GPU
-  does, with about 6% less host CPU. The identity is measured, not proven: a fused kernel may round
-  differently on another MLX or GPU, and the digests are the guard.
+  does, with about 6% less host CPU. Since `RF-68` (`4445adcf`, `87d6a4b0`), `CodePredictorCompiledPlan`
+  is hoisted onto `Qwen3TTSModel` and prewarmed at warmup (with lazy per-pass KV buffers allocated
+  only for the eager-sampler path) and passes flattened `predictor.parameters()` plus fused
+  projections via fixed-shape `compile(inputs: [weightInputs])`, eliminating a 180.2 MiB/switch
+  cross-thread `mlx-swift 0.32.3` `CompileCache` leak (`0.0 MB` cross-model leak in
+  `mac-memory-qualification-20261123-180900-4b639d73`, pinned by
+  `testCrossThreadPlanDeinitReleasesPredictorWeightsWhileTraceThreadStaysAlive`). The identity is
+  measured, not proven: a fused kernel may round differently on another MLX or GPU, and the digests
+  are the guard.
 
 Diagnostic environment values are resolved into the request policy before the model is invoked;
 they are not static mutable runtime authority. Seeded takes reproduce within one source identity
@@ -191,7 +207,11 @@ scratch and per-tier cleanup keep resident growth controlled. The per-tier clear
 cost are in mlx-guide §5.3–§5.4. Sliding-window and quantized KV experiments, legacy speed profiles
 and alternate eval strategies must be read through their ledger state; a knob in source is not proof
 that it is active or beneficial. The talker KV cache is the unbounded bf16 `KVCacheSimple`, and the
-codec decoder does not apply the reference's 72-frame window, so its KV grows over the take (A-03).
+codec decoder does not apply the reference's 72-frame window, so its KV grows over the take (A-03;
+`RF-54` declined 2026-11-24 in `f070f41a`, retaining full-causal decode for 3.2). Under `RF-68`
+(`23343521`), the Mimi encoder allocates a fresh per-encode KV cache so no KV state is retained
+between clone-reference calls (`A-08`), and the decoder builds its rectangular `[n, offset + n]`
+causal mask directly instead of slicing an `(offset + n)²` square mask (`A-27`).
 
 Memory-qualified benchmarks use telemetry schema v8 and evidence manifest v2. One process has one
 memory series: the macOS app hosts the engine, so its app and engine samplers are two readers of that

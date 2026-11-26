@@ -1,5 +1,5 @@
 ---
-status: active
+status: historical
 owner: backend-mlx
 reviewed: 2026-11-11
 summary: Counter-verification of an outside model-written report on the Qwen3-TTS integration - which of its claims hold in the code, the records and upstream, three new measurements (encoder rotary convention, 4-bit against 8-bit, mixed precision), and what follows for the parked engine-remediation items.

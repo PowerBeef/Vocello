@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-11-23
+reviewed: 2026-11-25
 summary: The Qwen3-TTS 12 Hz speech tokenizer guide (formerly the Mimi codec guide; the filename is kept) — the Mimi-derived encoder, split RVQ and Qwen decoder as owned in Vocello, streaming and partition semantics, where Vocello's decode and clone-reference encode diverge from the reference (A-02, A-03, A-04, G-03), and the shipped fp32 codec.
 sourceOfTruth:
   - Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift
@@ -70,7 +70,7 @@ into PCM. The encoder runs only to turn a clone reference into codes for in-cont
 | ID | What | Status |
 | --- | --- | --- |
 | A-02 | The encoder's rotary embedding uses the wrong convention (§2.2) | open; selectable behind `QWENVOICE_ENCODER_ROTARY` since 2026-11-11; the Swift clone screen was inconclusive with the direction pointing at harm, so the default stays (RF-52) |
-| A-03 | The decoder never applies its 72-frame window; its KV cache grows for the whole take (§5) | open; selectable behind `QWENVOICE_DECODER_WINDOW=on` since 2026-11-11; the `clone-long` screen's rule `decoder-window-72` decides the default (RF-54) |
+| A-03 | The decoder never applies its 72-frame window; its KV cache grows for the whole take (§5) | open (default unchanged for 3.2); selectable behind `QWENVOICE_DECODER_WINDOW=on` since 2026-11-11; `RF-54` (`decoder-window-72`) was declined on 2026-11-24 (`f070f41a`) |
 | D5 / A-04 | Streamed clones decoded from a cold decoder; the reference decodes reference plus generated codes (§5) | matches since 2026-11-12: streamed clones prime with the reference (`clone-decoder-history-primed-confirm`: speaker similarity +0.056, error rate unchanged); `QWENVOICE_CLONE_DECODER_HISTORY=cold` restores the cold decoder; since A-26 a streamed take restores the primed state its reference's first streamed take kept |
 | — | Encoder attention is full causal, as upstream's is (§2.3) | matches; do not add the 250-frame window |
 | — | The codec runs in fp32; Qwen's README setup loads bf16 (§7) | deliberate |
@@ -193,7 +193,7 @@ proposed, would move Vocello away from the reference.
 ### 2.4 Other encoder facts
 
 - **Eager encode (F-07, fixed).** `createVoiceClonePrompt` now evaluates the reference codes inside
-  the caller's MLX scope (`Q:1030-1033`), so the lazy encode no longer escapes into `MLX.save` or the
+  the caller's MLX scope (`Q:1135`), so the lazy encode no longer escapes into `MLX.save` or the
   first take.
 - **Memory (A-08 fixed in RF-68; A-28 open).** Since Pack B (`RF-68`, 2026-11-23), the encoder
   allocates a fresh per-encode KV cache so no KV state is retained between clone-reference calls
@@ -378,9 +378,9 @@ by about 64 KiB per frame: about 48 MiB at 60 s and 128 MiB at the 2,048-frame c
 applies the 72-frame window in every layer; the cache stays unbounded, and bounding it to the
 window is a separate change that keeps the output identical. The window changes only what a frame
 past the 72nd hears, so a take shorter than 5.76 s decodes the same either way, and the talker's
-codes never change: the `clone-long` screen (two four-sentence takes per reference, about 15 to
-20 s) decides it under the rule `decoder-window-72`, recorded before its takes, with the late
-speaker windows (from 6 s) as their own guard (RF-54). The decoder window must land before the
+codes never change. The pre-registered `clone-long` screen rule `decoder-window-72` (`RF-54`, with
+late speaker windows from 6 s as its own guard) was declined on 2026-11-24 (`f070f41a`), retaining
+full-causal decode as the 3.2 default. If revisited later, the decoder window must still land before
 decoder performance levers (audit ordering traps).
 
 ### 5.3 Partition invariance, within tolerance
@@ -504,8 +504,9 @@ Measured figures are from the engine audit (iPhone 17 Pro on iOS 27 with Speed 4
   the live paths evaluate before readback, so the graph never accumulates across chunks. If you move
   an `eval`, measure wall time and peak footprint together; on iOS a faster graph that raises peak
   memory can trigger Jetsam.
-- **Weights.** The codec is fp32 and unquantized in both tiers. Whole-model memory and the tier
-  policy are in [`mlx-guide.md`](mlx-guide.md).
+- **Weights.** The codec is fp32 and unquantized across all three shipped `attn` hybrid mode models
+  (as it was in both retired 3.0 tiers). Whole-model memory and the device-tier policy are in
+  [`mlx-guide.md`](mlx-guide.md).
 
 **MLX notes (CONV-21).** The package pins mlx-swift 0.32.3 since CONV-21. mlx-audio-swift v0.1.5
 (`dbe5eaa`) replaced MLX's scalar-gather form, which passes empty index metadata to Metal when API

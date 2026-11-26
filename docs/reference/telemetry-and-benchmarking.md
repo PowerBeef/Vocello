@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-21
+reviewed: 2026-11-25
 summary: The single telemetry and benchmarking reference — which benchmark lane to run, preflight and the macOS CLI/app and iOS device procedures, the Phase 2-3 language bench, per-generation typed telemetry schemas and fields, PASS-only publication, lineage and baselines, and the artifact map.
 sourceOfTruth:
   - Sources/QwenVoiceCore/NativeTelemetrySampler.swift
@@ -141,8 +141,8 @@ UI heartbeat        —                       yes                    yes
 | **macOS profile** | `scripts/macos_test.sh profile --kind cpu\|memory\|metal\|witness` | In-process via CLI inside exact-PID trace | CPU/signpost, allocation/VM validation, Metal GPU command-buffer/shader trace (`Metal System Trace + os_signpost`), or the signpost-only timing witness |
 | **iOS device** | `scripts/ios_device.sh bench` | In-process | iPhone tier, Jetsam, on-device RTF (headless diagnostics, single take) |
 | **iOS UI benchmark** | `scripts/ui_test.sh ios benchmark` | In-process | Full UI matrix through XCUITest on the paired physical iPhone; telemetry gated per take |
-| **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Twelve scripted SwiftUI scenarios with the in-app frame probe; ceilings that warn unless the contract enforces the scenario; canonical-hardware runs publish `ui-perf` registry records; lane contract in [`macos-testing.md`](macos-testing.md) (history: [the 2026-08 macOS UI audit](../audits/2026-08-04-macos-ui-refresh.md)) |
-| **iOS UI frame health** | `scripts/ui_test.sh ios perf` | No engine claims (UI-only) | Twelve snapshot-free scripted scenarios on the paired physical iPhone with the pinned-60 Hz in-app probe; `check_ios_ui_perf.py` structural + canonical-hardware gate with enforced confirmatory ceilings (7 confirmatory scenarios, calibrated 2026-11-21 under `AV-14`) from [`config/ui-perf-thresholds-ios.json`](../../config/ui-perf-thresholds-ios.json); canonical-iPhone runs publish platform-`ios` `ui-perf` registry records; lane contract in [`ios-device-testing.md`](ios-device-testing.md) (history: IUI-6, [the 2026-08 iOS UI audit](../audits/2026-08-29-ios-ui-refresh.md)) |
+| **macOS UI frame health** | `scripts/ui_test.sh macos perf` | No engine claims (UI-only) | Twelve scripted SwiftUI scenarios with the in-app frame probe; ceilings that warn unless the contract enforces the scenario; canonical-hardware runs publish `ui-perf` registry records; lane contract in [`macos-testing.md`](macos-testing.md) (history: the 2026-08 macOS UI audit, archived in git history) |
+| **iOS UI frame health** | `scripts/ui_test.sh ios perf` | No engine claims (UI-only) | Twelve snapshot-free scripted scenarios on the paired physical iPhone with the pinned-60 Hz in-app probe; `check_ios_ui_perf.py` structural + canonical-hardware gate with enforced confirmatory ceilings (7 confirmatory scenarios, calibrated 2026-11-21 under `AV-14`) from [`config/ui-perf-thresholds-ios.json`](../../config/ui-perf-thresholds-ios.json); canonical-iPhone runs publish platform-`ios` `ui-perf` registry records; lane contract in [`ios-device-testing.md`](ios-device-testing.md) (history: IUI-6, the 2026-08 iOS UI audit, archived in git history) |
 | **Language bench** | `scripts/macos_test.sh lang-bench` / `scripts/ios_device.sh lang-bench` | In-process | Language hint contract and spoken-output verification ([§5](#5-language-bench)) |
 
 **Important:** CLI bench numbers are **not** identical to macOS UI numbers. Compare like with
@@ -312,7 +312,7 @@ and artifacts stand, and the run stays local.
 | `QWENVOICE_MAC_WARM_GATE=off\|records\|enforce` | macOS warm-admission gate (`MacWarmupAdmissionPolicy`): defers **proactive** warms while the app-process kernel pressure level is soft/hardTrim on every Mac tier (the high-memory Mac since AUD-10). Default `enforce` (validated 2026-06-09); `records` logs verdicts without blocking; user generations are never gated. Events land in the app layer's `native-events.jsonl`. |
 | `QWENVOICE_MARKING=off` | Disables both publication marks only in a repository-built internal diagnostics binary with the master gate enabled. It exists for A/B isolation of the marking pass, is unavailable in distributed builds, and must never be set for canonical records. |
 | `QVOICE_TALKER_KV_QUANT=8\|4` | **Dev-only** opt-in talker KV-cache quantization (QuantizedKVCache, group 64). Measured (P4, §H): clone/long −271 MB physFoot but **−8.6% decode speedup** (`decodeSpeedupX`; pre-2026-09-12 "RTF") — not shipped on any tier; insurance knob only. Never combined with `QVOICE_TALKER_KV_WINDOW`. |
-| `QWENVOICE_STREAM_CHUNK_CACHE_CLEAR=on\|off` | **Dev-only** switch for the per-chunk MLX cache clear on any tier (`NativeMemoryPolicyResolver.policy`, RF-45), leaving the tier's cache limit and clear cadence as they are. It isolates the clear for an A/B: on the M6 the clear changes no sample and costs about 1.7% where the host bounds a frame, and the iPhone is unmeasured. |
+| `QWENVOICE_STREAM_CHUNK_CACHE_CLEAR=on\|off` | **Dev-only** switch for the per-chunk MLX cache clear on any tier (`NativeMemoryPolicyResolver.policy`, RF-45), leaving the tier's cache limit and clear cadence as they are. It isolates the clear for an A/B: on the M6 the clear changes no sample and costs about 1.7% where the host bounds a frame; on the iPhone 17 Pro (2026-11-11, cooled interleaved fixed-seed takes, [`mlx-guide.md` §5.4](mlx-guide.md#54-cache-clearing-and-what-it-costs)) turning it off cut a medium take's clears from 39 to 5 and changed neither its samples nor its frame time (35.5 ms either way), so the iPhone tier keeps the clear. |
 | `QVOICE_IOS_MLX_CACHE_LIMIT_MB=<n>` | **Dev-only** override of the MLX `Memory.cacheLimit` for the iPhone tier. Useful for sweeps; production uses the tier default. |
 | `QVOICE_IOS_MLX_MEMORY_LIMIT_MB=<n>` | **Dev-only / do not ship** override of MLX `Memory.memoryLimit`. Production avoids a hard `memoryLimit`; see `mlx-guide.md` §5.2. |
 | `QVOICE_IOS_MEMORY_PROFILE=iphone15pro` | **Physical-device memory-profile diagnostic**: clamps the effective per-process limit inside `IOSMemorySnapshot.capture()` so bands/admission/clone-gate use the smaller-device budget (`iphone15pro` → 5,000 MB). Rows stamp `notes.memoryProfile` and `notes.simulatedProcessLimitMB`. GPU compute and thermals remain those of the connected device; this is not proof for a different device. Driven by `ios_device.sh bench --memory-profile` ([§4.7](#47-ios-on-device-bench)). |
@@ -688,7 +688,12 @@ scripts/ios_device.sh bench --memory-profile iphone15pro custom:speed:
 ```
 
 Pulls diagnostics from the device, runs the summarizer, and exits non-zero unless
-`device-diagnostics-done.json` reports success.
+`device-diagnostics-done.json` reports success. Since `RF-73` (`4703237c`, 2026-11-25), the
+dormant headless device/perf diagnostic runners (`IOSDeviceDiagnosticsRunner` and its harness
+hooks) and shipping `QWENVOICE_*` environment-variable reads are compiled out of distribution iOS
+builds behind the `QVOICE_DEVICE_DIAGNOSTICS` compilation condition (`project.yml:513,707`,
+enforced by `scripts/verify_ios_release_artifacts.py`); `scripts/ios_device.sh` enables
+`QVOICE_DEVICE_DIAGNOSTICS` automatically when building local diagnostic binaries.
 
 ### 4.7b iOS UI benchmark (Studio matrix — XCUITest)
 
@@ -1033,7 +1038,7 @@ from the engine's receipt, so a run-on can be reproduced. The lane runs under th
 The default moved from `cell-hash-v1` on 2026-11-15 (RF-61, maintainer decision): under v1 the hybrid
 model's `design/short/warm#1` take ran on in silence at its seed and Fast QC refused it on every run
 (`macos-xcui-benchmark-20261114-195242-cfbe3925`, kept as failed evidence;
-[the investigation](../audits/2026-11-15-release-3-1-interruption-investigation.md)). The hybrid
+the 2026-11-15 release-3.1 interruption investigation (archived in git history)). The hybrid
 starts a new lineage anyway, and the policy is part of the comparison key. The seeds do not move
 again for a refused take: a v2 cell that is refused stands, and the lane records the refusal
 (Refused takes, above) instead of deriving the seeds again. Under either policy
@@ -1697,7 +1702,7 @@ older rows stay readable but are marked memory-contract-incomplete and excluded 
 | `chunkTimeline` | `[GenerationChunkTelemetry]?` | Per-chunk decode substages, with `arrivalNS` (v5) and optional `mimiDecoderBreakdownMS` (v5) ([§6.7](#67-per-chunk-timeline-chunktimeline-streaming-only)). |
 | `audioQC` | `AudioQCReport?` | Versioned reference-free overall, model-instability, and written-output verdicts plus flags, defect offsets, and optional per-chunk QC. Algorithm v10 (`makeAudioQCReport`; v7 adds warn-only `onset_step_burst`, v8 warn-only `speaking_rate_slow`, v9 failing `speaking_rate_fast`, v10 judges silent runs before the publication watermark) judges the atomically published WAV frames and, since 2026-09-12, also asserts the file's sample rate, channel count and frame count against the request ([§7.7](#77-output-quality-layers)). |
 | `audioQC.signal` | `AudioQCSignalObservations?` | Since 2026-09-26 (AQ-04, additive on QC v8): the Stage 0 observational measures of the persisted WAV (BS.1770 loudness, loudness range and 4x true peak, noise floor, WADA-SNR, effective bandwidth, spectral-flux events, 12.5 Hz codec-frame modulation, seam z-score, repetition stripe) under their own `algorithmVersion`. No flag or verdict reads them; eleven reach the tracked take as `audioQC.metrics`. |
-| `engineIntrospection` | `GenerationEngineIntrospection?` | Since 2026-09-26 (AQ-04, engine rows, success and post-terminal failure): the talker's own signals, from the facade's `VocelloQwen3GenerationIntrospection`: codebook-0 token cycles, per-step entropy (mean, p95, longest run at or above 4 nats), the EOS-probability trajectory and the streaming seam frames. Observational; telemetry only. |
+| `engineIntrospection` | `GenerationEngineIntrospection?` | Since 2026-09-26 (AQ-04, engine rows, success and post-terminal failure): the talker's own signals, from the facade's `VocelloQwen3GenerationIntrospection`: codebook-0 token cycles, per-step entropy (mean, p95, longest run at or above 4 nats), the EOS-probability trajectory and the streaming seam frames. Observational; telemetry only. Since `RF-68` (`dc9d6898`/`1513b744`), capture is gated by `captureIntrospection: telemetryRecorder != nil` (`Sources/QwenVoiceCore/NativeEngineRuntime.swift:1184,1401-1404,1467`) so non-telemetry product takes skip ~31 per-step GPU-scalar `.item()` reads. |
 | `summary` | `TelemetrySummary?` | Owning-process resident/physical-footprint/compressed/headroom/Metal start, end, delta, peak/min and aligned extrema snapshots; total RAM and implied process limit; independent memory/thread/headroom/Metal coverage; sampler cadence/boundaries; and process CPU/page-fault/context-switch/block-I/O deltas. `timeToPeakMS` tracks the physical-footprint peak. |
 | `streamingTelemetryV9` | `GenerationStreamingTelemetryTransitionV9?` | Nested partial v9 transition projection carried by new schema-v8 rows. Invalid generation IDs may omit it; otherwise missing producer domains are explicit `unavailable` entries and never inferred as zero. It is not a publishable schema-v9 envelope. |
 | `notes` | `[String: String]` | Bounded compatibility metadata such as `deviceClass`, `promptChars`, privacy-safe `promptDigest` (script text only — never the delivery instruction), the bench `delivery` cell stamp, the delivery-instruction receipt `instructChars`/`instructDigest` on instructed takes (verified fail-closed by the delivery bench; [§4.6](#46-delivery--prosody-cells)), and memory pressure. Raw script, transcript, voice description, file path, and failure message are forbidden; prompts/failures/instructions use SHA-256 identity rather than content. |
@@ -2216,10 +2221,10 @@ cannot claim. Pressure-triggered trims appear as `memory_pressure` and `memory_t
 Interpret them together with `physFoot`, the GPU-by-stage block, and the recorded device class; a
 forced class is diagnostic evidence, not proof for that physical device.
 
-> **Caveat:** on the forced floor tier, a Quality load that cannot fit will surface as an error rather
-> than silently falling back to Speed. The row's `modelID` reveals the actual variant served — check it
-> before attributing a Quality cell. The forced tier changes real behavior **only while the env is set**;
-> unset it for normal use.
+> **Caveat:** since RF-59 both platforms ship one `attn` hybrid model per mode (the 3.0 Quality tier is
+> retired), and on the forced floor tier a model load that cannot fit surfaces as an error rather than
+> silently downgrading. The row's `modelID` reveals the actual model served. The forced tier changes
+> real behavior **only while the env is set**; unset it for normal use.
 
 **Watch for OOM regressions** when optimizing the backend: a rising `physFoot` peak, GPU-stage peak,
 or any `hardTrim` in `trims` means a run is shedding model state under pressure — the early OOM signal.
@@ -2478,7 +2483,9 @@ the gate reports BASELINE INVALID with the exact seed command for that run's pat
 preflight predicts the same mismatch from the live host and the gate matrix before any build.
 
 The committed baseline's own identity and `seededRuns` record the commit, host, OS and toolchain it
-was pooled from (last re-pooled on 2026-10-16 for the mlx-swift 0.32.3 repin, CONV-21). A new OS or
+was pooled from (last re-pooled on 2026-11-14 at `7a050686` for the shipped `hybrid-attn` artifact
+`2026.11.13.1`, Xcode 27.2 / Swift 6.4.2, and QC v10; previously re-pooled on 2026-10-16 for the
+mlx-swift 0.32.3 repin, CONV-21). A new OS or
 Xcode build number changes the identity and needs a re-seed; earlier baselines stay in git history
 only.
 
@@ -2518,7 +2525,8 @@ pool of three, the gate's minimum).
 newest files. Ad-hoc diagnostics keep the newest 48 / ≤64 MiB. `vocello bench --telemetry verbose`
 sizes the sidecar budget to its own plan before any model loads (one sidecar per planned
 generation, delivery takes and TTFC probe included, at the same per-sidecar byte allowance) and
-refuses a plan above 256 generations, so a full default matrix (58 takes) keeps every sidecar
+refuses a plan above 256 generations, so a full default matrix (29 takes on the single-model hybrid,
+as well as the pre-RF-59 58-take two-tier matrix) keeps every sidecar
 publication needs (`GenerationTelemetrySidecarBudget`). No manual clearing is needed for logs.
 
 ### Committed (bounded)
@@ -2531,6 +2539,7 @@ publication needs (`GenerationTelemetrySidecarBudget`). No manual clearing is ne
 | `benchmarks/hardware-profiles.json`, `schema-v3.json`, `schema-v2.json` (both published today), `schema-v1.json` (read-only) | Canonical hardware identities plus the record contracts |
 | `benchmarks/baselines/mac-gate-bench.json` | The governed gate baseline ([§8](#baseline-comparison-json-machine-gated)) |
 | `benchmarks/qc/eval-v*.json` | QC v2 threshold evaluations ([`qc.md`](qc.md)) |
+| `benchmarks/qc/multimodal-eval-v1.json` | Calibrated Q1/Q2 Gemini 4 Neon multimodal audio QC evaluation receipt (`RF-72`, strictly offline and report-only; [`qc.md`](qc.md)) |
 | `benchmarks/OPTIMIZATION.md` | Historical optimization narrative |
 
 **Never commit raw JSONL, WAVs, screenshots, result bundles, or traces** under `benchmarks/`; the

@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-mlx
-reviewed: 2026-10-01
+reviewed: 2026-11-25
 summary: The design-then-clone workflow — what a curated emotion reference bank is, how curation selects and honestly refuses candidates, and how banks present as personas with a delivery choice in both apps.
 sourceOfTruth:
   - Sources/QwenVoiceCore/VoiceBankCatalog.swift

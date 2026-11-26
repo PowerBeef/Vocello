@@ -1862,6 +1862,12 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-09-27 | [`macos-xcui-benchmark-20260927-101957-c37aa311`](runs/ui-generation/macos-xcui-benchmark-20260927-101957-c37aa311.json) | canonical | canonical | passedWithWarnings | qualified | 29 | 0.28 | `d374af3c9809` | `d1c935e54ac5` | baseline | m6-stall-calibration |
 
+## ui-generation / macos / mac-mini-m6-16gb / config `d8fe962e95df`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-26 | [`macos-xcui-benchmark-20261126-092027-a9057aef`](runs/ui-generation/macos-xcui-benchmark-20261126-092027-a9057aef.json) | canonical | canonical | passed | qualified | 29 | 0.30 | `7e20e0707b81` | `d8fe962e95df` | baseline | macos-xcui-benchmark-20261126-092027-a9057aef |
+
 ## ui-perf / ios / iphone-17-pro / config `0aff6a5bd9c4`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

@@ -1867,6 +1867,7 @@ their harness files differ from the baseline's.
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-11-26 | [`macos-xcui-benchmark-20261126-092027-a9057aef`](runs/ui-generation/macos-xcui-benchmark-20261126-092027-a9057aef.json) | canonical | canonical | passed | qualified | 29 | 0.30 | `7e20e0707b81` | `d8fe962e95df` | baseline | macos-xcui-benchmark-20261126-092027-a9057aef |
+| 2026-11-26 | [`macos-xcui-benchmark-20261126-154113-ea3610e8`](runs/ui-generation/macos-xcui-benchmark-20261126-154113-ea3610e8.json) | canonical | canonical | passed | qualified | 29 | 0.30 | `072d1bd7a11c` | `d8fe962e95df` | vs macos-xcui-benchmark-20261126-092027-a9057aef: RTF +0.3% (within noise), TTFC +1.7% (within noise), RAM +0.5% (within noise) | macos-xcui-benchmark-20261126-154113-ea3610e8 |
 
 ## ui-perf / ios / iphone-17-pro / config `0aff6a5bd9c4`
 

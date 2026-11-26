@@ -1041,6 +1041,12 @@ their harness files differ from the baseline's.
 | 2026-11-16 | [`macos-engine-20261116-145238-b3fffea8`](runs/engine-generation/macos-engine-20261116-145238-b3fffea8.json) | focused | focused | passed | qualified | 5 | 0.30 | `5dc4be0aa762` | `5450b2687f95` | baseline | promo-delivery |
 | 2026-11-16 | [`macos-engine-20261116-220421-6c6226b3`](runs/engine-generation/macos-engine-20261116-220421-6c6226b3.json) | focused | focused | passed | qualified | 5 | 0.30 | `693f13d164da` | `5450b2687f95` | vs macos-engine-20261116-145238-b3fffea8: no cell with ≥3 takes (not trended) | promo-delivery |
 
+## engine-generation / macos / mac-mini-m6-16gb / config `743236cbedc0`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-26 | [`macos-engine-20261126-082625-fc1f5bbc`](runs/engine-generation/macos-engine-20261126-082625-fc1f5bbc.json) | focused | focused | passed | qualified | 5 | 0.30 | `56cdc23f4366` | `743236cbedc0` | baseline | promo-delivery |
+
 ## engine-generation / macos / mac-mini-m6-16gb / config `7ede380f740e`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

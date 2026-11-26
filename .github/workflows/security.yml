@@ -64,7 +64,10 @@ jobs:
             build-mode: manual
             runner: macos-26
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    # Swift CodeQL under Rosetta on macos-26 finishes its traced build around
+    # 88m (run 45876198950 built cleanly in 87m45s and cancelled 2m into
+    # Analyze at the old 90m cap); keep generous headroom for Analyze.
+    timeout-minutes: 150
     permissions:
       contents: read
       security-events: write

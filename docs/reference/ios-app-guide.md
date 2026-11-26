@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-11-10
+reviewed: 2026-11-25
 summary: Consolidated iPhone app map — every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.
 sourceOfTruth:
   - Sources/iOS
@@ -53,14 +53,15 @@ The UI is what this guide drives. Headless, non-UI device diagnostics are docume
 [`ios-device-testing.md`](ios-device-testing.md); that path is separate from XCUITest.
 
 The App Store bundle requires `arm64` and Apple's `iphone-performance-gaming-tier`, which limits
-installation to iPhone 15 Pro and later, and to the iPads Apple lists for the same capability
-(M1-or-later iPad Pro and iPad Air, and the iPad mini with A17 Pro). The runtime guard admits
-iPhones only, so those iPads see the localized unsupported-device screen (maintainer decision
-2026-11-10, RF-42). `IOSDeviceEligibilityPolicy` owns the source-level predicate and the minimum
-model's name;
-archive/IPA verification rejects any capability drift. The gaming-tier capability also makes iOS
-treat the app as a game and show the Game Mode banner at launch, so the Info.plist sets
-`LSSupportsGameMode` to NO, and the same checks reject a missing or true value (RF-37).
+installation to iPhone 15 Pro and later, and to the eligible 8 GB+ Apple silicon (M-series) iPad Pro
+/ iPad Air models and iPad mini (A17 Pro) that Apple lists for the same capability. Under `RF-73`
+(2026-11-25, `4703237c`, superseding the earlier 2026-11-10 `RF-42` iPad refusal), the runtime guard
+admits iPhone 15 Pro and later **and** those eligible 8 GB+ iPads in portrait iPhone compatibility
+mode (`TARGETED_DEVICE_FAMILY` remains `"1"`); unsupported devices with less memory see the localized
+unsupported-device screen. `IOSDeviceEligibilityPolicy` owns the source-level predicate and the
+minimum model's name; archive/IPA verification rejects any capability drift. The gaming-tier
+capability also makes iOS treat the app as a game and show the Game Mode banner at launch, so the
+Info.plist sets `LSSupportsGameMode` to NO, and the same checks reject a missing or true value (RF-37).
 
 ---
 
@@ -89,8 +90,10 @@ file opens once (AUD-01).
 
 Three pages (Welcome → Install → Ready). Controls: `onboarding_skip` (top-right on pages
 1–2) and `onboarding_cta` (primary button; label changes per page: "Get started" →
-"Continue" → "Open Studio"). Tests interact with these visible controls. There is no hidden
-onboarding bypass.
+"Continue" → "Open Studio"). Page 3 also displays the concise local-AI and AudioSeal watermarking
+notice (`IOSInterfaceText.onboardingAINotice`) with horizontal-fitting Terms of Use
+(`onboarding_terms`, `/terms/`) and Privacy Policy (`onboarding_privacy`, `/privacy/`) links
+(`RF-73`). Tests interact with these visible controls. There is no hidden onboarding bypass.
 
 ### Studio — `Sources/iOS/IOSStudioCanvas.swift`, `IOSGenerationModeViews.swift`
 
@@ -102,10 +105,11 @@ mode segments, composer, and primary action; there is no hidden screen-presence 
 |---|---|---|
 | Mode segment | `generateSection_custom\|design\|clone` | Tap to switch mode (keeps its id — not shadowed) |
 | Script composer | `textInput_textEditor`, count `textInput_lengthCount` | Multi-line; `textInput_longFormIndicator` shows localized Long-form above the shared 900-character single-take threshold (a Han, kana or Hangul character counts three, `SingleTakeScriptBudget`) and is absent for shorter scripts; `textInput_koreanLongFormCaution` warns under a long-form script that Auto sends as Korean, hidden while a take runs (RF-60). Editor retains the shared 30,000-character ceiling. |
-| **Generate CTA** | `textInput_generateButton` | Shown when the mode's model is installed; enabled once the script is ready (Design also needs a brief, Clone a reference and consent) |
+| Setup prompt | `textInput_setupAction`, `textInput_setupNotice` | `IOSStudioSetupPrompt` (`RF-73`): compact one-tap shortcut above the chips when a mode needs setup (for example opening the Voice Brief editor in Design or prompting inline cloning consent in Clone) |
+| **Generate CTA** | `textInput_generateButton` | Shown when the mode's model is installed; enabled once the script is ready (Design also needs a brief; Clone needs a reference and triggers one-time inline consent if not yet recorded) |
 | **Install CTA** | `textInput_installModelButton` | Shown instead of Generate when the model is **missing** (see §3) |
 | Cancel | `textInput_cancelButton` | Inside the generating progress bar |
-| Error retry | `textInput_generationError` | Retry bar on a failed generation |
+| Error retry | `textInput_generationError` | Multi-line wrapped retry/dismiss bar on a failed generation (`RF-73` fixes clipping and dismiss behavior) |
 | Foreground-exit notice | `textInput_backgroundNotice` | Shown on return after leaving the app stopped a take or long-form project; tap to dismiss |
 | Player controls | `studio_livePreview_playPause`, `studio_livePreview_cancel`; `studio_inlinePlayer_playPause`, `studio_inlinePlayer_download`, `studio_inlinePlayer_dismiss` | Live streaming preview and completed-take controls. The enclosing card is `studio_livePreview_card` while streaming and `studio_inlinePlayer_generation_<uuid>` once complete. |
 | Cadence review | `studio_inlinePlayer_cadenceNotice`, `studio_inlinePlayer_cadenceRetry` | An accepted take with unusual pause spacing remains playable and saved, but exposes a non-color-only warning and an explicit “Generate again” action using the currently visible settings. Severe gaps remain rejected before this surface. |
@@ -122,11 +126,16 @@ mode segments, composer, and primary action; there is no hidden screen-presence 
 confirmation, returning to a fresh seed per take. `studioChip_bankDelivery` (DP-16) shows the
 selected emotion-bank persona's current delivery and opens the bank member sheet below.
 
-Clone reads the persistent `voiceCloning_consentAcknowledgment` preference from Settings. Generate
-remains unavailable until the user acknowledges consent there. The optional transcript selects
-transcript-backed conditioning; no transcript selects the separate audio-only x-vector path. The
-reference transcript's language describes the conditioning clip only. Auto output language always
-resolves from the script being synthesized; an explicit Studio language always wins.
+Clone reads the persistent `voiceCloning_consentAcknowledgment` preference (`Settings → Privacy &
+Permissions`). When consent is not yet recorded, the first cloning action (Record, Import, Save as
+voice, or Studio Clone setup) presents the one-time scrollable inline `IOSVoiceCloningConsentSheet`
+(`voiceCloning_inlineConsentContinue`, `voiceCloning_inlineConsentCancel`,
+`voiceCloning_inlineConsentTerms`, gated through `VoiceCloningConsentPolicy.gateInlineAction`,
+`RF-73`); confirming records the same persistent preference, which can be turned off again in
+`Settings → Privacy & Permissions` at any time without deleting saved voices or history. The optional
+transcript selects transcript-backed conditioning; no transcript selects the separate audio-only
+x-vector path. The reference transcript's language describes the conditioning clip only. Auto output
+language always resolves from the script being synthesized; an explicit Studio language always wins.
 
 Studio lifecycle state is attempt-scoped. `StudioGenerationCoordinator.start` returns an opaque
 token that every single-take and long-form live or terminal callback must present. Delayed success,
@@ -220,10 +229,11 @@ clone reference through the Studio handoff). Studio Clone exposes the same perma
 pipeline directly through `referenceClip_importAudioFile`; it dismisses the custom reference panel
 before presenting Files and never creates a session-only reference. The enrollment sheet exposes
 `saveVoice_nameField`, `saveVoice_transcriptEditor`, `saveVoice_transcriptionStatus`,
-`saveVoice_referenceLanguagePicker`, `saveVoice_useAudioOnlyButton`, and `saveVoice_saveButton`; while
-voice-cloning consent is off, `saveVoice_consentRequired` (and `iosRecord_consentRequired` on the
-recorder) names Settings → Privacy and Save stays disabled (PA-17). A
-matching `.txt` sidecar is preferred;
+`saveVoice_referenceLanguagePicker`, `saveVoice_useAudioOnlyButton`, and `saveVoice_saveButton`; the
+first Record, Import, or Save action surfaces the one-time inline `IOSVoiceCloningConsentSheet`
+(`RF-73`), while `saveVoice_consentRequired` (passive one-line Save Voice reminder) and
+`iosRecord_consentRequired` appear whenever consent is off, pointing to `Settings → Privacy &
+Permissions` (PA-17, RF-73). A matching `.txt` sidecar is preferred;
 otherwise `VoiceClipTranscriber` starts automatically on device (status in
 `saveVoice_transcriptionStatus`), keeps Save disabled until the
 result is reviewable, and cannot replace a manual edit with a delayed result. If recognition cannot
@@ -340,7 +350,9 @@ English, French, Spanish, German, Italian, Brazilian Portuguese, Simplified Chin
 Korean and Russian; RF-36 completed the last strings in builds 25 and 26). It does not select the
 language of generated speech. The observable app-lifetime owner updates typed display copy without
 replacing runtime dependencies; system dialogs may retain the OS language. The localization lane's
-ten-language walk and full AX-XXXL/pseudo layout have not yet run on the phone (ASR-12/ISU-4).
+ten-language walk and AX-XXXL/pseudo layout ran and passed on the physical iPhone on 2026-11-25
+(`ios-xcui-localization-20261125-180114-8f09bdd2`); signed-candidate device acceptance (`ASR-12`)
+and broader accessibility/VoiceOver qualification (`ISU-4`) remain tracked in `config/roadmap.json`.
 
 Audio retains `iosSettings_autoPlayToggle` (default on); the Take variation menu
 (`iosSettings_variationRow`) is retired with the setting (RF-58). Models & Files owns `iosSettings_voiceModelsRow` and
@@ -355,10 +367,13 @@ again against History at that moment), `iosSettings_leftoverAudioKeep` (ends the
 Nothing is offered while a clear or long-form acceptance is pending, or while History, its outbox
 or its removal list cannot be read fully. The Mac outputs folder is never touched.
 Accessibility owns `iosSettings_reduceMotionToggle` and `iosSettings_reduceTransparencyToggle`.
-Privacy & Permissions retains `voiceCloning_consentAcknowledgment`, its full legal disclosure,
-`iosSettings_privacyPolicyRow`, and `iosSettings_openIOSSettingsRow`. About owns
-`iosSettings_supportRow`, `iosSettings_openSourceRow`, `iosSettings_sourceCodeRow`, and the
-dynamic, non-interactive `iosSettings_versionLabel`. Support and Source Code retain their URLs.
+Privacy & Permissions retains `voiceCloning_consentAcknowledgment` with its revocation caption
+(turning it off leaves saved voices and history intact), jurisdiction-neutral AI disclosure,
+AudioSeal watermark transparency note (`RF-73`), `iosSettings_privacyPolicyRow` (`/privacy/`),
+`iosSettings_termsRow` (`/terms/`), and `iosSettings_openIOSSettingsRow`. About owns
+`iosSettings_supportRow` (`/support/`), `iosSettings_reportIssueRow` (`/support/#report`, `RF-73`),
+`iosSettings_openSourceRow`, `iosSettings_sourceCodeRow`, and the dynamic, non-interactive
+`iosSettings_versionLabel`. Support and Source Code retain their URLs.
 Rows use decorative symbols, wrapping labels and subordinate trailing values at ordinary sizes;
 values reflow below their labels at accessibility sizes. No forced
 Dynamic Type limit or fixed-width value column is used. Models & Files and Accessibility have
@@ -372,8 +387,12 @@ below their labels rather than reserving a narrow trailing column.
 The restrained gold `iosSettings_exportPurchaseRow` opens the same purchase sheet as all export
 entry points. Its summary reflects locked/checking/unlocked state and never displays a price.
 The sheet separates the benefit, free functionality, one-time/no-subscription reassurance,
-full-width live StoreKit-price action, Restore, policy/support links, and thank-you text. All
-purchase states, disabling rules and explicit post-purchase export retry remain unchanged.
+full-width live StoreKit-price action (`exportPurchase_buy`), Restore (`exportPurchase_restore`),
+one-tap `Export Now` (`exportPurchase_exportNow`, re-verifying StoreKit entitlement after unlocking
+from a take), horizontal-fitting policy/terms/support links (`exportPurchase_privacy`,
+`exportPurchase_terms`, `exportPurchase_support`), and thank-you text (`RF-73` also eliminated the
+initial loading flash and raised contrast and footer-link Dynamic Type spacing). All purchase states
+and disabling rules remain unchanged.
 If product information cannot load while verified export access is already unlocked, the notice
 explicitly confirms that exports remain available. Product availability does not revoke access.
 New Settings/purchase presentation copy is typed and has catalog entries in all ten interface languages.
@@ -384,12 +403,16 @@ English layout configurations. Shared lifecycle tests explicitly select English 
 process-local launch arguments; localization walks may override it, and the phone's persisted
 language is untouched. Compilation alone does not qualify that physical-device journey. The
 accessibility row on TestFlight build 24 found partial Dynamic Type support on Studio and the
-purchase sheet, purchase-sheet contrast, and clipped text in Design and Clone at AX-XXXL; the
-maintainer accepted these as a 3.0 known limitation (BKL-31).
+purchase sheet, purchase-sheet contrast, and clipped text in Design and Clone at AX-XXXL (`BKL-31`);
+`RF-73` (`da5ce80d`, `71dd7d53`) resolved the purchase-sheet contrast and footer-link Dynamic Type
+slice, while the remaining Studio Dynamic Type items stay tracked under `BKL-31`.
 
 `iosSettings_openSourceRow` pushes `screen_openSourceLicenses`. The offline browser is generated from
-the exact application SwiftPM resolution, owned-runtime license/NOTICE/origin records, and the three
-hybrid production model revisions (RF-59). Rows expose `iosAttributionRow_<componentID>` and
+the exact application SwiftPM resolution (with `Sparkle` scoped to macOS only under `RF-73` so iOS
+omits desktop-only dependencies), owned-runtime license/NOTICE/origin records, the three hybrid
+production model revisions (`RF-59`), and Meta AudioSeal (`MIT`) auxiliary model weights
+(`auxiliaryModelWeights` in `config/third-party-attribution-policy.json`, verified across all three
+catalogs, `b896fce1`). Rows expose `iosAttributionRow_<componentID>` and
 `iosModelAttributionRow_<modelID>-<variantID>`; the 44-point
 `iosSettings_openSourceBackButton` returns to About. Each detail exposes complete license text,
 applicable NOTICE/origin text, pinned identity, and the upstream source without requiring network access.
@@ -572,9 +595,10 @@ Generate rather than Install. Destructive install/cancel/delete actions are outs
   text or an explicit Use audio only choice before Save becomes available. Enrollment permanently
   saves the app-owned reference and hands it directly to Clone. The transcript is optional after
   that explicit review: its presence selects transcript-backed
-  conditioning, while an empty transcript uses the genuine audio-only x-vector path. The visible
-  Settings control `voiceCloning_consentAcknowledgment` must be enabled before Generate. Saved
-  voices from the Voices tab are reusable references. Clone
+  conditioning, while an empty transcript uses the genuine audio-only x-vector path. Voice-cloning
+  consent (`voiceCloning_consentAcknowledgment` in Settings → Privacy & Permissions, or confirmed
+  once via the inline `IOSVoiceCloningConsentSheet` on first cloning action) must be enabled before
+  Generate. Saved voices from the Voices tab are reusable references. Clone
   cannot take a separate delivery instruction on current checkpoints — the delivery must live in
   the reference clip. Curated emotion reference banks make that practical: a bank persona's
   members enroll as ordinary saved voices ("Voice bank · <Delivery>" captions in Voices), and
@@ -608,7 +632,7 @@ both texts and drafts saved earlier resolve to exactly what they stored. Or writ
 pitch + timbre; describe the sound, not a persona; English is the current preset baseline, while
 freeform directions need not match the spoken language; note that negative constraints like "without
 laughing" are unmeasured and lack ablation support). Comparative instruction-language quality remains unqualified; see the
-[dated language research](../audits/2026-09-21-instruction-language-research.md).
+dated language research (`2026-09-21-instruction-language-research.md`, archived in git history).
 
 ### Languages — `GenerationSemantics` / language picker
 
@@ -702,8 +726,9 @@ in-session Studio mode, and the Studio selector changes the composer in place.
 
 ### What the lanes assume
 
-- Full smoke and the benchmark never install or delete models: they visibly assert that Custom,
-  Design and Clone Speed are Ready before generating. Three routes change model state (§3):
+- Full smoke and the benchmark never install or delete models: they visibly assert that Built-in
+  Voice (Custom), Voice Design, and Voice Cloning models are Ready before generating (one hybrid
+  model per mode since `RF-59`). Three routes change model state (§3):
   `scripts/ui_test.sh ios model-download`, the isolated lifecycle proof and the only one that
   cancels and removes; `smoke --scenario update-models`, which on explicit request accepts the
   RF-59 model update prompt that follows an update from an earlier Vocello (or else taps each
@@ -765,8 +790,9 @@ through the governed test route, never a shipping unlock or production credentia
   `exportPurchase_buy` displays the StoreKit-localized one-time price; `exportPurchase_reload` handles
   product unavailability; `exportPurchase_restore` explicitly syncs. Pending, cancellation and
   verification failures have visible status; dismissing the Apple Account prompt during Restore is a
-  cancelled restore, not an App Store failure (A4-02). `exportPurchase_close` dismisses without export.
-  Close and request export again after purchase: it never silently shares a previously selected clip.
+  cancelled restore, not an App Store failure (A4-02). `exportPurchase_close` dismisses without export;
+  after unlocking from a take, one-tap `exportPurchase_exportNow` re-verifies StoreKit entitlement and
+  opens the share sheet (`RF-73`), and the sheet never silently shares without user action.
 - Automatic folder copying never starts a purchase or changes the folder. Without verified access,
   paid-mode clips remain in History for manual export afterward. The folder explanation states this
   behavior. A paid-mode clip that finishes during startup checking waits for that entitlement scan
@@ -793,8 +819,9 @@ Every path that lets audio leave the iOS app, its provenance source, and the bou
 `scripts/repo_invariants.sh` keeps the inventory honest: an activity or share surface may exist only
 in `IOSExportGate` across `Sources/iOS`, `Sources/iOSSupport` and the shared views (a shared view
 sharing audio must carry an `#if os(iOS)` branch through the gate), and nothing but the two import
-pickers' default folder and the headless enrollment staging path touches the Files-visible
-Documents directory (`UIFileSharingEnabled`); generated output lives in the App Group container.
+pickers' default folder and the headless enrollment staging path touches the Documents directory
+(`UIFileSharingEnabled` was removed from `Sources/iOS/Info.plist` and is banned by
+`verify_ios_release_artifacts.py` under `RF-73`); generated output lives in the App Group container.
 
 | Surface | Source | Provenance | Boundary |
 | --- | --- | --- | --- |
@@ -805,7 +832,7 @@ Documents directory (`UIFileSharingEnabled`); generated output lives in the App 
 | Unqueued-generation banner export | `GenerationHistoryEnqueueWarning` (iOS branch) | `.recoveryRecord` (free by policy) | `IOSExportGate.share`; the `ShareLink` is macOS-only |
 | Saved-outputs folder copy after generation (single take and long-form joined output) | `IOSSavedOutputsDestination.exportIfConfigured` | generation mode of the saved row | `IOSExportCommerce.permits` before any copy; never starts a purchase |
 | Inbound `onOpenURL` audio (received in `QVoiceiOSApp`), Files import pickers | `RootView`, `IOSVoicesView` | not an export (import only) | none needed |
-| Headless enrollment staging (`ios_device.sh enroll-clone-fixture`) | `IOSDeviceDiagnosticsRunner` | reads a staged reference from Documents, deletes it after enrollment | not an export |
+| Headless enrollment staging (`ios_device.sh enroll-clone-fixture`) | `IOSDeviceDiagnosticsRunner` (`#if QVOICE_DEVICE_DIAGNOSTICS`, stripped from shipping Release builds under `RF-73`) | reads a staged reference from Documents, deletes it after enrollment | not an export |
 
 No App Intent, Shortcut, URL scheme, drag, pasteboard, Quick Look or document-browser route exists on
 iOS. Long-form projects export only through their joined History row and the folder copy above.

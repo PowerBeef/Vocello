@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-15
+reviewed: 2026-11-25
 summary: Local-first privacy and on-disk storage layout on both platforms — app transfers, operating-system backups, deletion semantics, diagnostics, and the repository's build-output ownership.
 sourceOfTruth:
   - Sources/SharedSupport
@@ -217,8 +217,9 @@ Maintained iPhone subtrees:
   to a user-granted Files/iCloud folder; Design/Clone copies require the iOS export purchase.
   The internal App Group copy always remains available to History. Checking/unowned access skips
   the paid-mode external copy, not internal persistence; export manually after verification.
-  Outputs do not move into Files-visible Documents. Existing document sharing and personal files
-  are unchanged. StoreKit handles billing; verified access is held in app memory, without an app
+  Outputs do not move into Documents (`UIFileSharingEnabled` was removed from
+  `Sources/iOS/Info.plist` and is banned by `verify_ios_release_artifacts.py` under `RF-73`);
+  existing personal files are unchanged. StoreKit handles billing; verified access is held in app memory, without an app
   server, receipt logging or preference unlock. App Privacy is published as Data Not Collected
   (2026-10-12, RF-02); the Paid Apps agreement remains RF-02 work. Storage-failure and original-reference recovery remain free. New generated
   Saved Voices retain source mode in enrollment metadata; legacy references are not reclassified.
@@ -326,7 +327,8 @@ physical iPhone.
 ### Device proof on the signed candidate (ASR-06)
 
 Written on 2026-11-07 for the phone session on the processed candidate (originally build 30 on
-2026-11-10; apply to the current processed 3.1 TestFlight candidate). Candidate runs never pull a distribution app's private data container
+2026-11-10; apply to the current processed 3.2 TestFlight candidate — no more 3.1 TestFlight builds
+since 2026-11-21). Candidate runs never pull a distribution app's private data container
 ([ios-device-testing.md](ios-device-testing.md)), and a development or
 diagnostics build never stands in for the candidate. So the proof uses what the candidate exposes:
 - an iPhone backup made on the Mac, whose `Manifest.db` lists every backed-up file with its data
@@ -378,7 +380,7 @@ If something blocks the read:
   Antigravity can read, rather than granting access.
 - **Weaker fallback:** with iCloud Backup on, Settings → Apple Account → iCloud → Manage Account
   Storage → Backups shows Vocello's backup size, which must be far below the size of the
-  installed models: the three 3.1 hybrid models are about 6.70 GB in the catalog and about 5.34 GB on
+  installed models: the three 3.2 hybrid models are about 6.70 GB in the catalog and about 5.34 GB on
   disk, because the 682 MB speech tokenizer is stored once via hard links
   ([`model-delivery.md`](model-delivery.md#shared-component-store)). That proves the models are
   left out, and nothing about protection classes.
@@ -429,8 +431,14 @@ native Files picker/document-open route. Only clone voices you own or have permi
 Reference clips, transcripts, and saved voices are local files, but the user remains responsible for
 rights and consent before recording, importing, or reusing them.
 
-Both apps expose the genuine `voiceCloning_consentAcknowledgment` control in Settings and keep
-Clone Generate disabled until it is enabled. The choice is stored locally as
+Both apps expose the genuine `voiceCloning_consentAcknowledgment` control in Settings (iOS:
+`Settings → Privacy & Permissions`, alongside its revocation caption confirming saved voices and
+history remain intact if turned off, jurisdiction-neutral AI disclosure, and AudioSeal watermark
+transparency note; macOS: `Settings → Voice Cloning`, with jurisdiction-neutral disclosure footnote
+and watermark transparency row, `RF-73`) and gate Clone generation and enrollment behind it. On iOS,
+the first cloning action (Record, Import, Save as voice, or Studio Clone setup) surfaces the
+one-time inline `IOSVoiceCloningConsentSheet` linking to Terms of Use, while Save Voice also displays
+a passive one-line reminder whenever consent is off (`RF-73`). The choice is stored locally as
 `vocello.voiceCloningConsent.v1`; it is not telemetry or an upload. A transcript is optional:
 transcript-backed conditioning uses the supplied text, while a clip without text uses the distinct
 audio-only x-vector path. Those modes have separate cache/artifact identities.
@@ -496,8 +504,10 @@ cannot recognize an unquoted prompt. The persisted boundaries that use it:
 telemetry keeps only a failure message's length and digest. Unified-log calls (`os_log`, `Logger`)
 mark only code-owned identifiers and numbers public, and the crash observer's write failure logs a
 typed summary. The app does not persist console output (`print`, standard error). Only the
-internal device-diagnostics runners and writers and the iPhone app's lifecycle and bootstrap
-lines (`QVoiceiOSApp`, `IOSAppBootstrap`, including the `[bootstrap] clone gate` line
+internal device-diagnostics runners and writers (compiled out of shipping iOS Release binaries
+behind `#if QVOICE_DEVICE_DIAGNOSTICS` alongside shipping `QWENVOICE_*` environment-variable reads
+under `RF-73`, enforced by `verify_ios_release_artifacts.py`) and the iPhone app's lifecycle and
+bootstrap lines (`QVoiceiOSApp`, `IOSAppBootstrap`, including the `[bootstrap] clone gate` line
 `ios-engine-optimization.md` cites) still print: their lines are the stream
 `scripts/ios_device.sh console` and `logs` capture, with typed summaries. The engine's
 stderr channels (codec-replay memory lines, telemetry-sink and live-preview diagnostics) are

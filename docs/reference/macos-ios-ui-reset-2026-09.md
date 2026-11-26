@@ -1,7 +1,7 @@
 ---
 status: historical
 owner: backend-and-platform
-reviewed: 2026-11-10
+reviewed: 2026-11-25
 summary: Historical record of the September 2026 reset that replaced the unsuccessful Mac presentation with the approved iOS design, sharing composition and retaining small desktop adapters; the plan finished on September 22 and only UIF-08 stays parked.
 sourceOfTruth:
   - config/roadmap.json
@@ -13,8 +13,9 @@ sourceOfTruth:
 
 > **Historical record.** The reset finished on September 22: UIF-01 to UIF-07 are done in
 > `config/roadmap-archive.json`. What remains is UIF-08, native acceptance of the converted screens
-> on current source, parked in `config/roadmap.json` until the 3.0 iOS submission lifts the focus
-> lock.
+> on current source, parked in `config/roadmap.json` until the 3.2 iOS submission lifts the focus
+> lock. (Since this snapshot, `RF-59` retired the Mac toolbar Speed/Quality switch and `RF-73` on
+> 2026-11-25 added Settings watermark transparency and Terms/Report links on both platforms.)
 
 ## Reference and scope
 

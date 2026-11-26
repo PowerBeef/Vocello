@@ -1,7 +1,7 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-11-15
+reviewed: 2026-11-25
 summary: Consolidated macOS app map — screens, elements, and options, and how XCUITest addresses each through the stable accessibility surface — plus macOS permissions (TCC), code signing and the dev loop, the UI test runner's grants, and permissions_doctor.sh diagnosis (§7).
 sourceOfTruth:
   - Sources/Views
@@ -206,13 +206,14 @@ language boundary.
 
 ### Settings (`sidebar_settings` → `screen_settings`)
 
-The overview groups Audio, App Language and Models & Files, then Voice Cloning (a separate
-consent destination) and Updates. Shared `VocelloSettingsGroup` and
-`VocelloSettingsNavigationRow` provide the
-same quiet surfaces as iOS, with desktop typography. The sidebar and Cmd+, window host the same
-screen. Audio owns playback; Models & Files owns model management and storage. Studio installation links open Models & Files and focus the requested mode. Updates
-(RF-23) mirrors Sparkle's automatic-check preference and checks on demand, beside the app's name
-and version, which is also the category row's subtitle.
+The overview groups Audio, App Language and Models & Files, then Voice Cloning (consent,
+disclosure, and watermark transparency) and Updates (Sparkle updates plus Terms of Use and Report an
+Issue). Shared `VocelloSettingsGroup` and `VocelloSettingsNavigationRow` provide the same quiet
+surfaces as iOS, with desktop typography. The sidebar and Cmd+, window host the same screen. Audio
+owns playback; Models & Files owns model management and storage. Studio installation links open
+Models & Files and focus the requested mode. Updates (RF-23, RF-73) mirrors Sparkle's
+automatic-check preference and checks on demand beside the app's name and version (also the category
+row's subtitle), and provides links to Terms of Use and Report an Issue.
 Category buttons use `settings_category_<audio|appLanguage|modelsFiles|cloning|updates>`; detail
 headings use `settings_detail_<category>`, and `settings_backButton` returns to the overview.
 
@@ -226,9 +227,9 @@ headings use `settings_detail_<category>`, and `settings_backButton` returns to 
 | App language | `settings_appLanguage` (menu: System Default plus the bundle's languages; `MacInterfaceLanguage` owns the selection in `AppDefaults.store` and feeds it to `MacInterfaceText`; smoke test05 reads English, which beginSession selects through this control) |
 | Auto-play | `preferences_autoPlayToggle` |
 | Prefer lower-memory models | `settings_preferSpeedEverywhere` (shown only when a mode offers two packages; since RF-59 each mode has one model, so neither it nor the toolbar's `<prefix>_<kind>VariantButton` switch appears, and a package row reads Model with no badge) |
-| Clone consent | `voiceCloning_consentAcknowledgment`; persistent and required before Clone Generate; in the Voice Cloning detail page |
+| Clone consent & watermark | `voiceCloning_consentAcknowledgment` (persistent, required before Clone Generate, with its jurisdiction-neutral AI-generated disclosure footnote) and the AudioSeal watermark transparency row (`RF-73`), both in the Voice Cloning detail page |
 | Output dir | `preferences_outputDirectory` / `preferences_browseButton` / `preferences_outputResetButton` / `preferences_outputDirectoryWarning` / `preferences_outputDirectoryIssue` / `preferences_openFinderButton` |
-| Updates | `settings_automaticUpdateChecks` (toggle "Check for updates automatically") / `settings_checkForUpdates` (button "Check for Updates…", the same action as the Vocello menu item; disabled while Sparkle cannot check, for example during a check) |
+| Updates & support links | `settings_automaticUpdateChecks` (toggle "Check for updates automatically") / `settings_checkForUpdates` (button "Check for Updates…", the same action as the Vocello menu item; disabled while Sparkle cannot check, for example during a check) / `settings_termsOfUse` (opens `https://vocello.vercel.app/terms/`) / `settings_reportIssue` (opens `https://vocello.vercel.app/support/#report`, `RF-73`) |
 | Version label | read-only `version (build)` caption in the Application data row (beside `preferences_openFinderButton`); the runtime debug gate is a launch environment (`QWENVOICE_DEBUG=1`, internal-diagnostics builds only), not an in-app toggle |
 
 ### Sidebar player + engine status

@@ -1,7 +1,7 @@
 ---
 status: historical
 owner: release-qa
-reviewed: 2026-10-28
+reviewed: 2026-11-25
 summary: Point-in-time research assessment (2026-08-06) of the EU AI Act's Article 50 synthetic-content marking obligations — what the law requires, whether and how it applies to Vocello, the gap at assessment time (since closed by the CP-2 marking seam; see the status updates), and maintainer decision points. Not legal advice.
 sourceOfTruth:
   - Sources/QwenVoiceCore/GenerationOutputAdapter.swift
@@ -14,10 +14,12 @@ sourceOfTruth:
 > zones that only a qualified adviser (or, eventually, regulators and courts) can settle.
 > Sources are linked at the end; all were retrieved 2026-08-06.
 >
-> **Since then (2026-10-28):** every 3.0.0 take carries the marking (§2 and §5 status updates):
-> the Mac app and CLI are public, and the iPhone app is in its TestFlight beta; its App Store
-> availability excludes the 27 EU territories (BKL-41). Options B and E and a legal review stay
-> gated as CP-1 recorded.
+> **Since then (2026-10-28; `RF-73` update 2026-11-25):** every 3.0+ take carries the marking (§2
+> and §5 status updates): `RF-73` (2026-11-25) aligned both apps on jurisdiction-neutral disclosure
+> copy with an AudioSeal watermark transparency note in Settings and an open AudioSeal
+> inspection/transcoding note on the website; the 3.2.0 iOS App Store availability still excludes
+> the 27 EU territories (`BKL-41`), and Options B (C2PA), E (Code of Practice), and legal review
+> stay gated as CP-1 recorded.
 
 ## 1. The law, precisely
 

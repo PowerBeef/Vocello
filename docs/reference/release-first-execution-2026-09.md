@@ -1,8 +1,8 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-23
-summary: The 3.2 release path (Mac/CLI 3.1 shipped Nov 17 under RF-61; no more 3.1 TestFlight builds since 2026-11-21; Pack B/C RF-68..RF-70 land before the 3.2 Mac/CLI release RF-71 and the 3.2.0 iOS App Store submission), the October 12 rebaseline, maintainer decisions, and focus-lock rules.
+reviewed: 2026-11-25
+summary: The 3.2 release path (Mac/CLI 3.1 shipped Nov 17 under RF-61; no more 3.1 TestFlight builds since 2026-11-21; RF-72, Pack B RF-69 + RF-68 Mac work, Pack C RF-70/RF-54/RF-57 retaining shipped attn unchanged, and RF-73 App Store safeguards closed ahead of RF-71 Mac/CLI 3.2.0 and the 3.2.0 iOS App Store submission), the October 12 rebaseline, maintainer decisions, and focus-lock rules.
 sourceOfTruth:
   - config/roadmap.json
   - config/quality-promotion-contract.json
@@ -11,13 +11,16 @@ sourceOfTruth:
 ---
 # Vocello 3.2 — Pack B/C engine upgrades, the 3.2 Mac and CLI release, and the iOS App Store submission
 
-**Decision of 2026-11-21.** Mac and CLI 3.1.0 shipped on 2026-11-17 (`RF-61`). There are **no more
-3.1 TestFlight builds** and no iOS 3.1 App Store release: every platform's next release is **3.2**,
-and **3.2.0** is the new target for the iOS App Store submission (`v3.2.0-ios.N` candidates). The
-engine audit's sample-preserving **Pack B** (`RF-68`, `RF-69`) and `RF-57`-screened **Pack C**
-(`RF-70`: zero-weight Korean `D1`, Bundle A, Bundle B) move into this plan to land before the 3.2
-Mac/CLI release (`RF-71`) and the 3.2.0 iOS candidate (`RF-12`, `RF-15`, `RF-17`, `RF-16`). Where
-historical notes or earlier items say 3.0.0 or 3.1.0 for the iPhone submission, read **3.2.0**.
+**Decision of 2026-11-21 (updated through 2026-11-25).** Mac and CLI 3.1.0 shipped on 2026-11-17
+(`RF-61`). There are **no more 3.1 TestFlight builds** and no iOS 3.1 App Store release: every
+platform's next release is **3.2**, and **3.2.0** is the target for the iOS App Store submission
+(`v3.2.0-ios.N` candidates). Ahead of `RF-71` (Mac/CLI 3.2.0) and the 3.2.0 iOS candidate (`RF-12`,
+`RF-15`, `RF-17`, `RF-16`), `RF-72`, **Pack B** (`RF-69` done; `RF-68` Mac work complete, iPhone
+proof pending), **Pack C** (`RF-70`, `RF-54`, `RF-57`, closed retaining the shipped `attn` hybrid
+unchanged), and **`RF-73`** (App Store safeguards, 8 GB+ iPad portrait compatibility, binary
+hygiene, 10-language impersonation guardrails, and website Terms/Privacy/Support updates) have
+landed on `main`. Where historical notes or earlier items say 3.0.0 or 3.1.0 for the iPhone
+submission, read **3.2.0**.
 
 **Decision of 2026-11-14 (superseded for iOS by 2026-11-21).** There was no iOS 3.0 release: Mac and
 CLI 3.1 shipped first (`RF-61`), while iPhone-only checks waited for a phone window. The October 12
@@ -51,7 +54,7 @@ Between September 4 and October 12 the release did not move:
 - **Quality bar (RF-14).** A one-week blind A/B of the four engine divergences from Qwen's reference
   (D1 streaming text conditioning, D2 EOS reinsertion, D3 sampling without a float32 cast, D6 the
   English fallback for Custom), described in the
-  [tooling research](../audits/2026-10-12-audio-qc-tooling-research.md). Only fixes that win become
+  tooling research (`2026-10-12-audio-qc-tooling-research.md`, archived in git history). Only fixes that win become
   defaults. The remaining defect rate, with RF-06's long-form failure, ships as a documented known
   limitation.
 - **No listening (2026-10-13).** The maintainer chose not to listen. RF-14 closed without the A/B:
@@ -86,7 +89,7 @@ Between September 4 and October 12 the release did not move:
   - Post-3-0-backlog items that need no iPhone are authorized; each closes in the change that fixes
     it.
 - **2026-10-18.** The development-workflow programme (DW-01 to DW-04,
-  [`2026-10-18-dev-workflow-audit.md`](../audits/2026-10-18-dev-workflow-audit.md)) runs alongside the
+  `2026-10-18-dev-workflow-audit.md`, archived in git history) runs alongside the
   release, and the freeze does not wait on it. `focusLock.maxInFlight` is 8 until the freeze and 2
   after it.
 - **2026-10-20.** RF-18's pre-registered follow-up screen adopted two reference behaviours:
@@ -104,7 +107,7 @@ Between September 4 and October 12 the release did not move:
 - **2026-10-21.** The maintainer reported a release-blocking iPhone Clone layout bug (RF-24). Its fix
   passed on the iPhone, the freeze checks reran, and the freeze moved to `0919e998`. The same day the
   CLI overhaul joined this plan (RF-08 re-gated, RF-25 to RF-31,
-  [`2026-10-21-cli-overhaul-plan.md`](../audits/2026-10-21-cli-overhaul-plan.md)); none of it changes
+  `2026-10-21-cli-overhaul-plan.md`, archived in git history); none of it changes
   the iPhone candidate, and RF-30 (iPhone-compiled files) and RF-31 (the publication) wait for the
   submission.
 - **2026-10-22.** The Mac app and the CLI 3.0 release first and the iPhone app follows a few days
@@ -231,24 +234,43 @@ Between September 4 and October 12 the release did not move:
   `build_hybrid_model.py` `.bias` parity (`4a42d25d`); Experiment 1 (`long-form-korean-d1-attn`)
   was decisively **`REJECT`**ed (2/3 seed sets spiked `+0.152` and `+0.324` in paired error rate from
   32–44 s of skipped text), leaving Experiment 2 (Bundle A `attn-io`, `+24.12 MB`) next.
+- **2026-11-24 to 25 (Phase 3 closure).** Under the pre-registered `RF-57` decision rules, **`RF-70`**,
+  **`RF-54`**, and **`RF-57`** closed (`f070f41a`), retaining `main`'s shipped `attn` hybrid baseline
+  (`artifactVersion` `2026.11.13.1`) unchanged for 3.2.
+- **2026-11-25 (`RF-73` closure & live ASC prep).** **`RF-73`** landed and closed (`4703237c..71dd7d53`,
+  verified across phone-free checks, 4/4 physical-iPhone XCUITest lanes, GitHub CI 9/9, Release
+  rehearsal 4/4, Vercel production, and manual Mac testing): admitted eligible 8 GB+ M-series / A17
+  Pro iPads in portrait compatibility mode (superseding `RF-42`'s refusal); compiled out dormant
+  device/perf runners (`QVOICE_DEVICE_DIAGNOSTICS`) and shipping `QWENVOICE_*` reads; dropped
+  `UIFileSharingEnabled`; added 10-language `.disallowedVoiceImitation` guardrails; scoped `Sparkle`
+  to macOS only and added Meta AudioSeal (`MIT`) auxiliary model attribution; shipped streamlined
+  onboarding, one-time inline voice-cloning consent, Settings safeguards, and website `/terms/` +
+  `/support/#report` updates. Authorized App Store Connect prep applied Age Rating `13+` (`RF-62`;
+  Nov 16 `Shared Location` and `Dating and Relationships` descriptors pending 2-click web UI),
+  **`147` territories** (excluding China Mainland `CHN` alongside the 27 EU territories on both app
+  and export IAP), and Privacy Policy URL readback (live ASC state authority:
+  [`ios-appstore-submission.md` §1](ios-appstore-submission.md#1-privacy--compliance-app-store-connect)).
 
 ## The path
 
-The status below reflects the 2026-11-23 state; `config/roadmap.json` is the live authority. The path
-carries no dates since the maintainer removed them on November 10: each step ends at its exit, Mac
-and CLI 3.1.0 (`RF-61`), Pack A (`RB-01`..`RB-12`), `RF-72`, and Pack B (`RF-69` + `RF-68` Mac work)
-have landed, Pack C (`RF-70`, Exp 2 Bundle A next) runs ahead of 3.2, and the remaining steps close on
-the **3.2.0** Mac/CLI release (`RF-71`) and **3.2.0** iPhone submission candidate.
+The status below reflects the 2026-11-25 state; `config/roadmap.json` is the live item authority,
+[`../development-progress.md`](../development-progress.md) holds the active checkpoint, and
+[`ios-appstore-submission.md` §1](ios-appstore-submission.md#1-privacy--compliance-app-store-connect)
+holds live App Store Connect state. The path carries no dates since the maintainer removed them on
+November 10: each step ends at its exit, Mac and CLI 3.1.0 (`RF-61`), Pack A (`RB-01`..`RB-12`),
+`RF-72`, Pack B (`RF-69` + `RF-68` Mac work), Pack C (`RF-70`/`RF-54`/`RF-57`), and `RF-73` have
+landed, and the remaining steps close on the **3.2.0** Mac/CLI release (`RF-71`) and **3.2.0** iPhone
+submission candidate.
 
 | Step | Items | Exit | Who | Status |
 | --- | --- | --- | --- | --- |
-| 1 — decisions | RF-02, ASR-02, ASR-04, ASR-09 | Recorded privacy, rights and region answers; App Store Connect prerequisites, including the Paid Apps agreement | Maintainer; Antigravity drafts the facts | ASR-04 closed Nov 1; RF-02 account steps (private record) and ASR-02 readback remain; ASR-09 fresh North America proof runs within 24 hours of submission |
+| 1 — decisions | RF-02, ASR-02, ASR-04, ASR-09 | Recorded privacy, rights and region answers; App Store Connect prerequisites, including the Paid Apps agreement | Maintainer; Antigravity drafts the facts | ASR-04 closed Nov 1; RF-02 account steps (private record) and ASR-02 web App Privacy readback remain; ASR-09 fresh North America proof runs within 24 hours of submission |
 | 2 — before the freeze | RF-14; AUD-01, AUD-02, AUD-07, AUD-09, F-01, F-16, DA-04; BG-01, CONV-21, RF-18, RF-19 | D3 the default; the blockers' code fixes with deterministic tests; the engine-audit items with their iPhone proofs | Antigravity; the phone in an announced window | Done except AUD-01, AUD-02, AUD-07 and AUD-09, whose device proof comes from RF-15 |
 | 3 — export purchase | RF-13 | The purchase lane passes on the phone | Antigravity, in a phone window | Done Oct 16 |
-| 4 — freeze, 3.1 Mac/CLI & 3.2 engine Pack B/C | ASR-08, RF-09, RF-61; RF-72, RF-68, RF-69, RF-70, RF-71 | Freeze recorded; Mac/CLI 3.1.0 shipped; `RF-72`, Pack B (`RF-68`, `RF-69`) and RF-57-screened Pack C (`RF-70`) land before 3.2; Mac/CLI 3.2.0 (`RF-71`) ships | Antigravity; maintainer authorizes any new model upload and tags | Frozen Oct 23 (`e7a8e2ae`); Mac/CLI 3.1.0 (`v3.1.0`, `RF-61`) published Nov 17; Pack A & Wave 5 done Nov 21; `RF-72` & `RF-69` closed and `RF-68` Mac work done (`needs: iphone`) Nov 23; `RF-70` Exp 1 Korean `D1` `REJECT`, Exp 2 Bundle A (`attn-io`) next, then Exp 3 & Mac/CLI 3.2 (`RF-71`) |
-| 5 — archive and TestFlight | ASR-10, ASR-07, RF-12 | A `v3.2.0-ios.N` candidate tag archives, verifies and uploads to internal TestFlight; the processed build installs with personal data preserved | Maintainer requests the tag; Antigravity verifies | ASR-10 and ASR-07 done Oct 24; 3.0 builds 29–30 and internal 3.1.0 builds 31–33 superseded (no more 3.1 TestFlight since Nov 21); next candidate is `v3.2.0-ios.1` after `RF-68`..`RF-70`; owned-export row waits on RF-02 |
-| 6 — acceptance and promotion | RF-15, ASR-06, RF-17 | Risk-based acceptance of the processed 3.2.0 build, with a machine screen of its takes; exact-tag promotion evidence | Antigravity and the phone | Waiting for `v3.2.0-ios.N` after `RF-68`..`RF-70` and `RF-02` |
-| 7 — store materials | ASR-05, ASR-11, RF-62, RF-63, RF-66 | Screenshots, 3.2.0 metadata, age-rating descriptors, privacy answers, reviewer notes, demo video; read-only account check | Maintainer; Antigravity prepares | 3.0.0 copy entered Nov 1–10; 3.2.0 review notes, demo video (`RF-66`), screenshots, ASC 3.2.0 update and `ASR-11` remain |
+| 4 — freeze, 3.1 Mac/CLI, 3.2 engine Pack B/C & RF-73 | ASR-08, RF-09, RF-61; RF-72, RF-68, RF-69, RF-70, RF-73, RF-71 | Freeze recorded; Mac/CLI 3.1.0 shipped; `RF-72`, Pack B (`RF-68`, `RF-69`), `RF-57`-screened Pack C (`RF-70`), and `RF-73` land before 3.2; Mac/CLI 3.2.0 (`RF-71`) ships | Antigravity; maintainer authorizes tags and pushes | Frozen Oct 23 (`e7a8e2ae`); Mac/CLI 3.1.0 (`v3.1.0`, `RF-61`) published Nov 17; Pack A & Wave 5 done Nov 21; `RF-72`, `RF-69`, `RF-70`/`RF-54`/`RF-57` (retaining shipped `attn`), and `RF-73` closed Nov 23–25 (`RF-68` Mac work done, `needs: iphone`); ready for Phase 4 Mac/CLI 3.2.0 (`RF-71`) |
+| 5 — archive and TestFlight | ASR-10, ASR-07, RF-12 | A `v3.2.0-ios.N` candidate tag archives, verifies and uploads to internal TestFlight; the processed build installs with personal data preserved | Maintainer requests the tag; Antigravity verifies | ASR-10 and ASR-07 done Oct 24; 3.0 builds 29–30 and internal 3.1.0 builds 31–33 superseded (no more 3.1 TestFlight since Nov 21); next candidate is `v3.2.0-ios.1` after `RF-71` bumps to 3.2.0; owned-export row waits on RF-02 |
+| 6 — acceptance and promotion | RF-15, ASR-06, RF-17, RF-65 | Risk-based acceptance of the processed 3.2.0 build, with a machine screen of its takes; exact-tag promotion evidence; `RF-68` iPhone proof; `RF-65` AWS Device Farm iPhone 15 Pro check | Antigravity and the phone | Waiting for `v3.2.0-ios.1` and `RF-02` |
+| 7 — store materials | ASR-05, ASR-11, RF-62, RF-63, RF-66 | Screenshots, 3.2.0 metadata, age-rating descriptors, privacy answers, reviewer notes, demo video; read-only account check | Maintainer; Antigravity prepares | Nov 25 ASC prep applied `13+`, `147` territories, and Privacy Policy URL; `RF-62` Nov 16 descriptors (2 web clicks), 3.2.0 version bump & reconciled `RF-63` copy/notes, demo video (`RF-66`), screenshots, IAP review screenshot, and `ASR-11` remain |
 | 8 — submission | RF-16 | The maintainer submits 3.2.0 for App Review | Maintainer | On the maintainer's go; no date |
 
 Mac and CLI 3.1.0 (`RF-10`, `RF-23`, `RF-31`, `RF-61`) and the CI cutover to GA `xcode-27` (`DW-04`)
@@ -260,11 +282,12 @@ can take days to activate after RF-02's last step, which is why RF-02 comes firs
 
 The blockers' device proof comes from RF-15, so they close after it and before RF-16. Group the phone
 work into as few windows as possible, and use the phone only in windows the maintainer announces. Once
-Pack B (`RF-68`, `RF-69`) and Pack C (`RF-70`) land and `RF-02` completes, one phone session on the
-**3.2.0** candidate (`v3.2.0-ios.N`; earlier 3.0 and 3.1 TestFlight builds are superseded) closes
-`RF-17`'s exact-tag records and manifest, `RF-15` with its purchase rows, the AUD items, `ASR-06`,
-`RF-35`'s cellular download, `RF-41`/`RF-42` device checks, `RF-12`'s Airplane Mode export, `RF-66`'s
-demo video and `ASR-05`'s screenshots.
+Phase 4 (`RF-71` Mac/CLI 3.2.0) and `RF-02` complete and `v3.2.0-ios.1` processes, one grouped phone
+session on the **3.2.0** candidate (`v3.2.0-ios.N`; earlier 3.0 and 3.1 TestFlight builds are
+superseded) closes `RF-68`'s iPhone proof, `RF-17`'s exact-tag records and manifest, `RF-15` with its
+purchase rows, the AUD items, `ASR-06`, `RF-35`'s cellular download, `RF-41`'s download confirmation,
+`RF-12`'s Airplane Mode export, `RF-66`'s demo video, and `ASR-05`'s screenshots (note `RF-42`'s iPad
+portrait compatibility admission already landed under `RF-73`).
 
 ## Rules while the focus lock holds
 
@@ -305,14 +328,16 @@ The maintainer lifts the focus lock and picks the next primary plan from the par
   Generation, listening, internal History and Built-in export stay free. macOS and the CLI have no
   paywall, and there is no Mac App Store route. The product `com.patricedery.vocello.design_clone_export`
   was approved on September 8 at USD 19.99 with automatic regional pricing and Family Sharing off. Its
-  en-US, fr-CA and fr-FR details were entered on 2026-10-12 (RF-02), and availability excludes the EU
-  since 2026-10-27. The updated Developer Program License Agreement, the Paid Apps agreement, tax and
-  banking remain the maintainer's. See the
-  [app guide](ios-app-guide.md#ios-export-purchase).
+  en-US, fr-CA and fr-FR details were entered on 2026-10-12 (RF-02), and availability covers **147
+  territories** (27 EU territories excluded 2026-10-27 under `BKL-41` and China Mainland `CHN`
+  excluded 2026-11-25 under `RF-73`; live ASC state lives in
+  [`ios-appstore-submission.md` §1](ios-appstore-submission.md#1-privacy--compliance-app-store-connect)).
+  The updated Developer Program License Agreement, the Paid Apps agreement, tax and banking remain
+  the maintainer's. See the [app guide](ios-app-guide.md#ios-export-purchase).
 - **Version.** Next release target is **3.2.0** (maintainer decision 2026-11-21); `project.yml`
-  remains at `3.1.0` until `RF-68`..`RF-70` land and the 3.2 version bump runs (`RF-71` / `RF-12`),
-  and owns the build number, which moves with each candidate. A fresh read-only check confirms the
-  build is unused immediately before the archive.
+  remains at `3.1.0` until Phase 4 (`RF-71`) bumps it to `3.2.0` (`RF-72`, `RF-69`, `RF-68` Mac work,
+  `RF-70`, and `RF-73` are landed), and owns the build number, which moves with each candidate. A
+  fresh read-only check confirms the build is unused immediately before the archive.
 - **No substitutes.** No diagnostics or development build stands in for the processed candidate. No
   faked entitlement replaces the purchase.
 - **Personal data.** Fresh-install proof never erases personal data without verified recovery and

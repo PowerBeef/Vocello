@@ -1,7 +1,7 @@
 ---
 status: active
 owner: macos
-reviewed: 2026-11-15
+reviewed: 2026-11-25
 summary: macOS test lanes — deterministic development verification, the platform gate, model fixtures, explicit XCUITest smoke/benchmark/perf acceptance with the ui-perf baseline protocol (copy reports out between runs; discard-and-replace on concurrent use), and crash/profile evidence.
 sourceOfTruth:
   - scripts/macos_test.sh
@@ -46,8 +46,9 @@ request). None of them needs UI execution, installed generation models, or relea
 (`core.test-results.json`, `runtime.test-results.json`, produced by
 `scripts/lib/xctest_summary.py`, the same writer the XCUITest lanes use) and `verdict.txt` under
 `build/artifacts/macos/tests/<run>/`. The bundles run through the direct `xcrun xctest` runner on
-purpose: Xcode 26.6 can compile and then wait indefinitely before spawning `xctest` for these
-hostless bundles through `xcodebuild`, so no `.xcresult` is produced for this lane.
+purpose (originally adopted under Xcode 26.6, which could compile and then wait indefinitely before
+spawning `xctest` for these hostless bundles through `xcodebuild`, and retained after the 2026-11-20
+`DW-04` cutover to GA Xcode 27.2), so no `.xcresult` is produced for this lane.
 
 Two of the runtime tests compare the watermark port with fixtures minted from the PyTorch
 reference (`AudioSealParityTests`: the whole-buffer parity test and the windowed-path test). The
@@ -441,8 +442,9 @@ records are not publishable"). Dirty-source successes are exploratory even on th
 
 ## Model-dependent tests
 
-Before generation, XCUITest must visibly confirm that Custom, Design, and Clone Speed are ready,
-Generate is enabled, and the benchmark clone voice is present. Use
+Before generation, XCUITest must visibly confirm that the Built-in Voice (Custom), Voice Design,
+and Voice Cloning models are ready (one hybrid model per mode since `RF-59`), Generate is enabled,
+and the benchmark clone voice is present. Use
 `scripts/macos_test.sh models ensure` only to repair/bootstrap fixtures, then begin a fresh test
 run. Do not download models implicitly inside a normal UI lane.
 
@@ -469,8 +471,9 @@ New publishable generation runs use telemetry schema v8 and evidence manifest v2
 `samples-<generationID>.jsonl` files must begin/end with one start/stop sample, contain the required
 load/stream/finalization boundaries, match summary counts, have zero capture failures, and leave no
 gap between samples above the policy's unobserved-gap bound (twice the sampler cadence, at least
-500 ms, calibrated on the M6 on 2026-09-25; 1,000 ms on the 8 GB Mac and the iPhone, provisional
-until an unforced record of theirs calibrates it; `config/memory-qualification-policy.json`). The app and engine samples of the one hosting
+500 ms, calibrated on `mac-mini-m6-16gb` via `mac-memory-qualification-20261114-174519-39bd0268`,
+and calibrated on `floorTiers` — `floor_8gb_mac` and `iphone_pro` — to `500.0 ms` on 2026-11-21 via
+`ios-memory-qualification-20261121-182637-c2b75046`; `config/memory-qualification-policy.json`). The app and engine samples of the one hosting
 process form one series in absolute-uptime order; they are never summed.
 Critical pressure, app memory warning/exit, `hardTrim`, or `fullUnload` fails publication, and so
 does a marking peak-equality breach (CP-2: within every take, no post-marking footprint sample may
@@ -554,13 +557,17 @@ Retained-memory qualification is a distinct non-Instruments lane:
 scripts/macos_test.sh memory --label retained-check
 ```
 
-It runs the policy-owned Custom→Design→Clone Speed/medium sequence with three canonically named
+It runs the policy-owned Custom→Design→Clone medium sequence (contract variant `speed`, one hybrid
+model per mode since `RF-59`) with three canonically named
 `retained#0...2` takes per mode (plus the CLI's genuine Custom/Design cold takes) in one process.
 Those retained takes still report their actual engine warm state. Policy
 `retained-memory-v1` compares the first and last completed retained-take footprint within each mode;
 the maximum positive growth must stay at or below 5% of physical RAM. `retained-memory-v2` (MLX
-active growth at the end of each take) is reported beside it and stays uncalibrated, gating nothing,
-until a consented run sets its bounds (`telemetry-and-benchmarking.md`). Intended cross-mode model
+active growth at the end of each take) is calibrated in `config/memory-qualification-policy.json` at
+`growthLimitMB = 16.0` across Custom, Design, and Clone for both macOS (2026-11-14,
+`mac-memory-qualification-20261114-174519-39bd0268`) and iOS (2026-11-21,
+`ios-memory-qualification-20261121-182637-c2b75046`) and gates alongside `retained-memory-v1`
+(`telemetry-and-benchmarking.md`). Intended cross-mode model
 residency is diagnostic and is not mislabeled as a leak. A PASS creates a
 `memory-qualification` record; a generation, memory, QC, or retention failure leaves only local
 artifacts.

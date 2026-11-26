@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-15
+reviewed: 2026-11-25
 summary: The standing macOS release-QA checklist — deterministic gates, the per-candidate smoke step, release-notes and performance-surface obligations, packaging and verification.
 sourceOfTruth:
   - scripts/release.sh
@@ -283,9 +283,12 @@ French once and to System Default once (Settings, `settings_appLanguage`); the a
 6. **History, Saved Voices, Settings**: sort and search in the toolbar, the long-form segments
    toggle, Save As and Reveal; the enroll and record sheets; the recommended-setup summary, the
    per-mode model rows with their actions (one model per mode since RF-59), the output folder,
-   Application data and clone consent; the Updates category's automatic-check toggle and its
-   Check for Updates button beside the app's name and version (`settings_checkForUpdates`, which
-   opens Sparkle's window); Cmd+, opens the same screen in its own window.
+   Application data; in Voice Cloning, clone consent with its jurisdiction-neutral disclosure
+   footnote and the AudioSeal watermark transparency row (`RF-73`); in Updates, the automatic-check
+   toggle, Check for Updates button beside the app's name and version (`settings_checkForUpdates`,
+   which opens Sparkle's window), plus `Terms of Use` (`settings_termsOfUse`, `/terms/`) and
+   `Report an Issue` (`settings_reportIssue`, `/support/#report`, `RF-73`); Cmd+, opens the same
+   screen in its own window.
 
 Anything that reads wrong in French is a catalog fix (`MacInterfaceText` + `Localizable.xcstrings`),
 never a code-side literal; see [`localization.md`](localization.md).
@@ -385,8 +388,12 @@ communication, written for both non-technical and technical readers:
   in any case). Automating that
   through the ASC API after upload is a recorded enhancement; until it lands, the
   paste is a required step of TestFlight distribution, not an optional nicety.
-- Published notes (v3.0.0 and earlier) stay as published; a later release writes its own
-  file.
+- **Frontmatter-free for untagged releases:** `release.yml` passes `docs/releases/<tag>.md` verbatim
+  to `gh release create --notes-file`, so untagged release notes (such as `v3.2.0.md`) must **not**
+  carry YAML frontmatter before tagging (or it would leak into the GitHub Release body).
+- Published notes (`v3.1.0` and earlier) stay frozen as published; a later release writes its own
+  file. (`v3.0.0.md` and `v3.1.0.md` remain frontmatter-free as published; earlier `v1.2.1.md`–`v2.4.0.md`
+  retain their historical post-publication frontmatter.)
 - Write dual-audience: lead each item with the user-visible change in plain language,
   then the technical grounding. The 2.2.0 notes are the reference standard; the
   v2.3.0 auto-generated stub (caught and fixed post-publication 2026-07-31) is the
@@ -460,10 +467,11 @@ then run the checks at the end.
    - `scripts/public_facts_contract.py` requires the README's Mac and iPhone model-availability rows
      to carry exact wording. Change the required wording when the model line-up changed.
    - `scripts/generate_readme_charts.py` names the models the chart's pool ran
-     (`pool_model_label`: "Vocello 3.1 models" for the one model per mode, from the pool's app
-     version; a variant name from `VARIANT_LABELS` only for a pool of the earlier two-package
-     line-up), and its performance card names the release ("Vocello 3.1") from the same app
-     version. Change the labels when the models' public names changed.
+     (`pool_model_label`: `"Vocello <major.minor> models"`, e.g. `"Vocello 3.1 models"` for 3.1 and
+     updated on the 3.2 flip for the one model per mode, from the pool's app version; a variant name
+     from `VARIANT_LABELS` only for a pool of the earlier two-package line-up), and its performance
+     card names the release (`"Vocello <major.minor>"`) from the same app version. Change the labels
+     when the models' public names changed.
 3. **The README lines.** The release badge and the download and installer links (they name the
    tag), the model table and its captions, the requirements and download sizes, the performance
    captions and alt text, and the command-line section. Search the file for the old version, the
@@ -482,19 +490,22 @@ then run the checks at the end.
    (`website/index.html`, `website/cli/index.html`, `website/engineering/index.html`), and the
    screenshots under `website/public/assets/screens/` when the product they show changed.
    The Engineering medians and provenance follow "Performance surfaces ship current numbers".
-7. **The privacy and support pages.** `website/public/privacy/index.html` states when Vocello
-   contacts the network and which version's files carry the audio mark;
-   `website/public/support/index.html` states how each version updates. Re-read both against the
-   release's behaviour, not only for the version number: a release that changes when a download
-   starts (as 3.1's automatic model update does) changes what the privacy page must say.
-8. **The notes.** `docs/releases/<tag>.md` is already written and gated
+7. **The privacy, support, and terms pages.** `website/public/privacy/index.html` states when Vocello
+   contacts the network (including static CDN model downloads under Guideline 5.1.2(i)) and which
+   version's files carry the audio mark and open AudioSeal inspection note;
+   `website/public/support/index.html` states how each version updates and hosts `#report`; and
+   `website/public/terms/index.html` (`RF-73`) states the Terms of Use linked from the apps and
+   footer. Re-read all three against the release's behaviour, not only for the version number: a
+   release that changes when a download starts (as 3.1's automatic model update does) or changes
+   safeguards changes what those pages must say.
+8. **The notes.** `docs/releases/<tag>.md` is already written (without YAML frontmatter) and gated
    ("Release notes are a release artifact", above); record each acceptance lane's run ID in it
    before the tag, not in this commit.
 
 Checks before the commit: `python3 scripts/public_facts_contract.py`,
 `python3 scripts/generate_readme_charts.py --check`, `npm --prefix website run check` (it needs
-Playwright's browsers), and a read of the five public pages in a browser. Earlier releases' notes
-stay as published.
+Playwright's browsers), and a read of the six public pages (`/`, `/cli/`, `/engineering/`,
+`/privacy/`, `/support/`, `/terms/`) in a browser. Earlier releases' notes stay frozen as published.
 
 ## Outward-facing performance terminology
 
@@ -515,7 +526,7 @@ provenance line in the same change.
 
 ## Known-cosmetic non-bugs (do not file)
 
-- Post-retirement readiness note briefly shows "Preparing Built-in Voice" (§G residual; no connection
-  is made and generation is unaffected).
+- Post-retirement readiness note briefly shows "Preparing Built-in Voice" (`benchmarks/OPTIMIZATION.md`
+  §G residual; no connection is made and generation is unaffected).
 - Enroll sheet: the first click on "Record…" immediately after typing in the Name field can be
   consumed by the field's focus-commit — a second click opens the sheet (observed v2.1.0 QA).

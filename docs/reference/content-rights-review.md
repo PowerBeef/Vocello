@@ -1,8 +1,8 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-21
-summary: The maintainer's recorded privacy, region and content-rights decisions for the 3.1 App Store submission, with the evidence behind them for model artifacts, built-in voice previews, marketing audio, product artwork and the App Store Connect declarations.
+reviewed: 2026-11-25
+summary: The maintainer's recorded privacy, region and content-rights decisions for the 3.2 App Store submission, with the evidence behind them for model artifacts, built-in voice previews, marketing audio, product artwork and the App Store Connect declarations.
 sourceOfTruth:
   - config/third-party-attribution-policy.json
   - Sources/Resources/qwenvoice_production_model_catalog.json
@@ -64,12 +64,16 @@ code, an SDK, an account, analytics, or a non-Apple purchase path.
 
 ### ASR-09: model downloads are verified for North America only
 
-3.1 is available in 148 territories outside the EU (since 2026-10-27), but download verification
-covers North America only, where App Review runs.
+3.2 is available in **147 territories** (27 EU territories excluded 2026-10-27 under `BKL-41` and
+China Mainland `CHN` excluded 2026-11-25 under `RF-73`; live App Store Connect state lives in
+[`ios-appstore-submission.md` §1](ios-appstore-submission.md#1-privacy--compliance-app-store-connect)),
+but download verification covers North America only, where App Review runs.
 - **Existing evidence:** the North America proof of 2026-09-01 (full digests of the three largest
   iOS files) is the evidence class.
 - **Before submission:** one fresh full-artifact North America proof runs within its 24-hour
-  freshness window. It downloads about 4 GB and needs the maintainer's go.
+  freshness window. It downloads the 3.2 hybrid catalog (about 6.70 GB total across the three modes,
+  about 5.34 GB unique deduplicated bytes with the shared speech tokenizer) and needs the
+  maintainer's go.
 - **Residual risk, accepted:** Europe and East Asia are unverified. Hugging Face serves through a
   global CDN, and support reports from those regions are the monitor. No paid regional hosts are used.
 
@@ -102,7 +106,7 @@ candidate's state, and no inventoried path changed between `a60dd204` and build 
 | 5 | Launch logo | 3 | `f8e963075a0a` | `Sources/Assets.xcassets/VocelloLaunchLogo.imageset/*.png` |
 | 6 | Launch background | 3 | `fcb8bc9835ee` | `Sources/Assets.xcassets/VocelloLaunchBackground.imageset/*.png` |
 | 7 | Website social preview | 1 | `125eba9aa004` | `website/public/assets/social_preview.png` |
-| 8 | README banner | 0 (retired) | `9f202800a5fd` (at `a60dd204`) | Retired `docs/readme_banner_vocello.png` (replaced by generated `docs/readme/hero.svg`) |
+| 8 | README banner | 0 (retired) | `9f202800a5fd` (at `a60dd204`) | Retired legacy PNG banner (replaced by generated `docs/readme/hero.svg`) |
 | 9 | Website app screenshots | 14 (20 at `a60dd204`) | `368430a47505` (`cd5489e7d394` at `a60dd204`) | `website/public/assets/screens/*.png`, `*.avif` (refreshed for 3.1 in `f5ba3251`; 6 unused triplets removed 2026-11-21) |
 | 10 | Website voice samples | 4 | `d7eefde05e19` | `website/public/assets/voice-samples/*.wav` |
 | 11 | In-app voice previews | 9 | `dccd9303c7fc` | `Sources/Resources/voice-previews/*.wav` |
@@ -133,7 +137,7 @@ below), so a "pending" in this table is history, not open work.
 | Surface | Source-proven evidence | Current decision | Qualified reviewer and closure evidence |
 | --- | --- | --- | --- |
 | Three downloadable hybrid model artifacts (`RF-59`; six in 3.0) | Every production fork and base artifact is bound to an immutable revision and model-card digest. The exact fork and base revisions declare Apache-2.0. The forks identify their base lineage and the quantized tensor modification (`docs/reference/hybrid-model.md` §7). Vocello bundles the Apache-2.0 text and offline model attribution. | **Conditional source support; qualified redistribution decision pending.** Apache-2.0 grants broad reproduction, derivative, and distribution rights subject to its conditions, but the repository cannot adjudicate whether the app's license-delivery mechanism, NOTICE handling, trademark references, and every distribution territory fully satisfy them. | Open-source/IP counsel records a signed decision covering Apache-2.0 section 4 delivery and modification notices, absence or handling of upstream NOTICE material, Qwen/Hugging Face names and marks, the public quantized forks, and commercial App Store redistribution. Attach a dated decision reference without credentials or private correspondence. |
-| AudioSeal watermark code and weights (3.0 candidate) | `MLXAudioMark` ports Meta's MIT-licensed AudioSeal generator, and every model package downloads its fp16 weights (`marking/audioseal_wm16_generator_fp16.safetensors`, digest pinned in the catalog). Meta's copyright and MIT notice are in `Packages/VocelloQwen3Core/NOTICES.md` and therefore in the bundled attribution manifest. The port's reference is the `audioseal` 0.2.0 Python package (GitHub `facebookresearch/audioseal` commit `a0ce2564ff2b`, which sets that version) with weights from `facebook/audioseal` `generator_base.pth`, whose content (SHA-256 `7a845b5fbe93…`) is identical at every Hugging Face revision; reconstructed on 2026-09-24 from public metadata and recorded in `ORIGINS.md` (the `cc2700db` hash cited before 2026-09-24 was the UTMOSv2 pin). The fp16 conversion is shape-consistent with that checkpoint but not byte-reproduced. | **Attribution present; upstream revision identified from metadata.** | Optional stronger proof: reproduce the fp16 conversion from `generator_base.pth` and match the catalog digest (needs the maintainer's consent to download the checkpoint). Counsel confirms the MIT notice delivery for the redistributed weights with the other model artifacts. |
+| AudioSeal watermark code and weights (3.0–3.2 shipping) | `MLXAudioMark` ports Meta's MIT-licensed AudioSeal generator, and every model package downloads its fp16 weights (`marking/audioseal_wm16_generator_fp16.safetensors`, digest pinned in the catalog). Meta's copyright and MIT notice are in `Packages/VocelloQwen3Core/NOTICES.md` and therefore in the bundled attribution manifest; `RF-73` (`b896fce1`) also added Meta AudioSeal (`MIT`) explicitly to `config/third-party-attribution-policy.json` (`auxiliaryModelWeights`, verified against all three catalogs) and resolved `redistributionDecision` across model cards and auxiliary weights to `"attested-maintainer-asr04-2026-11-01"`. The port's reference is the `audioseal` 0.2.0 Python package (GitHub `facebookresearch/audioseal` commit `a0ce2564ff2b`, which sets that version) with weights from `facebook/audioseal` `generator_base.pth`, whose content (SHA-256 `7a845b5fbe93…`) is identical at every Hugging Face revision; reconstructed on 2026-09-24 from public metadata and recorded in `ORIGINS.md` (the `cc2700db` hash cited before 2026-09-24 was the UTMOSv2 pin). The fp16 conversion is shape-consistent with that checkpoint but not byte-reproduced. | **Attribution present; attested under `ASR04-2026-11-01` and tracked in `auxiliaryModelWeights` (`RF-73`).** | Optional stronger proof: reproduce the fp16 conversion from `generator_base.pth` and match the catalog digest (needs the maintainer's consent to download the checkpoint). Counsel confirms the MIT notice delivery for the redistributed weights with the other model artifacts. |
 | Built-in voice previews and speaker presentation | The nine bundled WAVs are locally generated by Vocello from documented neutral scripts and built-in Qwen speakers. The official model card names and describes those speakers. | **Qualified output/personality-rights decision pending.** Reproducibility and model licensing do not themselves prove rights to commercially distribute voice output or use speaker identities/names in product presentation. | IP/publicity-rights counsel reviews the official Qwen terms and obtains written vendor clarification if needed. Record whether audio, speaker names, and personality presentation are permitted in each intended territory; otherwise replace the previews/presentation with independently cleared voices. |
 | Marketing audio other than cloning | `website/src/data/samples.js` identifies the mode, displayed speaker, delivery, script, and tracked audio asset. | **Creator provenance and output-rights decision pending.** The repository does not contain a signed script-ownership attestation, generation receipt, or qualified conclusion for using Qwen outputs in advertising. | The maintainer signs the factual asset attestation below for every clip; counsel then approves the relevant model/output terms and marketing use. Replace any clip lacking both records. |
 | Voice-cloning marketing sample | Removed from the website on 2026-09-22 (the Listen section no longer ships a Voice Cloning clip). | **Fail-closed: removed.** The repository did not identify the reference speaker, source recording, consent scope, or license. | Record the reference speaker's explicit consent for cloning and commercial marketing, source-audio ownership/license, permitted territories/duration, and revocation handling. Remove the sample until that record exists. Do not put private consent records in the repository. |
@@ -188,20 +192,19 @@ privacy, financial and regional account fields.
 
 ## Consolidated RF-02 decision checkpoint
 
-On 2026-10-12 (RF-02) version 3.0.0 replaced the 1.0 draft, the app became free and iPhone only,
-the age rating became 4+, and App Privacy was published as Data Not Collected; the account keeps
-`USES_THIRD_PARTY_CONTENT` and the configured Support URL. The rows below record what each decision
-needed, with the outcome where it is decided. This packet groups the decisions without creating
-another status ledger or authorizing account changes.
+This section records the dated basis and owner class for each decision packet; **live App Store
+Connect state** (version record, age rating, territories, IAP status, export compliance, and build
+numbers) lives solely in
+[`ios-appstore-submission.md` §1](ios-appstore-submission.md#1-privacy--compliance-app-store-connect)
+and is not duplicated here.
 
-| Decision and authority | Owner class | Evidence needed to close |
+| Decision and authority | Owner class | Recorded basis and closure boundary |
 | --- | --- | --- |
-| Download-provider processing and privacy labels — ASR-02 | Privacy counsel, with provider clarification if needed | Establish request metadata retained by Hugging Face/CDN operators, retention periods and purposes, linkage/tracking treatment, relevant territories, and resulting App Store questionnaire answers. Reconcile the signed candidate, policy and live labels. **Decided 2026-10-12:** Data Not Collected, on the facts recorded under ASR-02 above, and published the same day. |
-| Model redistribution, notices, previews, marketing audio and artwork — ASR-04 | Maintainer/asset owner plus qualified IP/privacy reviewer | Complete every asset row and signed factual attestation above; record allowed uses and restrictions with private-evidence digests. Existing bundled notices do not replace these decisions. **Done 2026-11-01:** attestation `ASR04-2026-11-01` (above). |
-| Source/account version and build — ASR-08 | Release maintainer | **Done:** version 3.0.0 replaced the 1.0 draft (2026-10-12), and ASR-08 closed on 2026-10-14. Remaining: confirm read-only in App Store Connect (web portal or the asc-* skills) that the build number is still unused immediately before archive, and verify the processed build. The unused number is not reserved; Apple rejects a reused one at upload. |
-| Distribution profile and entitlements — ASR-10 | Signing/release owner | **Done 2026-10-24:** release run 40103005257 archived, exported and verified build 24's IPA (entitlements, signing identity, profiles); every later candidate repeats the verification. |
-| Age rating, content declaration and encryption — ASR-11 | Maintainer with qualified reviewer for ambiguous declarations | Age rating 4+ set on 2026-10-12 (RF-02); `USES_THIRD_PARTY_CONTENT` declared. **Done 2026-11-01:** build 29, the candidate on that date, reads back VALID with `usesNonExemptEncryption` false, and App Store Connect asked no further export-compliance question. Repeat the read on any later candidate ([runbook §1](ios-appstore-submission.md#1-privacy--compliance-app-store-connect)); the checkpoint ([`../development-progress.md`](../development-progress.md), Resume now) owns the current candidate's state. |
-| Pricing/availability, agreements/financial, DSA and regional obligations — ASR-11 | Account holder; counsel where required | Pricing and availability set on 2026-10-12: free, 175 territories, iPhone only (RF-02). **Decided 2026-10-27:** 3.0 ships outside the EU for now; the 27 EU territories were removed (148 remain) on the maintainer's explicit instruction. The EU release needs the trader step first (BKL-41). Remaining: the account holder's agreement, banking and tax steps, whose status stays in the maintainer's private record, never in Git. The agent cannot accept agreements or provide legal clearance. |
+| Download-provider processing and privacy labels — ASR-02 | Maintainer (decided 2026-10-12 without paid counsel) | **Decided 2026-10-12:** App Privacy is Data Not Collected on the source facts recorded under ASR-02 above (static CDN downloads only, Guideline 5.1.2(i) clarified in `privacy/index.html` under `RF-73`). Live label and URL readback live in [`ios-appstore-submission.md` §1](ios-appstore-submission.md#1-privacy--compliance-app-store-connect). |
+| Model redistribution, notices, previews, marketing audio and artwork — ASR-04 | Maintainer / asset owner | **Done 2026-11-01:** attestation `ASR04-2026-11-01` (above), reflected in `config/third-party-attribution-policy.json` (`RF-73` added `auxiliaryModelWeights` for Meta AudioSeal `MIT`). |
+| Source/account version and build — ASR-08 | Release maintainer | **Done 2026-10-14** (initial version record replaced 1.0 draft). Live version/build state and the pre-archive read-only unused-build check live in [`ios-appstore-submission.md` §1 & §4](ios-appstore-submission.md#1-privacy--compliance-app-store-connect). |
+| Distribution profile and entitlements — ASR-10 | Signing / release owner | **Done 2026-10-24:** first verified signed IPA (build 24); every later candidate repeats `verify_ios_release_artifacts.py`. |
+| Age rating, content declaration, encryption, territories, and account agreements — ASR-11 / RF-02 | Account holder / maintainer | `USES_THIRD_PARTY_CONTENT` declared (2026-08-27); `ITSAppUsesNonExemptEncryption=false` declared in source; Paid Apps agreement, tax, and banking stay in the maintainer's private record (never in Git). Live ASC age rating, territories, export compliance, and remaining `RF-62`/`ASR-11` checks live in [`ios-appstore-submission.md` §1](ios-appstore-submission.md#1-privacy--compliance-app-store-connect). |
 
 Apple's [privacy definitions](https://developer.apple.com/app-store/app-privacy-details/) require
 considering third-party practices and retention beyond real-time request service. Hugging Face's

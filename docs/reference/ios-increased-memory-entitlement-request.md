@@ -1,8 +1,8 @@
 ---
-status: active
+status: historical
 owner: ios
-reviewed: 2026-11-10
-summary: Enablement and readiness guide for the increased-memory entitlement on the in-process iOS app, with verification steps and the kept-for-fallback justification text.
+reviewed: 2026-11-25
+summary: Historical one-time enablement record for the increased-memory entitlement on the in-process iOS app (completed 2026-10-28 and automatically enforced on every IPA by scripts/verify_ios_release_artifacts.py), with verification commands and kept-for-fallback justification text.
 sourceOfTruth:
   - Sources/iOS/VocelloiOS.entitlements
   - Sources/iOS/VocelloiOSRelease.entitlements
@@ -125,7 +125,7 @@ Vocello is a private, on-device text-to-speech app for iPhone. Its core feature 
 
 We are requesting com.apple.developer.kernel.increased-memory-limit for the iOS app (com.patricedery.vocello). The app process hosts the MLX runtime in-process and performs the app's core generation work.
 
-Our current hardware diagnostics use os_proc_available_memory(), task_vm_info, and Metal allocation metrics for the app process. Without the increased-memory entitlement, a streamed Built-in Voice take fits under the default process limit (an exploratory run on an iPhone 15 Pro peaked at about 2.5 GB), but that limit does not leave the headroom Voice Cloning needs: cloning keeps its reference encoders loaded beside the model, and the app enables it only when the measured process limit is at least 4.5 GB. Below that the app loads without those encoders, and it blocks any model load whose headroom is critical rather than risking jetsam. The constraint is the per-process memory limit, not lack of general device RAM.
+Our current hardware diagnostics use os_proc_available_memory(), task_vm_info, and Metal allocation metrics for the app process. Without the increased-memory entitlement, a streamed Built-in Voice take fits under the default process limit (an exploratory run on an iPhone 15 Pro peaked at about 2.5 GB), but that limit does not leave the headroom Voice Cloning needs: cloning keeps its reference encoders loaded beside the model, and the app enables it only when the measured process limit is at least 4,779 MiB (~5.01 GB). Below that the app loads without those encoders, and it blocks any model load whose headroom is critical rather than risking jetsam. The constraint is the per-process memory limit, not lack of general device RAM.
 
 Vocello already includes guardrails for responsible memory use: model admission checks, process-memory diagnostics, streaming-first iOS generation, bounded in-process PCM preview chunks for live playback with an explicit diagnostic opt-out for controlled memory comparisons, bounded event streams, explicit MLX/Qwen3 cache trimming, hard trim and full unload paths, active-generation cancellation under critical pressure, and fallback behavior when additional memory is unavailable.
 
@@ -143,7 +143,7 @@ Vocello's on-device neural text-to-speech generation. The MLX runtime runs in-pr
 Why the entitlement is necessary:
 
 ```text
-The iOS model packages include large local Qwen3-TTS and speech-tokenizer artifacts. A streamed Built-in Voice take peaks at about 2.5 GB, which fits under the default process limit on an iPhone 15 Pro. Voice Cloning keeps its reference encoders loaded beside the model, and the app enables it only when the measured process limit is at least 4.5 GB. The entitlement gives supported devices that headroom, and headroom for long takes; without it the app loads without the clone encoders and blocks generation when process headroom is critical, to avoid jetsam.
+The iOS model packages include large local Qwen3-TTS and speech-tokenizer artifacts. A streamed Built-in Voice take peaks at about 2.5 GB, which fits under the default process limit on an iPhone 15 Pro. Voice Cloning keeps its reference encoders loaded beside the model, and the app enables it only when the measured process limit is at least 4,779 MiB (~5.01 GB). The entitlement gives supported devices that headroom, and headroom for long takes; without it the app loads without the clone encoders and blocks generation when process headroom is critical, to avoid jetsam.
 ```
 
 How the app behaves without additional memory:
@@ -201,10 +201,12 @@ iOS never uses.) This is the necessity/sufficiency evidence to cite.
 on the same model. The roadmap treats both as exploratory evidence, never floor-device
 qualification. They overtake the earlier statement that the app reports critically low headroom
 before model admission without the entitlement: Built-in Voice fits under the default limit, and
-the entitlement's case is Voice Cloning (`cloneCapableMinimumProcessLimitBytes`, 4.5 GB, in
-`Sources/iOS/IOSAppBootstrap.swift`) and long-take headroom.
+the entitlement's case is Voice Cloning (`IOSMemoryBudgetPolicy.minimumCloneCapableProcessLimitBytes()`,
+`4,779 MiB` / `~5.01 GB` since `RB-05` `1d8397f6`, superseding the earlier `4.5 GB` floor) and
+long-take headroom.
 
-**On device** (`scripts/ios_device.sh` + `IOSDeviceDiagnosticsRunner`), capture an unentitled baseline
+**On device** (`scripts/ios_device.sh` + `IOSDeviceDiagnosticsRunner`, compiled only under
+`#if QVOICE_DEVICE_DIAGNOSTICS` and stripped from shipping iOS Release binaries under `RF-73`), capture an unentitled baseline
 showing the default limit and what the app admits under it, then an entitled baseline showing raised headroom. The app-process rows to extract
 from the diagnostics JSONL:
 

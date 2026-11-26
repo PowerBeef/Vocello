@@ -1,8 +1,8 @@
 ---
-status: active
+status: historical
 owner: backend-and-platform
-reviewed: 2026-11-10
-summary: Governed diagnosis of the reported iOS Built-in Voice startup failure, including typed request receipts, startup boundaries, physical-device plans, and closure requirements.
+reviewed: 2026-11-25
+summary: Historical record of the parked August 2026 iOS Built-in Voice startup-failure investigation (ISR-04/ISR-06 parked on unavailable original script bytes with invalidated seeds; ISR-05 false-startup presentation fix closed).
 sourceOfTruth:
   - config/roadmap.json
   - Sources/QwenVoiceCore/GenerationStartupDiagnostics.swift
@@ -74,7 +74,10 @@ requires exactly attempt zero or the contiguous sequence zero then one.
 
 ## Physical-device runner
 
-The diagnostics-compiled app extends the existing `IOSDeviceDiagnosticsRunner`; it is not a
+The diagnostics-compiled app extends the existing `IOSDeviceDiagnosticsRunner` (both
+`IOSStartupReliabilityRunner` and `IOSDeviceDiagnosticsRunner` are compiled only under
+`#if QVOICE_DEVICE_DIAGNOSTICS` and stripped from shipping iOS Release binaries under `RF-73`,
+enforced by `scripts/verify_ios_release_artifacts.py`); it is not a
 second engine or UI driver. A plan contains 1–128 ordered takes and one exact script digest and
 character count. Each take fixes speaker, strict `<preset>.<intensity>` delivery ID, language,
 seed, variation, streaming, predecessor, and one preparation mode: production state, full runtime

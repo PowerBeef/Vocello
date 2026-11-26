@@ -25,21 +25,28 @@ XCUITest evidence. External TestFlight distribution, App Review submission, and 
 release require the exact-tag iOS manifest in
 [`quality-promotion.md`](quality-promotion.md).
 
-**Current state (2026-11-21):** Mac and `vocello` CLI shipped **3.1.0** (`v3.1.0`, `RF-61`) on
+**Current state (2026-11-25):** Mac and `vocello` CLI shipped **3.1.0** (`v3.1.0`, `RF-61`) on
 2026-11-17. By the maintainer's 2026-11-21 decision, there are **no more 3.1 TestFlight builds** and
-no iPhone 3.0 or 3.1 App Store release: **3.2.0** (`v3.2.0-ios.N` candidates) is the new target for
-the iOS App Store submission after Pack B (`RF-68`, `RF-69`) and `RF-57`-screened Pack C (`RF-70`)
-land (`project.yml` remains at `3.1.0` until the 3.2 version bump). `release.yml` archived, verified
-and uploaded the historical 3.0.0 train (ASR-10 closed on build 24; builds 26 and 27 remain in the
-3.0 Public Beta under the maintainer's RF-17 waiver; build 30 `v3.0.0-ios.9` is superseded) and
-internal 3.1.0 candidates (`v3.1.0-ios.1` through `v3.1.0-ios.3`, build 33 `VALID` in TestFlight,
-now superseded). The checkpoint ([`../development-progress.md`](../development-progress.md), Resume
-now) owns the live candidate state. The App Review submission waits for `RF-68`..`RF-70`, the 3.2.0
-candidate upload (`RF-12`), the iPhone-window checks (`RF-35`, `RF-41`, `RF-42`, `RF-15`), exact-tag
-iOS promotion (`RF-17`), the open release items, and the maintainer's go (`RF-16`). The
-[App Review readiness audit](../audits/2026-11-04-app-review-readiness.md) is the historical 3.0
-review baseline. Any App Store Connect metadata change (including bumping the App Store Connect
-version record from 3.0.0 to 3.2.0 and pasting the reconciled [`app-store-listing.md`](app-store-listing.md)
+no iPhone 3.0 or 3.1 App Store release: **3.2.0** (`v3.2.0-ios.N` candidates) is the target for the
+iOS App Store submission. `RF-72`, Pack B (`RF-69` done; `RF-68` Mac work complete, iPhone proof
+pending), Pack C (`RF-70`, `RF-54`, `RF-57`, closed retaining the shipped `attn` hybrid baseline
+unchanged), and `RF-73` (App Store safeguards, 8 GB+ iPad portrait compatibility admission superseding
+`RF-42`'s refusal, binary hygiene, 10-language impersonation guardrails, and website Terms/Privacy/Support
+updates) have landed on `main` (`project.yml` remains at `3.1.0` until the 3.2 version bump under
+`RF-71` / `RF-12`). `release.yml` archived, verified and uploaded the historical 3.0.0 train (ASR-10
+closed on build 24; builds 26 and 27 remain in the 3.0 Public Beta under the maintainer's RF-17
+waiver; build 30 `v3.0.0-ios.9` is superseded) and internal 3.1.0 candidates (`v3.1.0-ios.1` through
+`v3.1.0-ios.3`, build 33 `VALID` in TestFlight, now superseded). On 2026-11-25, authorized App Store
+Connect prep applied Age Rating `13+`, `147` territories (excluding `CHN` alongside the 27 EU
+territories on both app and export IAP), and Privacy Policy URL readback. The checkpoint
+([`../development-progress.md`](../development-progress.md), Resume now) owns the live candidate
+state. The App Review submission waits for Mac/CLI 3.2.0 (`RF-71`), the 3.2.0 candidate upload
+(`RF-12`), the grouped iPhone-window checks (`RF-68` iPhone proof, `RF-15`, `RF-35`, `RF-41`,
+exact-tag iOS promotion `RF-17`, `RF-66`, `ASR-05` screenshots), `RF-65`, `RF-62` Nov 16 web-portal
+descriptors, `ASR-09`, `ASR-11`, `RF-02`, and the maintainer's go (`RF-16`). The App Review readiness
+audit (`2026-11-04-app-review-readiness.md`, archived in git history) is the historical 3.0 review
+baseline. Any App Store Connect metadata change (including bumping the App Store Connect version
+record from 3.0.0 to 3.2.0 and pasting the reconciled [`app-store-listing.md`](app-store-listing.md)
 copy), upload or submission still needs its own explicit authorization.
 Physical-device XCUITest runs separately at coherent checkpoints; CI and archive packaging are
 deterministic-only ([`testing-runbook.md`](testing-runbook.md)). Local development builds derive the
@@ -126,7 +133,9 @@ production state/policy with deterministic StoreKit-boundary fixtures, including
 parity, and `--only IOSSavedOutputsDestinationTests` proves the automatic folder copy never moves a
 locked Design/Clone clip; `scripts/repo_invariants.sh` (run by `scripts/dev.sh contracts` and by CI)
 holds the one-StoreKit-owner grep, the one-export-boundary grep over every source root the iOS app
-compiles, the Files-visible-Documents rule and the fixture-ownership greps. The audited surface list
+compiles, the rule keeping generated outputs out of Documents (`UIFileSharingEnabled` was removed
+from `Sources/iOS/Info.plist` and is banned by `verify_ios_release_artifacts.py` under `RF-73`) and
+the fixture-ownership greps. The audited surface list
 is the [outward export inventory](ios-app-guide.md#outward-export-inventory-audited-2026-09-14-source-side).
 These **do not execute an Apple transaction**; generic iOS compilation checks the real adapter and
 UI.
@@ -211,7 +220,7 @@ is complete.
 - [x] **Privacy Policy URL** = `https://vocello.vercel.app/privacy/` (hosted by this repo's website;
       in-app onboarding, Export Purchase, and Settings → Privacy & Permissions → Privacy Policy link
       to the same URL). **Terms of Use URL** = `https://vocello.vercel.app/terms/` (linked from
-      onboarding, inline voice-cloning consent, Export Purchase, and Settings → About).
+      onboarding, inline voice-cloning consent, Export Purchase, and Settings → Privacy & Permissions).
 - [x] **App Privacy "nutrition label"**: published as **Data Not Collected** on 2026-10-12 (the
       maintainer's ASR-02 decision of the same day). The rationale and the source facts it rests on are in the
       [content-rights review](content-rights-review.md#asr-02-app-privacy-label-is-data-not-collected).
@@ -235,12 +244,12 @@ is complete.
 - [ ] **Accessibility declaration** (Accessibility Nutrition Labels): none is entered. It does not
       block the submission. Apple's App Store Connect help (read 2026-11-10) says the labels are
       voluntary for now, and that support can be published only for a device with a live App Store
-      version, so before 3.1 is live the most that can exist is a saved draft. Complete it only from
+      version, so before 3.2 is live the most that can exist is a saved draft. Complete it only from
       the exact-candidate accessibility evidence; do not infer supported features from source or
       historical device runs. Apple's test is that every common task (first launch, purchase and
       settings included) can be completed with the feature. Draft for iPhone, approved by
-      the maintainer on 2026-11-10. Save it in App Store Connect after RF-15's rows on the 3.1
-      submission candidate confirm Dark Interface from their screenshots, and publish it once 3.1 is
+      the maintainer on 2026-11-10. Save it in App Store Connect after RF-15's rows on the 3.2
+      submission candidate confirm Dark Interface from their screenshots, and publish it once 3.2 is
       live; each is an App Store Connect write on the maintainer's go:
 
       | Feature | Draft answer | Basis |
@@ -248,7 +257,7 @@ is complete.
       | VoiceOver | Not claimed | Only XCTest's automated audit has run; the hand VoiceOver pass is open (RF-15), as are AUD-06 and BKL-59 |
       | Voice Control | Not claimed | Never evaluated |
       | Larger Text | Not claimed | Maintainer decision of 2026-10-24 until BKL-31 is fixed |
-      | Dark Interface | Claim, once the 3.1 candidate's lane screenshots confirm it | The app is dark only: `UIUserInterfaceStyle` is Dark and the window forces the dark scheme |
+      | Dark Interface | Claim, once the 3.2 candidate's lane screenshots confirm it | The app is dark only: `UIUserInterfaceStyle` is Dark and the window forces the dark scheme |
       | Differentiate Without Color Alone | Not claimed | No grayscale walk has been done |
       | Sufficient Contrast | Not claimed | Same decision; the purchase sheet failed the contrast audit on build 24 |
       | Reduced Motion | Not claimed | Source honors the setting in two places; never checked on a device |
@@ -270,14 +279,14 @@ is complete.
 ## 2. App Review demo notes (paste into "App Review Information → Notes")
 
 The notes text to paste is in [`app-store-listing.md`](app-store-listing.md#app-review-notes-4000),
-with the rest of the 3.1.0 listing draft. No demo account is needed (no login); the notes spell out
+with the rest of the 3.2.0 listing draft. No demo account is needed (no login); the notes spell out
 the model download requirement so the app is not judged non-functional under Guideline 2.1.
 
 Storage guidance is grounded in `IOSModelDeliverySupport.ensureSufficientDiskSpace`:
 `max(2 × bytes, bytes + 256 MiB)`. The coordinator supplies the bytes still to fetch, without
 shared components already installed or bytes already received;
-[`model-delivery.md`](model-delivery.md#shared-component-store) owns the rule. For the 3.1 hybrid
-artifacts (`2.226–2.250 GB` decimal), a first model on a fresh install needs approximately
+[`model-delivery.md`](model-delivery.md#shared-component-store) owns the rule. For the 3.2 hybrid
+artifacts (`artifactVersion` `2026.11.13.1`, `2.226–2.250 GB` decimal), a first model on a fresh install needs approximately
 `4.45–4.50 GB` decimal (`4.15–4.19 GiB`) of available space and later models need less; the `5 GB`
 advice in the listing notes provides reviewer headroom, not a different runtime policy or a guarantee
 against concurrent storage use. Recheck against the candidate catalog before pasting these notes into
@@ -303,18 +312,23 @@ hours of submission remains (ASR-09).
       state, personal data, and misleading claims. Do not submit the tracked 780×1696 historical image
       or the 1440×1224 Mac images as iPhone screenshots.
 - [ ] App name, subtitle (≤30 chars each), description, keywords (≤100), marketing URL
-      (`https://vocello.vercel.app`), and copyright. The en-US draft, awaiting the maintainer's
-      review, is [`app-store-listing.md`](app-store-listing.md); copyright is not drafted yet.
+      (`https://vocello.vercel.app`), and copyright. The reconciled 3.2.0 en-US draft is in
+      [`app-store-listing.md`](app-store-listing.md) (ready to paste when authorized to bump ASC
+      version 3.0.0 to 3.2.0); enter the copyright line in that same ASC metadata update.
 - [x] Source support identity is single-sourced in `config/support-contact.json`: the unauthenticated
       support page exposes the monitored address and response owner, the website privacy/footer surfaces
       link it, and Settings opens the exact route. `scripts/support_contact_contract.py` rejects drift,
       placeholders, insecure URLs, and ungoverned response-time promises.
 - [x] The production support route returned HTTPS 200 with the expected monitored contact, response owner,
       and privacy link. The `en-US` localization read back the exact governed Support URL in App Store
-      Connect on 2026-08-27, on the 1.0 draft that version 3.0.0 replaced. Verify it again on 3.1.0,
-      and add the same URL to any new localization.
+      Connect on 2026-08-27 and again on 2026-11-25 (`https://vocello.vercel.app/support/`). Verify it
+      again once the App Store Connect version record bumps to 3.2.0, and add the same URL to any new
+      localization.
 - [x] The accessible in-app Open Source & Licenses browser reads the deterministic offline manifest generated
-      from the exact SwiftPM graph, owned-runtime NOTICE/origins, and all three catalog-pinned hybrid model cards (plus upstream lineage in `config/third-party-attribution-policy.json`).
+      from the exact SwiftPM graph (with `Sparkle` scoped to macOS only so iOS does not claim a desktop-only
+      dependency), owned-runtime NOTICE/origins, all three catalog-pinned hybrid model cards, and Meta
+      AudioSeal (`MIT`) auxiliary model weights (`auxiliaryModelWeights` in
+      `config/third-party-attribution-policy.json`, verified against all three catalogs under `RF-73`).
       Archive/IPA verification rejects a missing, malformed, duplicated, or byte-different manifest.
 - [x] App Store Connect declares `USES_THIRD_PARTY_CONTENT` and read it back on 2026-08-27.
 - [x] The maintainer's ASR-04 rights decisions for Qwen outputs and built-in speaker presentation,
@@ -409,9 +423,10 @@ the maintainer or by Antigravity on the maintainer's request for that candidate.
    --processing-state all` shows the build VALID, and take its build id.
 3. `asc builds test-notes create --build-id <ID> --locale en-US --whats-new <TEXT>`, where TEXT is the
    "TestFlight: what to test" section of `docs/releases/v<version>.md`
-   ([`macos-release-qa.md`](macos-release-qa.md) owns that section's rules). A published notes
-   file is frozen, so that section is the base text: update the build number and the lines
-   specific to the candidate when pasting, not in the file.
+   ([`macos-release-qa.md`](macos-release-qa.md) owns that section's rules; `docs/releases/v3.1.0.md`
+   is frozen and superseded for iOS, so `docs/releases/v3.2.0.md` owns the 3.2.0 TestFlight notes).
+   A published notes file is frozen, so that section is the base text: update the build number and
+   the lines specific to the candidate when pasting, not in the file.
 4. `asc testflight review submit --build-id <ID> --confirm` submits the build for beta review.
    Internal testers get every build already: the Internal group has access to all builds, so adding
    it by hand is refused.

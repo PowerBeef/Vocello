@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-10-28
+reviewed: 2026-11-25
 summary: Vocello localization architecture, String Catalog ownership, typed presentation vocabulary, literal-growth guard, and pseudo-localization acceptance.
 sourceOfTruth:
   - project.yml
@@ -93,11 +93,12 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
   strings. Since PA-20, typed engine and generation failures reach both apps through
   `generationFailureMessage(_:)`, keyed on the path-free `GenerationFailurePresentationReason`
   (QwenVoiceCore: memory pressure, runtime and preparation failures, the generation limit, the
-  audio-quality rejections, and the reference-audio, storage, memory and model errors an engine
-  failure wraps). The engine's English messages stay the CLI and diagnostic text; each app host
-  installs the mapper as `MLXTTSEngine.visibleErrorDescription`, so the engine's visible error, a
-  failed load and a failed clone preparation read the interface language too. Errors without a typed
-  reason keep their own description.
+  audio-quality rejections, the 10-language `.disallowedVoiceImitation` voice-impersonation
+  guardrail refusal landed in `RF-73` / `b896fce1`, and the reference-audio, storage, memory and
+  model errors an engine failure wraps). The engine's English messages stay the CLI and diagnostic
+  text; each app host installs the mapper as `MLXTTSEngine.visibleErrorDescription`, so the engine's
+  visible error, a failed load and a failed clone preparation read the interface language too.
+  Errors without a typed reason keep their own description.
 - `MacInterfaceText` (`Sources/Services/MacInterfaceText.swift`; the macOS app, and also compiled
   into `VocelloCoreTests` and, because `MacLineBatchRequest` names it, `VocelloDesktopCore`, where no CLI
   path reaches its copy; so it must not reference app-only types) owns the macOS
@@ -129,8 +130,9 @@ Original license/NOTICE bodies remain unchanged; translate their surrounding bro
 
 `config/localization-unlocalized-baseline.json` records content-addressed identities for existing
 direct string-literal arguments to common SwiftUI presentation APIs under `Sources/iOS`,
-`Sources/Views`, and `Sources/SharedSupport`. It holds ten iOS records (the stale Studio counter record left on 2026-10-06)
-and no macOS exception since 2026-09-15 (the empty keyboard-shortcut bridge button left with the legacy composer, the wordless starters-label key with the legacy brief editor). The validator permits removal but rejects a new or
+`Sources/Views`, and `Sources/SharedSupport`. It holds nine iOS records (12 total occurrences across
+9 entries) and no macOS exception since 2026-09-15 (the empty keyboard-shortcut bridge button left
+with the legacy composer, the wordless starters-label key with the legacy brief editor). The validator permits removal but rejects a new or
 additional occurrence; it does not report a record whose literal is gone, so refresh the baseline in
 the change that removes a baselined literal. It is an incremental migration boundary, not proof that every indirect or
 computed string is localized.
@@ -158,12 +160,12 @@ maps it through `VocelloPresentationText`, `MacInterfaceText` or `IOSInterfaceTe
 ## Acceptance scope and routes
 
 Both apps carry all ten UI catalogs (the eight added on September 21, plus RF-36's last strings in
-builds 25 and 26), proven by macOS UI validation and phone-free iOS compilation; the iPhone
-ten-language walk has not run yet. Website and App Store metadata are separate work. Catalog
-completeness and a successful compile do not qualify a ten-language release or prove
-native-speaker review. `config/roadmap.json` remains the work authority: ASR-12 owns
-signed-candidate device acceptance; ISU-4 owns the remaining Settings/accessibility and purchase
-qualification.
+builds 25 and 26, and RF-73's safeguard and impersonation-guardrail copy on November 25), proven by
+macOS UI validation, phone-free iOS compilation, and the physical-iPhone ten-language walk (passed
+2026-11-22 and 2026-11-25). Website and App Store metadata are separate work. Catalog completeness
+and local device runs do not by themselves qualify a signed-candidate release or prove
+native-speaker review. `config/roadmap.json` remains the work authority: ASR-12 owns signed-candidate
+device acceptance; ISU-4 owns the remaining Settings/accessibility and purchase qualification.
 
 - `scripts/localization_contract.py validate` requires every locale in every entry, matching format
   arguments and locale-specific plurals. Its Python fixtures reject missing locales/categories,
@@ -185,7 +187,8 @@ qualification.
 - `scripts/ui_test.sh ios localization` prepares all ten explicit language selections in its
   Default arm, checking Settings copy, persisted choice and unchanged Studio text. The existing
   French, AX-L, AX-XXXL and pseudo-AX-XXXL arms remain. Every run observes and restores the original
-  interface preference through genuine controls. This expanded journey has not yet run on a phone.
+  interface preference through genuine controls. This expanded ten-language journey ran on the
+  physical iPhone on 2026-11-22 and passed cleanly on 2026-11-25 (below).
 
 ## Evidence
 
@@ -193,10 +196,12 @@ qualification.
 source `25f27b62` (September 22) in 1,807 seconds, with every required step, crash delta and
 language restoration; representative Russian, Japanese, Korean and German screenshots were
 reviewed. Since 2026-10-25 only the macOS localization lane runs that walk; smoke skips it. On the
-iPhone, `ios-xcui-localization-20260921-054309-966a91d7` passed the then-current EN/FR and text-size
-walk, and the variation-label fix passed the accessibility control audit
-`ios-xcui-control-audit-20260921-064147-ef16ae49`; both precede the eight added catalogs and cannot
-qualify them. Full French accessibility-size coverage, spoken VoiceOver, the ten-language phone walk
-and broader signed-candidate scenarios remain open under ISU-4 and ASR-12. Local UI evidence is not
-signed-candidate, VoiceOver or native-speaker acceptance. Earlier failed attempts and their
-corrections are in the repository history.
+iPhone, the expanded ten-language and AX-XXXL/pseudo walk ran on 2026-11-22
+(`ios-xcui-localization-20261122-021927-fcb2d313`) and passed cleanly on 2026-11-25
+(`ios-xcui-localization-20261125-180114-8f09bdd2`, 500.4 s, covering all ten UI locales plus
+`RF-73` Settings rows and screenshot visual QA), superseding the earlier pre-10-language EN/FR walk
+(`ios-xcui-localization-20260921-054309-966a91d7`) and accessibility control audit
+(`ios-xcui-control-audit-20260921-064147-ef16ae49`). Full French accessibility-size coverage, spoken
+VoiceOver, and broader signed-candidate scenarios remain open under ISU-4 and ASR-12. Local UI
+evidence is not signed-candidate, VoiceOver or native-speaker acceptance. Earlier failed attempts
+and their corrections are in the repository history.

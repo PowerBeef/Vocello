@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-11-21
+reviewed: 2026-11-25
 summary: iOS physical-device testing — deterministic compile lanes, device preparation, explicit XCUITest lanes (smoke, candidate rows, purchase, control audit, perf), pause and resume, headless diagnostics and retained evidence.
 sourceOfTruth:
   - scripts/ios_device.sh
@@ -109,7 +109,8 @@ tees the same stream to `build/artifacts/diagnostics/ios/logs/<run>.log`, `debug
 attached launch with LLDB attach guidance (the `get-task-allow` build), `pull [dest]` copies the
 app-container diagnostics mirror back, and `device-state --json|--json-v2 [watch [--interval N]
 [--count N]]` emits machine-readable reachability and lock state, optionally polling. A diagnostics spec is
-`<mode>:<variant>:<text>` with mode `custom|design|clone` and variant `speed` (iPhone is speed-only).
+`<mode>:<variant>:<text>` with mode `custom|design|clone` and variant `speed` (the internal contract
+variant identifier for the one shipped hybrid model per mode since `RF-59`).
 `mirroring status [--json]|stop`: `status` says whether iPhone Mirroring runs and whether the phone
 is reachable and locked, and `stop` quits iPhone Mirroring, which `ui-preflight` requires before any
 XCUITest lane ([Checks XCUITest does not cover](#checks-xcuitest-does-not-cover)).
@@ -229,7 +230,7 @@ the extended >220-character long corpus; the iPhone lane never bypasses the user
 | Benchmark | Ordered, configurable Studio matrix with pulled telemetry, readable audio, audio QC, thermal and timing evidence; the default is exactly 29 takes |
 | Control audit | Source-bound inventory, stateful, external-system, accessibility, and 201-row all-pairs generation scenarios. Schema-v3 plans speak the exact tracked corpus without ownership markers. Bounded read-only before/after History censuses must prove exactly one new persisted row, followed by exact full-player transcript verification before pin/delete. Versioned observations bind row ID, generation UUID, script digest, exact seed, and preserved cleanup baseline. Existing identical user text is never normalized away. Host validation preserves byte-exact v1/v2 historical plans, including original numeric stress failures. One verified History carrier per mode freezes the normally obtained seed; test-runner-only resume metadata identifies that exact row and requires visible seed agreement before pinning. Resume rejects changed source, build, device, plan, uncorrelated ownership, or zero observations. Final-plan cleanup removes only verified carriers and the plan-owned Clone fixture. Clone has no fabricated delivery dimension. Missing, blocked, infrastructure, harness, and product outcomes remain distinct; global destruction is cancelled, never counted as exercised. |
 | Model delivery | Fixed test-owned root normalized through visible state-appropriate controls. `diagnose` covers Custom cancel/restart/process adoption/Ready/remove; `queue` proves independent active/queued cancellation; `acceptance` adds Design/Clone shared-component reuse and all-model removal; `soak` repeats the lifecycle; `recover` inspects and visibly clears retained failure state without starting a transfer. Every transfer records exact logical bytes, milestone row/bar screenshots, phase activity, action exclusivity, five-minute advancement bounds, correlated delivery events, and exact canonical-state preservation |
-| Perf | Nine frame-health scenarios (`Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`), each a fresh app launch with the in-app `CADisplayLink` probe pinned to the app's 60 Hz cap and one marked wall-clock window; `scripts/check_ios_ui_perf.py` joins windows to the pulled 500 ms probe rows |
+| Perf | Twelve frame-health scenarios (`Tests/VocelloiOSUITests/VocelloiOSPerfUITests.swift`), each a fresh app launch with the in-app `CADisplayLink` probe pinned to the app's 60 Hz cap and one marked wall-clock window; `scripts/check_ios_ui_perf.py` joins windows to the pulled 500 ms probe rows |
 
 Smoke explicitly selects those four journeys; the class's other tests run only in their own lane or
 named scenario. The Settings layout walk is selected only by
@@ -636,8 +637,8 @@ only when the retained log proves a SpringBoard notification banner and
 `NotificationShortLookView`, the `.xcresult` proves exactly one identified wait timeout, and no
 product, harness, crash, generation, or QC failure coexists. It never turns the run into PASS and
 never authorizes an automatic retry. See the
-[historical infrastructure findings](../audits/2026-08-29-ios-control-audit-remediation.md); their dated
-runs do not qualify new source or guarantee Xcode bootstrap reliability.
+historical infrastructure findings (`2026-08-29-ios-control-audit-remediation.md`, archived in git
+history); their dated runs do not qualify new source or guarantee Xcode bootstrap reliability.
 
 ### UI-performance lane (`ios perf`)
 
@@ -666,7 +667,7 @@ from three counted `iphone-17-pro` runs, closing `AV-14`); breaches on the seven
 confirmatory scenarios fail the run (exit 1, no evidence published), while non-enforced/exploratory
 scenarios stay warn-only or unceilinged. On the canonical iPhone profile a PASS emits registry
 evidence and publishes a platform-`ios` `ui-perf` record — the macOS UI-7 twin
-([iOS UI refresh audit](../audits/2026-08-29-ios-ui-refresh.md)).
+(iOS UI refresh audit, `2026-08-29-ios-ui-refresh.md`, archived in git history).
 
 ## Pause and resume
 
@@ -709,8 +710,8 @@ QVOICE_GATE_SKIP_GENERATION=1 scripts/ios_device.sh gate   # same gate without t
 The gate is the explicit physical-device deterministic/runtime diagnostic, not part of `scripts/dev.sh
 check` or push CI. Its required steps are `project-inputs` (`check_project_inputs.sh`),
 `device-preflight` (the `preflight` verb above), `generation` (a fresh `build` and `install` of the
-exact local binary, then one headless Speed take through the diagnostics runner; it needs the Speed
-model installed on the phone) and `crash-delta` (`crashes`), followed by history publication of the
+exact local binary, then one headless take through the diagnostics runner using contract variant
+`speed`; it needs the mode's shipped hybrid model installed on the phone) and `crash-delta` (`crashes`), followed by history publication of the
 generation take; every step lands in a required-step ledger with the verdict under
 `build/artifacts/ios/gates/<run>/`. It requires 15 GiB of host free space and a quiet
 host (`require_quiet_host ios-gate`), and it follows the targeted checkpoint policy above.
@@ -773,8 +774,9 @@ the in-app gate (`spoken_content`), and of the QC v2 gate only a fail fails the 
 
 ## Model readiness
 
-Before generation, XCUITest visibly requires Custom, Design, and Clone Speed to report ready,
-Generate to be enabled, and the required clone voice to exist. iOS has no command-line model
+Before generation, XCUITest visibly requires Built-in Voice (Custom), Voice Design, and Voice
+Cloning models to report ready (one hybrid model per mode since `RF-59`), Generate to be enabled,
+and the required clone voice to exist. iOS has no command-line model
 ensure/install path: repair missing models in the visible Settings → Voice models section, then restart the
 UI lane. Device scripts retain headless engine diagnostics, but normal acceptance never substitutes
 a headless inventory for the visible Settings state.
@@ -791,11 +793,12 @@ launches with `QVOICE_IOS_DEVICE_ENROLL_VOICE_NAME`, and validates the enrollmen
 (staged digests, voice ID, quality warnings). The runner deletes the staged inputs after a clean
 enrollment. The command is opt-in and never runs in smoke, benchmark, CI, or release.
 
-**Clone consent precondition (PA-17).** The app refuses clone generation and saved-voice
-enrollment below the views until the phone's visible voice-cloning consent is on (Settings →
-Privacy). Headless lanes cannot record it: `enroll-clone-fixture`, clone diagnostics/bench cells,
-`memory` and `clone-conditioning` then fail with the named reason `clone-consent-not-recorded`, and
-`scripts/ios_device.sh` prints the fix. Turn the toggle on once on the phone, or run a UI lane
+**Clone consent precondition (PA-17, RF-73).** The app refuses clone generation and saved-voice
+enrollment below the views until the phone's voice-cloning consent is on (`Settings → Privacy &
+Permissions`). Interactive UI actions surface the one-time inline `IOSVoiceCloningConsentSheet` on
+first use (`RF-73`), whereas headless lanes cannot record consent: `enroll-clone-fixture`, clone
+diagnostics/bench cells, `memory` and `clone-conditioning` fail with `clone-consent-not-recorded`,
+and `scripts/ios_device.sh` prints the fix. Turn the toggle on once on the phone, or run a UI lane
 that calls `ensureCloneConsentEnabled()` (for example `scripts/ui_test.sh ios enroll-clone-fixture`).
 
 ## Voice identity and language reliability diagnostic
@@ -993,15 +996,11 @@ memory evidence; its digest/settings/extracted summary and retention status rema
 evidence. A CPU profile discards its raw trace unless `--keep-trace` opts into local retention.
 Raw traces and sample rows remain untracked.
 
-Device builds require 10 GiB of host free space before compilation (the same floor as the generic
-foundation compile; the macOS development build uses 8 GiB). Language, generation benchmark,
-memory, clone-conditioning, and gate lanes require 15 GiB; UI smoke, benchmark, and isolated model
-download require 12, 15, and 18 GiB respectively, and the control audit requires 24 GiB
-(`ui-control-audit` in `config/build-output-policy.json`). These host-side checks run before adding another
-cache/result tree and do not contact, pair, or alter the phone. The exact-PID profile lane retains
-its separate tracer-stage 5/15 GiB CPU/memory check. Because every profile rebuilds the exact app,
-the full CPU-profile command is also subject to the 10 GiB device-build floor; memory remains
-15 GiB.
+Host-side working-space floors for device builds, diagnostics, UI lanes, and the control audit are
+owned by `config/build-output-policy.json` (see [`privacy-storage.md`](privacy-storage.md#repository-build-output)
+for the manifest table and cleanup commands). These checks run before adding another cache/result
+tree and do not contact, pair, or alter the phone; the exact-PID profile lane retains its separate
+tracer-stage 5/15 GiB CPU/memory checks alongside the device-build floor.
 
 ### Retained-memory qualification
 
@@ -1011,13 +1010,15 @@ Retained-memory qualification is separate from Instruments:
 scripts/ios_device.sh memory --voice-id <exact-prepared-saved-voice-id> --label retained-check
 ```
 
-One persistent app/engine process executes three medium Speed takes for Custom, then Design, then
-Clone (nine total). The terminal sentinel is written only after all output/QC/telemetry proofs pass.
-Policy `retained-memory-v1` compares first-to-last retained-take footprint growth within each mode and allows
-at most 5% of physical RAM; cross-mode residency is diagnostic because different models are
-intentionally loaded. `retained-memory-v2` (MLX active growth at the end of each take) is reported
-beside it and gates nothing until a consented run calibrates it. A PASS creates
-`memory-qualification`, while any generation, memory,
+One persistent app/engine process executes three medium takes (contract variant `speed`, one hybrid
+model per mode since `RF-59`) for Custom, then Design, then Clone (nine total). The terminal
+sentinel is written only after all output/QC/telemetry proofs pass. Policy `retained-memory-v1`
+compares first-to-last retained-take footprint growth within each mode and allows at most 5% of
+physical RAM; cross-mode residency is diagnostic because different models are intentionally loaded.
+`retained-memory-v2` (MLX active growth at the end of each take) is calibrated for iOS in
+`config/memory-qualification-policy.json` at `growthLimitMB = 16.0` across Custom, Design, and Clone
+(2026-11-21, `ios-memory-qualification-20261121-182637-c2b75046`) and gates alongside
+`retained-memory-v1`. A PASS creates `memory-qualification`, while any generation, memory,
 retention, output, or crash failure leaves tracked history unchanged.
 
 ### Clone-conditioning semantic acceptance
@@ -1026,8 +1027,8 @@ retention, output, or crash failure leaves tracked history unchanged.
 scripts/ios_device.sh clone-conditioning --label focused-clone-proof
 ```
 
-This compile-gated physical-device lane runs exactly two Clone Speed generations in one app/engine
-process. It verifies the canonical saved Voice Design reference and transcript digests, then uses an
+This compile-gated physical-device lane runs exactly two Clone generations (contract variant
+`speed`) in one app/engine process. It verifies the canonical saved Voice Design reference and transcript digests, then uses an
 exact purpose-owned copy without a `.txt` sidecar or prepared voice ID for the x-vector-only take.
 Both takes must pass typed conditioning flags, distinct prompt identities, strict output/ASR,
 telemetry-v8 memory coverage, app/engine correlation, crash delta, and interruption checks. The
@@ -1052,8 +1053,13 @@ screenshots, traces, and `.xcresult` stay untracked; publication never stages, c
 
 Physical-iPhone acceptance of telemetry v8/evidence v2 was first completed in July 2026 (the
 exact-PID [memory profile](../../benchmarks/runs/instrument-profile/ios-memory-profile-20260714-112759-9a573224.json)
-is still the latest). RF-17 reruns the 29-take UI matrix and the retained-memory qualification
-at a candidate's tag, so no record is named here:
+remains the latest published `memory` profile record; Wave 5 wired-USB profiling on 2026-11-22
+published the hybrid
+[Metal](../../benchmarks/runs/instrument-profile/ios-metal-profile-20261122-004303-62fc2244.json),
+[CPU](../../benchmarks/runs/instrument-profile/ios-cpu-profile-20261122-010506-af2fc0e1.json), and
+[witness](../../benchmarks/runs/instrument-profile/ios-witness-profile-20261122-010852-a0085eed.json)
+records alongside retained local `--kind memory` traces). RF-17 reruns the 29-take UI matrix and the
+retained-memory qualification at a candidate's tag, so no candidate record is pinned here:
 [`benchmarks/HISTORY.md`](../../benchmarks/HISTORY.md) lists the newest of each under its
 `ui-generation / ios` and `memory-qualification / ios` headings.
 Each record proves only its exact source, toolchain, model, and hardware identities; repository
@@ -1062,8 +1068,11 @@ relevant change.
 
 ## Cloud device farm (iPhone 15 Pro class)
 
-No iPhone 15 Pro, the hardware floor, is paired with this Mac. BrowserStack App Automate's real
-iPhone 15 Pro (iOS 27) and 15 Pro Max (iOS 26) run the self-contained farm tests in
+No iPhone 15 Pro, the hardware floor, is paired with this Mac. By the maintainer's 2026-11-22
+decision (**`RF-65` Option A**), measuring the shipped 3.2 hybrid build on a real iPhone 15 Pro uses
+**AWS Device Farm** on-demand XCUITest, keeping BrowserStack App Automate (`scripts/farm_smoke.sh`)
+as fallback. Historical 3.0 exploratory runs used BrowserStack App Automate's real iPhone 15 Pro
+(iOS 27) and 15 Pro Max (iOS 26) to run the self-contained farm tests in
 `Tests/VocelloiOSUITests/VocelloiOSFarmSmokeUITests.swift`, which no lane selects:
 
 ```sh

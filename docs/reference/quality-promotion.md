@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-15
+reviewed: 2026-11-25
 summary: Source-bound quality promotion for making a verified macOS draft public or submitting an iOS candidate for external App Store review.
 sourceOfTruth:
   - config/quality-promotion-contract.json
@@ -38,8 +38,10 @@ an untrusted or unverified release source.
 
 - the tag commit, clean release source identity, exact `release-evidence.json` bytes, version, and build;
 - the contract's own path routing (`promotionRouting`) and the exact paths changed since the previous release commit;
-- the capability/change matrix for Speed, Quality, Studio modes, multilingual output, delivery
-  evaluation, and model lifecycle, including dimensions the current evidence does not support;
+- the capability/change matrix for the shipped generation models (recorded under `speed-generation`;
+  `quality-generation` has `platformApplicability: false` on both platforms since `RF-59`), Studio
+  modes, multilingual output, delivery evaluation, and model lifecycle, including dimensions the
+  current evidence does not support;
 - the required platform lanes, record or receipt digests, and explicitly accepted warnings;
 - benchmark hardware profile, OS, toolchain, executable hashes, and Mach-O UUIDs already validated
   by `scripts/benchmark_history.py`.
@@ -100,10 +102,12 @@ facts name one.
 Every tracked product file routes to a class or is listed in `promotionRouting.unrouted` with the
 reason it needs no promotion lane; `validate-contract` fails on a file that is neither.
 
-Every platform requires its canonical 29-take Speed `ui-generation` matrix. Capability-sensitive
-changes add the smallest platform-specific set declared by the contract: applicable Quality
-requires a Quality-tier engine record across Custom, Design, and Clone on macOS; the production
-model contract does not expose Quality on iOS. Multilingual changes require every
+Every platform requires its canonical 29-take `ui-generation` matrix (recorded under the
+contract's `speed` variant identifier since `RF-59` retired the separate Quality package on both
+platforms and replaced the two-tier lineup with one hybrid model per mode). Capability-sensitive
+changes add the smallest platform-specific set declared by the contract: `quality-generation` has
+`platformApplicability` `false` on both macOS and iOS (the production model contract exposes no
+Quality package on either platform); multilingual changes require every
 declared language cell; delivery changes require delivery cells carrying the governed prosody
 metric on macOS (iPhone delivery is declared not applicable, below); and model-catalog changes
 require the managed lifecycle receipt. Memory paths add
@@ -112,20 +116,21 @@ classify --base <previous-tag>` shows the conditional evidence before capture; a
 no routing class adds nothing beyond the platform minimum.
 
 The manifest records `capabilityCoverage` and `unsupportedDimensions`. Unsupported combinations
-such as multilingual Quality/Clone cohorts and independently held-out delivery calibration are
-never silently implied by a successful Speed record. The research and device-evidence roadmap
+such as retired Quality-tier cohorts and independently held-out delivery calibration are
+never silently implied by a successful `ui-generation` record. The research and device-evidence roadmap
 items remain the authority for removing those labels.
 
 Contract schema v3 digest-binds platform applicability to
 `Sources/Resources/qwenvoice_contract.json`, validating every model's platform and iOS download
-eligibility. iOS Quality is explicitly `unsupported` in coverage, not passed or silently omitted.
+eligibility. Because `RF-59` retired the separate Quality package on both macOS and iOS,
+`quality-generation` has `platformApplicability: false` on both platforms and is reported explicitly
+as `unsupported` in coverage, not passed or silently omitted.
 A capability the catalog does not decide can be declared not applicable on one platform through
 its `notApplicable` entry, which carries the recorded decision: that platform lists no evidence and
 the manifest reports the capability `unsupported` there (`declared-not-applicable`, with the
 decision text). iPhone delivery evaluation is declared so (maintainer, 2026-10-30, RF-17): no
-iPhone lane produces delivery cells. All other iOS Speed/mode, language, lifecycle, memory and UI
-requirements still apply when selected by impact. macOS Quality cannot be substituted with a Speed
-record. Eligibility drift,
+iPhone lane produces delivery cells. All other mode, language, lifecycle, memory and UI
+requirements still apply when selected by impact. Eligibility drift,
 partial-mode support, absent applicability or unsupported waivers fail closed and require review.
 Manifest schema v2 is unchanged. Historical contract-v2 manifests retain their original nonempty
 lane requirements and exact contract digest; they are not reinterpreted as current-source evidence.
@@ -154,7 +159,8 @@ lane requirements and exact contract digest; they are not reinterpreted as curre
    (`PATH="$(dirname "$(python3 scripts/select_python.py)"):$PATH"`): the bench starts its
    prosody analysis with `python3`, and a `python3` without NumPy fails the run after its takes.
    Before the CLI-hosted lanes, check that the shell exports no runtime knob
-   (`env | grep -E '^(QWENVOICE|QVOICE)_'` should show at most `QVOICE_WORKER_SESSION`): they
+   (`env | grep -E '^(QWENVOICE|QVOICE)_'` should show at most `QVOICE_LEAD_ONLY`, declared only
+   after confirming zero active workers): they
    inherit the shell's environment, and publication does not read a take's active overrides
    (BKL-22).
 3. Download the draft's exact release evidence and the metadata file it binds, into one folder,

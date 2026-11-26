@@ -1,7 +1,7 @@
 ---
 status: historical
 owner: ios
-reviewed: 2026-11-11
+reviewed: 2026-11-25
 summary: Historical record (June–August 2026, iOS 26) of the iPhone engine's bring-up and optimization — the in-process move, the Jetsam and memory posture, streaming-first, the canonical July record and the disposed levers — with its iOS 27 memory limit and RTF labels corrected; current numbers live in the engine audit and benchmarks/HISTORY.md.
 sourceOfTruth:
   - config/runtime-debug-knobs.json
@@ -16,9 +16,12 @@ sourceOfTruth:
 > (reviewed 2026-10-20):
 >
 > - **Memory limit.** "~6 GB" was the iOS 26 entitled limit on the iPhone 17 Pro (12 GB). Under
->   iOS 27.0.1 the October 14 and 16 smoke diagnostics measured **8,192 MB**, while the shipping
->   memory bands still assume the older figure (engine audit D-06, programme item ER-07). The
->   limit on 8 GB phones under iOS 27 is unmeasured.
+>   iOS 27.0.1 the October 14 and 16 pre-Game-Mode-opt-out smoke diagnostics measured **8,192 MB**,
+>   but `RF-47` proved shipped builds with `LSSupportsGameMode = NO` read **6,144 MB** on the 12 GB
+>   iPhone 17 Pro (superseding `ER-07`'s `8,192 MB` premise).
+> - **Wave 5 & `RF-73` update (2026-11-21 to 25):** the shipped `attn` hybrid models were measured
+>   on the physical iPhone 17 Pro in Wave 5 (`f1e8631c`, `c2b75046`), and `RF-73` stripped dormant
+>   device/perf runners from shipping Release builds behind `#if QVOICE_DEVICE_DIAGNOSTICS`.
 > - **"RTF" here is a decode speedup.** Every "RTF" above 1 in this record is the decode-loop speedup
 >   (audio seconds per wall second, `decodeSpeedupX`, higher is faster), not the standard real-time
 >   factor (wall ÷ audio, lower is faster), and the two never share a comparison key.
@@ -44,7 +47,7 @@ decode-loop + output-quality work, shared by both platforms — the deep §A–�
 entitlement), [`ios-device-testing.md`](ios-device-testing.md) (how to build/bench on device),
 [`telemetry-and-benchmarking.md`](telemetry-and-benchmarking.md) (the telemetry schema).
 
-**Source-of-truth rule (from `CLAUDE.md`): if this doc disagrees with the code, the code wins — fix
+**Source-of-truth rule (from `AGENTS.md`): if this doc disagrees with the code, the code wins — fix
 this doc.** All claims below are cited to a file or commit; re-verify before relying on a number.
 
 ---
@@ -54,8 +57,8 @@ this doc.** All claims below are cited to a file or commit; re-verify before rel
 - **In-process, one model per mode.** The engine runs inside the app process (`MLXTTSEngine` via
   `NativeRuntimeFactory`); the ExtensionKit extension was removed (it could never load the model —
   see §1). Since RF-59 the iPhone runs the same hybrid model per mode as the Mac (4-bit with the
-  talker's attention at 8 bits); its memory and speed on a phone are not yet measured. The figures
-  below were measured on the earlier 4-bit Speed models.
+  talker's attention at 8 bits), measured on iPhone 17 Pro in Wave 5 (2026-11-21: `f1e8631c`,
+  `c2b75046`). The figures below remain the historical July 2026 4-bit Speed snapshot.
 - **Faster than realtime with bounded memory.** The clean 29-take schema-v2 record
   [`ios-xcui-benchmark-20260716-184106-48e3a3a6`](../../benchmarks/runs/ui-generation/ios-xcui-benchmark-20260716-184106-48e3a3a6.json)
   measured a per-cell median decode speedup (recorded as "RTF") of **1.70–1.89** and peak physical

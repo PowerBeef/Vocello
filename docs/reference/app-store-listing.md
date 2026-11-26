@@ -2,7 +2,7 @@
 status: active
 owner: release-qa
 reviewed: 2026-11-25
-summary: App Store listing draft for Vocello for iPhone 3.2.0 (en-US), reconciled from the 2026-11-01/10 App Store Connect 3.0.0 entry against the shipped 3.1.0 hybrid baseline and RF-73 App Store readiness safeguards (to be reconciled again if RF-70 updates model sizes before 3.2.0 submission). Pushing updates to App Store Connect needs a separate explicit request.
+summary: App Store listing draft for Vocello for iPhone 3.2.0 (en-US), reconciled from the 2026-11-01/10 App Store Connect 3.0.0 entry against the shipped attn hybrid baseline (retained unchanged for 3.2 under RF-70) and RF-73 App Store readiness safeguards. Pushing remaining updates to App Store Connect needs a separate explicit request.
 sourceOfTruth:
   - config/public-product-facts.json
   - Sources/Resources/qwenvoice_contract.json
@@ -14,19 +14,19 @@ sourceOfTruth:
 ---
 # App Store listing: Vocello for iPhone 3.2.0 (en-US)
 
-**Status: 3.2.0 target draft reconciled with `main`'s 3.1.0 `attn` hybrid baseline (App Store Connect still holds the 2026-11-10 3.0.0 entry until an explicit update request; re-check byte counts if `RF-70` adopts a new hybrid artifact before submission).**
+**Status: 3.2.0 target draft reconciled with `main`'s shipped `attn` hybrid baseline (`RF-70` closed keeping `artifactVersion` `2026.11.13.1` unchanged). On 2026-11-25, authorized App Store Connect prep applied Age Rating `13+`, `147` territories (app and export IAP), and the Privacy Policy URL; the version record still holds the 2026-11-10 `3.0.0` entry until an explicit 3.2.0 metadata update request.**
 On 2026-11-01 (ASR-05), at the maintainer's request, the subtitle "Local AI voice studio", the
 promotional text, description, keywords and marketing URL, and the App Review contact and notes were
 entered in App Store Connect on version 3.0.0 and read back byte-identical. On 2026-11-02 (iPhone 15
-Pro floor), 2026-11-04 ([App Review readiness audit](../audits/2026-11-04-app-review-readiness.md)
+Pro floor), 2026-11-04 (App Review readiness audit, archived in git history,
 Safeguards paragraph), and 2026-11-10 (RF-41 download confirmation and RF-42 iPad refusal on build 30),
 the listing and review notes were updated and read back byte-identical. By the maintainer's 2026-11-21
 decision there is no iPhone 3.0 or 3.1 App Store release and no more 3.1 TestFlight builds: iPhone
-submits directly as **3.2.0** after Pack B (`RF-68`, `RF-69`) and Pack C (`RF-70`) land. The copy
-below currently reflects `main`'s `artifactVersion` `2026.11.13.1` hybrid model byte counts and
-storage headroom, and will be reconciled with any `RF-70` artifact update before being written to App
-Store Connect. Any change to App Store Connect requires a separate, explicit maintainer request; keep
-this file and App Store Connect in step.
+submits directly as **3.2.0** after Pack B (`RF-68`, `RF-69`), Pack C (`RF-70`), and `RF-73` land.
+`RF-70` closed keeping `main`'s `artifactVersion` `2026.11.13.1` hybrid model byte counts and
+storage headroom unchanged for 3.2. Any change to App Store Connect requires a separate, explicit
+maintainer request; keep this file and [`ios-appstore-submission.md`](ios-appstore-submission.md) in
+step with live App Store Connect state.
 
 The copy follows `website/PRODUCT.md`:
 - it says local, not on-device;
@@ -43,9 +43,9 @@ Apple's limit.
 | Name (30) | Vocello | Already set; unchanged (7). |
 | Subtitle (30) | Local AI voice studio | 21. Alternatives: "Text to speech, made locally" (28), "Private AI text to speech" (25). |
 | Privacy Policy URL | https://vocello.vercel.app/privacy/ | Matches the website canonical URL and in-app Settings link. |
-| Terms of Use URL | https://vocello.vercel.app/terms/ | Linked from onboarding, inline cloning consent, Export Purchase, and Settings → About. |
-| Age Rating | 13+ (target before 3.2.0 submission) | Raise from 4+ in App Store Connect before initial 3.2.0 submission (`RF-73`); set Nov 16 descriptors `Shared Location = No`, `Dating and Relationships = No`. |
-| Territories | 147 of 175 (target before 3.2.0 submission) | Exclude the 27 EU territories (`BKL-41`) and China Mainland (`CN`, `RF-73`); keep South Korea (`KR`) enabled on both app and export IAP. |
+| Terms of Use URL | https://vocello.vercel.app/terms/ | Linked from onboarding, inline cloning consent, Export Purchase, and Settings → Privacy & Permissions. |
+| Age Rating | 13+ (applied 2026-11-25) | Raised from 4+ and verified via readback in App Store Connect on 2026-11-25 (`RF-62`/`RF-73`); Nov 16 descriptors `Shared Location = No` and `Dating and Relationships = No` remain pending web-portal completion. |
+| Territories | 147 of 175 (applied 2026-11-25) | Applied and verified via readback on both app and export IAP: excludes the 27 EU territories (`BKL-41`) and China Mainland (`CN`, `RF-73`), keeping South Korea (`KR`) enabled. |
 
 ## Version 3.2.0
 
@@ -128,7 +128,7 @@ Please review on an iPhone 15 Pro or later, or on an eligible Apple silicon or A
 4. Voice Cloning: the first time you record, import, save, or clone a voice, an inline permission sheet confirms you own or have permission to clone the voices you use and links to Terms of Use. The same permission toggle lives in Settings → Privacy & Permissions and can be turned off at any time without deleting saved voices or history. Microphone and Speech Recognition are requested only to record and transcribe a reference clip locally.
 5. In-app purchase: Design & Clone Export (non-consumable) unlocks exporting Voice Design and Voice Cloning audio via the share sheet (with a one-tap Export Now button after unlocking from a take). Generation, listening, History, Saved Voices, and Built-in Voice export are free. Reach it via Settings → Design & Clone Export or by tapping Share on a Voice Design or Voice Cloning take; Restore Purchases is on the same sheet.
 
-Safeguards and Guideline 5.1.2(i). Vocello is a single-user local tool with no accounts, no feed, no posting, and no third-party AI inference APIs. Hugging Face serves immutable static model files verified against bundled SHA-256 digests before use; zero scripts, voice descriptions, recordings, transcripts, or generated audio ever leave the device unless exported by the user or backed up by iOS. Voice Design descriptions and Built-in delivery instructions that request celebrity imitation or voice impersonation are refused across all 10 supported languages. Spoken scripts themselves are intentionally unfiltered because Vocello is a private local text-to-speech editor, not a chatbot or UGC platform. Every generated WAV take carries a mandatory inaudible AudioSeal watermark (fixed non-identifying Vocello payload) and WAV LIST/INFO provenance metadata inspectable with open-source AudioSeal tools (external transcoding after export may degrade it), disclosed in Settings → Privacy & Permissions. Settings → About provides Terms of Use (https://vocello.vercel.app/terms/), Help & Support (https://vocello.vercel.app/support/), and Report an Issue (https://vocello.vercel.app/support/#report, privacy-first with zero automatic upload).
+Safeguards and Guideline 5.1.2(i). Vocello is a single-user local tool with no accounts, no feed, no posting, and no third-party AI inference APIs. Hugging Face serves immutable static model files verified against bundled SHA-256 digests before use; zero scripts, voice descriptions, recordings, transcripts, or generated audio ever leave the device unless exported by the user or backed up by iOS. Voice Design descriptions and Built-in delivery instructions that request celebrity imitation or voice impersonation are refused across all 10 supported languages. Spoken scripts themselves are intentionally unfiltered because Vocello is a private local text-to-speech editor, not a chatbot or UGC platform. Every generated WAV take carries a mandatory inaudible AudioSeal watermark (fixed non-identifying Vocello payload) and WAV LIST/INFO provenance metadata inspectable with open-source AudioSeal tools (external transcoding after export may degrade it), disclosed in Settings → Privacy & Permissions alongside Privacy Policy and Terms of Use (https://vocello.vercel.app/terms/). Settings → About provides Help & Support (https://vocello.vercel.app/support/) and Report an Issue (https://vocello.vercel.app/support/#report, privacy-first with zero automatic upload).
 ```
 
 Before pasting, recheck the three byte counts against the candidate's catalog, and close ASR-09's
@@ -139,10 +139,10 @@ fresh North America download proof (see [`ios-appstore-submission.md`](ios-appst
 
 Entered in App Store Connect on 2026-11-10 at the maintainer's request and read back:
 
-- **Availability:** update both the app and the export purchase from 148 to **147 territories**
-  ahead of 3.2.0 submission (`RF-73`: exclude China Mainland `CN` alongside the 27 EU territories,
-  keeping South Korea `KR` enabled). When the EU territories return (`BKL-41`), add them to the
-  purchase too.
+- **Availability:** applied and verified via readback on 2026-11-25 at **147 territories** on both
+  the app and the export purchase (`RF-73`: China Mainland `CN` excluded alongside the 27 EU
+  territories, keeping South Korea `KR` enabled). When the EU territories return (`BKL-41`), add
+  them to the purchase too.
 - **Review note (4000):** updated for 3.2.0 Share label and one-tap Export Now.
 
 ```text
@@ -174,7 +174,9 @@ on the phone (RF-12), and one account step is RF-02's.
   (1206×2622), the iPhone size Apple's specifications require. Apple's page also still calls the
   6.5-inch size required when no 6.9-inch set is present, so the media manager settles it at upload.
   [`ios-appstore-submission.md`](ios-appstore-submission.md) §3 owns the rule.
-- The copyright line. Category and age rating are already set in App Store Connect (RF-02,
-  2026-10-12).
+- The copyright line (entered during the explicit 3.2.0 App Store Connect metadata update). Category
+  (Productivity / Utilities) was set under RF-02 (2026-10-12 / 2026-11-04) and age rating was raised
+  to `13+` on 2026-11-25 (`RF-62`/`RF-73`; Nov 16 `Shared Location` and `Dating and Relationships`
+  descriptors remain pending web-portal completion).
 - Other localizations. The listing is en-US only so far; the export purchase already has en-US,
   fr-CA and fr-FR names and descriptions.

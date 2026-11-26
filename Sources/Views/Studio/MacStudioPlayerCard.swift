@@ -295,6 +295,8 @@ private struct MacStudioWaveformRow: View {
     }
 
     var body: some View {
+        let currentProgress = playbackProgress.progress
+        let samples = audioPlayer.waveformSamples
         HStack(spacing: MacTheme.Spacing.sm) {
             Text(playbackProgress.formattedCurrentTime)
                 .macType(.counter)
@@ -303,8 +305,8 @@ private struct MacStudioWaveformRow: View {
 
             GeometryReader { geo in
                 MacWaveformBars(
-                    samples: audioPlayer.waveformSamples,
-                    progress: playbackProgress.progress,
+                    samples: samples,
+                    progress: currentProgress,
                     tint: tint,
                     barCount: 56
                 )

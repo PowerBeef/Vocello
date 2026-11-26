@@ -41,12 +41,82 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
     @MainActor
     @Observable
     final class PlaybackProgress {
-        var currentTime: TimeInterval = 0
-        var duration: TimeInterval = 0
+        var currentTime: TimeInterval = 0 {
+            didSet { reconcileFloor() }
+        }
+        var duration: TimeInterval = 0 {
+            didSet { reconcileFloor() }
+        }
+        private(set) var liveEstimatedDuration: TimeInterval? {
+            didSet { reconcileFloor() }
+        }
+        private(set) var isLiveStreaming = false {
+            didSet { reconcileFloor() }
+        }
+        /// Monotonic high-water mark while streaming and across the live -> final
+        /// duration handoff so arriving chunks or an actual duration slightly longer
+        /// than the text forecast never step the bar backward.
+        private var floorProgress: Double = 0
 
         var progress: Double {
-            guard duration > 0 else { return 0 }
-            return min(max(currentTime / duration, 0), 1)
+            let denominator = isLiveStreaming
+                ? max(liveEstimatedDuration ?? 0, duration, 0.8)
+                : duration
+            guard denominator > 0 else { return 0 }
+            let raw = min(max(currentTime / denominator, 0), 1)
+            return max(raw, floorProgress)
+        }
+
+        func beginLiveStream(estimatedDuration: TimeInterval?) {
+            floorProgress = 0
+            isLiveStreaming = true
+            liveEstimatedDuration = estimatedDuration
+            duration = 0
+            currentTime = 0
+        }
+
+        func concludeLiveEstimate(finalDuration: TimeInterval, currentTime targetCurrentTime: TimeInterval? = nil) {
+            let heldFloor = currentTime > 0 ? progress : 0
+            isLiveStreaming = false
+            liveEstimatedDuration = nil
+            floorProgress = 0
+            duration = finalDuration
+            if let targetCurrentTime {
+                currentTime = targetCurrentTime
+            }
+            if currentTime > 0 {
+                floorProgress = heldFloor
+                reconcileFloor()
+            }
+        }
+
+        func resetProgressState() {
+            floorProgress = 0
+            isLiveStreaming = false
+            liveEstimatedDuration = nil
+        }
+
+        func resetProgressFloor() {
+            floorProgress = 0
+        }
+
+        private func reconcileFloor() {
+            guard currentTime > 0 else {
+                floorProgress = 0
+                return
+            }
+            if isLiveStreaming {
+                let denominator = max(liveEstimatedDuration ?? 0, duration, 0.8)
+                if denominator > 0 {
+                    let raw = min(max(currentTime / denominator, 0), 1)
+                    floorProgress = max(floorProgress, raw)
+                }
+            } else if floorProgress > 0, duration > 0 {
+                let raw = min(max(currentTime / duration, 0), 1)
+                if raw >= floorProgress {
+                    floorProgress = 0
+                }
+            }
         }
 
         var formattedCurrentTime: String { AudioPlayerViewModel.formatTime(currentTime) }
@@ -647,11 +717,13 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
 
         let clampedFraction = max(0, min(1, fraction))
         let targetTime = clampedFraction * duration
+        playbackProgress.resetProgressFloor()
 
         if playbackMode == .live, liveFinalFilePath != nil {
             switchToFinalFilePlayback(
                 preserveCurrentTime: targetTime,
-                autoPlay: isPlaying
+                autoPlay: isPlaying,
+                preserveMorphFloor: false
             )
             return
         }
@@ -745,8 +817,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         livePreviewDisabledSessionID = nil
         currentTitle = title
         currentFilePath = nil
-        duration = 0
-        currentTime = 0
+        playbackProgress.beginLiveStream(estimatedDuration: sessionEstimate?.estimatedAudioDuration)
         waveformSamples = []
         playbackError = nil
         isPlaying = false
@@ -864,7 +935,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         if let streamSessionDirectory = result.streamSessionDirectory {
             liveSessionDirectory = streamSessionDirectory
         }
-        duration = max(duration, result.durationSeconds)
+        playbackProgress.concludeLiveEstimate(finalDuration: max(duration, result.durationSeconds))
 
         // Only transition immediately if live playback never started or all
         // buffers have already drained. Otherwise the existing buffer-drain
@@ -1144,8 +1215,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         livePreviewDisabledSessionID = nil
         currentTitle = title
         currentFilePath = nil
-        duration = 0
-        currentTime = 0
+        playbackProgress.beginLiveStream(estimatedDuration: sessionEstimate?.estimatedAudioDuration)
         waveformSamples = []
         playbackError = nil
         isPlaying = false
@@ -1470,7 +1540,9 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
             self.pendingFirstChunkInterval = nil
         }
 
-        if Self.shouldStartLivePlayback(
+        if isPlaying, livePlayback.isNodePlaying {
+            setLivePreviewPhase(.playing)
+        } else if Self.shouldStartLivePlayback(
             autoplayEnabled: liveAutoplayEnabled,
             queuedChunks: livePlayback.scheduledCount,
             queuedDuration: livePlayback.queuedAudioSeconds,
@@ -1572,7 +1644,9 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
             self.pendingFirstChunkInterval = nil
         }
 
-        if Self.shouldStartLivePlayback(
+        if isPlaying, livePlayback.isNodePlaying {
+            setLivePreviewPhase(.playing)
+        } else if Self.shouldStartLivePlayback(
             autoplayEnabled: liveAutoplayEnabled,
             queuedChunks: livePlayback.scheduledCount,
             queuedDuration: livePlayback.queuedAudioSeconds,
@@ -1722,7 +1796,11 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         }
     }
 
-    private func switchToFinalFilePlayback(preserveCurrentTime: TimeInterval, autoPlay: Bool) {
+    private func switchToFinalFilePlayback(
+        preserveCurrentTime: TimeInterval,
+        autoPlay: Bool,
+        preserveMorphFloor: Bool = true
+    ) {
         guard let finalFilePath = liveFinalFilePath else { return }
         // Short generations can finish before the live prebuffer threshold is
         // reached. In that case autoplay starts from the finalized WAV instead
@@ -1742,6 +1820,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
                 preserveCurrentTime: preserveCurrentTime,
                 autoPlay: autoPlay,
                 transitionFromLive: true,
+                preserveMorphFloor: preserveMorphFloor,
                 presentationContext: playbackPresentationContext,
                 playbackTelemetrySessionID: telemetrySessionID
             )
@@ -1781,6 +1860,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
             pendingLivePreviewEstimate = nil
             livePreviewDisabledSessionID = nil
             isLiveStream = false
+            playbackProgress.resetProgressState()
             setLivePreviewPhase(.idle)
             // Discard the audio graph so the next session rebuilds fresh
             // (Phase 4 fix rationale lives with
@@ -1883,6 +1963,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         preserveCurrentTime: TimeInterval,
         autoPlay: Bool,
         transitionFromLive: Bool,
+        preserveMorphFloor: Bool = true,
         presentationContext: PlaybackPresentationContext,
         playbackTelemetrySessionID: String? = nil
     ) throws {
@@ -1922,10 +2003,18 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
         currentFilePath = filePath
         playbackTargetFilePath = filePath
         currentTitle = title.isEmpty ? url.lastPathComponent : title
-        duration = audioPlayer.duration
         let clampedTime = min(max(preserveCurrentTime, 0), audioPlayer.duration)
         audioPlayer.currentTime = clampedTime
-        currentTime = clampedTime
+        if transitionFromLive && preserveMorphFloor {
+            playbackProgress.concludeLiveEstimate(
+                finalDuration: audioPlayer.duration,
+                currentTime: clampedTime
+            )
+        } else {
+            playbackProgress.resetProgressState()
+            duration = audioPlayer.duration
+            currentTime = clampedTime
+        }
         playbackError = nil
         isLiveStream = false
         setLivePreviewQueueDepth(0)
@@ -2034,6 +2123,7 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
     private func clearLoadedAudio() {
         currentFilePath = nil
         currentTitle = ""
+        playbackProgress.resetProgressState()
         duration = 0
         currentTime = 0
         waveformSamples = []
@@ -2081,8 +2171,11 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
     @ObservationIgnored private var activeTimerInterval: TimeInterval = 0.1
 
     private func startTimer() {
-        stopTimer()
         let interval = desiredTimerInterval
+        if let timer, timer.isValid, activeTimerInterval == interval {
+            return
+        }
+        stopTimer()
         activeTimerInterval = interval
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {

@@ -49,7 +49,7 @@ class FakeCommands:
             "git rev-parse HEAD": COMMIT + "\n",
             "git rev-parse refs/remotes/origin/main": COMMIT + "\n",
             "git remote get-url origin": "https://github.com/PowerBeef/Vocello.git\n",
-            f"git show {COMMIT}:project.yml": "project spec\n",
+            f"git show {COMMIT}:{cut.PROJECT_SPEC}": "project spec\n",
             f"git show {COMMIT}:docs/releases/v3.2.0.md": VALID_NOTES,
             "git config --get gpg.format": "ssh\n",
             "git config --get user.signingkey": __file__ + "\n",

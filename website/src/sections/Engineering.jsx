@@ -6,11 +6,10 @@ import React from "react";
     over up to five canonical records that share the comparison key and app build of the newest
     one (the anchor). The provenance line below mirrors the chart footer, as the generator prints
     it: "Record <anchor>" for one record, "Median of N records through <anchor>" for more. Today
-    the pool is two records of app 3.1.0 build 31,
-    benchmarks/runs/ui-generation/macos-xcui-benchmark-20261115-233746-ecd24c7b.json and the
-    anchor, macos-xcui-benchmark-20261116-220447-0b6bc26b.json, which the promotion sitting
-    measured on the v3.1.0 tag's checkout (a new app build resets the pool); the generator's
-    `--check` fails when a new canonical record changes the charts.
+    the pool is two records of app 3.2.0 build 32,
+    benchmarks/runs/ui-generation/macos-xcui-benchmark-20261126-092027-a9057aef.json and the
+    anchor, macos-xcui-benchmark-20261126-154113-ea3610e8.json (a new app build resets the pool);
+    the generator's `--check` fails when a new canonical record changes the charts.
     RTF is the standard real-time factor: seconds of generation per second of audio, lower is
     faster, below 1.0 audio is produced quicker than it plays. This record was published after the
     2026-09-12 RTF cutover (`run.rtfDefinition: wall/audio`), so each value is the per-cell median
@@ -24,18 +23,17 @@ import React from "react";
   This section is a maintained whole-package surface (docs/reference/macos-release-qa.md
   "Technical sections are maintained surfaces"): refresh facts each release, never a
   single-release billboard.
-  Release 3.1.0: the pooled records (sources 12f87e4a and 693f13d1, the tag; app 3.1.0 build 31) measure each mode's
-  one model, the hybrid that replaced Speed and Quality (RF-55, RF-59); its takes carry the variant
-  id `speed`, which public copy never uses as the model's name. The record's build was compiled
-  with Xcode 27.2 and the released app with Xcode 26.6 from the same source, which the copy says
-  as docs/releases/v3.1.0.md does. The memory figures predate the hybrid.
+  Release 3.2.0: the pooled records (sources 7e20e070 and 072d1bd7; app 3.2.0 build 32) measure
+  each mode's one model, the hybrid introduced in 3.1 (RF-55, RF-59) and retained unchanged in 3.2;
+  its takes carry the variant id `speed`, which public copy never uses as the model's name. Both
+  the benchmarked builds and the released Mac app compile with Xcode 27.2 (Swift 6.4.2).
   The translucency gate (+33.6% warm RTF, 9b6f267b to d02005ae) was measured on the Mac mini M2.
   The memory figures are OPTIMIZATION.md §F.1 and long-form smoke run 8f15c1fd, both on the M2.
 */
 const MODES = [
-  { name: "Built-in Voice", tone: "var(--mode-custom)", takes: [0.36, 0.31, 0.30] },
-  { name: "Voice Design", tone: "var(--mode-design)", takes: [0.34, 0.31, 0.29] },
-  { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [0.41, 0.33, 0.30] },
+  { name: "Built-in Voice", tone: "var(--mode-custom)", takes: [0.36, 0.31, 0.29] },
+  { name: "Voice Design", tone: "var(--mode-design)", takes: [0.34, 0.30, 0.29] },
+  { name: "Voice Cloning", tone: "var(--mode-clone)", takes: [0.38, 0.32, 0.29] },
 ];
 const LENGTHS = ["short", "medium", "long"];
 const RTF_SCALE_MAX = 1.2;
@@ -60,7 +58,7 @@ const LEDGER = [
   },
   {
     k: "Reproducible by construction",
-    v: "Every request carries its own seed and sampler state, so the same request and seed reproduce a take on the same version. Performance changes are checked against fixed-seed takes, so a speed change that alters the audio shows up before it merges. A seed from 3.0 or earlier does not reproduce its old take, because the model changed in 3.1.",
+    v: "Every request carries its own seed and sampler state, so the same request and seed reproduce a take on the same model. Performance changes are checked against fixed-seed takes, so a speed change that alters the audio shows up before it merges. A seed pinned in 3.1 reproduces its take in 3.2; a seed from 3.0 or earlier does not, because the model changed in 3.1.",
   },
   {
     k: "Honest benchmarks",
@@ -78,7 +76,7 @@ const RtfChart = () => (
   <div
     className="rtf-chart"
     role="img"
-    aria-label="Warm real-time factor of each mode's model by script length, lower is faster, measured on a Mac mini M6 with 16 GB. Built-in Voice 0.30 to 0.36, Voice Design 0.29 to 0.34, Voice Cloning 0.30 to 0.41. Every bar sits below the real-time line at 1.0."
+    aria-label="Warm real-time factor of each mode's model by script length, lower is faster, measured on a Mac mini M6 with 16 GB. Built-in Voice 0.29 to 0.36, Voice Design 0.29 to 0.34, Voice Cloning 0.29 to 0.38. Every bar sits below the real-time line at 1.0."
   >
     {MODES.map((mode) => (
       <div className="rtf-group" key={mode.name} style={{ "--bar-tone": mode.tone }}>
@@ -123,7 +121,7 @@ const SpeedPanel = () => (
     <RtfChart />
     <figcaption className="perf-caption">
       Warm generation by mode and script length, take medians, with each
-      mode's one model in Vocello 3.1.0 (build 31). Translucent app surfaces
+      mode's one model in Vocello 3.2.0 (build 32). Translucent app surfaces
       render solid while audio generates; on the 8 GB Mac mini M2, that change
       sped up the same take by about a third.
     </figcaption>
@@ -139,11 +137,10 @@ export const EngineeringDetail = () => (
         <h1 id="eng-title" className="section-title page-title">A first-party engine, measured take by take.</h1>
         <p className="section-sub">
           The speed chart pools two records on Vocello's benchmark host, a Mac mini M6
-          with 16 GB: Vocello 3.1.0 (build 31) with each mode's one model, measured on
-          November 15 and 16, 2026. That build was compiled with Xcode 27.2; the released app is
-          compiled from the same source with Xcode 26.6, so its own numbers may differ
-          slightly. The memory figures come from earlier records on the 8 GB Mac mini M2,
-          the support floor, made before 3.1's model.
+          with 16 GB: Vocello 3.2.0 (build 32) with each mode's one model, measured on
+          November 26, 2026 on Xcode 27.2, matching the compiler that builds the release.
+          The earlier streaming-reduction figures in the ledger come from records on the
+          8 GB Mac mini M2, the support floor.
           Speed is the real-time factor: seconds of generation per second of audio.
           Below 1.0, audio generates ahead of playback, and every number here traces
           to a tracked record in the open repository.
@@ -161,7 +158,7 @@ export const EngineeringDetail = () => (
         </dl>
       </div>
       <p className="perf-provenance">
-        Median of 2 records through <span className="perf-mono">0b6bc26b</span> in{" "}
+        Median of 2 records through <span className="perf-mono">ea3610e8</span> in{" "}
         <a href="https://github.com/PowerBeef/Vocello/blob/main/benchmarks/HISTORY.md" target="_blank" rel="noreferrer">
           benchmarks/HISTORY.md
         </a>

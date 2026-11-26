@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="236" height="56" viewBox="0 0 236 56" role="img" aria-labelledby="title desc">
-<title id="title">Install the vocello 3.1.0 command line for macOS 26 or newer</title>
-<desc id="desc">Install the vocello 3.1.0 command line for macOS 26 or newer</desc>
+<title id="title">Install the vocello 3.2.0 command line for macOS 26 or newer</title>
+<desc id="desc">Install the vocello 3.2.0 command line for macOS 26 or newer</desc>
 <rect x="0.5" y="0.5" width="235" height="55" rx="27.5" fill="#1C1E26" stroke="#EDCC8A" stroke-opacity="0.45"/>
 <g transform="translate(24 16) scale(1)" fill="none" stroke="#EDCC8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M7.5 10l2.8 2.5-2.8 2.5"/><path d="M12.5 15.5h4"/></g>
 <text x="60" y="25" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#F5F6F8">Install the CLI</text>
-<text x="60" y="42" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#F5F6F8" fill-opacity="0.65">vocello 3.1.0 · macOS 26+</text>
+<text x="60" y="42" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#F5F6F8" fill-opacity="0.65">vocello 3.2.0 · macOS 26+</text>
 </svg>

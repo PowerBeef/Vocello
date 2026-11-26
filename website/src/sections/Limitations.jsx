@@ -33,11 +33,11 @@ const LIMITATIONS = [
   },
   {
     k: "Against 3.0's models",
-    v: "The 3.1 model clones a voice about as closely as the 3.0 Speed model, not as closely as Quality, and its long-form error rate sits between the two.",
+    v: "Each mode's model (introduced in 3.1 and kept unchanged in 3.2) clones a voice about as closely as the 3.0 Speed model, not as closely as Quality, and its long-form error rate sits between the two.",
   },
   {
     k: "Seeds from earlier versions",
-    v: "The model changed in 3.1, so a seed pinned with 3.0 or earlier does not reproduce its old take.",
+    v: "A seed pinned in 3.1 reproduces its take in 3.2; a seed pinned with 3.0 or earlier does not, because the model changed in 3.1.",
   },
   {
     k: "iPhone is in beta",

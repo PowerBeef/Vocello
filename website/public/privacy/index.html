@@ -61,7 +61,7 @@
     <main class="wrap">
       <a class="back" href="/">&larr; Vocello</a>
       <h1>Privacy Policy</h1>
-      <p class="updated">Last updated: November 25, 2026</p>
+      <p class="updated">Last updated: November 26, 2026</p>
       <p class="lede">
         Vocello is a local voice studio for Apple Silicon: a Mac app, an iPhone app (also
         supported on eligible Apple silicon and A17 Pro iPads in compatibility mode), and the
@@ -78,7 +78,7 @@
           downloads of the AI voice models from Hugging Face, on iPhone, App Store purchases,
           which Apple handles, and on Mac, if you allow it, a check for a newer version of the
           app. A model downloads when you choose to install it, with one exception: after the
-          Mac app is updated to Vocello 3.1 from an earlier version, it updates the models you
+          Mac app is updated to Vocello 3.1 or later from an earlier version, it updates the models you
           had installed on its own, and you can stop it. If you connect an AI agent to <code>vocello mcp</code>,
           that agent sees what you let it read, and its own privacy terms apply to it.
         </p>
@@ -122,15 +122,16 @@
       <p>
         Vocello's own network activity is downloading AI voice model files from Hugging Face.
         A model downloads when you install or update it, in an app or with
-        <code>vocello models install</code>, and in one case without your asking. Vocello 3.1
-        replaces each mode's two models with one, so when the Mac app is updated to 3.1 from an
-        earlier version, such as 3.0, it downloads the new model for each mode whose model you
-        had installed, and removes your earlier models once a new one is ready. It starts this
-        at launch on its own, only on a network that is not a personal hotspot or cellular
-        connection and is not in Low Data Mode; on any other network it waits for you to choose
-        Update Now. A banner shows the progress. <strong>Not Now</strong> on the banner stops
-        it, as cancelling the download does, and a stopped or failed update waits until you
-        choose Update: Vocello never restarts it on its own. A mode you never installed is not
+        <code>vocello models install</code>, and in one case without your asking. Since Vocello 3.1,
+        each mode uses one model in place of 3.0's two models, so when the Mac app is updated to 3.1
+        or later from an earlier version, such as 3.0, it downloads the new model for each mode whose
+        model you had installed, and removes your earlier models once a new one is ready. Updating
+        from 3.1 to 3.2 keeps the installed models with no automatic download. When an update from
+        3.0 starts this at launch on its own, it runs only on a network that is not a personal
+        hotspot or cellular connection and is not in Low Data Mode; on any other network it waits
+        for you to choose Update Now. A banner shows the progress. <strong>Not Now</strong> on the
+        banner stops it, as cancelling the download does, and a stopped or failed update waits until
+        you choose Update: Vocello never restarts it on its own. A mode you never installed is not
         downloaded, the command line never starts a download on its own, and on iPhone a model
         downloads only when you choose to install it.
       </p>

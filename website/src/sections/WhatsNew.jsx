@@ -5,12 +5,12 @@ import { HIGHLIGHTS, IPHONE_NOTE, UPGRADE_NOTE, WHATS_NEW_VERSION } from "../dat
 
 // The home page names the changes people notice; the release notes carry every one.
 const ON_HOME = [
-  "One improved model per mode",
-  "Your models update themselves",
-  "Voice cloning follows its reference more faithfully",
-  "Clearer feedback on references",
-  "One way to sample a take",
-  "A leaner, quicker engine",
+  "A leaner, steadier engine",
+  "Smooth live streaming preview",
+  "Long-form, cloning and storage reliability",
+  "Clearer transparency and AI safeguards",
+  "Same models, no re-download from 3.1",
+  "Hardened command line and 8 GB coordination",
 ];
 const highlights = ON_HOME.map((k) => HIGHLIGHTS.find((item) => item.k === k)).filter((item) => item !== undefined);
 
@@ -21,8 +21,9 @@ export const WhatsNew = () => (
         <p className="section-note">Released November 2026</p>
         <h2 id="whatsnew-title" className="section-title">What's new in {WHATS_NEW_VERSION}</h2>
         <p className="section-sub">
-          One improved model for each mode, in the Mac app and the command line, and the models
-          you already have update on their own. {IPHONE_NOTE}
+          A leaner engine, smooth live streaming preview progress, hardened reliability and clearer
+          AI safeguards in the Mac app and command line, with no model re-download from 3.1.{" "}
+          {IPHONE_NOTE}
         </p>
       </header>
       <ul className="whatsnew-grid" role="list">

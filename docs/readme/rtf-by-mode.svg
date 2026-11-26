@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="880" height="500" viewBox="0 0 880 500" role="img" aria-labelledby="title desc">
 <title id="title">Speed by mode and script length</title>
-<desc id="desc">Bar chart: warm real-time factor of the Vocello 3.1 models by script length, lower is faster: Built-in Voice 0.30 to 0.36, Voice Design 0.29 to 0.34, Voice Cloning 0.30 to 0.41. Every bar sits below the real-time line at 1.0.</desc>
+<desc id="desc">Bar chart: warm real-time factor of the Vocello 3.2 models by script length, lower is faster: Built-in Voice 0.29 to 0.36, Voice Design 0.29 to 0.34, Voice Cloning 0.29 to 0.38. Every bar sits below the real-time line at 1.0.</desc>
 <defs><linearGradient id="canvas" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1C1E26"/><stop offset="1" stop-color="#111318"/></linearGradient><radialGradient id="glow0" cx="88" cy="0" r="528" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#EDCC8A" stop-opacity="0.1"/><stop offset="1" stop-color="#EDCC8A" stop-opacity="0"/></radialGradient></defs>
 <rect width="880" height="500" rx="24" fill="url(#canvas)"/><rect width="880" height="500" rx="24" fill="url(#glow0)"/><rect x="0.5" y="0.5" width="879" height="499" rx="23.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.07"/>
 <text x="36" y="50" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#8C8F9B" letter-spacing="1.3">SPEED BY MODE AND SCRIPT LENGTH</text>
 <text x="36" y="86" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="26" font-weight="600" fill="#F5F6F8">Faster than real time in every mode</text>
 <text x="36" y="112" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="14.5" font-weight="400" fill="#C9CBD4">Warm real-time factor: seconds of generation per second of audio, lower is faster</text>
-<text x="36" y="133" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8C8F9B">Mac mini M6, 16 GB · Vocello 3.1 models</text>
+<text x="36" y="133" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="13" font-weight="400" fill="#8C8F9B">Mac mini M6, 16 GB · Vocello 3.2 models</text>
 <line x1="375.45" y1="138" x2="375.45" y2="418" stroke="#2A2C36" stroke-opacity="1" stroke-width="1" stroke-dasharray="3 4"/>
 <text x="375.45" y="438" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="400" fill="#8C8F9B" text-anchor="middle">0.25</text>
 <line x1="500.91" y1="138" x2="500.91" y2="418" stroke="#2A2C36" stroke-opacity="1" stroke-width="1" stroke-dasharray="3 4"/>
@@ -18,35 +18,35 @@
 <circle cx="42" cy="183" r="6" fill="#BE8A24"/>
 <text x="56" y="188.5" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#F5F6F8">Built-in Voice</text>
 <text x="240" y="163.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#8C8F9B" text-anchor="end">short</text>
-<path d="M250 150 h178.19 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-178.19 z" fill="#BE8A24"/>
-<text x="440.19" y="163.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.36</text>
+<path d="M250 150 h174.5 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-174.5 z" fill="#BE8A24"/>
+<text x="436.5" y="163.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.36</text>
 <text x="240" y="187.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#8C8F9B" text-anchor="end">medium</text>
-<path d="M250 174 h153.85 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-153.85 z" fill="#BE8A24"/>
-<text x="415.85" y="187.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.31</text>
+<path d="M250 174 h149.21 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-149.21 z" fill="#BE8A24"/>
+<text x="411.21" y="187.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.31</text>
 <text x="240" y="211.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#8C8F9B" text-anchor="end">long</text>
-<path d="M250 198 h146.53 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-146.53 z" fill="#BE8A24"/>
-<text x="408.53" y="211.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.30</text>
+<path d="M250 198 h142.65 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-142.65 z" fill="#BE8A24"/>
+<text x="404.65" y="211.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.29</text>
 <circle cx="42" cy="279" r="6" fill="#9070E6"/>
 <text x="56" y="284.5" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#F5F6F8">Voice Design</text>
 <text x="240" y="259.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#8C8F9B" text-anchor="end">short</text>
-<path d="M250 246 h168.29 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-168.29 z" fill="#9070E6"/>
-<text x="430.29" y="259.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.34</text>
+<path d="M250 246 h165.97 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-165.97 z" fill="#9070E6"/>
+<text x="427.97" y="259.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.34</text>
 <text x="240" y="283.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#8C8F9B" text-anchor="end">medium</text>
-<path d="M250 270 h149.81 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-149.81 z" fill="#9070E6"/>
-<text x="411.81" y="283.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.31</text>
+<path d="M250 270 h145.69 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-145.69 z" fill="#9070E6"/>
+<text x="407.69" y="283.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.30</text>
 <text x="240" y="307.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#8C8F9B" text-anchor="end">long</text>
-<path d="M250 294 h143.42 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-143.42 z" fill="#9070E6"/>
-<text x="405.42" y="307.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.29</text>
+<path d="M250 294 h139.88 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-139.88 z" fill="#9070E6"/>
+<text x="401.88" y="307.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.29</text>
 <circle cx="42" cy="375" r="6" fill="#E26034"/>
 <text x="56" y="380.5" font-family="ui-rounded, 'SF Pro Rounded', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#F5F6F8">Voice Cloning</text>
 <text x="240" y="355.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#8C8F9B" text-anchor="end">short</text>
-<path d="M250 342 h203.1 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-203.1 z" fill="#E26034"/>
-<text x="465.1" y="355.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.41</text>
+<path d="M250 342 h189.01 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-189.01 z" fill="#E26034"/>
+<text x="451.01" y="355.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.38</text>
 <text x="240" y="379.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#8C8F9B" text-anchor="end">medium</text>
-<path d="M250 366 h159.67 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-159.67 z" fill="#E26034"/>
-<text x="421.67" y="379.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.33</text>
+<path d="M250 366 h155.78 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-155.78 z" fill="#E26034"/>
+<text x="417.78" y="379.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.32</text>
 <text x="240" y="403.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" fill="#8C8F9B" text-anchor="end">long</text>
-<path d="M250 390 h146.59 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-146.59 z" fill="#E26034"/>
-<text x="408.59" y="403.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.30</text>
-<text x="844" y="476" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#8C8F9B" text-anchor="end">median of 2 records through 0b6bc26b · benchmarks/HISTORY.md</text>
+<path d="M250 390 h143.67 a4 4 0 0 1 4 4 v10 a4 4 0 0 1 -4 4 h-143.67 z" fill="#E26034"/>
+<text x="405.67" y="403.5" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#F5F6F8">0.29</text>
+<text x="844" y="476" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" fill="#8C8F9B" text-anchor="end">median of 2 records through ea3610e8 · benchmarks/HISTORY.md</text>
 </svg>

@@ -63,7 +63,7 @@
     <main class="wrap">
       <a class="back" href="/">&larr; Vocello</a>
       <h1>Help and Support</h1>
-      <p class="updated">Last updated: November 25, 2026</p>
+      <p class="updated">Last updated: November 26, 2026</p>
       <p class="lede">
         Get help with Vocello for Mac or iPhone, or with the <code>vocello</code> command line.
         Support is handled directly by the Vocello maintainer, and response time varies with
@@ -81,7 +81,7 @@
 
       <h2>Before contacting support</h2>
       <ol>
-        <li>Confirm that the required voice model shows Ready: on a Mac in Settings, Models &amp; Files; on iPhone in Settings, Models &amp; Files, Voice Models; in the terminal with <code>vocello models list</code>. After an update from 3.0 to 3.1, a mode whose model you had installed reads Update required until its new model is ready.</li>
+        <li>Confirm that the required voice model shows Ready: on a Mac in Settings, Models &amp; Files; on iPhone in Settings, Models &amp; Files, Voice Models; in the terminal with <code>vocello models list</code>. After an update from 3.0 to 3.1 or later, a mode whose model you had installed reads Update required until its new model is ready.</li>
         <li>Confirm that the device has enough free storage for the selected model and generated audio.</li>
         <li>For microphone or transcription problems, review Vocello permissions in Apple Settings.</li>
         <li>For an interrupted model download, keep Vocello installed and use the visible Retry or Remove action.</li>
@@ -98,8 +98,8 @@
 
       <h2>Updating Vocello</h2>
       <ul>
-        <li>The Mac app updates itself from 3.0 on: choose <strong>Vocello &gt; Check for Updates</strong>, or let it check on its own schedule, a setting you can turn off. Vocello 2.4 and earlier have no updater, so install the 3.1 DMG by hand once.</li>
-        <li>Vocello 3.1 uses one model for each mode in place of the Speed and Quality models of 3.0. After the Mac app updates from 3.0, the modes whose models you had installed read Update required and update on their own on an unmetered network (not a personal hotspot or cellular connection, and not in Low Data Mode). A banner shows the progress and offers <strong>Update Now</strong> or <strong>Not Now</strong>. Each mode downloads about 2.2 GB on its own, and all three about 4.7 GB; your earlier models are removed once a new one is ready.</li>
+        <li>The Mac app updates itself from 3.0 on: choose <strong>Vocello &gt; Check for Updates</strong>, or let it check on its own schedule, a setting you can turn off. Vocello 2.4 and earlier have no updater, so install the 3.2 DMG by hand once.</li>
+        <li>Since 3.1, Vocello uses one model for each mode in place of the Speed and Quality models of 3.0. Updating from 3.1 to 3.2 keeps your installed models with no new download. After the Mac app updates from 3.0, the modes whose models you had installed read Update required and update on their own on an unmetered network (not a personal hotspot or cellular connection, and not in Low Data Mode). A banner shows the progress and offers <strong>Update Now</strong> or <strong>Not Now</strong>. Each mode downloads about 2.2 GB on its own, and all three about 4.7 GB; your earlier models are removed once a new one is ready.</li>
         <li><strong>Not Now</strong> stops the model update. A stopped, cancelled or failed update waits for you: choose Update in Settings, Models &amp; Files. If the disk is too full to keep the earlier models meanwhile, Vocello offers to remove them first, and says so on the button.</li>
         <li>After upgrading from 2.x, History, saved voices and settings carry over, and the models you had installed are replaced the same way. If a mode reads Not installed afterwards, install its model in Settings, Models &amp; Files.</li>
         <li>Check for Updates updates only the app. To update the command line, install the newer <code>Vocello-macos26-cli.pkg</code> from the <a href="https://github.com/PowerBeef/Vocello/releases">Vocello releases</a>; it replaces the previous install. Replace a copied Vocello CLI folder with the newer one. After an update from 3.0, <code>vocello models list</code> marks a mode whose model needs its update, and <code>vocello models install</code> installs the new model and removes the earlier folders.</li>

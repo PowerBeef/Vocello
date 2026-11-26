@@ -1,62 +1,52 @@
-// What's new in Vocello 3.1. Every line restates docs/releases/v3.1.0.md, the
+// What's new in Vocello 3.2. Every line restates docs/releases/v3.2.0.md, the
 // published release notes; change this module only with those notes. The
-// content is 3.1's own, so its version label is literal, not the stable mirror.
+// content is 3.2's own, so its version label is literal, not the stable mirror.
 
-export const WHATS_NEW_VERSION = "3.1";
+export const WHATS_NEW_VERSION = "3.2";
 
 // The release's changes, in the release notes' order. `short` is the home page's
-// one-line summary of each; `v` is the full account. 3.1 is the Mac app's and the
-// command line's release: the iPhone app's 3.1 version follows (IPHONE_NOTE).
+// one-line summary of each; `v` is the full account. 3.2 is the Mac app's and the
+// command line's release: the iPhone app's 3.2 version follows (IPHONE_NOTE).
 export const HIGHLIGHTS = [
   {
-    k: "One improved model per mode",
-    short: "One model per mode replaces Speed and Quality: close to Speed's pace, fewer mistakes on long scripts, and nothing to choose.",
-    v: "Built-in Voice, Voice Design and Voice Cloning each use a single model that keeps the 4-bit model's size and puts its attention layers at 8 bits (about 180 MB more). In Vocello's automated screens it makes fewer mistakes than the 3.0 Speed model on single takes and long projects, finishes more long projects, and clones a voice as closely as Speed did. On the benchmark Mac mini M6 it takes about 9% more time than the 3.0 Speed model and about 27% less than Quality. The Speed/Quality switch and the \"Prefer lower-memory models\" setting are gone, and each mode's package row reads Model.",
+    k: "A leaner, steadier engine",
+    short: "Hoisted predictor plans, fixed-shape GPU masking and Mimi encoder fixes trim warm memory and move median speed to 18 s per minute of speech, with identical audio.",
+    v: "The code predictor's compiled execution plan is hoisted and prewarmed with weights passed as compile inputs so cross-thread MLX compile caches are not retained between takes, talker repetition penalties use a fixed-shape GPU seen-mask, per-step introspection is gated behind diagnostics, Mimi encoder KV retention and causal-mask handling are fixed, and quantization and fusion invariants fail closed. Audio samples are identical to 3.1 on the same seeds; on the benchmark Mac mini M6, warm median real-time factor moves from 0.315 to 0.308 (about 18 seconds to make one minute of speech, down from 19 seconds) with lower warm retained memory.",
   },
   {
-    k: "Your models update themselves",
-    short: "After an update from 3.0, the models you installed update on their own on an unmetered network. Not Now stops it.",
-    v: "After an update from 3.0, the modes whose models you installed read Update required and update on their own on an unmetered network, one or two at a time; a mode you never installed stays a first install. A banner above every page shows the progress, offers Update Now or Not Now, and ends with the space your earlier models freed. Each mode downloads about 2.2 GB on its own; updating all three downloads about 4.7 GB, because the speech tokenizer they share with your earlier models is reused. On a disk too full to keep the earlier models meanwhile, Vocello offers to remove them first, and says so on the button. A cancelled or failed update waits for you to choose Update; Vocello never restarts it on its own.",
+    k: "Smooth live streaming preview",
+    short: "The live preview's elapsed counter and waveform bar now advance smoothly while a clip is still generating, and stay monotonic through the handoff.",
+    v: "Fixed a timer-starvation bug where incoming audio chunks reset the live preview's 3 Hz playhead timer, leaving elapsed time stuck at 0:00 and the waveform bar immobile while a clip was still generating. The elapsed time counter and waveform bar now advance smoothly throughout generation in both Studio and the sidebar player, hold monotonic progress across arriving chunks and the live-to-final handoff, and scrub back immediately once the take finishes.",
   },
   {
-    k: "Voice cloning follows its reference more faithfully",
-    short: "A reference clip is prepared the same way every time: stereo is mixed down and silent edges are trimmed.",
-    v: "A reference clip is prepared the same way every time, a stereo clip is mixed down as the reference implementation does, and silent edges are trimmed. A cloned take that plays while it is generated now hears the reference's own speech first, which in Vocello's screens brought it measurably closer to the reference voice. Chinese and Japanese targets join the reference transcript as the reference implementation joins them.",
+    k: "Long-form, cloning and storage reliability",
+    short: "Unspeakable long-form paragraphs fold cleanly, control-token-only scripts are rejected early, and downloads, outbox writes and output errors are hardened.",
+    v: "Unspeakable or punctuation-only paragraphs in long-form scripts are folded cleanly instead of stalling a segment, scripts containing only control tokens are rejected before generation starts, Korean long-form cautions surface clearly in Studio and the command line, model downloads and History outbox writes are hardened against partial or corrupted state, and an unwritable output folder reports a storage failure instead of an engine fault.",
   },
   {
-    k: "Clearer feedback on references",
-    short: "Saving a voice checks the recording and names what is wrong with it: a low sample rate, near-silence or clipping.",
-    v: "Saving a voice checks the original recording and names what is wrong with it (a low sample rate, near-silence or clipping). A recognized transcript that does not cover the whole clip waits for your review instead of saving as Ready, enrollment asks the recognizer for punctuation, and Use audio only on a saved voice is never overridden by its stored transcript.",
+    k: "Clearer transparency and AI safeguards",
+    short: "Settings adds an AudioSeal watermark disclosure, Terms of Use and Report an Issue links, 10-language impersonation guardrails, and Meta AudioSeal licensing.",
+    v: "Mac Settings > Voice Cloning now includes an AudioSeal watermarking disclosure alongside the jurisdiction-neutral cloning consent note; Settings > Updates links directly to Terms of Use and Report an Issue; voice-imitation guardrails are localized across all ten interface languages; and Meta AudioSeal (MIT) is listed in Open Source & Licenses.",
   },
   {
-    k: "One way to sample a take",
-    short: "The Variation setting is retired: every take samples as the former Expressive did.",
-    v: "The Variation setting is retired: every take samples as the model's reference implementation does (the former Expressive). A saved Balanced or Consistent preference reads as Expressive, and History still shows an older take's recorded variation. In the long-form screens Consistent stopped far more projects than Expressive and showed no benefit.",
+    k: "Same models, no re-download from 3.1",
+    short: "Vocello 3.2 keeps 3.1's single model per mode unchanged, so upgrading from 3.1 downloads only the app and preserves pinned 3.1 seeds.",
+    v: "Pre-registered automated screens evaluated candidate mixed-precision alternatives against the 3.1 models and did not clear the promotion bar, so Vocello 3.2 keeps the single model per mode introduced in 3.1 unchanged. Upgrading from 3.1 downloads only the app and CLI package, and seeds pinned in 3.1 reproduce their takes in 3.2.",
   },
   {
-    k: "A caution for Korean long-form scripts",
-    short: "Studio shows a caution under a long script that Auto sends as Korean, before you start.",
-    v: "Korean long-form projects stop more often than other languages, so Studio shows a caution under a script that Auto sends as Korean, before you start.",
-  },
-  {
-    k: "A leaner, quicker engine",
-    short: "About 315 MB less resident memory and fewer GPU launches per frame, with identical samples. The live preview starts sooner.",
-    v: "About 400 fewer GPU kernel launches per frame and the text embedding read from the model file by row (about 315 MB less resident memory), both with identical samples; the live preview starts sooner; the watermark pass finishes faster, and every long-form segment is joined on the watermark's frame so the joined file reads as marked.",
-  },
-  {
-    k: "Stricter automatic checks",
-    short: "A take far too short for its script fails the audio check, and one that runs on in silence stops after three seconds.",
-    v: "A take far too short for its script now fails Vocello's audio check, silence is judged before the watermark is applied, and a take that runs on in silence stops after three seconds instead of filling its length limit.",
+    k: "Hardened command line and 8 GB coordination",
+    short: "Cleaner forced exits, hardened 8 GB single-engine leases and model-deletion gates, hybrid telemetry, and explicit Korean long-form warnings.",
+    v: "Forced exits use _exit so teardown hooks do not contend with an active engine, 8 GB single-engine host leases and model-deletion gates are hardened, benchmark telemetry records the hybrid quantization tier directly, and long-form scripts sent as Korean emit long_form_korean before model work.",
   },
 ];
 
 // The iPhone app's current status (matches IphoneBeta.jsx): the public
 // TestFlight beta runs 3.0, and the next iPhone release targets 3.2.
 export const IPHONE_NOTE =
-  "The iPhone app's 3.2 version, on the same engine, follows through TestFlight and the App Store. The public TestFlight beta still runs 3.0.";
+  "The iPhone app's 3.2 version, on the same engine and also admitting eligible 8 GB+ iPads in portrait compatibility mode, follows through TestFlight and the App Store. The public TestFlight beta still runs 3.0.";
 
 export const UPGRADE_NOTE =
-  "Upgrading from 3.0? Choose Vocello > Check for Updates, or install the new DMG as usual. History, saved voices and settings carry over. On first launch Vocello replaces the models you installed with 3.0 by the new one for each mode, on its own on an unmetered network: a banner shows the progress, and Not Now stops it. Updating all three modes downloads about 4.7 GB. Upgrading from 2.x? Install the new DMG, then install each mode's new model from Settings > Models & Files.";
+  "Upgrading from 3.1? Choose Vocello > Check for Updates, or install the new DMG as usual. History, saved voices, settings and installed models carry over with no new model download. Upgrading from 3.0? Choose Vocello > Check for Updates; on first launch Vocello replaces your 3.0 models by the one model per mode on an unmetered network (about 4.7 GB for all three; Not Now stops it). Upgrading from 2.x? Install the new DMG by hand once, then install each mode's model from Settings > Models & Files.";
 
 export const QUALITY_NOTE =
-  "Take quality in 3.1 is not verified by human listening. Automated checks catch gross failures (silence, a cut-off or unfinished take, missing words, the wrong language), and a take can still carry subtle defects; generate again for a different take. A seed pinned with 3.0 no longer reproduces its take, because the model changed.";
+  "Take quality in 3.2 is not verified by human listening. Automated checks catch gross failures (silence, a cut-off or unfinished take, missing words, the wrong language), and a take can still carry subtle defects; generate again for a different take. A seed pinned in 3.1 reproduces its take in 3.2; a seed from 3.0 or earlier does not, because the model changed in 3.1.";

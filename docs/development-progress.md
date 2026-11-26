@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-25
+reviewed: 2026-11-26
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -18,75 +18,66 @@ through November 15, `20533a12` holds October 23 to 25, and `a0597deb` every che
 
 ## Resume now
 
-### November 25 (`RF-73` closed, live ASC prep applied, docs & `AGENTS.md` tightened): ready for Phase 4 (`RF-71` Mac/CLI 3.2.0)
+### November 26 (Phase 4 `RF-71` Mac/CLI 3.2.0 pre-tag qualification, live preview fix & publication flip complete on local `main`): ready for maintainer push & signed `v3.2.0` tag
 
-**Workspace & Git state:** Local `main` ahead of `origin/main` `0a63f634` with the pre-3.2
-documentation, `AGENTS.md`, harness, roadmap, website parity, and audit-pruning cleanup commits
-(**unpushed** — awaiting explicit push request), 0 linked worktrees, 0 active builds/tests/benchmarks.
-Phase 3 (`RF-70`, `RF-54`, `RF-57`) is closed with shipped `attn` retained unchanged for 3.2
-(`f070f41a`), and **`RF-73` is closed (`done`)** after full phone-free, physical-iPhone, CI,
-Release rehearsal, Vercel production, and manual macOS verification.
+**Workspace & Git state:** Local `main` ahead of `origin/main` `3dd764c6` with all Phase 4 (`RF-71`)
+Mac/CLI 3.2.0 build `32` commits (**unpushed** — awaiting explicit maintainer push request), 0
+linked worktrees, 0 active builds/tests/benchmarks. Phase 3 (`RF-70`, `RF-54`, `RF-57`) and `RF-73`
+are closed (`done`); `RF-71` is `in-flight` pending maintainer push, CI, signed `v3.2.0` tag,
+`release.yml` draft, and the exact-tag 7-lane Mac promotion sitting.
 
-**Landed & verified milestones (2026-11-25):**
+**Landed & verified Phase 4 milestones (2026-11-26, `3.2.0` build `32`, Xcode `27.2` / Swift `6.4.2`):**
 
-- **`RF-73` App Store 3.2.0 readiness & streamlined AI safeguards (`1363da5c..71dd7d53` on `origin/main`, strictly sample-preserving, `vocello-swift-review` approved on every Swift commit):**
-  - Admitted 13 eligible 8 GB+ M-series / A17 Pro iPads in portrait compatibility mode (`4703237c`,
-    `IOSDeviceEligibilityPolicy`), compiled out dormant Release diagnostics & shipping iOS
-    `QWENVOICE_*` env reads (`QVOICE_DEVICE_DIAGNOSTICS`, Guideline `2.5.19`, enforced by
-    `verify_ios_release_artifacts.py`), enforced `.withoutCloneEncoders`, dropped `UIFileSharingEnabled`.
-  - Localized 10-language `.disallowedVoiceImitation` guardrails (`b896fce1`), scoped `Sparkle` to
-    macOS only, resolved `"pending-qualified-review"` to attested ASR-04 status, added Meta
-    AudioSeal (`MIT`) auxiliary attribution.
-  - Shipped streamlined iOS safeguards (`da5ce80d`, `71dd7d53`): Onboarding Page 3 watermark +
-    Terms/Privacy notice, one-time inline `IOSVoiceCloningConsentSheet` + passive Save Voice
-    reminder (0 extra toggles, 0 Player/History AI badges), 1-tap `IOSStudioSetupPrompt`, dismissible
-    multi-line `errorBar`, `IOSExportPurchaseSheet` contrast/loading-flash fix + 1-tap `Export Now` +
-    `/privacy/` & `/terms/` links, `Settings → Privacy & Permissions` revocation/disclosure/watermark
-    note & `Terms of Use`, `Settings → About → Report an Issue`, path-free localized download/removal
-    errors, and aligned macOS Settings rows.
-  - Published website `/terms/` and updated `/privacy/`, `/support/#report`, `README.md`,
-    `app-store-listing.md`, and `ios-appstore-submission.md` (`9afcbefe`); verified `/terms/`,
-    `/privacy/`, and `/support/` live HTTP `200` on `vocello.vercel.app`.
-  - **Verification:** `scripts/dev.sh check --since 1363da5c` 11/11 stages PASS (52/52 Playwright
-    checks); physical iPhone 4/4 XCUITest lanes PASS + visual QA (`studio-layout`
-    `ios-xcui-smoke-20261125-171558-719509a0`, `purchase exports`
-    `ios-xcui-purchase-20261125-173317-6570050a`, `control-audit external`
-    `ios-xcui-control-audit-20261125-174101-5e0f34ca`, `localization`
-    `ios-xcui-localization-20261125-180114-8f09bdd2`); GitHub **CI** (`45674571446`, 9/9) and
-    **Release rehearsal** (`45674571439`, 4/4) PASS; signed local `build/Vocello.app` manually verified.
-- **App Store Connect read-only audit & authorized updates (`RF-62`, `ASR-11`, verified via readback):**
-  - **Territories (`148 → 147`):** excluded China Mainland (`CHN`) on both app and export IAP
-    (`com.patricedery.vocello.design_clone_export`); readback verified identical **147** territories
-    (27 EU + `CHN` excluded; South Korea `KOR` kept; `availableInNewTerritories: true`).
-  - **Privacy Policy URL:** updated `en-US` App Info localization to `https://vocello.vercel.app/privacy/`
-    and verified readback (`supportUrl` already `https://vocello.vercel.app/support/`).
-  - **Age Rating (`4+ → 13+`):** raised `ageRatingOverride` and `ageRatingOverrideV2` to
-    `THIRTEEN_PLUS` (`territoryAgeRatings` read back `THIRTEEN_PLUS`). Apple's two Nov 16
-    descriptors (`sharedLocation`, `datingAndRelationships`) still read back `null` because `asc`
-    v7.4.0 lacks CLI flags for them — 2 web-portal clicks (`No`/`No`) remain to close `RF-62`.
-  - **Remaining ASC gaps:** version `3.0.0` (`PREPARE_FOR_SUBMISSION`, 0 screenshot sets); export IAP
-    `MISSING_METADATA` (0 review screenshot uploaded + `RF-02` Paid Apps pending).
-- **Pre-3.2 documentation, `AGENTS.md` & context cleanup:**
-  - Tightened `AGENTS.md` by ~30% (19.7 KB → 13.7 KB), synced `.agents/` rules/skills/agents/workflows,
-    fixed P0 `Terms of Use` Settings path (`Settings → Privacy & Permissions`) in paste-ready App
-    Review Notes, unblocked `RF-71`/`RF-12` from `RF-68`'s Phase 5 iPhone proof, fixed live website
-    `whatsnew.js` `IPHONE_NOTE` (`"3.1" → "3.2"`), synced all active iOS/macOS/runtime/QC/package
-    reference docs, pruned 26 historical `docs/audits/*.md` files (−1.12 MiB, preserved in git
-    history) and 518 lines of obsolete checkpoints here, and verified zero broken links and clean
-    contracts/hooks.
-- **Disk cache note:** `python3 scripts/build_cleanup.py --qc-v1 --yes` reclaimed `0 B` because QC v2
-  hard-links both 6.67 GiB ASR weights in `build/cache/delivery-analysis`.
+- **Version bump & contracts (`90933c27`):** bumped `project.yml` to `MARKETING_VERSION: "3.2.0"`,
+  `CURRENT_PROJECT_VERSION: "32"` (`release_build_number.py check --tag v3.2.0` PASS: `32 > 31`),
+  updated `third-party-attribution-policy.json`, `third_party_attributions.json`, all 8 CLI v1
+  contract examples, and regenerated `QwenVoice.xcodeproj/project.pbxproj`.
+- **Headless Mac 3.2.0 benchmarks & gates (`7ca406b1`..`58bd3678`):**
+  - Reseeded `benchmarks/baselines/mac-gate-bench.json` from 3 consecutive clean runs on `90933c27`
+    for `RF-69`'s `.hybrid` telemetry tier (warm RTF `0.289`, first chunk `166.0 ms`, MLX peak
+    `2227.1 MB`) and passed confirming `gate` (`mac-gate-bench-20261126-081917-fa2d5c2c`, warm RTF
+    `0.2892` / `+0.05%`).
+  - Retained-memory qualification PASS (`mac-memory-qualification-20261126-082054-c3f4d2b1`;
+    Built-in peak `2.34 GiB`, Design `2.79 GiB`, Clone `4.12 GiB`, warm retained `2.87 GiB`).
+  - 10-language benchmark PASS (`mac-lang-bench-20261126-082230-51d3f1ff`; 23/23 takes, `hint_gate`
+    & `spoken_content` PASS, same 2 advisory Spanish cadence warnings as 3.1).
+  - Delivery benchmark PASS (`macos-engine-20261126-082625-fc1f5bbc`; 5/5 takes, 0 warnings).
+  - `macos_test.sh release-readiness` PASS (`release-readiness-20261126-114535`; 39/39 contracts,
+    full Python suite, signed `Vocello.app`, Core/Runtime tests, 0 crashes).
+- **Live streaming preview playhead fix (`072d1bd7`, `Reviewed-by: vocello-swift-review`) & Mac UI acceptance (`7e20e070`..`78e91cb5`):**
+  - Fixed live preview playhead timer starvation (idempotent `startTimer()` + guarded
+    `appendLiveChunk`) and monotonic progress across chunk arrivals and `.live → .complete` handoff
+    in `AudioPlayerViewModel`, `MacStudioPlayerCard`, and `MacInlinePlayerCard` (14/14 unit tests).
+  - Added lane-owned `QWENVOICE_MODEL_UPDATE_AUTOSTART` to `LANE_OWNED_RUNTIME_OVERRIDES`
+    (`7e20e070`).
+  - **UI benchmark PASS** (`macos-xcui-benchmark-20261126-154113-ea3610e8` on `072d1bd7`, paired
+    with `a9057aef`; 29/29 takes, 0 refused, max stall `250 ms` vs `600 ms`, warm median RTF
+    `0.308`; pooled chart medians: Built-in `0.29–0.36`, Design `0.29–0.34`, Cloning `0.29–0.38`).
+  - **UI performance PASS** (`macos-xcui-perf-20261126-155321-3e754107`; 12/12 scenarios).
+  - **UI smoke PASS** (`macos-xcui-smoke-20261126-162431-d223bac9`; 16/16 tests, 1/1 playback
+    capture, 3-segment long-form `149.6 s` in `46.1 s` / RTF `0.31` / `-5.18%` footprint growth),
+    including new real-app `test03_GenerationCancellation` assertions and visually verified
+    screenshots (`045-mac-smoke-live-preview-advancing.png`, `046-mac-smoke-sidebar-live-advancing.png`)
+    confirming the elapsed timer and golden waveform bars advance smoothly while generating.
+- **Publication flip (local `main`, pre-tag):** authored frontmatter-free `docs/releases/v3.2.0.md`,
+  flipped `config/public-product-facts.json` to `3.2.0` / `v3.2.0`, regenerated all 23 `docs/readme/`
+  SVGs (`performance.svg` `18 s` per minute of speech, `2.5–4.3 GB` peak memory), updated
+  `README.md` and `website/` (`/`, `/cli/`, `/engineering/`, `/privacy/`, `/support/`).
 
-**Next — Phase 4 (`RF-71` Mac/CLI 3.2.0) & Phase 5 (`v3.2.0-ios.1` → `RF-16`):**
+**Next — Remaining Phase 4 (`RF-71` push/tag/promotion) & Phase 5 (`v3.2.0-ios.1` → `RF-16`):**
 
-1. **Maintainer web-portal items (anytime before submission):** activate Paid Apps Agreement +
+1. **Maintainer push & tag (`RF-71`):** push local `main` → watch `CI required` green → maintainer
+   creates & pushes signed `v3.2.0` tag (`git tag -s v3.2.0 <sha> && git push origin v3.2.0`) and
+   approves `release.yml` (`package` & `sparkle-feed` jobs) to produce the verified draft release.
+2. **Exact-tag Mac promotion sitting (`RF-71`):** on clean `v3.2.0` tag checkout, run the 7
+   required Mac promotion lanes (with explicit authorization for the ~2.23 GB
+   `macos-model-download-lifecycle` download) + `cli_package.py qualify` on the signed CLI candidate
+   → assemble & upload `quality-promotion.json` → maintainer approves `promote-release.yml` → close
+   `RF-71`.
+3. **Maintainer web-portal items (anytime before iOS submission):** activate Paid Apps Agreement +
    tax/banking (`RF-02`, active 24h+ before submit) and set `Shared Location = No` / `Dating and
    Relationships = No` in App Store Connect Age Rating (`RF-62`).
-2. **Phase 4 (`RF-71` — Mac/CLI 3.2.0):** quiet-Mac `mac-gate-bench.json` reseed (`>= 3` clean runs
-   with `QWENVOICE_GATE_BENCH_SEED=1 scripts/macos_test.sh gate`, `QVOICE_LEAD_ONLY=1`), bump
-   `project.yml` (`3.2.0` / build `34`) + contracts + `docs/releases/v3.2.0.md`, push on go → CI →
-   signed `v3.2.0` tag & 7-lane Mac promotion sitting.
-3. **Phase 5 (`v3.2.0-ios.1` → `RF-16`):** Cut `v3.2.0-ios.1` → grouped iPhone window
+4. **Phase 5 (`v3.2.0-ios.1` → `RF-16`):** Cut `v3.2.0-ios.1` → grouped iPhone window
    (`RF-68`/`RF-15`/`RF-17` + `RF-72` 30-take audit + 6.3-inch screenshots + `RF-66` demo video) →
    AWS Device Farm iPhone 15 Pro (`RF-65`) → remaining authorized ASC updates (`3.2.0`, screenshots,
    IAP review screenshot + attach, `RF-63` Review Notes, `RF-62` Nov 16 readback) → `ASR-09` 24h

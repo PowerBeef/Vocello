@@ -1,4 +1,4 @@
-// The vocello command line, as docs/releases/v3.1.0.md and docs/reference/cli.md
+// The vocello command line, as docs/releases/v3.2.0.md and docs/reference/cli.md
 // describe it. Commands are copied from those documents (their examples and the
 // install, uninstall and MCP lines); change them only with the CLI reference.
 

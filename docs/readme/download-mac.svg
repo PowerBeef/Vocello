@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="236" height="56" viewBox="0 0 236 56" role="img" aria-labelledby="title desc">
-<title id="title">Download Vocello 3.1.0 for macOS 26 or newer</title>
-<desc id="desc">Download Vocello 3.1.0 for macOS 26 or newer</desc>
+<title id="title">Download Vocello 3.2.0 for macOS 26 or newer</title>
+<desc id="desc">Download Vocello 3.2.0 for macOS 26 or newer</desc>
 <rect x="0.5" y="0.5" width="235" height="55" rx="27.5" fill="#EDCC8A" stroke="#B5832E" stroke-opacity="0.55"/>
 <g transform="translate(24 16) scale(1)" fill="none" stroke="#16181E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7.5 11l4.5 4.5 4.5-4.5"/><path d="M5 20h14"/></g>
 <text x="60" y="25" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="16" font-weight="600" fill="#16181E">Download for Mac</text>
-<text x="60" y="42" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#16181E" fill-opacity="0.72">Vocello 3.1.0 · macOS 26+</text>
+<text x="60" y="42" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12" font-weight="500" fill="#16181E" fill-opacity="0.72">Vocello 3.2.0 · macOS 26+</text>
 </svg>

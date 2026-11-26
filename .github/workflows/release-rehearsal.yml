@@ -60,6 +60,7 @@ on:
       - scripts/verify_ios_release_archive.sh
       - scripts/check_ios_catalog.sh
       - scripts/ios_candidate_tag.py
+      - scripts/release_tag.py
 
 permissions:
   contents: read

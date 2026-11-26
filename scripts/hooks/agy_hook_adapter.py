@@ -308,6 +308,13 @@ def _check_ask_command(raw_head: str, name: str, args: list[str], operands: list
             "force_ask",
             "`scripts/ios_candidate_tag.py` signs and pushes a TestFlight candidate tag; confirm before running (AGENTS.md: Main is the only published branch).",
         )
+    if _matches_repo_script(raw_head, "scripts/release_tag.py"):
+        if "--dry-run" in args or "--help" in args or "-h" in args:
+            return "allow", ""
+        return (
+            "force_ask",
+            "`scripts/release_tag.py` signs and pushes a release tag; confirm before running (AGENTS.md: Main is the only published branch).",
+        )
     if _matches_repo_script(raw_head, "scripts/macos_test.sh") and operands[:2] in (["models", "install"], ["models", "ensure"]):
         return "ask", "Model download/install requires explicit maintainer authorization (AGENTS.md: Specific authorization)."
     if _matches_repo_script(raw_head, "scripts/ui_test.sh") and "model-download" in operands:

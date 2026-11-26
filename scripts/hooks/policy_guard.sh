@@ -83,7 +83,7 @@ if [[ -n "$git_violation" ]]; then
         "Push fast-forward commits only; CI required protects main." ;;
     push|config)
       block "$reason; only main is ever pushed (AGENTS.md: Main is the only published branch)." \
-        "Integrate agent branches into main locally, then push main; release tags are maintainer-run, and iPhone TestFlight candidates go through scripts/ios_candidate_tag.py." ;;
+        "Integrate agent branches into main locally, then push main; public release tags go through scripts/release_tag.py and iPhone TestFlight candidates go through scripts/ios_candidate_tag.py." ;;
     staging)
       block "$reason (AGENTS.md: stage explicit paths, never stash or broadly stage)." \
         "Stage the assigned files by name (git add <path> ...) and commit the index; set work aside with a commit on the branch, never the stash." ;;

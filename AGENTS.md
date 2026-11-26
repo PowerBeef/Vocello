@@ -118,9 +118,10 @@ Lane notes:
   - **Post-freeze commits** (`focusLock.freeze`) must name a release item in their subject.
   Rules: `docs/reference/release-first-execution-2026-09.md`.
 - **Main is the only published branch:** commit on local `main`; push only `main`, fast-forward, on
-  explicit request. No hand-made branches/worktrees, ref rewrites or force pushes. Release tags are
-  maintainer-run, except `python3 scripts/ios_candidate_tag.py` on request after `main` is pushed
-  and CI passes.
+  explicit request. No hand-made branches/worktrees, ref rewrites or force pushes. Release tags go
+  through `python3 scripts/release_tag.py` (public `v<x.y.z>`) or
+  `python3 scripts/ios_candidate_tag.py` (`v<x.y.z>-ios.<n>`) on explicit maintainer request after
+  `main` is pushed and CI passes (both `force_ask`-gated).
 - **Subagents and worktrees:** max 4 active including lead; editing workers inherit lead's model
   (read-only research may use a lighter tier). Lead stays on main checkout. Editing workers
   (`Workspace: "share"` / `swarm(..., workspace: "share")`) use registered `subagent-*`/`swarm-*`

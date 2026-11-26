@@ -1200,6 +1200,12 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-11-26 | [`mac-lang-bench-20261126-082230-51d3f1ff`](runs/language/mac-lang-bench-20261126-082230-51d3f1ff.json) | focused | focused | passedWithWarnings | qualified | 23 | 0.29 | `77a9a15810be` | `fb223fa1cf9f` | baseline | mac-lang-bench-20261126-082230-51d3f1ff |
 
+## memory-qualification / ios / iphone-17-pro / config `051fab1a9b47`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-26 | [`ios-memory-qualification-20261126-191012-6d5ced96`](runs/memory-qualification/ios-memory-qualification-20261126-191012-6d5ced96.json) | focused | focused | passed | qualified | 9 | 0.55 | `79392a080ec5` | `051fab1a9b47` | baseline | ios-memory-qualification-20261126-191012-6d5ced96 |
+
 ## memory-qualification / ios / iphone-17-pro / config `538f1168d01a`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

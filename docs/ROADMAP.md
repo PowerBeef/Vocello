@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 59/96 (61%) |
+| `release-first-3-0-2026-09` | active | release-qa | 60/96 (62%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 13/17 (76%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -143,7 +143,7 @@ Needs the maintainer present: a permission prompt, a keychain or password, a rel
 - `RF-63` (planned) Fit the 3.2 App Review notes into 4,000 UTF-8 bytes
 - `RF-71` (in-flight) Ship Vocello and the vocello CLI 3.2 on the Mac (also: Mac, remotely)
 
-### iPhone (62)
+### iPhone (61)
 
 Needs the paired iPhone, in a window the maintainer announces.
 
@@ -207,7 +207,6 @@ Needs the paired iPhone, in a window the maintainer announces.
 - `RF-59` (planned) One model: the attn hybrid replaces Speed and Quality, and the model selector is retired
 - `RF-65` (planned) Measure the shipped hybrid on an iPhone 15 Pro
 - `RF-66` (planned) Record a demo video of the shipping flow on a physical iPhone
-- `RF-68` (in-flight) Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance
 - `VLR-07` (parked) Complete physical-device closure and publish the privacy-safe report
 
 ## Vocello 3.2 — Pack B/C engine upgrades, the 3.2 Mac and CLI release, and the iOS App Store submission
@@ -255,7 +254,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-63` | planned | Fit the 3.2 App Review notes into 4,000 UTF-8 bytes | `RF-73` |
 | `RF-65` | planned | Measure the shipped hybrid on an iPhone 15 Pro | — |
 | `RF-66` | planned | Record a demo video of the shipping flow on a physical iPhone | — |
-| `RF-68` | in-flight | Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance | — |
 | `RF-71` | in-flight | Ship Vocello and the vocello CLI 3.2 on the Mac | `RF-69`, `RF-70`, `RF-72`, `RF-73` |
 
 ### Open items in detail
@@ -369,9 +367,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-66`** (planned) — Record a demo video of the shipping flow on a physical iPhone.
   gate: A screen recording from a signed candidate on a physical iPhone shows first launch, the download size prompt, the download, a take, the cloning consent screen and the export purchase, with no claim the status bar contradicts, and it is attached or linked for App Review.
-
-- **`RF-68`** (in-flight) — Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance.
-  gate: With bit-identical fixed-seed PCM digests (scripts/pcm_identity.py) across Custom, Design and Clone: eliminate one-shot MLX Error::check() double-eval consumption in Qwen3TTS and AudioSealGenerator via a single try evalForReadback(...); replace silent try? BaseConfiguration quantization fallback with explicit parse errors, [.noUnusedKeys, .shapeMismatch] weight verification and fused projection logging; fix A-08 Mimi encoder KV retention and super-linear concatenation growth with per-encode local caches; replace A-27's 16.8 MB square decoder causal mask with a rectangular [seqLen, totalLen] mask; hoist and prewarm CodePredictorCompiledPlan across takes (dropping the 10 unused KV buffers), telemetry-gate per-frame introspectionStepScalars, deduplicate back-to-back cache clears and evaluate AudioSeal weight caching (H2) or lazy repetition penalty (A3) only where memory-neutral and bit-identical; land minor package hygiene (streaming tensor rank, control-token-only clone refText, validateChatTemplateTokenCount, mixed-precision sibling check). Verified by VocelloCoreTests, Qwen3RuntimeTests, vocello-swift-review, Mac benchmark/memory lanes and an announced iPhone check.
 
 - **`RF-71`** (in-flight) — Ship Vocello and the vocello CLI 3.2 on the Mac.
   gate: Vocello and the vocello CLI 3.2.0 are public on the Mac. Before the tag: MARKETING_VERSION 3.2.0 with a build number above the last release tag's; Mac benchmark, memory, language and UI-perf lanes recorded on the 3.2 engine (and reseeded baselines/lineage if RF-70 updates model artifacts or alters samples); docs/releases/v3.2.0.md passes check_release_notes.py; README charts, website copy/numbers and config/public-product-facts.json describe 3.2; push CI, release rehearsal, full macOS smoke and engine bench pass on the release commit. Then the maintainer's signed v3.2.0 tag builds a verified draft through release.yml; the macOS promotion lanes and signed CLI qualification pass on the tag checkout; the maintainer promotes the release and the website deploys with it.

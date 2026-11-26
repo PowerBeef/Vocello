@@ -670,26 +670,6 @@
       "notes": "Opened 2026-11-16 from two external audits of the 3.1.0 tree, each claim re-checked against the code and Apple's current pages. No demo video exists (gap G5 of the 2026-11-04 audit). It pre-empts the most likely Guideline 2.1 round, a reviewer who cannot see the model download or the consent gate. The screenshots from the same build stay under ASR-05."
     },
     {
-      "id": "RF-68",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance",
-      "status": "in-flight",
-      "blockedBy": [],
-      "gate": "With bit-identical fixed-seed PCM digests (scripts/pcm_identity.py) across Custom, Design and Clone: eliminate one-shot MLX Error::check() double-eval consumption in Qwen3TTS and AudioSealGenerator via a single try evalForReadback(...); replace silent try? BaseConfiguration quantization fallback with explicit parse errors, [.noUnusedKeys, .shapeMismatch] weight verification and fused projection logging; fix A-08 Mimi encoder KV retention and super-linear concatenation growth with per-encode local caches; replace A-27's 16.8 MB square decoder causal mask with a rectangular [seqLen, totalLen] mask; hoist and prewarm CodePredictorCompiledPlan across takes (dropping the 10 unused KV buffers), telemetry-gate per-frame introspectionStepScalars, deduplicate back-to-back cache clears and evaluate AudioSeal weight caching (H2) or lazy repetition penalty (A3) only where memory-neutral and bit-identical; land minor package hygiene (streaming tensor rank, control-token-only clone refText, validateChatTemplateTokenCount, mixed-precision sibling check). Verified by VocelloCoreTests, Qwen3RuntimeTests, vocello-swift-review, Mac benchmark/memory lanes and an announced iPhone check.",
-      "sourceOfTruth": [
-        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
-        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift",
-        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSConfig.swift",
-        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSLoading.swift",
-        "Packages/VocelloQwen3Core/Sources/MLXAudioMark/AudioSealGenerator.swift"
-      ],
-      "needs": [
-        "iphone"
-      ],
-      "updated": "2026-11-23",
-      "notes": "Mac work done 2026-11-23 (574d58d8..9d572dfb, all Reviewed-by: vocello-swift-review): B1.1-B1.6 + narrow A3 GPU seenMask (3852e8c7; H2 and full speculative A3 deferred per D2) + compile(inputs: [weightInputs]) fixing a caught 180.2 MiB/switch cross-thread MLX CompileCache leak (87d6a4b0). Proven bit-identical 14/14 PCM takes vs pre-pack-b (post-pack-b-final-20261123-181128: host CPU -3.56%, custom/short -2.74% RTF / -9 ms first chunk) and Mac memory qualified (mac-memory-qualification-20261123-180900-4b639d73 PASS: 0 MB cross-model leak, Clone cold MLX peak -16.0 MB to 3749.3 MB / physFoot 3452.3 MB, warm RTF 0.28/0.28/0.30). Remaining gate: physical-iPhone memory and benchmark proof."
-    },
-    {
       "id": "RF-71",
       "plan": "release-first-3-0-2026-09",
       "title": "Ship Vocello and the vocello CLI 3.2 on the Mac",

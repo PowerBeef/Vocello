@@ -6919,6 +6919,28 @@
         "run:ios-xcui-control-audit-20261125-174101-5e0f34ca",
         "run:ios-xcui-localization-20261125-180114-8f09bdd2"
       ]
+    },
+    {
+      "id": "RF-68",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "With bit-identical fixed-seed PCM digests (scripts/pcm_identity.py) across Custom, Design and Clone: eliminate one-shot MLX Error::check() double-eval consumption in Qwen3TTS and AudioSealGenerator via a single try evalForReadback(...); replace silent try? BaseConfiguration quantization fallback with explicit parse errors, [.noUnusedKeys, .shapeMismatch] weight verification and fused projection logging; fix A-08 Mimi encoder KV retention and super-linear concatenation growth with per-encode local caches; replace A-27's 16.8 MB square decoder causal mask with a rectangular [seqLen, totalLen] mask; hoist and prewarm CodePredictorCompiledPlan across takes (dropping the 10 unused KV buffers), telemetry-gate per-frame introspectionStepScalars, deduplicate back-to-back cache clears and evaluate AudioSeal weight caching (H2) or lazy repetition penalty (A3) only where memory-neutral and bit-identical; land minor package hygiene (streaming tensor rank, control-token-only clone refText, validateChatTemplateTokenCount, mixed-precision sibling check). Verified by VocelloCoreTests, Qwen3RuntimeTests, vocello-swift-review, Mac benchmark/memory lanes and an announced iPhone check.",
+      "sourceOfTruth": [
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTS.swift",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSSpeechTokenizer.swift",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSConfig.swift",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioTTS/Models/Qwen3TTS/Qwen3TTSLoading.swift",
+        "Packages/VocelloQwen3Core/Sources/MLXAudioMark/AudioSealGenerator.swift"
+      ],
+      "updated": "2026-11-26",
+      "notes": "Mac work done 2026-11-23 (574d58d8..9d572dfb, all Reviewed-by: vocello-swift-review): B1.1-B1.6 + narrow A3 GPU seenMask (3852e8c7; H2 and full speculative A3 deferred per D2) + compile(inputs: [weightInputs]) fixing a caught 180.2 MiB/switch cross-thread MLX CompileCache leak (87d6a4b0). Proven bit-identical 14/14 PCM takes vs pre-pack-b (post-pack-b-final-20261123-181128: host CPU -3.56%, custom/short -2.74% RTF / -9 ms first chunk) and Mac memory qualified (mac-memory-qualification-20261123-180900-4b639d73 PASS: 0 MB cross-model leak, Clone cold MLX peak -16.0 MB to 3749.3 MB / physFoot 3452.3 MB, warm RTF 0.28/0.28/0.30). Remaining gate: physical-iPhone memory and benchmark proof. 2026-11-26: Physical-iPhone 3.2.0 build 32 proof complete on iPhone 17 Pro: canonical 29-take UI benchmark ios-xcui-benchmark-20261126-185008-141ece72 (PASS, 0 refused, warm median RTF 0.554, peak phys 2.31/2.75/3.56 GB) and retained-memory qualification ios-memory-qualification-20261126-191012-6d5ced96 (PASS, 0 warnings, Custom 2297->1855 MB, Design 2096->1851 MB, Clone 3554->2102 MB).",
+      "evidence": [
+        "commit:79392a08",
+        "benchmark:ios-xcui-benchmark-20261126-185008-141ece72",
+        "benchmark:ios-memory-qualification-20261126-191012-6d5ced96"
+      ]
     }
   ]
 }

@@ -20,6 +20,12 @@ inputs:
       another ref wrote must never reach a job that signs or packages a release.
     required: false
     default: "true"
+  toolchain-group:
+    description: >-
+      Toolchain group in config/toolchain.json to select Xcode from and validate
+      ("native" for Xcode 27.2 builds, "codeql" for Xcode 26.6 Swift CodeQL tracing).
+    required: false
+    default: "native"
 runs:
   using: composite
   steps:
@@ -38,9 +44,17 @@ runs:
       env:
         INSTALL_METAL: ${{ inputs.metal }}
         INSTALL_RELEASE_TOOLS: ${{ inputs.release-tools }}
+        TOOLCHAIN_GROUP: ${{ inputs.toolchain-group }}
       run: |
         set -euo pipefail
-        XCODE_PIN="$(python3 -c "import json; print(json.load(open('config/toolchain.json'))['native']['xcode']['version'])")"
+        case "$TOOLCHAIN_GROUP" in
+          native|codeql) ;;
+          *)
+            echo "error: unsupported toolchain-group '$TOOLCHAIN_GROUP' (expected native or codeql)" >&2
+            exit 2
+            ;;
+        esac
+        XCODE_PIN="$(python3 -c "import json, os; print(json.load(open('config/toolchain.json'))[os.environ['TOOLCHAIN_GROUP']]['xcode']['version'])")"
         sudo xcode-select -s "/Applications/Xcode_${XCODE_PIN}.app"
         xcodebuild -version
         swift --version
@@ -56,11 +70,11 @@ runs:
         echo "$HOME/.qwenvoice-pinned-tools/bin" >> "$GITHUB_PATH"
         export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
         if [[ "$INSTALL_METAL" == "true" ]] && ! xcrun metal --version >/dev/null 2>&1; then
-          # Xcode 27 ships Metal as an optional component and fresh runner
+          # Xcode ships Metal as an optional component and fresh runner
           # images do not consistently include it; MLX compiles Metal sources.
           xcodebuild -downloadComponent metalToolchain
         fi
-        python3 scripts/supply_chain_contract.py --installed native
+        python3 scripts/supply_chain_contract.py --installed "$TOOLCHAIN_GROUP"
         if [[ "$INSTALL_RELEASE_TOOLS" == "true" ]]; then
           # The runner image's own gh drifts (2.100.0 against the 2.96.0 pin
           # broke the release group), so release jobs use SHA-pinned copies.

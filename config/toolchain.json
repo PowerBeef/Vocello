@@ -68,6 +68,22 @@
       ]
     }
   },
+  "codeql": {
+    "xcode": {
+      "version": "26.6",
+      "versionCommand": [
+        "xcodebuild",
+        "-version"
+      ]
+    },
+    "swift": {
+      "version": "6.3.3",
+      "versionCommand": [
+        "swift",
+        "--version"
+      ]
+    }
+  },
   "npmPins": {
     "pyright": {
       "version": "1.1.414"

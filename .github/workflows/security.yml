@@ -2,9 +2,16 @@ name: Security
 
 # Weekly and on-demand security analysis, and the exact-tag run release.yml
 # calls before it authorizes a candidate. Not per push: Swift CodeQL rebuilds
-# the whole graph and takes about an hour on an xcode-27 runner, which is not a
+# the whole graph and takes about an hour on a macos-26 runner, which is not a
 # useful signal on every trunk commit. `Security required` remains the stable
 # aggregate name.
+#
+# Swift CodeQL stays pinned to macos-26 / Xcode 26.6 (`config/toolchain.json`
+# `codeql` group) while all build/test/release workflows run on xcode-27 /
+# Xcode 27.2: Apple removed Intel (x86_64) slices from system/developer
+# binaries on macOS 27 / Xcode 27 and CodeQL does not support traced Swift 6.4
+# extraction (`posix_spawn error: Bad CPU type in executable (86)` on
+# xcode-27, runs 45471740616 and 45870657481).
 on:
   schedule:
     - cron: '23 8 * * 2'
@@ -55,7 +62,7 @@ jobs:
             runner: ubuntu-24.04
           - language: swift
             build-mode: manual
-            runner: xcode-27
+            runner: macos-26
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     permissions:
@@ -74,13 +81,14 @@ jobs:
         uses: ./.github/actions/native-toolchain
         with:
           metal: "true"
+          toolchain-group: "codeql"
           # release.yml calls this workflow on the tag: a tag run restores no cache.
           pip-cache: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
       - name: Prepare Swift CodeQL build inputs
         if: matrix.language == 'swift'
         run: |
-          # Prebuild the full graph natively so Xcode 27's optional Metal
+          # Prebuild the full graph natively so Xcode 26.6's optional Metal
           # compiler materializes and validates MLX shader outputs in managed
           # CI scratch before CodeQL's translated tracing shell starts. The
           # traced command below reuses that scratch graph and invalidates only
@@ -96,11 +104,11 @@ jobs:
       - name: Build Swift targets for CodeQL
         if: matrix.language == 'swift'
         run: |
-          # CodeQL's tracing shell currently runs through Rosetta on the ARM
-          # xcode-27 image. Keep the owned-Swift rebuild inside that shell so
-          # the extractor sees it, while reusing native Metal/dependency outputs
-          # and emitting only arm64 products through ARCHS=arm64. Neither
-          # command stages public output.
+          # CodeQL's tracing shell runs through Rosetta on the ARM macos-26
+          # image (Xcode 26.6 / Swift 6.3.3). Keep the owned-Swift rebuild
+          # inside that shell so the extractor sees it, while reusing native
+          # Metal/dependency outputs and emitting only arm64 products through
+          # ARCHS=arm64. Neither command stages public output.
           ./scripts/build.sh codeql
 
       - name: Analyze

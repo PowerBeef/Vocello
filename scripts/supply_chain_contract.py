@@ -149,9 +149,23 @@ def validate(root: Path, installed: str | None = None) -> list[str]:
                 errors.append(f"website/package.json is missing the deterministic {command} script")
 
     if installed:
-        groups = ("native", "release", "website") if installed == "all" else (installed,)
-        for group in groups:
-            for name, spec in manifest.get(group, {}).items():
+        if installed == "codeql":
+            codeql_entries = manifest.get("codeql", {})
+            if not isinstance(codeql_entries, dict) or "xcode" not in codeql_entries or "swift" not in codeql_entries:
+                errors.append("config/toolchain.json: missing codeql.xcode or codeql.swift entry")
+                group_specs: list[tuple[str, dict]] = []
+            else:
+                shared_native = {
+                    name: spec
+                    for name, spec in manifest.get("native", {}).items()
+                    if name not in ("xcode", "swift")
+                }
+                group_specs = [("codeql", {**shared_native, **codeql_entries})]
+        else:
+            groups = ("native", "release", "website") if installed == "all" else (installed,)
+            group_specs = [(group, manifest.get(group, {})) for group in groups]
+        for group, entries in group_specs:
+            for name, spec in entries.items():
                 command = spec.get("versionCommand")
                 expected = spec.get("version")
                 if not isinstance(command, list) or not expected:
@@ -214,7 +228,7 @@ def sync_actions(root: Path) -> tuple[list[str], list[str]]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
-    parser.add_argument("--installed", choices=("native", "release", "website", "all"))
+    parser.add_argument("--installed", choices=("native", "codeql", "release", "website", "all"))
     parser.add_argument(
         "--sync-actions", action="store_true",
         help="copy the workflows' action SHAs and version comments into config/toolchain.json, then validate",

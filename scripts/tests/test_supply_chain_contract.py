@@ -116,6 +116,45 @@ class SupplyChainContractTests(unittest.TestCase):
         finally:
             module._tool_output = original
 
+    def test_codeql_installed_group_validates_codeql_xcode_and_shared_native_tools(self) -> None:
+        manifest = {
+            "schemaVersion": 1,
+            "native": {
+                "xcode": {"version": "27.2", "versionCommand": ["xcodebuild", "-version"]},
+                "swift": {"version": "6.4.2", "versionCommand": ["swift", "--version"]},
+                "xcodegen": {"version": "2.46.0", "versionCommand": ["xcodegen", "--version"]},
+            },
+            "codeql": {
+                "xcode": {"version": "26.6", "versionCommand": ["xcodebuild", "-version"]},
+                "swift": {"version": "6.3.3", "versionCommand": ["swift", "--version"]},
+            },
+            "release": {},
+            "website": {},
+            "actions": {
+                "actions/checkout": {"version": "v4", "sha": self.sha},
+                "actions/upload-artifact": {"version": "v4", "sha": self.sha},
+            },
+        }
+        (self.root / "config/toolchain.json").write_text(json.dumps(manifest), encoding="utf-8")
+        original = module._tool_output
+        try:
+            outputs = {
+                ("xcodebuild", "-version"): "Xcode 26.6\nBuild version 17F113\n",
+                ("swift", "--version"): "Apple Swift version 6.3.3\n",
+                ("xcodegen", "--version"): "Version: 2.46.0\n",
+            }
+            module._tool_output = lambda command: outputs[tuple(command)]
+            self.assertEqual(module.validate(self.root, "codeql"), [])
+            outputs[("xcodebuild", "-version")] = "Xcode 27.2\n"
+            errors = module.validate(self.root, "codeql")
+            self.assertTrue(any("xcode: expected 26.6" in e for e in errors), errors)
+            outputs[("xcodebuild", "-version")] = "Xcode 26.6\n"
+            outputs[("xcodegen", "--version")] = "Version: 2.45.4\n"
+            errors = module.validate(self.root, "codeql")
+            self.assertTrue(any("xcodegen: expected 2.46.0" in e for e in errors), errors)
+        finally:
+            module._tool_output = original
+
     def write_sparkle(self, artifact_version: str | None, package_version: str | None, url: str | None = None) -> None:
         manifest = json.loads((self.root / "config/toolchain.json").read_text())
         if artifact_version is not None:

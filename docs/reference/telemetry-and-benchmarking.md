@@ -295,7 +295,8 @@ engine row's `runtimeDebugProvenance.activeOverrideKeys` always names the lane's
 IDs and observability keys, which change nothing. A key of a registry group that needs the master
 gate is armed unless the lanes own it (`LANE_OWNED_RUNTIME_OVERRIDES` in
 `scripts/publish_benchmark_history.py`: isolated storage, the benchmarks' cold flag and seed
-policy, warm-up suppression, the CLI bench's preview switch, the ui-perf probe and History seed)
+policy, warm-up suppression, the Mac UI lanes' model-update auto-start guard, the CLI bench's
+preview switch, the ui-perf probe and History seed)
 or it simulates a memory tier the rows stamp as forced, which is exploratory. The engine,
 language and iPhone engine publishers and the macOS and iPhone UI benchmark checkers write the
 armed keys of the run's selected engine rows into `benchmark-evidence.json`

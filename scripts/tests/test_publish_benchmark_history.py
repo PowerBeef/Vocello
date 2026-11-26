@@ -1534,7 +1534,7 @@ class PublisherTests(unittest.TestCase):
             "QVOICE_IOS_DEVICE_RUN_ID", "QVOICE_MAC_BENCH_RUN_ID", "QWENVOICE_NATIVE_TELEMETRY_MODE",
             "QWENVOICE_BENCH_FORCE_COLD", "QWENVOICE_BENCH_SEED_CELLS", "QWENVOICE_BENCH_SEED_POLICY",
             "QWENVOICE_STREAMING_PREVIEW_DATA", "QWENVOICE_SUPPRESS_WARMUP",
-            "QWENVOICE_UIPERF_FRAME_PROBE",
+            "QWENVOICE_MODEL_UPDATE_AUTOSTART", "QWENVOICE_UIPERF_FRAME_PROBE",
         ]
         self.assertEqual(publisher.armed_runtime_overrides([self.armed_row("a", canonical)]), [])
         self.assertEqual(publisher.armed_runtime_overrides([self.armed_row("a", [])]), [])

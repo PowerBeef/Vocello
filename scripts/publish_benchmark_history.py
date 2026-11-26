@@ -996,6 +996,8 @@ LANE_OWNED_RUNTIME_OVERRIDES = frozenset({
     "QWENVOICE_BENCH_FORCE_COLD", "QWENVOICE_BENCH_SEED_CELLS", "QWENVOICE_BENCH_SEED_POLICY",
     # The macOS UI benchmark keeps the app's own warm-up out of its takes.
     "QWENVOICE_SUPPRESS_WARMUP",
+    # Every macOS UI lane disables background 3.0->3.1 model auto-update at launch (RF-59).
+    "QWENVOICE_MODEL_UPDATE_AUTOSTART",
     # The CLI bench turns inline preview PCM off for every take.
     "QWENVOICE_STREAMING_PREVIEW_DATA",
     # The ui-perf lanes' frame probe and History seed.

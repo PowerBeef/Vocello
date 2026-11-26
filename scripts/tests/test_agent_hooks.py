@@ -393,50 +393,58 @@ class HooksWiringTests(unittest.TestCase):
                                      "tool_input": {"command": "git status"}}, 0),
                  ("agent_guard.py", {"tool_name": "Bash", "agent_id": "a", "cwd": str(ROOT),
                                      "tool_input": {"command": "scripts/ui_test.sh help && xcodebuild -version"}}, 0)]
-        for interpreter in sorted(interpreters):
-            for name, payload, expected in cases:
-                with self.subTest(interpreter=interpreter, hook=name, payload=payload), \
-                        tempfile.TemporaryDirectory() as workers:
-                    result = subprocess.run(
-                        [interpreter, str(HOOKS / name)], input=json.dumps(payload), text=True,
-                        capture_output=True, timeout=20,
-                        env=dict(os.environ, QVOICE_WORKER_DIRECTORY=workers))
-                    self.assertEqual(result.returncode, expected, result.stderr)
-                    self.assertNotIn("Traceback", result.stderr)
-            for mode, agy_payload, expected_decision in (
-                ("pre-command", {"toolCall": {"name": "run_command", "args": {"CommandLine": "git status"}}, "cwd": str(ROOT)}, "allow"),
-                ("pre-command", {"toolCall": {"name": "run_command", "args": {"CommandLine": "git switch -c smoke"}}, "cwd": str(ROOT)}, "deny"),
-                ("pre-command", {"toolCall": {"name": "run_command", "args": {"CommandLine": "git push origin main"}}, "cwd": str(ROOT)}, "force_ask"),
-                ("pre-edit", {"toolCall": {"name": "edit_file", "args": {"Path": str(ROOT / "docs/ROADMAP.md")}}, "cwd": str(ROOT)}, "deny"),
-                ("pre-mcp", {"toolCall": {"name": "call_mcp_tool", "args": {"ServerName": "mobilebuildmcp", "ToolName": "boot" + SIM_SUFFIX}}, "cwd": str(ROOT)}, "deny"),
-            ):
-                with self.subTest(interpreter=interpreter, hook="agy_hook_adapter.py", mode=mode):
-                    result = subprocess.run(
-                        [interpreter, str(HOOKS / "agy_hook_adapter.py"), mode],
-                        input=json.dumps(agy_payload), text=True, capture_output=True, timeout=20)
-                    self.assertEqual(result.returncode, 0, result.stderr)
-                    self.assertNotIn("Traceback", result.stderr)
-                    self.assertEqual(json.loads(result.stdout)["decision"], expected_decision)
-            for mode, agy_payload in (
-                ("post-invocation", {"hookEventName": "PostInvocation", "cwd": str(ROOT)}),
-                ("stop", {"hookEventName": "Stop", "terminationReason": "NO_TOOL_CALL",
-                          "fullyIdle": True, "continuationActive": True, "cwd": str(ROOT)}),
-            ):
-                with self.subTest(interpreter=interpreter, hook="agy_hook_adapter.py", mode=mode):
-                    result = subprocess.run(
-                        [interpreter, str(HOOKS / "agy_hook_adapter.py"), mode],
-                        input=json.dumps(agy_payload), text=True, capture_output=True, timeout=20)
-                    self.assertEqual(result.returncode, 0, result.stderr)
-                    self.assertNotIn("Traceback", result.stderr)
-                    self.assertIsInstance(json.loads(result.stdout), dict)
-            for mode, command, expected in (("git-policy", "git status", ""),
-                                            ("simulator-policy", "rg 'simctl boot' && xcrun simctl list", ""),
-                                            ("simulator-policy", "xcrun simctl boot 1234", "`simctl boot`\n")):
-                with self.subTest(interpreter=interpreter, hook="agent_hook_input.py", mode=mode, command=command):
-                    payload = {"tool_name": "Bash", "tool_input": {"command": command}, "cwd": str(ROOT)}
-                    result = subprocess.run([interpreter, str(HOOKS / "agent_hook_input.py"), mode],
-                                            input=json.dumps(payload), text=True, capture_output=True, timeout=20)
-                    self.assertEqual((result.returncode, result.stdout, result.stderr), (0, expected, ""))
+        with tempfile.TemporaryDirectory(prefix="vocello hooks ") as tmp:
+            # Release packaging checks out a detached HEAD where `commit_lint.sh` blocks pushes;
+            # exercise `git push origin main` against an isolated `main` fixture repo so this test
+            # stays branch-independent on tag checkouts.
+            main_repo = Path(tmp).resolve() / "repo"
+            initialize_repo(main_repo)
+            main_hooks = fixture_hooks(main_repo)
+            for interpreter in sorted(interpreters):
+                for name, payload, expected in cases:
+                    with self.subTest(interpreter=interpreter, hook=name, payload=payload), \
+                            tempfile.TemporaryDirectory() as workers:
+                        result = subprocess.run(
+                            [interpreter, str(HOOKS / name)], input=json.dumps(payload), text=True,
+                            capture_output=True, timeout=20,
+                            env=dict(os.environ, QVOICE_WORKER_DIRECTORY=workers))
+                        self.assertEqual(result.returncode, expected, result.stderr)
+                        self.assertNotIn("Traceback", result.stderr)
+                for mode, agy_payload, expected_decision, hook_root, hooks_dir in (
+                    ("pre-command", {"toolCall": {"name": "run_command", "args": {"CommandLine": "git status"}}, "cwd": str(ROOT)}, "allow", ROOT, HOOKS),
+                    ("pre-command", {"toolCall": {"name": "run_command", "args": {"CommandLine": "git switch -c smoke"}}, "cwd": str(ROOT)}, "deny", ROOT, HOOKS),
+                    ("pre-command", {"toolCall": {"name": "run_command", "args": {"CommandLine": "git push origin main"}}, "cwd": str(main_repo)}, "force_ask", main_repo, main_hooks),
+                    ("pre-edit", {"toolCall": {"name": "edit_file", "args": {"Path": str(ROOT / "docs/ROADMAP.md")}}, "cwd": str(ROOT)}, "deny", ROOT, HOOKS),
+                    ("pre-mcp", {"toolCall": {"name": "call_mcp_tool", "args": {"ServerName": "mobilebuildmcp", "ToolName": "boot" + SIM_SUFFIX}}, "cwd": str(ROOT)}, "deny", ROOT, HOOKS),
+                ):
+                    with self.subTest(interpreter=interpreter, hook="agy_hook_adapter.py", mode=mode):
+                        result = subprocess.run(
+                            [interpreter, str(hooks_dir / "agy_hook_adapter.py"), mode],
+                            input=json.dumps(agy_payload), text=True, capture_output=True, timeout=20,
+                            env=dict(os.environ, VOCELLO_PROJECT_ROOT=str(hook_root)))
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertNotIn("Traceback", result.stderr)
+                        self.assertEqual(json.loads(result.stdout)["decision"], expected_decision, result.stdout)
+                for mode, agy_payload in (
+                    ("post-invocation", {"hookEventName": "PostInvocation", "cwd": str(ROOT)}),
+                    ("stop", {"hookEventName": "Stop", "terminationReason": "NO_TOOL_CALL",
+                              "fullyIdle": True, "continuationActive": True, "cwd": str(ROOT)}),
+                ):
+                    with self.subTest(interpreter=interpreter, hook="agy_hook_adapter.py", mode=mode):
+                        result = subprocess.run(
+                            [interpreter, str(HOOKS / "agy_hook_adapter.py"), mode],
+                            input=json.dumps(agy_payload), text=True, capture_output=True, timeout=20)
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertNotIn("Traceback", result.stderr)
+                        self.assertIsInstance(json.loads(result.stdout), dict)
+                for mode, command, expected in (("git-policy", "git status", ""),
+                                                ("simulator-policy", "rg 'simctl boot' && xcrun simctl list", ""),
+                                                ("simulator-policy", "xcrun simctl boot 1234", "`simctl boot`\n")):
+                    with self.subTest(interpreter=interpreter, hook="agent_hook_input.py", mode=mode, command=command):
+                        payload = {"tool_name": "Bash", "tool_input": {"command": command}, "cwd": str(ROOT)}
+                        result = subprocess.run([interpreter, str(HOOKS / "agent_hook_input.py"), mode],
+                                                input=json.dumps(payload), text=True, capture_output=True, timeout=20)
+                        self.assertEqual((result.returncode, result.stdout, result.stderr), (0, expected, ""))
 
     def test_configured_pretool_hooks_allow_ask_and_deny_from_root_and_website(self):
         for cwd in (ROOT, ROOT / "website"):
@@ -444,7 +452,7 @@ class HooksWiringTests(unittest.TestCase):
             cases = [
                 ("pre-command", {"name": "run_command", "args": {"CommandLine": "git push --force origin main"}}, "deny"),
                 ("pre-command", {"name": "run_command", "args": {"CommandLine": "git push origin subagent-1"}}, "deny"),
-                ("pre-command", {"name": "run_command", "args": {"CommandLine": "git push origin main"}}, "force_ask"),
+                ("pre-command", {"name": "run_command", "args": {"CommandLine": "gh workflow run ci.yml"}}, "force_ask"),
                 ("pre-command", {"name": "run_command", "args": {"CommandLine": "git restore notes.md"}}, "ask"),
                 ("pre-command", {"name": "run_command", "args": {"CommandLine": "git status --short"}}, "allow"),
                 ("pre-edit", {"name": "edit_file", "args": {"Path": f"{prefix}docs/ROADMAP.md"}}, "deny"),
@@ -458,6 +466,23 @@ class HooksWiringTests(unittest.TestCase):
                     result = invoke_agy(mode, {"hookEventName": "PreToolUse", "toolCall": tool_call, "cwd": str(cwd)}, cwd=cwd)
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(json.loads(result.stdout)["decision"], expected, result.stdout)
+        # Verify `git push origin main` asks on `main` (root and website) and denies on detached HEAD
+        # regardless of whether the outer test runner checked out a branch or a release tag commit.
+        with tempfile.TemporaryDirectory(prefix="vocello push hooks ") as tmp:
+            repo = Path(tmp).resolve() / "repo"
+            initialize_repo(repo)
+            (repo / "website").mkdir()
+            push_call = {"name": "run_command", "args": {"CommandLine": "git push origin main"}}
+            for cwd in (repo, repo / "website"):
+                with self.subTest(branch="main", cwd=cwd.name):
+                    result = invoke_agy("pre-command", {"hookEventName": "PreToolUse", "toolCall": push_call, "cwd": str(cwd)}, cwd=cwd, root=repo)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(json.loads(result.stdout)["decision"], "force_ask", result.stdout)
+            subprocess.run(["git", "-C", str(repo), "checkout", "-q", "--detach", "HEAD"], check=True)
+            with self.subTest(branch="detached"):
+                result = invoke_agy("pre-command", {"hookEventName": "PreToolUse", "toolCall": push_call, "cwd": str(repo)}, cwd=repo, root=repo)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout)["decision"], "deny", result.stdout)
 
     def test_session_start_adapter_returns_inject_steps(self):
         result = invoke_agy("session-start", {"hookEventName": "SessionStart", "cwd": str(ROOT)})

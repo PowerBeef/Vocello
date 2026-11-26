@@ -1064,6 +1064,7 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-11-26 | [`mac-gate-bench-20261126-081131-c951cef8`](runs/engine-generation/mac-gate-bench-20261126-081131-c951cef8.json) | focused | focused | passed | qualified | 6 | 0.29 | `90933c27c69a` | `f79e3edf5cbe` | baseline | mac-gate-bench |
 | 2026-11-26 | [`mac-gate-bench-20261126-081420-82ea58dd`](runs/engine-generation/mac-gate-bench-20261126-081420-82ea58dd.json) | focused | focused | passed | qualified | 6 | 0.29 | `90933c27c69a` | `f79e3edf5cbe` | vs mac-gate-bench-20261126-081131-c951cef8: RTF +0.0% (within noise), TTFC +2.5% (within noise), RAM -0.0% (within noise) | mac-gate-bench |
+| 2026-11-26 | [`mac-gate-bench-20261126-081917-fa2d5c2c`](runs/engine-generation/mac-gate-bench-20261126-081917-fa2d5c2c.json) | focused | focused | passed | qualified | 6 | 0.29 | `7ca406b1bf3b` | `f79e3edf5cbe` | vs mac-gate-bench-20261126-081420-82ea58dd: RTF +0.1% (within noise), TTFC -0.0% (within noise), RAM +2.6% (within noise) | mac-gate-bench |
 
 ## instrument-profile / ios / iphone-17-pro / config `1259c1914031`
 

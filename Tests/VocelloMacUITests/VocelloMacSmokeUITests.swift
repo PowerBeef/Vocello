@@ -545,8 +545,40 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         )
         startGenerationAndAwaitCancelControl(mode: .custom)
         XCTAssertTrue(VocelloUIWait.exists(button("studio_livePreview_playPause"), timeout: 180))
+        // Live streaming preview playhead must advance above 0:00 while generation is still active.
+        let liveCard = element("studio_livePreview_card")
+        var studioElapsedSeconds = 0
+        XCTAssertTrue(
+            VocelloUIWait.condition("live preview playhead time to advance while generating", timeout: 10) {
+                guard self.button("textInput_cancelButton").exists,
+                      let elapsed = Self.liveElapsedSeconds(in: liveCard) else {
+                    return false
+                }
+                studioElapsedSeconds = elapsed
+                return elapsed >= 2
+            },
+            "Live preview elapsed time must advance while generation is still active (last: \(studioElapsedSeconds)s)"
+        )
+        XCTAssertTrue(button("textInput_cancelButton").exists,
+                      "Generation must still be active while verifying live preview playhead progress")
+        VocelloUIScreenshot.attach(app, named: "mac-smoke-live-preview-advancing")
         navigate(to: .history)
         XCTAssertTrue(VocelloUIWait.exists(element("sidebarPlayer_liveBadge"), timeout: 15))
+        let sidebarTime = element("sidebarPlayer_time")
+        var sidebarElapsedSeconds = 0
+        XCTAssertTrue(
+            VocelloUIWait.condition("live sidebar playback time to keep advancing while generating", timeout: 8) {
+                guard self.element("sidebarPlayer_liveBadge").exists,
+                      let elapsed = Self.parsedElapsedSeconds(sidebarTime.value)
+                        ?? Self.parsedElapsedSeconds(sidebarTime.label) else {
+                    return false
+                }
+                sidebarElapsedSeconds = elapsed
+                return elapsed >= max(2, studioElapsedSeconds)
+            },
+            "Live streaming preview time in the sidebar player must advance while still generating (last: \(sidebarElapsedSeconds)s, value: \(String(describing: sidebarTime.value)), label: \(sidebarTime.label))"
+        )
+        VocelloUIScreenshot.attach(app, named: "mac-smoke-sidebar-live-advancing")
         XCTAssertTrue(VocelloUIPrimaryAction.perform(on: button("sidebarPlayer_dismiss"), timeout: 15))
         navigate(to: .customVoice)
         assertStaysAbsent(button("studio_livePreview_playPause"),
@@ -869,6 +901,25 @@ final class VocelloMacSmokeUITests: VocelloMacUITestCase {
         "The story kept one final image for the ledger: streetlamps doubling themselves in the black water.",
         "And there the long account rested, not because the road ended, but because the page did.",
     ]
+
+    /// Returns the elapsed seconds shown by a live player card's counter text.
+    private static func liveElapsedSeconds(in container: XCUIElement) -> Int? {
+        for text in container.staticTexts.allElementsBoundByIndex {
+            if let elapsed = parsedElapsedSeconds(text.value) ?? parsedElapsedSeconds(text.label) {
+                return elapsed
+            }
+        }
+        return nil
+    }
+
+    /// Parses elapsed seconds from `"0:02 / Live"` or `"0:02"`.
+    private static func parsedElapsedSeconds(_ rawValue: Any?) -> Int? {
+        guard let text = rawValue as? String else { return nil }
+        let prefix = text.split(separator: "/", maxSplits: 1).first.map(String.init) ?? text
+        let parts = prefix.trimmingCharacters(in: .whitespacesAndNewlines).split(separator: ":")
+        guard parts.count == 2, let minutes = Int(parts[0]), let seconds = Int(parts[1]) else { return nil }
+        return minutes * 60 + seconds
+    }
 
     /// Writes a mono 24 kHz speech-like PCM WAV: a two-tone "voice" under a
     /// syllable-rate envelope with phrase pauses, so the live level meter

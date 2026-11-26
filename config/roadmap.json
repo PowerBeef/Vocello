@@ -693,7 +693,7 @@
       "id": "RF-71",
       "plan": "release-first-3-0-2026-09",
       "title": "Ship Vocello and the vocello CLI 3.2 on the Mac",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [
         "RF-69",
         "RF-70",
@@ -712,7 +712,7 @@
         "mac",
         "keyboard"
       ],
-      "updated": "2026-11-25",
+      "updated": "2026-11-26",
       "notes": "Opened 2026-11-21 at the maintainer's request: Mac and CLI 3.1.0 shipped on 2026-11-17 (RF-61); 3.2.0 carries Pack A, Pack B (RF-68 Mac work complete 2026-11-23, RF-69 done), Pack C (RF-70 closed keeping shipped attn unchanged), RF-72 (done), and RF-73 (done). RF-68's remaining iPhone-only proof runs in Phase 5 and does not block shipping Mac/CLI 3.2.0."
     },
     {

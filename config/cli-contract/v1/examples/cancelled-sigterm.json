@@ -23,7 +23,7 @@
     }
   ],
   "meta": {
-    "vocelloVersion": "3.1.0",
+    "vocelloVersion": "3.2.0",
     "build": "24",
     "contractRevision": 1,
     "durationMs": 1830,

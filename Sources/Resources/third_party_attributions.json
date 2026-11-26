@@ -220,7 +220,7 @@
       "scope": "owned",
       "sourceURL": "https://github.com/PowerBeef/Vocello",
       "upstreamLicenseSHA256": "91332fae4ac60b9ace81f08ab678e0286317f335e99f7020df9f0152e766d2c8",
-      "version": "3.1.0"
+      "version": "3.2.0"
     },
     {
       "copyrightNotice": null,
@@ -279,7 +279,7 @@
   "generatedFrom": {
     "applicationPackageResolutionSHA256": "925d49ee1e34ca36aed94f4b360628af1f94eadda04d3dc90a5441a59cc2b4dd",
     "ownedRuntimePackageResolutionSHA256": "f0d6902e9f07a0a68b597a4f3dff097f6baff57cb0c0b2a48144490363799068",
-    "policySHA256": "96ca35fcbb7fcd29d98f6dd4cff9b43781985a1f1de11ca2ebcd1cbeea0077b4",
+    "policySHA256": "0f25e30a266d3d292e345aeee4b2deeffc5a11ea10268a1597aa9a18675b70c5",
     "productionModelCatalogSHA256": "fd2bd3b9b82b54d4cac593acb2327e961a2f7d9905d6c7810616bf9d47217c8d"
   },
   "licenses": [

@@ -117,7 +117,7 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `RF-46` (planned) Core overhaul, stage 2a: the frame pipeline, identity-preserving
 - `RF-47` (planned) Core overhaul, stage 3: memory (also: iPhone)
 - `RF-52` (planned) Quality remediation, stage 2: clone conditioning parity (also: iPhone)
-- `RF-71` (planned) Ship Vocello and the vocello CLI 3.2 on the Mac (also: At the keyboard)
+- `RF-71` (in-flight) Ship Vocello and the vocello CLI 3.2 on the Mac (also: At the keyboard)
 - `UIF-08` (parked) Native acceptance of the iOS-derived screens on current source
 
 ### At the keyboard (18)
@@ -141,7 +141,7 @@ Needs the maintainer present: a permission prompt, a keychain or password, a rel
 - `RF-48` (planned) Core overhaul, stage 4: finalization, preview and the heat pause (also: iPhone)
 - `RF-62` (planned) Set initial Age Rating to 13+ and answer Nov 16 descriptors when filing 3.2.0
 - `RF-63` (planned) Fit the 3.2 App Review notes into 4,000 UTF-8 bytes
-- `RF-71` (planned) Ship Vocello and the vocello CLI 3.2 on the Mac (also: Mac, remotely)
+- `RF-71` (in-flight) Ship Vocello and the vocello CLI 3.2 on the Mac (also: Mac, remotely)
 
 ### iPhone (62)
 
@@ -256,7 +256,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-65` | planned | Measure the shipped hybrid on an iPhone 15 Pro | — |
 | `RF-66` | planned | Record a demo video of the shipping flow on a physical iPhone | — |
 | `RF-68` | in-flight | Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance | — |
-| `RF-71` | planned | Ship Vocello and the vocello CLI 3.2 on the Mac | `RF-69`, `RF-70`, `RF-72`, `RF-73` |
+| `RF-71` | in-flight | Ship Vocello and the vocello CLI 3.2 on the Mac | `RF-69`, `RF-70`, `RF-72`, `RF-73` |
 
 ### Open items in detail
 
@@ -373,7 +373,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-68`** (in-flight) — Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance.
   gate: With bit-identical fixed-seed PCM digests (scripts/pcm_identity.py) across Custom, Design and Clone: eliminate one-shot MLX Error::check() double-eval consumption in Qwen3TTS and AudioSealGenerator via a single try evalForReadback(...); replace silent try? BaseConfiguration quantization fallback with explicit parse errors, [.noUnusedKeys, .shapeMismatch] weight verification and fused projection logging; fix A-08 Mimi encoder KV retention and super-linear concatenation growth with per-encode local caches; replace A-27's 16.8 MB square decoder causal mask with a rectangular [seqLen, totalLen] mask; hoist and prewarm CodePredictorCompiledPlan across takes (dropping the 10 unused KV buffers), telemetry-gate per-frame introspectionStepScalars, deduplicate back-to-back cache clears and evaluate AudioSeal weight caching (H2) or lazy repetition penalty (A3) only where memory-neutral and bit-identical; land minor package hygiene (streaming tensor rank, control-token-only clone refText, validateChatTemplateTokenCount, mixed-precision sibling check). Verified by VocelloCoreTests, Qwen3RuntimeTests, vocello-swift-review, Mac benchmark/memory lanes and an announced iPhone check.
 
-- **`RF-71`** (planned) — Ship Vocello and the vocello CLI 3.2 on the Mac.
+- **`RF-71`** (in-flight) — Ship Vocello and the vocello CLI 3.2 on the Mac.
   gate: Vocello and the vocello CLI 3.2.0 are public on the Mac. Before the tag: MARKETING_VERSION 3.2.0 with a build number above the last release tag's; Mac benchmark, memory, language and UI-perf lanes recorded on the 3.2 engine (and reseeded baselines/lineage if RF-70 updates model artifacts or alters samples); docs/releases/v3.2.0.md passes check_release_notes.py; README charts, website copy/numbers and config/public-product-facts.json describe 3.2; push CI, release rehearsal, full macOS smoke and engine bench pass on the release commit. Then the maintainer's signed v3.2.0 tag builds a verified draft through release.yml; the macOS promotion lanes and signed CLI qualification pass on the tag checkout; the maintainer promotes the release and the website deploys with it.
 
 ## Specialist-audit remediation

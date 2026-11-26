@@ -388,9 +388,12 @@ final class AudioPlayerLivePreviewTests: XCTestCase {
         XCTAssertEqual(player.playbackProgress.progress, heldBeforeSeek, accuracy: 1e-9)
 
         // Seeking backward to 5% while live buffers are still queued switches to the final file
-        // without re-arming the pre-seek morph floor.
+        // without re-arming the pre-seek morph floor. Because autoPlay starts the real
+        // AVAudioPlayer immediately, allow bounded forward advancement (e.g. under TSan).
         player.seek(to: 0.05)
-        XCTAssertEqual(player.playbackProgress.progress, 0.05, accuracy: 1e-3)
+        XCTAssertGreaterThanOrEqual(player.playbackProgress.progress, 0.05 - 1e-3)
+        XCTAssertLessThan(player.playbackProgress.progress, 0.12)
+        XCTAssertLessThan(player.playbackProgress.progress, heldBeforeSeek - 0.05)
 
         player.stop()
         XCTAssertEqual(player.currentTime, 0, accuracy: 1e-9)

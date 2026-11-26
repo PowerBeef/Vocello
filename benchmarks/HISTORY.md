@@ -1387,6 +1387,12 @@ their harness files differ from the baseline's.
 |---|---|---|---|---|---|---:|---:|---|---|---|---|
 | 2026-07-13 | [`ios-xcui-benchmark-20260713-042913-57f9e32e`](runs/ui-generation/ios-xcui-benchmark-20260713-042913-57f9e32e.json) | focused | exploratory | passed | memory-contract-incomplete | 2 | ~0.73 | `04083b15a4e2` dirty | `excluded` | baseline | focused-short-playback-repair-20260713 |
 
+## ui-generation / ios / iphone-17-pro / config `232341c63fba`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-26 | [`ios-xcui-benchmark-20261126-185008-141ece72`](runs/ui-generation/ios-xcui-benchmark-20261126-185008-141ece72.json) | canonical | canonical | passed | qualified | 29 | 0.55 | `7edccaa92c90` | `232341c63fba` | baseline | ios-xcui-benchmark-20261126-185008-141ece72 |
+
 ## ui-generation / ios / iphone-17-pro / config `35a3b94d3ba6`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

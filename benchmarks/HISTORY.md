@@ -1058,6 +1058,13 @@ their harness files differ from the baseline's.
 | 2026-11-16 | [`mac-gate-bench-20261116-024328-2dc84ba4`](runs/engine-generation/mac-gate-bench-20261116-024328-2dc84ba4.json) | focused | focused | passed | qualified | 6 | 0.29 | `e397d3023fd6` | `860db4679490` | vs mac-gate-bench-20261114-175506-9d5c0487: RTF +2.0% (within noise), TTFC +0.9% (within noise), RAM +0.0% (within noise), harness changed | mac-gate-bench |
 | 2026-11-16 | [`mac-gate-bench-20261116-220213-9eace02f`](runs/engine-generation/mac-gate-bench-20261116-220213-9eace02f.json) | focused | focused | passed | qualified | 6 | 0.29 | `693f13d164da` | `860db4679490` | vs mac-gate-bench-20261116-024328-2dc84ba4: RTF -0.2% (within noise), TTFC +0.0% (within noise), RAM +0.3% (within noise) | mac-gate-bench |
 
+## engine-generation / macos / mac-mini-m6-16gb / config `f79e3edf5cbe`
+
+| completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |
+|---|---|---|---|---|---|---:|---:|---|---|---|---|
+| 2026-11-26 | [`mac-gate-bench-20261126-081131-c951cef8`](runs/engine-generation/mac-gate-bench-20261126-081131-c951cef8.json) | focused | focused | passed | qualified | 6 | 0.29 | `90933c27c69a` | `f79e3edf5cbe` | baseline | mac-gate-bench |
+| 2026-11-26 | [`mac-gate-bench-20261126-081420-82ea58dd`](runs/engine-generation/mac-gate-bench-20261126-081420-82ea58dd.json) | focused | focused | passed | qualified | 6 | 0.29 | `90933c27c69a` | `f79e3edf5cbe` | vs mac-gate-bench-20261126-081131-c951cef8: RTF +0.0% (within noise), TTFC +2.5% (within noise), RAM -0.0% (within noise) | mac-gate-bench |
+
 ## instrument-profile / ios / iphone-17-pro / config `1259c1914031`
 
 | completed (UTC) | run | scope | classification | status | memory | takes | RTF | source | comparison | trend | label |

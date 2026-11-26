@@ -19,11 +19,11 @@
         "mode": "custom",
         "modelID": "PowerBeef02/Qwen3-TTS-12Hz-1.7B-CustomVoice-hybrid-attn",
         "variant": "speed",
-        "quantization": "4-bit",
+        "quantization": "hybrid",
         "revision": "c36e22eddb74ed1ae3c9f054b961b1173f7c093f",
         "artifactVersion": "2026.11.13.1",
         "integrityDigest": "23a8e9c09658e1a546f57e8bac1626a5029f6a7604aa3ae35411bf0237766ff3",
-        "runtimeProfileSignature": "qwen3_tts|custom_voice|4bit|24000|qwen3_tts_tokenizer_12hz|auto,chinese,english,french,german,italian,japanese,korean,portuguese,russian,spanish|aiden,dylan,eric,ono_anna,ryan,serena,sohee,uncle_fu,vivian|pro1b7|instruction|no_x_vector_only_clone",
+        "runtimeProfileSignature": "qwen3_tts|custom_voice|hybrid|24000|qwen3_tts_tokenizer_12hz|auto,chinese,english,french,german,italian,japanese,korean,portuguese,russian,spanish|aiden,dylan,eric,ono_anna,ryan,serena,sohee,uncle_fu,vivian|pro1b7|instruction|no_x_vector_only_clone",
         "fixtureDigest": "not-applicable"
       }
     ],
@@ -33,8 +33,8 @@
   },
   "seededRuns": [
     {
-      "runID": "mac-gate-bench-20261114-175017-adc12718",
-      "sourceCommit": "7a0506863f9711f709564502cfb8fedb15007d78",
+      "runID": "mac-gate-bench-20261126-080455-fdceb49a",
+      "sourceCommit": "90933c27c69a6a4c8d5f6829cf59c3ed2a9f6831",
       "cells": [
         {
           "cellKey": [
@@ -48,16 +48,152 @@
           "warmState": "cold",
           "lenBucket": "medium",
           "n": 1,
-          "rtf": 0.29398148148148145,
+          "rtf": 0.29799382716049383,
           "rtfMAD": 0.0,
           "physFootMAD": 0.0,
-          "decodeSpeedupX": 3.7543453070683666,
-          "tokps": 46.91175046985246,
+          "decodeSpeedupX": 3.7070938215102975,
+          "tokps": 46.32573532670967,
+          "ttfcMS": null,
+          "engineFirstChunkMS": 1200,
+          "engineFirstChunkMAD": 0,
+          "physFootMB": 2447.0488204956055,
+          "mlxPeakMB": 2227.128279685974,
+          "mlxPeakMAD": 0.0,
+          "generatedTokens": 81,
+          "generatedTokenCounts": [
+            81
+          ],
+          "qcVerdict": "pass"
+        },
+        {
+          "cellKey": [
+            "custom",
+            "pro_custom_speed",
+            "warm",
+            "medium"
+          ],
+          "mode": "custom",
+          "modelID": "pro_custom_speed",
+          "warmState": "warm",
+          "lenBucket": "medium",
+          "n": 5,
+          "rtf": 0.2905864197530864,
+          "rtfMAD": 0.00030864197530861004,
+          "physFootMAD": 17.578147888183594,
+          "decodeSpeedupX": 3.7284234752589187,
+          "tokps": 46.593413862762986,
+          "ttfcMS": null,
+          "engineFirstChunkMS": 167,
+          "engineFirstChunkMAD": 2,
+          "physFootMB": 2347.2519454956055,
+          "mlxPeakMB": 2227.128504753113,
+          "mlxPeakMAD": 0.0,
+          "generatedTokens": 81,
+          "generatedTokenCounts": [
+            81,
+            81,
+            81,
+            81,
+            81
+          ],
+          "qcVerdict": "pass"
+        }
+      ]
+    },
+    {
+      "runID": "mac-gate-bench-20261126-081131-c951cef8",
+      "sourceCommit": "90933c27c69a6a4c8d5f6829cf59c3ed2a9f6831",
+      "cells": [
+        {
+          "cellKey": [
+            "custom",
+            "pro_custom_speed",
+            "cold",
+            "medium"
+          ],
+          "mode": "custom",
+          "modelID": "pro_custom_speed",
+          "warmState": "cold",
+          "lenBucket": "medium",
+          "n": 1,
+          "rtf": 0.29537037037037034,
+          "rtfMAD": 0.0,
+          "physFootMAD": 0.0,
+          "decodeSpeedupX": 3.7284234752589187,
+          "tokps": 46.5914261380841,
+          "ttfcMS": null,
+          "engineFirstChunkMS": 1183,
+          "engineFirstChunkMAD": 0,
+          "physFootMB": 2393.423797607422,
+          "mlxPeakMB": 2227.126326560974,
+          "mlxPeakMAD": 0.0,
+          "generatedTokens": 81,
+          "generatedTokenCounts": [
+            81
+          ],
+          "qcVerdict": "pass"
+        },
+        {
+          "cellKey": [
+            "custom",
+            "pro_custom_speed",
+            "warm",
+            "medium"
+          ],
+          "mode": "custom",
+          "modelID": "pro_custom_speed",
+          "warmState": "warm",
+          "lenBucket": "medium",
+          "n": 5,
+          "rtf": 0.2890432098765432,
+          "rtfMAD": 0.00030864197530866555,
+          "physFootMAD": 2.28125,
+          "decodeSpeedupX": 3.7521713954834977,
+          "tokps": 46.89017328560509,
+          "ttfcMS": null,
+          "engineFirstChunkMS": 162,
+          "engineFirstChunkMAD": 1,
+          "physFootMB": 2336.564422607422,
+          "mlxPeakMB": 2227.1283922195435,
+          "mlxPeakMAD": 0.0,
+          "generatedTokens": 81,
+          "generatedTokenCounts": [
+            81,
+            81,
+            81,
+            81,
+            81
+          ],
+          "qcVerdict": "pass"
+        }
+      ]
+    },
+    {
+      "runID": "mac-gate-bench-20261126-081420-82ea58dd",
+      "sourceCommit": "90933c27c69a6a4c8d5f6829cf59c3ed2a9f6831",
+      "cells": [
+        {
+          "cellKey": [
+            "custom",
+            "pro_custom_speed",
+            "cold",
+            "medium"
+          ],
+          "mode": "custom",
+          "modelID": "pro_custom_speed",
+          "warmState": "cold",
+          "lenBucket": "medium",
+          "n": 1,
+          "rtf": 0.2950617283950617,
+          "rtfMAD": 0.0,
+          "physFootMAD": 0.0,
+          "decodeSpeedupX": 3.741339491916859,
+          "tokps": 46.7710237917269,
           "ttfcMS": null,
           "engineFirstChunkMS": 1191,
           "engineFirstChunkMAD": 0,
-          "physFootMB": 2395.064422607422,
-          "mlxPeakMB": 2227.1673126220703,
+          "physFootMB": 2371.0956497192383,
+          "mlxPeakMB": 2227.126326560974,
           "mlxPeakMAD": 0.0,
           "generatedTokens": 81,
           "generatedTokenCounts": [
@@ -77,153 +213,17 @@
           "warmState": "warm",
           "lenBucket": "medium",
           "n": 5,
-          "rtf": 0.29135802469135796,
-          "rtfMAD": 0.0009259259259258856,
-          "physFootMAD": 4.53125,
-          "decodeSpeedupX": 3.7155963302752295,
-          "tokps": 46.43633385144243,
-          "ttfcMS": null,
-          "engineFirstChunkMS": 171,
-          "engineFirstChunkMAD": 0,
-          "physFootMB": 2342.205093383789,
-          "mlxPeakMB": 2227.167324066162,
-          "mlxPeakMAD": 0.0,
-          "generatedTokens": 81,
-          "generatedTokenCounts": [
-            81,
-            81,
-            81,
-            81,
-            81
-          ],
-          "qcVerdict": "pass"
-        }
-      ]
-    },
-    {
-      "runID": "mac-gate-bench-20261114-175243-f2d075fe",
-      "sourceCommit": "7a0506863f9711f709564502cfb8fedb15007d78",
-      "cells": [
-        {
-          "cellKey": [
-            "custom",
-            "pro_custom_speed",
-            "cold",
-            "medium"
-          ],
-          "mode": "custom",
-          "modelID": "pro_custom_speed",
-          "warmState": "cold",
-          "lenBucket": "medium",
-          "n": 1,
-          "rtf": 0.2944444444444444,
-          "rtfMAD": 0.0,
-          "physFootMAD": 0.0,
-          "decodeSpeedupX": 3.758700696055685,
-          "tokps": 46.96658211715495,
-          "ttfcMS": null,
-          "engineFirstChunkMS": 1208,
-          "engineFirstChunkMAD": 0,
-          "physFootMB": 2382.080093383789,
-          "mlxPeakMB": 2227.1673126220703,
-          "mlxPeakMAD": 0.0,
-          "generatedTokens": 81,
-          "generatedTokenCounts": [
-            81
-          ],
-          "qcVerdict": "pass"
-        },
-        {
-          "cellKey": [
-            "custom",
-            "pro_custom_speed",
-            "warm",
-            "medium"
-          ],
-          "mode": "custom",
-          "modelID": "pro_custom_speed",
-          "warmState": "warm",
-          "lenBucket": "medium",
-          "n": 5,
-          "rtf": 0.2912037037037037,
-          "rtfMAD": 0.0009259259259259411,
-          "physFootMAD": 5.34375,
-          "decodeSpeedupX": 3.7177280550774525,
-          "tokps": 46.46556698930639,
-          "ttfcMS": null,
-          "engineFirstChunkMS": 170,
-          "engineFirstChunkMAD": 1,
-          "physFootMB": 2342.2988662719727,
-          "mlxPeakMB": 2227.1673126220703,
-          "mlxPeakMAD": 0.0,
-          "generatedTokens": 81,
-          "generatedTokenCounts": [
-            81,
-            81,
-            81,
-            81,
-            81
-          ],
-          "qcVerdict": "pass"
-        }
-      ]
-    },
-    {
-      "runID": "mac-gate-bench-20261114-175506-9d5c0487",
-      "sourceCommit": "7a0506863f9711f709564502cfb8fedb15007d78",
-      "cells": [
-        {
-          "cellKey": [
-            "custom",
-            "pro_custom_speed",
-            "cold",
-            "medium"
-          ],
-          "mode": "custom",
-          "modelID": "pro_custom_speed",
-          "warmState": "cold",
-          "lenBucket": "medium",
-          "n": 1,
-          "rtf": 0.2959876543209876,
-          "rtfMAD": 0.0,
-          "physFootMAD": 0.0,
-          "decodeSpeedupX": 3.711340206185567,
-          "tokps": 46.38496485766258,
-          "ttfcMS": null,
-          "engineFirstChunkMS": 1189,
-          "engineFirstChunkMAD": 0,
-          "physFootMB": 2373.4706954956055,
-          "mlxPeakMB": 2227.1673126220703,
-          "mlxPeakMAD": 0.0,
-          "generatedTokens": 81,
-          "generatedTokenCounts": [
-            81
-          ],
-          "qcVerdict": "pass"
-        },
-        {
-          "cellKey": [
-            "custom",
-            "pro_custom_speed",
-            "warm",
-            "medium"
-          ],
-          "mode": "custom",
-          "modelID": "pro_custom_speed",
-          "warmState": "warm",
-          "lenBucket": "medium",
-          "n": 5,
-          "rtf": 0.28858024691358025,
+          "rtf": 0.2890432098765432,
           "rtfMAD": 0.00030864197530866555,
-          "physFootMAD": 8.53125,
-          "decodeSpeedupX": 3.756521739130435,
-          "tokps": 46.960521305477165,
+          "physFootMAD": 5.5,
+          "decodeSpeedupX": 3.7521713954834977,
+          "tokps": 46.90287007625656,
           "ttfcMS": null,
-          "engineFirstChunkMS": 170,
-          "engineFirstChunkMAD": 2,
-          "physFootMB": 2334.236343383789,
-          "mlxPeakMB": 2227.1673126220703,
-          "mlxPeakMAD": 0.0,
+          "engineFirstChunkMS": 166,
+          "engineFirstChunkMAD": 1,
+          "physFootMB": 2336.283172607422,
+          "mlxPeakMB": 2227.1283922195435,
+          "mlxPeakMAD": 0.0001125335693359375,
           "generatedTokens": 81,
           "generatedTokenCounts": [
             81,
@@ -251,24 +251,24 @@
       "lenBucket": "medium",
       "n": 1,
       "runCount": 3,
-      "rtf": 0.2944444444444444,
-      "decodeSpeedupX": 3.7543453070683666,
-      "tokps": 46.91175046985246,
+      "rtf": 0.29537037037037034,
+      "decodeSpeedupX": 3.7284234752589187,
+      "tokps": 46.5914261380841,
       "ttfcMS": null,
       "engineFirstChunkMS": 1191.0,
-      "physFootMB": 2382.080093383789,
-      "mlxPeakMB": 2227.1673126220703,
+      "physFootMB": 2393.423797607422,
+      "mlxPeakMB": 2227.126326560974,
       "generatedTokens": 81.0,
       "rtfMAD": 0.0,
       "physFootMAD": 0.0,
       "engineFirstChunkMAD": 0.0,
       "mlxPeakMAD": 0.0,
       "runSpread": {
-        "rtf": 0.006813417190775637,
-        "engineFirstChunkMS": 0.01595298068849706,
-        "physFootMB": 0.009065071813409143,
-        "mlxPeakMB": 0.0,
-        "tokps": 0.012398114623033332
+        "rtf": 0.009926854754441158,
+        "engineFirstChunkMS": 0.014273719563392108,
+        "physFootMB": 0.03173410862392758,
+        "mlxPeakMB": 8.769709094211668e-07,
+        "tokps": 0.009557304893340592
       },
       "qcVerdict": "pass",
       "generatedTokenCounts": [
@@ -290,24 +290,24 @@
       "lenBucket": "medium",
       "n": 5,
       "runCount": 3,
-      "rtf": 0.2912037037037037,
-      "decodeSpeedupX": 3.7177280550774525,
-      "tokps": 46.46556698930639,
+      "rtf": 0.2890432098765432,
+      "decodeSpeedupX": 3.7521713954834977,
+      "tokps": 46.89017328560509,
       "ttfcMS": null,
-      "engineFirstChunkMS": 170.0,
-      "physFootMB": 2342.205093383789,
-      "mlxPeakMB": 2227.1673126220703,
+      "engineFirstChunkMS": 166.0,
+      "physFootMB": 2336.564422607422,
+      "mlxPeakMB": 2227.1283922195435,
       "generatedTokens": 81.0,
-      "rtfMAD": 0.0009259259259258856,
-      "physFootMAD": 5.34375,
+      "rtfMAD": 0.00030864197530866555,
+      "physFootMAD": 5.5,
       "engineFirstChunkMAD": 1.0,
       "mlxPeakMAD": 0.0,
       "runSpread": {
-        "rtf": 0.00953895071542108,
-        "engineFirstChunkMS": 0.0058823529411764705,
-        "physFootMB": 0.003442278778642586,
-        "mlxPeakMB": 5.138406859699164e-09,
-        "tokps": 0.011281202145997165
+        "rtf": 0.005339028296849998,
+        "engineFirstChunkMS": 0.030120481927710843,
+        "physFootMB": 0.0046944020811304265,
+        "mlxPeakMB": 5.052855045495926e-08,
+        "tokps": 0.0065995962865971385
       },
       "qcVerdict": "pass",
       "generatedTokenCounts": [

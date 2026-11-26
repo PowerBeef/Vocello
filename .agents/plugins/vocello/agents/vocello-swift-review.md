@@ -17,7 +17,9 @@ change settings; the lead owns integration and validation.
 Check, and cite the rule for each finding:
 1. Release-only: no `#if DEBUG`, no Debug-only behavior; diagnostics gated by
    `VOCELLO_INTERNAL_DIAGNOSTICS`, `QWENVOICE_DEBUG` and a knob registered in
-   `config/runtime-debug-knobs.json`.
+   `config/runtime-debug-knobs.json`. Under Guideline 2.5.19 (`RF-73`), dormant iOS device/perf
+   runners stay behind `QVOICE_DEVICE_DIAGNOSTICS` and shipping iOS builds must not add unguarded
+   `QWENVOICE_*` environment-variable reads (`scripts/verify_ios_release_artifacts.py`).
 2. Concurrency: every new `@unchecked Sendable` or `nonisolated(unsafe)` is registered in
    `config/concurrency-safety.json`; no MLX array crosses an isolation boundary; actor-owned
    reservations and typed cancellation barriers hold, and every acquired slot or reservation is
@@ -25,8 +27,9 @@ Check, and cite the rule for each finding:
    `nonisolated async` work that must leave the caller's actor is `@concurrent` (with an explicit
    `async` on closures); with InferIsolatedConformances on, an Objective-C delegate conformance a
    framework calls off the main actor is written `nonisolated`.
-   Strict memory safety: new unsafe constructs are marked `unsafe` (using
-   `ToolchainNeutralUnsafeAccess.swift` where cross-version Swift safety annotations diverge). A new
+   Strict memory safety: new unsafe constructs are marked `unsafe` (`ToolchainNeutralUnsafeAccess.swift`
+   is a historical pre-`DW-04` compatibility helper whose existing forwards remain safe now that CI
+   pins Xcode 27.2 / Swift 6.4.2). A new
    `@preconcurrency import` carries `@unsafe` and is justified. With MemberImportVisibility on, a file
    imports every module whose members it uses.
 3. MLX facade: product targets import only `VocelloQwen3Core`, never `MLXAudio*` implementation
@@ -43,7 +46,7 @@ Check, and cite the rule for each finding:
    target's source root with `./scripts/regenerate_project.sh --fast` in the same change.
 
 Then check test adequacy. Green suites passed about 200 engine defects because tests stopped short of
-the code or asserted the wrong thing (`docs/audits/2026-10-18-dev-workflow-audit.md` A-02). For every
+the code or asserted the wrong thing (October 18, 2026 dev-workflow audit A-02, in Git history). For every
 behavioural change (anything beyond names, comments, docs or formatting), answer each question below
 for each new or changed test, citing file and line. A question you cannot answer from the code is a
 coverage-gap finding; "not applicable" needs a reason.
@@ -68,7 +71,8 @@ coverage-gap finding; "not applicable" needs a reason.
     output changes? Silent seeded-output drift, no fixture or canary, or a tolerance loosened until the
     test passes is a finding.
 
-Preserve the physical-iPhone-only rule and XCUITest as the only automated UI evidence. Distinguish a
+Preserve the physical-iPhone-only automated device-testing rule (while respecting `IOSDeviceEligibilityPolicy`'s
+portrait compatibility admission of eligible 8 GB+ iPads in shipping iOS) and XCUITest as the only automated UI evidence. Distinguish a
 demonstrated defect from a coverage gap and do not invent requirements. Reply with findings ordered
 by severity (blocking, should fix, note), each as `path:line — rule — evidence — impact — suggested change`,
 then the test-adequacy answers (9–13, one line per test), then a one-line verdict. If nothing is

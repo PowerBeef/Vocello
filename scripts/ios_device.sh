@@ -44,7 +44,7 @@
 #   scripts/ios_device.sh debug [spec]             # attached launch + LLDB attach guidance (get-task-allow build)
 #   scripts/ios_device.sh logs [spec] [--voice-id SAVED_VOICE_ID]
 #                                                 # attached launch teeing stdout → build/artifacts/diagnostics/ios/logs/<run>.log
-#   scripts/ios_device.sh profile [--kind cpu|memory] [--keep-trace] [spec]
+#   scripts/ios_device.sh profile [--kind cpu|memory|metal|witness] [--keep-trace] [spec]
 #                                                 # exact-PID Instruments diagnostic generation
 #   scripts/ios_device.sh memory --voice-id SAVED_VOICE_ID [--label ID]
 #                                                 # one-process retained-memory qualification

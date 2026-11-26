@@ -68,7 +68,7 @@ def make_worker(bucket):
         "- NEVER run native Xcode/SwiftPM builds, tests, devices, models, or measured lanes.\n"
         "- NEVER push, stash, or broadly stage (`git add -A` / `git add .`).\n"
         f"- {tests_line}\n"
-        "- Stage explicit file paths and make one clean commit on your worktree branch (no Claude trailers).\n"
+        "- Stage explicit file paths and make one clean commit on your worktree branch (no AI co-author trailers).\n"
         "- Return your worktree branch name, commit SHA (`git rev-parse HEAD`), changed files, and checks run."
     )
     return agent(

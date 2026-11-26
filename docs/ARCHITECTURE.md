@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-21
+reviewed: 2026-11-25
 summary: System architecture — engine core, the in-process request lifecycle on macOS and iOS, model management, telemetry layers, and the engine invariants each surface must preserve.
 sourceOfTruth:
   - project.yml
@@ -21,13 +21,10 @@ sourceOfTruth:
 >
 > This is static architecture verification; it is not fresh model, device, UI, or performance
 > evidence. The development loop, agents and tool routing live in
-> [`reference/development-workflow.md`](reference/development-workflow.md); the
-> [October 18 development-workflow audit](audits/2026-10-18-dev-workflow-audit.md) is the current
-> review of that workflow. The Codex harness was retired on 2026-10-12
-> ([Claude Code takeover audit](audits/2026-10-12-claude-code-takeover-audit.md)), and the
-> November 20 Antigravity cutover (`RF-67`) retired Claude Code and `.claude/`; the
-> [October 10 Codex workflow audit](audits/2026-10-10-codex-workflow-audit.md) and its coverage map
-> and the October 12 takeover audit are historical. Earlier checkpoints remain in Git history.
+> [`reference/development-workflow.md`](reference/development-workflow.md). The Codex harness was
+> retired on 2026-10-12 and the November 20 Antigravity cutover (`RF-67`) retired Claude Code and
+> `.claude/`; the historical October 2026 Codex, Claude Code takeover, and development-workflow
+> audits and earlier checkpoints remain in Git history.
 
 ## TL;DR
 
@@ -47,7 +44,8 @@ One engine core (`QwenVoiceCore` / `MLXTTSEngine`) is hosted three ways:
 
 Platforms: macOS 26+, iOS 26+, Apple Silicon (`arm64`), Swift 6; CI pins Xcode 27.2 / Swift 6.4.2
 on GitHub's GA `xcode-27` runner (matching the local development Mac since 2026-11-20, DW-04). Minimum
-hardware support is an Apple Silicon Mac with 8 GB or iPhone 15 Pro or newer; canonical benchmark
+hardware support is an Apple Silicon Mac with 8 GB, an iPhone 15 Pro or newer, or an eligible
+8 GB+ M-series / A17 Pro iPad in portrait compatibility mode (`IOSDeviceEligibilityPolicy`); canonical benchmark
 hardware is separately defined as Mac mini M6 16 GB (since 2026-09-22; the retired Mac mini M2
 8 GB records stay history) and iPhone 17 Pro.
 Release identities live in [`project.yml`](../project.yml) (`MARKETING_VERSION`,
@@ -117,7 +115,7 @@ graph TD
     VocelloCoreTests --> VocelloiOSPolicies
     VocelloCoreTests -.->|"@testable import"| VocelloCLICore
 
-    VocelloiOSPolicies --> VocelloSharedPolicies
+    VocelloiOSPolicies --> QwenVoiceCore
     VocelloSharedPolicies --> QwenVoiceCore
     QwenVoiceCore --> QwenVoiceBackendCore
 
@@ -139,12 +137,12 @@ for the exact link graph.)
 | `QwenVoice` | application | macOS | `QwenVoice` | `com.qwenvoice.app` | macOS SwiftUI app (`Vocello.app`); hosts the engine in-process on the shared store (compiles the iOS store by path). |
 | `VocelloiOS` | application | iOS | `QVoiceiOS` | `com.patricedery.vocello` | iOS SwiftUI app; engine runs in-process. App Group `group.com.patricedery.vocello.shared`. |
 | `VocelloCLI` | tool | macOS | `VocelloCLI` | `com.qwenvoice.cli` | Headless `vocello` binary; engine in-process. Its entry point, the bench commands and the small catalog commands (`speakers`, `deliveries`, `languages`) over `VocelloCLICore`. |
-| `VocelloCLICore` | framework.static | macOS | `VocelloCLICore` | `com.qwenvoice.cli.core` | The CLI's runtime, argument parsing and routing, consent, process supervision, batch execution and the command handlers for `generate`, `run`, `modes`, `models`, `voices`, `history`, `settings`, `batch` and `doctor`: linked into `vocello` and imported `@testable` by `VocelloCoreTests` instead of compiled there by path (workflow audit P2-3). |
+| `VocelloCLICore` | framework.static | macOS | `VocelloCLICore` | `com.qwenvoice.cli.core` | The CLI's runtime, argument parsing and routing, consent, process supervision, batch execution and the command handlers for `generate`, `modes`, `run`, `models`, `voices`, `history`, `batch` and `doctor`: linked into `vocello` and imported `@testable` by `VocelloCoreTests` instead of compiled there by path (workflow audit P2-3). |
 | `VocelloDesktopCore` | framework.static | macOS | `VocelloDesktopCore` | `com.qwenvoice.desktop.core` | The Mac app logic the CLI shares (RF-26, RF-27): app files compiled by path (the engine store and Mac memory budget, History records and migrations, model-variant resolution) plus `Sources/DesktopShared` (also compiled by the app; it holds the engine-host lease the app and the CLI both write, and the one admission rule both apply). `DesktopEngineHost` hosts the engine as `MacEngineBootstrap` does and runs long-form projects through the apps' `IOSLongFormProjectRunner` (compiled by path) headless; read-only History, app settings (CFPreferences), model selection and inventory. |
 | `QwenVoiceCore` | framework.static | iOS + macOS | `QwenVoiceCore` | `com.qwenvoice.core` | **Engine core**: `TTSEngine` protocol, `MLXTTSEngine`, generation semantics, runtime, memory policy, telemetry. |
 | `QwenVoiceBackendCore` | framework.static | iOS + macOS | `QwenVoiceBackendCore` | `com.qwenvoice.backend-core` | Backend provenance, generation defaults and policy vocabulary, finish reason, and the minimal synthesis abstraction. MLX loading, synthesis, and codecs live in `QwenVoiceCore` and the owned Qwen3 runtime. |
 | `VocelloSharedPolicies` | framework.static | iOS + macOS | `VocelloSharedPolicies` | `com.qwenvoice.shared-policies` | Pure platform-neutral runtime-release, generation-ownership, Studio attempt-authority, foreground-exit, retry-policy, handoff and notification types compiled once instead of 4-5x by path across `QwenVoice`, `VocelloiOS`, `VocelloDesktopCore`, `VocelloCoreTests` and `VocelloiOSLogicTests` (P2-3 / DW-03). |
-| `VocelloiOSPolicies` | framework.static | iOS + macOS | `VocelloiOSPolicies` | `com.patricedery.vocello.ios-policies` | Pure iOS-only policies (device eligibility, storage protection, download ledger, background `URLSession` completion coordinator, attribution manifest, upgrade/Make Room decisions) linked only by `VocelloiOS`, `VocelloCoreTests` and `VocelloiOSLogicTests` with zero link on `QwenVoice` or `VocelloCLI` (Wave 4 / DW-03). |
+| `VocelloiOSPolicies` | framework.static | iOS + macOS | `VocelloiOSPolicies` | `com.qwenvoice.ios-policies` | Thirteen pure iOS-only policy files (startup recovery/reliability, download admission/cancellation/progress mapping, storage protection, device eligibility, export access/purchase state, audio session, Studio draft persistence, leftover-audio analysis, attribution manifest) linked only by `VocelloiOS`, `VocelloCoreTests` and `VocelloiOSLogicTests` with zero link on `QwenVoice` or `VocelloCLI` (Wave 4 / DW-03). |
 | `VocelloCoreTests` | bundle.unit-test | macOS | `VocelloCoreTests` | `com.qwenvoice.core.tests` | Core semantics, typed telemetry compatibility, atomic/readable output contracts, the host-runnable iOS policy assertions from `Tests/VocelloiOSLogicTests`, which this target also compiles, and the shared orchestrators compiled by path (engine store over a fake engine, Studio coordinator, History database service, export gate, iPhone model inventory, long-form coordinator and runner). |
 | `VocelloiOSLogicTests` | bundle.unit-test | iOS | `VocelloiOSLogicTests` | `com.patricedery.vocello.logic-tests` | Duplicate standalone, app-host-free platform policy compile for catalog/ledger, memory, cancellation, storage gating, and privacy-safe diagnostics. Ordinary CI compiles this bundle for the physical-device SDK. Xcode 27 (`27.2`) does not support executing a tool-hosted app-free bundle on a physical-device destination, so this target is compile-only; its shared assertions execute in `VocelloCoreTests`. |
 | `VocelloMacUITests` | bundle.ui-testing | macOS | `VocelloMacUITests` | `com.qwenvoice.app.uitests` | Explicit native-app smoke and benchmark XCUITest lanes. |
@@ -208,12 +206,13 @@ and never executes that standalone bundle; it compiles all four UI test bundles 
 
 ### Key layering rule
 
-`QwenVoiceBackendCore` ← `QwenVoiceCore` ← `VocelloSharedPolicies` ← `{VocelloiOSPolicies ← VocelloiOS, QwenVoice, VocelloDesktopCore ← VocelloCLICore ← CLI}`.
+`QwenVoiceBackendCore` ← `QwenVoiceCore` ← `{VocelloSharedPolicies ← {VocelloiOS, QwenVoice, VocelloDesktopCore ← VocelloCLICore ← CLI}, VocelloiOSPolicies ← VocelloiOS}`.
 BackendCore is a narrow, dependency-light contract/provenance layer; `QwenVoiceCore` and the owned
 Qwen3 runtime implement model loading, synthesis, streaming, and codecs; `VocelloSharedPolicies`
 compiles pure multiplatform runtime, Studio, ownership and retry policies once for both apps,
-desktop core and unit tests, while `VocelloiOSPolicies` keeps pure iOS-only policies linked strictly
-into the iOS app and test targets. Every host reaches the engine in-process through
+desktop core and unit tests, while sibling `VocelloiOSPolicies` (depending directly on
+`QwenVoiceCore`, not `VocelloSharedPolicies`) keeps pure iOS-only policies linked strictly
+into `VocelloiOS`, `VocelloCoreTests` and `VocelloiOSLogicTests`. Every host reaches the engine in-process through
 `QwenVoiceCore` alone; the platform differences live in the bootstraps
 (`MacEngineBootstrap`, `QVoiceiOSApp.makeBackend`, `CLIRuntime`), never in a second engine module.
 
@@ -458,7 +457,11 @@ runtime only as request-local
 turns D1 off, registered internal-diagnostics knobs turn any arm on or off, and a request that
 departs from production names its arms on the engine row (`reference_parity`). The values, the
 arms and the text layouts per take kind are owned by
-[`qwen3-tts-guide.md` §9](reference/qwen3-tts-guide.md#9-generation-parameters).
+[`qwen3-tts-guide.md` §9](reference/qwen3-tts-guide.md#9-generation-parameters). Before inference,
+`Qwen3TTSRuntimeProfile` and `MLXTTSEngine` enforce a localized 10-language impersonation guardrail
+(`RF-73`) that refuses prohibited voice-imitation prompts with a typed `.disallowedVoiceImitation`
+outcome across `GenerationSemantics`, `GenerationFailureDiagnosticLogger`, `VocelloPresentationText`,
+and `CLIFailure`.
 
 Explicit reserved/generating/aborting ownership prevents an
 abort-owned reservation from reopening generation and makes duplicate aborts join one finalization.
@@ -656,7 +659,7 @@ path. `GenerationOutputAdapterChoreographyTests` exercises this production helpe
 reservation, including terminal-before-release ordering. It does not execute concrete `run` with
 loaded weights, `EngineReservedTake`, the limiter, file writer, telemetry, and transport together;
 that integration boundary is finding CW-06 of the historical
-[October 10 Codex workflow audit](audits/2026-10-10-codex-workflow-audit.md#findings-and-migration-disposition),
+October 10, 2026 Codex workflow audit (in Git history),
 parked in `config/roadmap.json`.
 
 **MLX failures.** Every actor entry point that runs MLX work does so inside an MLX error scope, so
@@ -702,7 +705,11 @@ takes.
 A take can match its delivery and still have pathological spacing, or the reverse. Offline audio
 QC of generated takes (models, labels, detectors and lane gates) is QC v2, a report-only diagnostic
 since its flags did not predict the takes the maintainer hears as unusable:
-[`docs/reference/qc.md`](reference/qc.md).
+[`docs/reference/qc.md`](reference/qc.md). As a separate, strictly offline and report-only advisory
+complement (`RF-72`), `scripts/qc.py multimodal` (`vocello-audio-qc`, calibrated in
+`benchmarks/qc/multimodal-eval-v1.json`) performs blinded two-pass and dual-order `AB`/`BA`
+listening audits on Gemini 4 Neon strictly outside QC v2 `SCORING_SOURCES` and Fast QC, blocking
+personal audio by default.
 
 ### 4.11 Spoken-text and long-form planning status
 
@@ -810,7 +817,7 @@ metadata never selects output language.
 
 ## 6. Request lifecycle — iOS
 
-iOS links `QwenVoiceCore` and `VocelloSharedPolicies`; the engine is in-process behind
+iOS links `QwenVoiceCore`, `VocelloSharedPolicies`, and `VocelloiOSPolicies`; the engine is in-process behind
 `Sources/iOS/TTSEngineStore.swift`, the store the macOS app shares since 2026-09-15.
 
 ```mermaid
@@ -864,15 +871,21 @@ concrete type. Key iOS behaviors:
   critical, for at most three minutes, and the progress line says why. The first take of a run,
   single takes and segment regeneration are never held; Stop works throughout. The apps pause; the
   CLI, which has no progress line, does not.
-- **Interruption recorder** (2026-07-02): `IOSInterruptionRecorder` (CXCallObserver +
-  UIApplication lifecycle) runs during headless device diagnostics only; events land in
-  `device-diagnostics-done.json` as `interruptions` so doomed runs self-report calls/backgrounding.
+- **Interruption recorder & device-diagnostics compile guard** (2026-07-02; `RF-73` Guideline
+  2.5.19): `IOSInterruptionRecorder` (`CXCallObserver` + `UIApplication` lifecycle),
+  `IOSDeviceDiagnosticsRunner`, and `IOSStartupReliabilityRunner` are compiled into iOS only when
+  `QVOICE_DEVICE_DIAGNOSTICS` is defined (omitted from shipping builds, verified by
+  `scripts/verify_ios_release_artifacts.py`); during headless device diagnostics, interruption events
+  land in `device-diagnostics-done.json` as `interruptions` so doomed runs self-report
+  calls/backgrounding.
 - **Memory posture**: `.iPhonePro` policy; `Qwen3TTSMemoryCaches.clearAll()` on
   hard-trim/unload/failure. A Mac clears the same caches for memory relief only (a hard trim, or
   the full unload a pressure band asked for) and keeps them across an idle or explicit unload.
 - **Clone load profile**: `.fullCapabilities` vs `.iOSProductionDefault`
-(`.withoutCloneEncoders`) depending on the entitled memory limit.
-- **Hardware gate**: `IOSDeviceSupport.isSupportedHardware` (iPhone 15 Pro+).
+  (`.withoutCloneEncoders`) depending on the entitled memory limit.
+- **Hardware gate**: `IOSDeviceSupport.isSupportedHardware` / `IOSDeviceEligibilityPolicy` (iPhone
+  15 Pro+ plus 13 eligible 8 GB+ M-series and A17 Pro iPads admitted in portrait compatibility mode
+  under `TARGETED_DEVICE_FAMILY: "1"`).
 - **Ordering authorities** (2026-09-12): `IOSGenerationOwnershipAuthority`
   (`Sources/iOSSupport/Services/`) owns generation admission, ownership and terminal ordering for
   `TTSEngineStore`; `IOSModelDownloadCancellationSequence` records durable cancel intent before the
@@ -885,8 +898,9 @@ concrete type. Key iOS behaviors:
 
 `Sources/VocelloCLI/CLIRuntime.swift` (`@MainActor public struct CLIRuntime`, compiled into the
 `VocelloCLICore` framework with the command model and parser, consent, process supervision,
-batch execution, the `vocello mcp` server and the `generate`, `run` and `modes` commands; the
-`vocello` executable keeps `VocelloMain` and the other commands and links it) bootstraps
+batch execution, and the `generate`, `modes`, `run`, `models`, `voices`, `history`, `batch`, and
+`doctor` command handlers; the `vocello` executable keeps `VocelloMain`, the bench commands, and the
+small catalog commands `speakers`/`deliveries`/`languages` and links it) bootstraps
 the in-process engine the same way the apps do — `NativeRuntimeFactory.make`
 over a data directory — and reuses models already installed by the app. `generate`, `batch` and
 `run` pass `hostedLikeTheApp`, so takes go through `DesktopEngineHost` and the shared
@@ -968,7 +982,9 @@ machine-readable (a path, or JSON with `--json`); progress goes to stderr. Full 
   after the user accepts any quality warning; Cancel, Discard, and outside dismissal discard it.
   The Voices row menu deletes one confirmed saved voice through the engine transaction and clears
   matching preview and Studio draft state without cascading to other voice-bank members.
-  `Info.plist` declares `public.audio`, in-place document opening, and Files sharing for this route.
+  `Info.plist` declares four explicit audio UTIs (`com.microsoft.waveform-audio`, `public.mp3`,
+  `public.aiff-audio`, `public.mpeg-4-audio`) and in-place document opening
+  (`LSSupportsOpeningDocumentsInPlace`); `UIFileSharingEnabled` was dropped under `RF-73`.
 - iOS UI conventions: `IOSScrollView` (not raw `ScrollView`) for vertical
   surfaces, `TabDock`, voice previews from `Resources/voice-previews/`.
 
@@ -995,20 +1011,23 @@ machine-readable (a path, or JSON with `--json`); progress goes to stderr. Full 
 - **`Sources/iOSSupport/`** is the iOS counterpart to macOS `Services/`: runtime helpers + model wrappers
   coordinating through the **App Group** container
   (`group.com.patricedery.vocello.shared`) and a `UserDefaults` suite, plus the pure ordering
-  types the `@MainActor` iOS classes drive (`IOSModelDownloadCancellationSequence`,
-  `CriticalMemoryReliefExecutor`, and the seven multiplatform policy files compiled once in
-  `VocelloSharedPolicies`: `IOSGenerationOwnershipAuthority`, `RuntimeReleaseCoordinator`,
-  `IOSBackgroundGenerationPolicy`, `SavedVoicesBusyRetryPolicy`, `StudioGenerationAttemptAuthority`,
-  `AppNotifications`, and `PendingVoiceCloningHandoff`), which is what lets
+  types the `@MainActor` iOS classes drive (`CriticalMemoryReliefExecutor`, the eight multiplatform
+  policy files compiled once in `VocelloSharedPolicies`: `IOSGenerationOwnershipAuthority`,
+  `RuntimeReleaseCoordinator`, `IOSBackgroundGenerationPolicy`, `SavedVoicesBusyRetryPolicy`,
+  `StudioGenerationAttemptAuthority`, `AppNotifications`, `PendingVoiceCloningHandoff`, and
+  `IOSSingleTakeGenerationExecutor`, and the thirteen pure iOS-only policy files compiled once in
+  `VocelloiOSPolicies`, including `IOSModelDownloadCancellationSequence` and
+  `IOSDeviceEligibilityPolicy`), which is what lets
   `Tests/VocelloiOSLogicTests` characterize them without an app host.
 - macOS links `VocelloSharedPolicies` (so `IOSGenerationOwnershipAuthority`,
-  `RuntimeReleaseCoordinator`, `AppNotifications`, and the other shared policies are no longer
+  `RuntimeReleaseCoordinator`, `AppNotifications`, `IOSSingleTakeGenerationExecutor`, and the other
+  shared policies are no longer
   compiled by path into `QwenVoice`) and uses `Sources/Services/` plus the remaining shared
   `Sources/iOS/` and `Sources/iOSSupport/` files it compiles by path (`TTSEngineStore`, the
   diagnostics recorder, the History `DatabaseService` with `Generation`/`Voice`, the saved-voices
-  view model, `StudioGenerationCoordinator`, the single-take executor, the long-form project and
-  the generation drafts — listed in `project.yml`); iOS links `VocelloSharedPolicies` and uses
-  `Sources/iOS/` + `iOSSupport/`. Plan
+  view model, `StudioGenerationCoordinator`, the long-form project and
+  the generation drafts — listed in `project.yml`); iOS links both `VocelloSharedPolicies` and
+  `VocelloiOSPolicies` and uses `Sources/iOS/` + `iOSSupport/`. Plan
   `macos-ios-convergence-2026-09` completed on 2026-09-15.
 - Both frontends persist the reviewed transcript source and separately confirmed reference
   language as `PreparedVoiceEnrollmentMetadata`. The legacy prepared-candidate command remains
@@ -1054,7 +1073,7 @@ rebuilding the table copies surviving row IDs but does not preserve a larger del
 AUTOINCREMENT high-water mark (retained ID 41 / deleted ID 900 becomes sequence 41, next ID 42).
 This is tracked separately from workflow migration; do not assume historical IDs remain globally
 unused across that upgrade. See finding CW-05 of the historical
-[October 10 Codex workflow audit](audits/2026-10-10-codex-workflow-audit.md#findings-and-migration-disposition).
+October 10, 2026 Codex workflow audit (in Git history).
 
 **Locations** (release vs debug):
 
@@ -1121,8 +1140,10 @@ Long-form acceptance uses its separate journal so a joined take and segment supe
 together. The graph describes publication authority, not every callback: playback can precede
 History acceptance, and an enqueue failure has no durable crash-recovery claim.
 
-**`UserDefaults` keys**: `vocello.voiceCloningConsent.v1` (visible Settings-owned clone-consent
-acknowledgment; below the views `AnyTTSEngineBackend` reads it through `VoiceCloningConsentPolicy`
+**`UserDefaults` keys**: `vocello.voiceCloningConsent.v1` (clone-consent acknowledgment owned by
+Settings and also gated inline via the one-time `IOSVoiceCloningConsentSheet` /
+`VoiceCloningConsentPolicy.gateInlineAction` added under `RF-73`; below the views
+`AnyTTSEngineBackend` reads it through `VoiceCloningConsentPolicy`
 on every clone generation and saved-voice enrollment and refuses both without it, while the CLI
 records consent per invocation with `--confirm-consent`), `vocello.ios.interfaceLanguage` (the interface language, in `AppDefaults.store` on
 macOS through `MacInterfaceLanguage`), `vocello.ios.studioDrafts.v1` (the iPhone Studio drafts,
@@ -1290,7 +1311,10 @@ Environment-variable ownership is explicit. `config/runtime-debug-knobs.json` re
 supported key and classifies production-affecting overrides, bounded observability, and
 test-target-only device diagnostics. Production-affecting values are read only through
 `RuntimeDebugGate` and require both the `VOCELLO_INTERNAL_DIAGNOSTICS` compile capability and
-`QWENVOICE_DEBUG`; distribution routes omit the capability. The owned package cannot see that
+`QWENVOICE_DEBUG`; distribution routes omit the capability. Under Guideline 2.5.19 (`RF-73`),
+shipping iOS builds additionally compile out dormant device/perf runners (`QVOICE_DEVICE_DIAGNOSTICS`)
+and `QWENVOICE_*` environment-variable reads in `RuntimeDebugGate` and `TelemetryGate` (enforced by
+`scripts/verify_ios_release_artifacts.py`). The owned package cannot see that
 compile condition, so the product attests it on every load
 (`VocelloQwen3LoadBehavior.internalDiagnosticsAvailable`, default false) and the package's
 `VocelloQwen3ImplementationDebugGate` refuses its load-time overrides without it. Bounded observability remains
@@ -1509,9 +1533,7 @@ Most-frequent imports across `Sources/**/*.swift`:
 - [`development-progress.md`](development-progress.md) — active checkpoint: deterministic development status, the completed XCUITest stack, and the agent resume route.
 - [`AGENTS.md`](../AGENTS.md) — repo operating instructions and links to native/tooling safeguards.
 - [`reference/development-workflow.md`](reference/development-workflow.md) — the current local loop, commit lint, CI routing, agents and tool routing.
-- [`audits/2026-10-18-dev-workflow-audit.md`](audits/2026-10-18-dev-workflow-audit.md) — the current development-workflow audit and its phased improvement programme.
-- [`audits/2026-10-12-claude-code-takeover-audit.md`](audits/2026-10-12-claude-code-takeover-audit.md) — the return to Claude Code: harness changes, live observations and open follow-ups (DA-15).
-- [`audits/2026-10-10-codex-workflow-audit.md`](audits/2026-10-10-codex-workflow-audit.md) — historical: the Codex-era takeover findings and coverage map, from before the Codex harness was retired on 2026-10-12.
+- [`audits/2026-10-16-engine-runtime-audit.md`](audits/2026-10-16-engine-runtime-audit.md) — active engine/runtime audit (historical October 2026 Codex, Claude Code takeover, and development-workflow audits remain in Git history).
 - [`README.md`](../README.md) — product overview + install.
 - [`PRODUCT.md`](../PRODUCT.md) — product/brand guidance.
 - Per-subsystem deep-dives in `docs/reference/`:
@@ -1546,9 +1568,8 @@ native serialization, performance admissibility, or release authority. Scripts r
 CI and on hosts without personal plugins.
 
 Choose verification with [`reference/development-workflow.md`](reference/development-workflow.md)
-and the [October 18 workflow audit](audits/2026-10-18-dev-workflow-audit.md): helper-level
+and [`reference/testing-runbook.md`](reference/testing-runbook.md): helper-level
 deterministic tests, compile-only bundles, explicit native UI/device execution, and measured model
-lanes answer different questions. The historical
-[October 10 coverage map](audits/2026-10-10-codex-workflow-audit.md#coverage-map) records the same
-split as of that date. A successful build or passing schema test never implies background delivery,
-audible playback, or benchmark qualification.
+lanes answer different questions (the historical October 2026 workflow audits and coverage map in Git
+history record the same split). A successful build or passing schema test never implies background
+delivery, audible playback, or benchmark qualification.

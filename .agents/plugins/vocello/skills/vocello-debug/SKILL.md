@@ -17,8 +17,9 @@ incomplete evidence) before taking action.
 Load applicable Axiom guidance via the `axiom` MCP server, `docs/reference/mlx-guide.md` for runtime
 issues, and Sosumi or Context7 for authoritative API research. Hand a finished native run to the
 read-only `vocello-xcresult-triage` subagent when a second reading helps. Detect optional
-`mobilebuildmcp` discovery/coverage or LLDB capabilities in the live session; do not assume a
-device/LLDB route exists. Keep native serialization; a UI reproduction is an XCUITest lane or a new
+`mobilebuildmcp` discovery/coverage tools in the live session (its debugging/LLDB MCP tools are
+denied and disabled); use LLDB strictly through `scripts/macos_test.sh debug` or
+`scripts/ios_device.sh debug`. Keep native serialization; a UI reproduction is an XCUITest lane or a new
 scenario, never a `cua-driver` or computer-use session.
 
 Use `axiom` MCP's `axiom_xcsym_*` tools for retained crash symbolication and `axiom_xcprof_*` for

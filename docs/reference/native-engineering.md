@@ -2,18 +2,7 @@
 status: active
 owner: backend-and-platform
 summary: Native engineering rule for the engine, macOS app and iOS app; Antigravity loads it on demand through .agents/plugins/vocello/rules/native.md when matching files are touched.
-reviewed: 2026-11-21
-paths:
-  - "Sources/**"
-  - "Packages/**"
-  - "Tests/**"
-  - "project.yml"
-  - "config/runtime-debug-knobs.json"
-  - "config/concurrency-safety.json"
-  - "config/runtime-refactor-contract.json"
-  - "config/model-artifact-receipts.json"
-  - "config/macos-entitlement-policy.json"
-  - "config/ios-control-audit.json"
+reviewed: 2026-11-25
 ---
 # Native rule — engine, macOS app, iOS app
 
@@ -74,6 +63,11 @@ physical-device or macOS XCUITest lane at a coherent checkpoint.
   status; do not restate it in prose.
 - **Diagnostics fail closed.** Every production-affecting environment key is registered in
   `config/runtime-debug-knobs.json` and needs the internal-diagnostics build plus `QWENVOICE_DEBUG`.
+  Under Guideline 2.5.19 (`RF-73`), dormant iOS device/perf runners (`IOSInterruptionRecorder`,
+  `IOSDeviceDiagnosticsRunner`, `IOSStartupReliabilityRunner`) compile out unless
+  `QVOICE_DEVICE_DIAGNOSTICS` is defined, and shipping iOS builds compile out `QWENVOICE_*`
+  environment-variable reads in `RuntimeDebugGate` and `TelemetryGate`
+  (`scripts/verify_ios_release_artifacts.py` enforces both).
   Every `@unchecked Sendable` and `nonisolated(unsafe)` is justified in
   `config/concurrency-safety.json`; `scripts/runtime_security_contract.py` checks both.
 - **Catalog activation fails closed.** The generated schema-v2 catalog is complete for the three
@@ -168,7 +162,9 @@ physical-device or macOS XCUITest lane at a coherent checkpoint.
   position; all glass routes through `IOSGatedGlassModifier` (system glass button styles through
   `IOSGlassGate`); Reduce Motion / Reduce Transparency honored; identifiers stable and governed with
   `config/ios-control-audit.json`; no hidden test UI.
-- **Hardware and memory.** `IOSDeviceSupport.isSupportedHardware` (iPhone 15 Pro and later) aligns with
+- **Hardware and memory.** `IOSDeviceSupport.isSupportedHardware` / `IOSDeviceEligibilityPolicy`
+  (iPhone 15 Pro and later, plus 13 eligible 8 GB+ M-series and A17 Pro iPads admitted in portrait
+  compatibility mode under `TARGETED_DEVICE_FAMILY: "1"`) aligns with
   `scripts/ios_device_eligibility.py`; the `increased-memory-limit` entitlement stays; clone load profile
   follows the entitled limit. Publishable device evidence is memory-qualified
   (`docs/reference/tooling-and-evidence.md`, Memory-qualified publication).
@@ -230,8 +226,9 @@ physical-device or macOS XCUITest lane at a coherent checkpoint.
 - Adding, moving or deleting a file under a globbed `Sources/`, `Tests/` or resource path without
   `./scripts/regenerate_project.sh --fast` and the regenerated `project.pbxproj` in the same commit
   (the generation signature: `docs/reference/development-workflow.md`, Cache and generation policy).
-- Relying on a class-level `@MainActor` to isolate XCTest `setUp`/`tearDown`; the pinned CI Xcode does
-  not, so hop with `await MainActor.run`. A failed CI run names its failing tests or compile errors
+- Relying on a class-level `@MainActor` to isolate XCTest `setUp`/`tearDown`; even after `DW-04`
+  moved CI to Xcode 27.2, hop explicitly with `await MainActor.run` for cross-toolchain safety. A
+  failed CI run names its failing tests or compile errors
   in the job summary (`scripts/ci/summarize_test_failures.py`); the full logs are in the run's
   `macos-deterministic-test-artifacts` artifact.
 - Assuming a newer local Xcode matches CI when `config/toolchain.json` pins an older one: `DW-04`
@@ -257,9 +254,11 @@ physical-device or macOS XCUITest lane at a coherent checkpoint.
   querying a tab while a bottom panel or keyboard covers the dock (the hittability query can end the
   runner before cleanup; close the panel first).
 - Testing pure order or state logic owned by an app-only `@MainActor` iOS type in place: extract it
-  into a value type under `Sources/iOSSupport/Services`, either adding it to `VocelloSharedPolicies`
-  (preferred for pure platform-neutral policies shared across apps and tests) or listing the file
-  under both `VocelloCoreTests` and `VocelloiOSLogicTests` in `project.yml`, and add it to the
+  into a value type under `Sources/iOSSupport/Services`, adding it to `VocelloSharedPolicies`
+  (for pure platform-neutral policies shared across both apps, desktop core and tests),
+  `VocelloiOSPolicies` (for pure iOS-only policies linked strictly by `VocelloiOS`,
+  `VocelloCoreTests` and `VocelloiOSLogicTests` with zero link on macOS/CLI), or dual-listing the
+  file under both `VocelloCoreTests` and `VocelloiOSLogicTests` in `project.yml`, and add it to the
   matching `promotionRouting` class in `config/quality-promotion-contract.json`. The orchestrators
   themselves are the exception: the engine
   store, the Studio coordinator, the History `DatabaseService`, the export gate's decision logic, the

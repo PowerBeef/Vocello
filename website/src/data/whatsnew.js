@@ -50,10 +50,10 @@ export const HIGHLIGHTS = [
   },
 ];
 
-// The iPhone app's status. The release notes say its 3.1 version follows and has no TestFlight
-// candidate yet; since October 26, 2026 the public TestFlight beta runs 3.0.
+// The iPhone app's current status (matches IphoneBeta.jsx): the public
+// TestFlight beta runs 3.0, and the next iPhone release targets 3.2.
 export const IPHONE_NOTE =
-  "The iPhone app's 3.1 version, on the same engine, follows through TestFlight and the App Store. The public TestFlight beta still runs 3.0.";
+  "The iPhone app's 3.2 version, on the same engine, follows through TestFlight and the App Store. The public TestFlight beta still runs 3.0.";
 
 export const UPGRADE_NOTE =
   "Upgrading from 3.0? Choose Vocello > Check for Updates, or install the new DMG as usual. History, saved voices and settings carry over. On first launch Vocello replaces the models you installed with 3.0 by the new one for each mode, on its own on an unmetered network: a banner shows the progress, and Not Now stops it. Updating all three modes downloads about 4.7 GB. Upgrading from 2.x? Install the new DMG, then install each mode's new model from Settings > Models & Files.";

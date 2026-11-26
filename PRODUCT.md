@@ -8,7 +8,7 @@ product
 
 Mac (and iPhone) power users who create voice content for their own projects — videos, audiobooks, accessibility narration, podcasting, personal work — and value privacy enough to want generation to happen on-device instead of through a cloud TTS service. They are comfortable with native macOS conventions, likely use other Apple-native pro tools (Final Cut, Logic, Notes), and expect a Mac app to behave like a Mac app: keyboard-first, sheet-based, system materials, no novelty chrome.
 
-The hardware floor (any Apple Silicon Mac with 8 GB / iPhone 15 Pro) intentionally widens the audience past pro-only — hobbyists creating one voice clone for a side project sit on the same surface as someone batching narration for a series. The UI must read as "competent for both" without optimizing for either.
+The hardware floor (any Apple Silicon Mac with 8 GB / iPhone 15 Pro or newer, plus eligible 8 GB+ iPads in portrait compatibility mode) intentionally widens the audience past pro-only — hobbyists creating one voice clone for a side project sit on the same surface as someone batching narration for a series. The UI must read as "competent for both" without optimizing for either.
 
 The job: bring text, leave with audio that sounds right, in seconds, without leaving the laptop.
 

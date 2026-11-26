@@ -2,14 +2,7 @@
 status: active
 owner: release-qa
 summary: Tooling, CI, packaging, benchmark and evidence rule; Antigravity loads it on demand through .agents/plugins/vocello/rules/tooling.md when matching files are touched.
-reviewed: 2026-11-23
-paths:
-  - "scripts/**"
-  - ".github/**"
-  - "config/**"
-  - "benchmarks/**"
-  - ".agents/**"
-  - "AGENTS.md"
+reviewed: 2026-11-25
 ---
 # Release / QA rule — scripts, CI, packaging, benchmarks, evidence
 
@@ -87,10 +80,12 @@ rules they enforce:
   from the tag under the `release` environment and verifies the build attestation of each DMG and the
   CLI installer package from
   `release.yml`. The jobs that sign or ship (`package`, `sparkle-feed`, `draft-release`,
-  `archive-ios`) restore no Actions cache (`native-toolchain` with `pip-cache: "false"`; the signed
-  builds resolve packages cold from `Package.resolved`). `compile-ios`, the unsigned compile-safety
-  check whose products are scratch, restores a SwiftPM source cache
-  (`build/cache/xcode/source-packages`, keyed on the pinned Xcode and `Package.resolved`). The
+  `archive-ios`) restore no Actions cache (`package` and `archive-ios` call `native-toolchain` with
+  `pip-cache: "false"` and resolve packages cold from `Package.resolved`; `sparkle-feed` and
+  `draft-release` do not invoke `native-toolchain`). `compile-ios`, the unsigned compile-safety
+  check whose products are scratch, also passes `pip-cache: "false"` to `native-toolchain` while
+  restoring a SwiftPM source cache (`build/cache/xcode/source-packages`, keyed on the pinned Xcode
+  and `Package.resolved`). The
   Sparkle key lives only in `sparkle-feed`, a fresh runner that builds
   nothing, and only `draft-release`, which holds no secret, has `contents: write`. Lightweight tags,
   cross-SHA checks and incomplete check-run pagination fail closed. Every release step matches its
@@ -167,9 +162,10 @@ rules they enforce:
   contract-v1 records keep their ≥95% coverage rule. Marking evidence keeps the take peak
   (`config/marking-peak-equality.json`).
 - **Audio QA: Fast QC gates, QC v2 reports, no automated score is a quality verdict
-  (`docs/reference/qc.md`).** For 3.x nobody listens (maintainer decision 2026-10-13): RF-14 and RF-15
-  use a machine screen for gross failures only (Fast QC, end of take, the better ASR family's edit rate
-  and the language check), and subtle defects ship as the documented known limitation.
+  (`docs/reference/qc.md`).** For 3.x nobody listens (maintainer decision 2026-10-13): machine-screened
+  quality gates (`RF-14` closed, `RF-15` open) catch gross failures only (Fast QC, end of take, the
+  better ASR family's edit rate and the language check), and subtle defects ship as the documented
+  known limitation.
   Fixed seeds and byte-bound PCM Fast QC stay mandatory; Fast QC thresholds stay in Swift. QC v2 is
   a report-only diagnostic: some detectors have historical human-recording calibration (`qc.py controls`,
   `qc.py calibrate`), while current acceptance requires complete inputs and qualified scoring/runner
@@ -252,7 +248,7 @@ rules they enforce:
   hand, or adding a document or changing a summary without `scripts/dev.sh regen`.
 - Running iOS UI work in the Simulator or making ordinary CI wait for a phone, a model or XCUITest.
 - Clearing caches to evade native-lock contention instead of serializing native commands, or running
-  native builds outside the host-wide lock (MobileBuildMCP/XcodeBuildMCP builds bypass it).
+  native builds outside the host-wide lock (`MobileBuildMCP` builds bypass it).
 - Editing, committing or integrating agent work while a UI or benchmark lane runs: publication compares
   the pre- and post-run tree fingerprints, and a mismatch demotes the record to exploratory.
 - Running a probe of the `benchmark` or `perf` lane without `--no-publish`: a passing run leaves a

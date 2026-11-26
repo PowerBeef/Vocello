@@ -10,7 +10,9 @@ contracts, read `docs/reference/native-engineering.md` (the authoritative native
 
 Non-negotiable invariants enforced here:
 - **Release-only:** no `#if DEBUG`; diagnostics use `VOCELLO_INTERNAL_DIAGNOSTICS`, `QWENVOICE_DEBUG=1`,
-  and knobs registered in `config/runtime-debug-knobs.json`.
+  and knobs registered in `config/runtime-debug-knobs.json`. Shipping iOS builds also compile out
+  dormant device/perf runners (`QVOICE_DEVICE_DIAGNOSTICS`) and `QWENVOICE_*` env-var reads
+  (Guideline 2.5.19; `scripts/verify_ios_release_artifacts.py`).
 - **Swift 6 & concurrency:** register any `@unchecked Sendable` or `nonisolated(unsafe)` in
   `config/concurrency-safety.json`; never pass MLX arrays across isolation boundaries; honor
   `NonisolatedNonsendingByDefault`, `InferIsolatedConformances`, `MemberImportVisibility`, and strict

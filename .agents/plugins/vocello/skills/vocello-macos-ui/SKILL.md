@@ -20,7 +20,9 @@ backgrounded via `WaitMsBeforeAsync: 500` (never shell `&`).
 Every UI check is a repository XCUITest lane (maintainer decision 2026-11-17); never use `cua-driver`
 or computer use. Use genuine controls and stable identifiers, and give a check no lane covers its own
 scenario. What XCUITest cannot drive (the macOS privacy grants, a Sparkle install) is the
-maintainer's, by hand. After the lane, review `<run>/screenshots/index.json`: each failure frame and
+maintainer's, by hand. After the lane, review `<run>/screenshots/index.json` (or run
+`.agents/workflows/xcuitest_visual_qa.py` for automated parallel screenshot QA alongside
+`vocello-xcresult-triage`): each failure frame and
 each named state the row asserts, for clipping, overlap, a wrong state, untranslated text or an
 unexpected dialog; report-only, each finding classified as a release blocker or a backlog line.
 

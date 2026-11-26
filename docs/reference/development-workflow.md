@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-23
+reviewed: 2026-11-25
 summary: Setting up a new Mac, the local edit loop, the commit lint and how push CI routes lanes; scripts/dev.sh is the interface and CI on main is the gate.
 sourceOfTruth:
   - scripts/dev.sh
@@ -37,8 +37,8 @@ cd Vocello
 - An Apple Silicon Mac on macOS 26 or newer with **full Xcode**; the Command Line Tools alone cannot
   build any product. CI pins `Xcode 27.2` / `Swift 6.4.2` in `config/toolchain.json` (`native.xcode`,
   `native.swift`) on GitHub's GA `xcode-27` runner image (DW-04 cutover on 2026-11-20). If a newer
-  local Xcode point release is installed than the pin, push CI stays the judge and the daily
-  report-only `xcode-preview.yml` shows differences against newer Xcode 27.x releases on the runner.
+  local Xcode point release is installed than the pin, push CI stays the judge and the on-demand
+  report-only `xcode-preview.yml` (`workflow_dispatch`) shows differences against newer Xcode 27.x releases on the runner.
 - Select it and finish its first launch:
 
   ```sh
@@ -103,7 +103,7 @@ venvs under `build/cache/qc/runtimes/`, never in this interpreter; see [`qc.md`]
 
 ```sh
 npm --prefix website ci
-npx --prefix website playwright install --with-deps chromium webkit  # as CI and website/AGENTS.md do
+npm --prefix website exec playwright install chromium webkit  # Linux CI adds --with-deps
 npm --prefix website run check
 ```
 
@@ -134,7 +134,7 @@ signed and GitHub-verified (`git tag -s`), so configure a signing key only if yo
 
 ```sh
 scripts/dev.sh status
-python3 scripts/supply_chain_contract.py --installed native     # a newer local Xcode shows as drift; expected
+python3 scripts/supply_chain_contract.py --installed native     # passes when local Xcode matches config/toolchain.json (a newer local Xcode shows as drift)
 python3 scripts/supply_chain_contract.py --installed website    # any Node 24.x / npm 11.x passes
 scripts/dev.sh check                                            # first run: regenerate, resolve packages, cold build
 scripts/dev.sh build && scripts/dev.sh run
@@ -178,36 +178,20 @@ models or touching devices: tools and their pins, the selected Python and its te
 Playwright's browser builds for the website check and the repository's Antigravity harness files.
 Detect MCP tools in the live session.
 
-The maintainer's global Antigravity toolset is optional assistance, never a CI dependency. Detect
-tools in the live session rather than assuming installation means connection:
+The maintainer's global Antigravity toolset (optional MCP servers, plugins, `browser` subagent,
+and CLIs) is assistance, never a CI dependency; see the unified routing table and boundaries under
+[Antigravity setup and tool routing](#antigravity-setup-and-tool-routing).
 
-- **MCP servers:** `axiom` (skills, read-only auditors, `xcsym`, `xcprof`, `xclog`), `mobilebuildmcp`
-  (discovery and coverage only; Simulator, build and UI tools are denied by `.agents/hooks.json`),
-  `sosumi`, `context7_context7` and `huggingface` (`hf_fs`, `hub_repo_search`, `hub_repo_details`,
-  `hf_whoami`; Space-running tools ask).
-- **Plugins & skills:** `asc` (App Store Connect CLI skills and rule), `chrome-devtools-plugin`
-  (browser/a11y/perf debugging), `axiom` and `mobilebuildmcp` skills. `cua-driver` is denied in
-  Vocello (UI checks are XCUITest-only); `vercel-plugin` does not authorize direct CLI deploys
-  (Vercel deploys from Git).
-- **Built-in surfaces:** the `browser` subagent for local website inspection and `invoke_subagent` /
-  `swarm` for bounded parallel work.
-- **CLIs:** `hf`, `asc` and `gh`.
 - **Terminal sandbox:** Antigravity's default sandbox hides host paths outside the repository.
   Allowlist read access to `~/.qwenvoice-pinned-tools`, `~/Library/Python`,
   `~/Library/Caches/ms-playwright` and `~/Library/Application Support/QwenVoice`, plus read/write
   access to `~/Library/Caches/Vocello` (`native-build.lock`), so deterministic checks run smoothly
   inside the sandbox; commands needing Xcode, CoreDevice, Keychain or network run outside the sandbox
   with prefix-matchable command shapes.
-
-`.mobilebuildmcp/config.yaml` enables only MobileBuildMCP's project-discovery and coverage workflows,
-with macOS and physical-device profiles for scheme and settings lookups; repository scripts own
-canonical builds and host serialization, and `.agents/hooks.json` hard-denies Simulator, build, UI
-and `persist: true` calls even if global MCP environment variables expose extra workflows. Native UI
-evidence comes only from XCUITest.
-
-For a symbol server, `buildServer.json` is ignored because it holds machine paths. The swift-lsp
-plugin's sourcekit-lsp reads it for the LSP tool. When explicitly setting up an installed
-xcode-build-server, its config can target the warm `build/cache/xcode/macos` arena. Optional setup never replaces pinned repository tools or authorizes installation/repinning.
+- **Symbol server (`buildServer.json`):** `buildServer.json` is gitignored because it holds machine
+  paths. When explicitly setting up an installed `xcode-build-server` for `sourcekit-lsp`, target
+  the warm `build/cache/xcode/macos` arena. Optional setup never replaces pinned repository tools or
+  authorizes installation/repinning.
 
 ### Troubleshooting
 
@@ -228,7 +212,7 @@ scripts/dev.sh test --only FooTests  # one XCTest class on the incremental test 
 scripts/dev.sh test --only FooTests --repeat 50  # flaky hunting: up to 50 runs, stops at the first failure
 scripts/dev.sh py                    # Python consumers of the changed tooling (--all, --lane, or modules)
 scripts/dev.sh contracts             # the contract gate alone (check_project_inputs.sh --local)
-scripts/dev.sh lint                  # changed-file advisory SwiftLint, shellcheck, privacy
+scripts/dev.sh lint                  # changed-file advisory SwiftLint, ruff/pyright, shellcheck, privacy
 scripts/dev.sh build | run           # warm incremental macOS development build / launch
 ./scripts/build.sh cli && build/vocello models list  # the development CLI
 npm --prefix website run check       # the website's lint, tests, build and browser tests
@@ -250,8 +234,9 @@ the macOS test host never compiles the executable's own sources (BKL-75).
 Push CI compiles all four UI test bundles too (`VocelloMacUI`, `VocelloiOSUI`, `VocelloiOSPurchaseUI`, and `VocelloiOSCandidateUI`; `--gate`, after the deterministic builds in their arenas) and never
 runs them. XCUITest-only sources never reach the `swift` lane, since no deterministic bundle or TSan
 subset compiles them: `Tests/VocelloMacUITests` routes to `macos_ui`, which runs `macos-tests` for
-the bundle compile alone, and `Tests/VocelloiOSUITests` routes to `ios` alone
-(`Tests/UIAutomationSupport` stays a `swift` input because `VocelloCoreTests` compiles part of it).
+the bundle compile alone, and `Tests/VocelloiOSUITests` routes to `ios_ui` alone (skipping
+`build_foundation_targets.sh` and running only `build_ui_test_bundles.sh ios --gate`;
+`Tests/UIAutomationSupport` stays a `swift` input because `VocelloCoreTests` compiles part of it).
 On a push, CI diffs each lane against the last run on the
 branch in which that lane's job passed (not against the previous push), because `cancel-in-progress`
 can drop a superseded push's run and the lanes it owed must still run on the next push; a lane with
@@ -350,8 +335,9 @@ CI while nothing under `scripts/` or `config/` is dirty.
 
 ## Lint and warnings
 
-`scripts/dev.sh lint` runs `git diff --check`, the privacy scan, shellcheck on changed shell and
-SwiftLint's low-noise rules in `.swiftlint.yml` on changed Swift files under `Sources/` and `Tests/`
+`scripts/dev.sh lint` runs `git diff --check`, the privacy scan, shellcheck on changed shell,
+`lint_baseline.py ruff` and `pyright` on changed `.py` files, and SwiftLint's low-noise rules in
+`.swiftlint.yml` on changed Swift files under `Sources/`, `Tests/`, and `Packages/VocelloQwen3Core/`
 (advisory locally, where it reports every finding on a changed file; formatting stays Xcode's). Both
 linters are pinned in `config/toolchain.json`; a missing one is reported, not silently skipped, and a
 SwiftLint other than the pin is named (`./scripts/install_pinned_tools.sh swiftlint` installs the pin;
@@ -416,7 +402,7 @@ tests; a test that outgrows its lane moves, it does not slow every push. `pytest
 | `python` | ubuntu | Python paths, contracts, workflow files | 3 to 4 min: product and tooling tests; research tests when routed |
 | `macos-tests` | xcode-27 | never on a pull request; Swift compile inputs, build configs, the lane's own scripts and the `scripts/` modules their Python imports; also macOS XCUITest sources (`macos_ui`), which run only the bundle compile | cached DerivedData; macOS bundles, CLI identity (`-Onone`, same settings as the bundles, about 30 s), then `build_ui_test_bundles.sh macos --gate` compiles the macOS XCUITest bundle in the same arena (build only) |
 | `macos-tsan` | xcode-27 | never on a pull request; the `swift` lane only (never `macos_ui`) | cached `macos-tsan` DerivedData; `scripts/macos_test.sh tsan`, the deterministic core bundles under ThreadSanitizer, blocking since 2026-09-14 (`config/tsan-policy.json`); 5 to 11 min on a second runner |
-| `ios-compile` | xcode-27 | never on a pull request; iOS compile inputs | cached DerivedData; `build_foundation_targets.sh ios --incremental` at `-Onone` (`QVOICE_FOUNDATION_SWIFT_OPTIMIZATION`), then `build_ui_test_bundles.sh ios --gate` compiles the iOS XCUITest bundle unsigned in the same arena (build only) |
+| `ios-compile` | xcode-27 | never on a pull request; iOS compile inputs (`ios`) or iOS XCUITest-only sources (`ios_ui`) | cached DerivedData; `ios` runs `build_foundation_targets.sh ios --incremental` at `-Onone` (`QVOICE_FOUNDATION_SWIFT_OPTIMIZATION`) then `build_ui_test_bundles.sh ios --gate` unsigned in the same arena; `ios_ui` skips foundation targets and compiles only the iOS XCUITest bundles (build only) |
 | `website` | ubuntu | `website/` | about 1 min |
 | `dependency-submission` | ubuntu | push only (skipped on dispatch and pull requests) | seconds: `scripts/swift_dependency_snapshot.py` submitted to the GitHub dependency graph; needed by `CI required`, which it fails only when the snapshot cannot be generated: a failed or stalled POST (bounded at two minutes) is a warning annotation (BKL-58) |
 | `CI required` | ubuntu | always | the branch-protection context; skipped lanes count as passed |
@@ -446,15 +432,16 @@ splits it into `-m "not research"` plus an optional `-m research` on Linux.
 Only push CI's own inputs (`.github/workflows/ci.yml`, `.github/actions/**`,
 `scripts/ci/classify_changes.py`) force the three native lanes; the other workflow files route to
 the Python lane, whose supply-chain tests check their pins. A lane skipped inside a green run
-advances that lane's base, so a rarely-run lane never drags the others back. Caches are keyed
-`<platform>-xcode<version>-<dependency graph>-<ISO week>` and saved only on an exact miss by a job
-whose steps all passed (a failed build never becomes the week's snapshot), so the first run of each week (or of a new dependency graph) pays one save and the store holds at most a
-couple of generations per platform; the shared package checkout has its own cache keyed on the two
+advances that lane's base, so a rarely-run lane never drags the others back. Caches use unique per-run keys (`<platform>-xcode<version>-<dependency graph>-<ISO week>-<run_id>-<run_attempt>`)
+and save on a passing job when no current-ISO-week cache was restored **or** more than 200 Swift
+files recompiled (a failed build never becomes a snapshot), so the first run of each week (or of a
+new dependency graph or broad recompile) refreshes the store while keeping generations bounded; the
+shared package checkout has its own cache keyed on the two
 `Package.resolved` digests. `scripts/ci/restore_mtimes.py` gives tracked files their commit mtimes
 so Xcode's task signatures hit. Dispatch with `cold: true` to skip the restore. `nightly.yml` (04:00
 UTC and on dispatch) runs a cold pass of the TSan subset (`tsan`), the complete Python suite
-(`python-full`) and cold compiles of both platforms (`foundation-cold`, which also compiles the
-macOS app optimized with warnings as errors); a failure keeps one open issue labelled `nightly`,
+(`python-full`) and cold compiles of both platforms (`foundation-cold`, which compiles both the
+macOS and iOS apps plus policy tests optimized `-O wholemodule` with warnings as errors); a failure keeps one open issue labelled `nightly`,
 titled "Nightly lane failing", commenting on it rather than filing a second
 (`scripts/ci/failure_issue.py`). Its report-only jobs file no issue and gate nothing: `coverage`,
 `migration-warnings`, `shipped-config` (`scripts/macos_test.sh test --shipped-config`: owned code
@@ -467,7 +454,7 @@ dispatch and on pushes that touch release inputs: without secrets it installs th
 through `.github/actions/native-toolchain`, runs the ledgered `release.sh` (ad-hoc signed, not notarized)
 and the packaged-DMG verification, and validates the release evidence locally; a failure keeps one
 issue labelled `release-rehearsal`. `security.yml` (CodeQL, npm audit) runs weekly, on dispatch and
-inside `release.yml` on the tagged commit. `xcode-preview.yml` (daily and on dispatch, report-only)
+inside `release.yml` on the tagged commit. `xcode-preview.yml` (manual `workflow_dispatch`, report-only)
 runs the deterministic suites on GitHub's `xcode-27` preview image, so a difference between the two
 toolchains shows before a push meets it; it blocks nothing and files no issue.
 `swift-dependency-watch.yml` (weekly, read-only) compares the exact Swift pins with upstream releases
@@ -561,7 +548,8 @@ branch with `git branch -d <branch>` (preserving needed ignored evidence first; 
 ancestry (`OWNER_NAMES = ("antigravity", "agy", "claude")`), and `agy_hook_adapter.py` registers
 best-effort linked-worktree worker leases on `SessionStart`/`PreToolUse` and clears them on `Stop`
 when `fullyIdle` is true (skipped silently when the default terminal sandbox blocks `ps`). Because
-Antigravity does not propagate `CLAUDE_ENV_FILE` into `run_command`, the lead still joins or stops
+Antigravity does not expose `SubagentStart`/`SubagentStop`/`SessionEnd` hooks and the sandbox blocks
+`ps`, the lead still joins or stops
 every subagent and swarm worker (`manage_subagents list`, `swarm status`), confirms no other sessions
 are active in this repository, and explicitly passes `QVOICE_LEAD_ONLY=1` to measured lanes. Never use
 `QVOICE_LEAD_ONLY=1` to bypass a known active worker or unknown lease. The host checks a measured lane
@@ -642,8 +630,9 @@ For any multi-file feature, runtime optimization or debt wave, run one determini
    substantive Swift diff (`Reviewed-by: vocello-swift-review`), and `.agents/workflows/xcuitest_visual_qa.py`
    on every live XCUITest run directory.
 
-**GPU / MLX profiling (`--kind metal`):** run `scripts/macos_test.sh profile --kind metal --lead-only`
-or `scripts/ios_device.sh profile --kind metal --lead-only` (over wired USB on iPhone — Wi-Fi
+**GPU / MLX profiling (`--kind metal`):** run `scripts/macos_test.sh --lead-only profile --kind metal`
+(`--lead-only` must precede the subcommand on `macos_test.sh`) or `scripts/ios_device.sh profile --kind
+metal --lead-only` (over wired USB on iPhone — Wi-Fi
 CoreDevice disconnects Instruments immediately), with zero active workers, to capture a bounded
 Metal System Trace + `os_signpost` `.trace` bundle (1 cold + 1 warm medium take, 120 s default cap,
 15 GiB disk floor, kept by default for history), then inspect it offline via `axiom_xcprof_analyze`
@@ -693,7 +682,7 @@ the Antigravity harness configured.
 | Repository/CI | Exact-commit checks and repository release scripts | `gh` CLI reads; `gh run watch` in the background after an authorized push |
 | App Store/deployment/publication | Explicitly requested release workflow | `asc` plugin skills over Homebrew `/opt/homebrew/bin/asc`, and `vercel` CLI (both ask on writes) |
 | Model research | Receipts, exact pins and maintenance contracts | `huggingface` MCP reads (`hf_fs`, `hub_repo_search`, `hub_repo_details`, `hf_whoami`) and `hf` CLI reads; downloads, Space runs and writes ask |
-| Audio quality | `scripts/qc.py` machine screens and report-only QC v2 (`docs/reference/qc.md`); nobody listens for 3.x (maintainer decision 2026-10-13) | Hugging Face discovery for candidate models; rendered evidence images. The agent cannot hear audio and never issues listening verdicts |
+| Audio quality | `scripts/qc.py` machine screens and report-only QC v2 (`docs/reference/qc.md`); nobody listens for 3.x (maintainer decision 2026-10-13) | Hugging Face discovery for candidate models; rendered evidence images; separate offline report-only `RF-72` multimodal advisory complement (`scripts/qc.py multimodal`, `vocello-audio-qc`, blinded two-pass and dual-order `AB`/`BA` listening on Gemini 4 Neon via `read_file` + `run_workflow`, strictly outside QC v2 `SCORING_SOURCES` and Fast QC, blocking personal audio by default — never a CI/release gate or human-listening substitute) |
 | Antigravity configuration | Tracked `.agents/`, `AGENTS.md`, `website/AGENTS.md` and `scripts/tests/test_agent_hooks.py` | Built-in `agy-customizations` skill |
 
 Detect capabilities in the current session rather than assuming installation means connection.
@@ -728,9 +717,10 @@ Never install or change global configuration simply to satisfy a routing table.
 
 ### Host and release prerequisites
 
-The development host may use a newer Xcode than the exact CI/release pin. `doctor` reports this
-mismatch without changing the selected developer directory, and local success does not establish
-pinned-compiler acceptance (New Mac setup, section 1). Release
+When the development host runs a newer Xcode than the exact CI/release pin (`config/toolchain.json`),
+`doctor` reports the mismatch without changing the selected developer directory, and local success does
+not establish pinned-compiler acceptance (New Mac setup, section 1; since `DW-04`, CI and the
+development Mac both pin Xcode 27.2 / Swift 6.4.2 until local Xcode moves ahead again). Release
 checks consume exact tools from `config/toolchain.json`; select the existing pinned-tool bin
 directory when available and verify with `scripts/supply_chain_contract.py --installed release`.
 An ambient newer `gh` is fine for ordinary read-only inspection but cannot qualify a pinned release.

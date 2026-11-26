@@ -23,7 +23,9 @@ worker tracking is unavailable, explicitly declare `QVOICE_LEAD_ONLY=1` only aft
 workers.
 
 Installed assets only; large downloads and publication need specific authorization. Do not edit
-source during a run. Fast QC gates differ from report-only QC v2 (`scripts/qc.py`); automated scores
-do not imply human listening or supported product-quality claims. Preserve failures; a justified
+source during a run. Fast QC gates differ from report-only QC v2 (`scripts/qc.py`) and the separate
+offline report-only `RF-72` multimodal advisory complement (`vocello-audio-qc` / `scripts/qc.py
+multimodal`, strictly outside QC v2 `SCORING_SOURCES` and Fast QC); automated scores do not imply
+human listening or supported product-quality claims. Preserve failures; a justified
 rerun gets a new ID and explanation. Report actual verdict, source/build identity, baseline
 compatibility and limits. Never publish benchmark history implicitly.

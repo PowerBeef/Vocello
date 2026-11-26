@@ -12,7 +12,7 @@ npm --prefix website run lint     # site contract, ESLint (eslint.config.js), ts
 npm --prefix website test         # Node contract fixtures + rendered contract
 npm --prefix website run build    # client + SSR + prerender -> website/dist/
 npm --prefix website run check    # lint + test + build + Playwright browser tests
-                                  # (needs Chromium and WebKit once: npx --prefix website playwright install --with-deps chromium webkit)
+                                  # (needs Chromium and WebKit once: npm --prefix website exec playwright install chromium webkit; Linux CI uses --with-deps)
 npm --prefix website run preview  # serve production build (use port 4174 with --strictPort; 4173 stays free for Playwright)
 ```
 
@@ -22,7 +22,8 @@ build outputs are generated; do not hand-edit them.
 
 ## Tool routing
 
-- Read `PRODUCT.md` and `DESIGN.md` before visual or copy work.
+- Read `PRODUCT.md` (brand voice, release facts, copy rules) and `DESIGN.md` (visual register, layout
+  tiers, motion, visual bans) before visual or copy work.
 - Use current primary React/Vite/library documentation; Context7 (`context7_context7`) may assist when callable.
 - For visual, responsive, interactive and accessibility inspection, start the local dev or preview
   server (`--host 127.0.0.1 --port 5173 --strictPort`, or `4174` for preview) and delegate inspection
@@ -62,8 +63,8 @@ Keep content in the existing boundaries:
 
 - `src/sections/`: page sections. The home page (`src/pages/HomePage.jsx`) renders, in order:
   `Hero`, `Modes` (`#workflows`, the mode switcher), `Listen`, `Privacy` (`#how-it-runs`),
-  `Capabilities`, `IphoneBeta`, `WhatsNew` (`#whats-new`, "What's new in 3.1"), `Developers` (the
-  `#cli` and `#engineering` tiles), `Limitations` (`summary`) and `FinalCTA` (`#download`).
+  `Capabilities`, `IphoneBeta`, `WhatsNew` (`#whats-new`, `"What's new in {WHATS_NEW_VERSION}"`),
+  `Developers` (the `#cli` and `#engineering` tiles), `Limitations` (`summary`) and `FinalCTA` (`#download`).
   - `CommandLine.jsx`: `CommandLineGuide` (`/cli/`);
   - `Engineering.jsx`: `EngineeringDetail` (`/engineering/`), with the HTML speed chart;
   - `Limitations.jsx`: a `summary` on the home page and the `full` list on `/engineering/`.
@@ -72,7 +73,8 @@ Keep content in the existing boundaries:
 - `src/data/workflows.js`: the three modes the switcher shows, with the app's short tab names.
 - `src/data/samples.js`: samples, delivery labels and groups, and colors. The samples predate 3.0;
   never present them as 3.0 takes.
-- `src/data/whatsnew.js`: the release's What's new entries, drawn from `../docs/releases/`.
+- `src/data/whatsnew.js`: the release's What's new entries (`WHATS_NEW_VERSION`, `HIGHLIGHTS`,
+  `IPHONE_NOTE`, `UPGRADE_NOTE`, `QUALITY_NOTE`), drawn from `../docs/releases/`.
 - `src/data/cli.js`: the command line section's install, uninstall, and MCP setup commands, quoted
   from `../docs/reference/cli.md`.
 - `src/data/credits.js`: technology, GitHub, release, and TestFlight URLs, plus the tagged Mac DMG,
@@ -84,52 +86,28 @@ Keep content in the existing boundaries:
 `App.jsx` mounts cookieless Vercel Analytics and owns scroll reveal, including immediate reveal for
 anchor jumps. The privacy page must continue to disclose website analytics.
 
-### Responsive layout
+### Responsive layout implementation
 
-Four layout tiers, defined in `DESIGN.md` and at the top of `src/site.css`:
-
-| Tier | Widths | Layout |
-| --- | --- | --- |
-| Phone | below 600 px | one column; 56 px bar |
-| Small tablet | 600 to 899 px, and landscape phones | one column; side-panel menu |
-| Tablet | 900 to 1199 px | two-column sections; the hero stacks |
-| Desktop | 1200 px and up | full layout; a 1320 px container from 1600 px |
+Four layout tiers are owned by `DESIGN.md` and implemented at the top of `src/site.css`:
 
 - Media queries use exactly `max-width: 599.98px`, `899.98px` and `1199.98px`, or `min-width:
   1200px` and `1600px`. A short landscape screen, `(orientation: landscape) and (max-height:
-  500px)`, also tightens the bar and the display type, and caps screenshots at 80% of the height.
-- Sizes come from the layout tokens in `src/site.css`: `--fs-display` (the home hero), `--fs-hero`, `--fs-section`, `--fs-band`,
-  `--fs-cta`, `--fs-quote`, `--section-y`, `--gutter`, `--nav-h` and `--tap`. Display type and
-  section rhythm scale with `clamp()`, so do not add a per-tier font size or section padding.
-- **The bar (`src/sections/Nav.jsx`)** is opaque. Each section link names the narrowest tier
-  that shows it:
-
-  | Tier | Bar contents |
-  | --- | --- |
-  | Desktop | all six links, plus Open source from 1320 px |
-  | Tablet | four section links (Voices, Listen, Privacy, iPhone), Download and the menu button |
-  | Below 900 px | brand, Download and the menu button |
-
-  The menu is a native modal `<dialog>` (`#site-menu`) listing every section. It locks the page
-  and hands focus back to the menu button when it closes. The former-name clarification shows
-  only from 1200 px.
-- Every interactive control in the bar and the menu keeps a 44 px target (`--tap`). Hover styles
-  live only inside `@media (hover: hover) and (pointer: fine)`, so a tap never leaves a control
-  looking active.
-- The hero, the closing call to action and short section intros over a centered control or grid
-  (the mode switcher, the privacy facts) are centered. Body text, lists and tables stay left-aligned
-  at every width.
-- `html` sets `scroll-padding-top`, so anchor jumps land below the bar. The body clips sideways
-  overflow (`overflow-x: clip`), but the layout matrix measures every element regardless, so fix
-  overflow where it starts.
-- `tests/layout-matrix.spec.mjs` checks every page on every tier edge and three landscape sizes in
-  Chromium, plus real iPhone and iPad descriptors in WebKit. It checks that no element extends past
-  the viewport, the bar's items neither overlap nor escape, tap targets are 44 px, the menu behaves
-  and anchor jumps land below the bar. Its widths, devices and pure checks live in
-  `scripts/browser-smoke-contract.mjs`.
-
-Use `grid-template-columns: minmax(0, 1fr)` for narrow single-column grids. A bare `1fr` allows
-intrinsic-width children such as max-content point lists to overflow.
+  500px)`, tightens the bar and display type and caps screenshots at 80% of the height.
+- Sizes come from layout tokens in `src/site.css` (`--fs-display`, `--fs-hero`, `--fs-section`,
+  `--fs-band`, `--fs-cta`, `--fs-quote`, `--section-y`, `--gutter`, `--nav-h`, `--tap`) scaled via
+  `clamp()`; do not add per-tier font sizes or section padding.
+- **The bar (`src/sections/Nav.jsx`)** is opaque: Desktop shows all six links (plus Open source from
+  1320 px); Tablet shows four (Voices, Listen, Privacy, iPhone), Download and the menu button; below
+  900 px shows brand, Download and the menu button. `#site-menu` is a native modal `<dialog>` that
+  locks the page and restores focus on close; the former-name clarification shows only from 1200 px.
+- Controls keep a 44 px target (`--tap`), hover styles stay inside `@media (hover: hover) and
+  (pointer: fine)`, `html` sets `scroll-padding-top`, and body sets `overflow-x: clip` (fix overflow
+  at its source — the layout matrix measures every element).
+- Use `grid-template-columns: minmax(0, 1fr)` for narrow single-column grids so intrinsic-width
+  children cannot overflow.
+- `tests/layout-matrix.spec.mjs` (widths, devices and pure checks in
+  `scripts/browser-smoke-contract.mjs`) checks every page across all tier edges and landscape sizes
+  in Chromium plus real iPhone/iPad descriptors in WebKit.
 
 ## Content accuracy
 
@@ -146,36 +124,16 @@ Existing copy is not evidence. Verify every product claim against the parent rep
 | Release contents and known limitations | the tag's notes under `../docs/releases/` |
 | Command line, its install, and `vocello mcp` | `../docs/reference/cli.md`, `../Sources/VocelloCLI`, and `../scripts/cli_package.py` |
 
-Voice Cloning has no instruction channel. Its delivery banks select verified reference clips,
-not engine emotion/intensity instructions. Keep public language aligned with
-`../config/public-product-facts.json`; do not infer
-availability from an old page or release note.
+Voice Cloning has no instruction channel; its delivery banks select verified reference clips. Keep
+public copy aligned with `../config/public-product-facts.json`, `PRODUCT.md` (copy rules; visible
+copy bans em dashes, enforced by the site contract), and `DESIGN.md` (visual bans and color/type
+rules). Never infer availability from an old page or release note.
 
-## Brand and copy rules
+## Tokens and assets
 
-`PRODUCT.md` owns brand voice and `DESIGN.md` owns visual constraints.
-
-- Say *local*, not *offline* or *on-device*, unless the technical distinction matters.
-- Use sentence case. All caps are reserved for tiny labels.
-- Visible copy contains no em dash character. Use commas, colons, semicolons, periods, or
-  parentheses. The website contract enforces this.
-- No emoji, celebration copy, hype, unsupported superlatives, or first-person-plural voice.
-- No gradient text, decorative glassmorphism, repetitive identical-card grids, repeated uppercase
-  eyebrow scaffolding, or card side stripes wider than 1 px.
-- Performance claims require compatible repository evidence and must keep their hardware/context
-  qualification.
-
-## Design tokens and assets
-
-- Built-in Voice/custom: gold (`--mode-custom`).
-- Voice Design: lavender (`--mode-design`).
-- Voice Cloning: terracotta (`--mode-clone`).
-- Canvas: charcoal (`--charcoal-900`).
-- Type: SF Pro Text for body, SF Pro Rounded for the wordmark, and New York/system serif for large
-  editorial display moments.
-
-Pass mode colors through existing CSS custom properties such as `--row-mode` and `--mode-current`;
-do not hard-code duplicate hex values.
+Pass mode colors through existing CSS custom properties (`--mode-custom`, `--mode-design`,
+`--mode-clone`, `--charcoal-900`, `--row-mode`, `--mode-current`); do not hard-code duplicate hex
+values.
 
 Asset ownership:
 
@@ -193,27 +151,24 @@ Asset ownership:
   `social_preview.png`: brand art. `src/data/release.js` mirrors the stable and fallback releases in
   `../config/public-product-facts.json`; download links name the stable tag.
 
-Add assets under a category directory in `public/assets/` and reference them through the data layer, not directly
-from unrelated JSX.
+Add assets under a category directory in `public/assets/` and reference them through the data layer,
+not directly from unrelated JSX.
 
 ## Interaction and accessibility
 
-- There is no client-side router. Internal navigation uses plain hash anchors and links between the
-  three pages.
+- There is no client-side router. Internal navigation uses plain hash anchors and links across the
+  three React pages (`/`, `/cli/`, `/engineering/`) and three static HTML pages (`/support/`,
+  `/privacy/`, `/terms/`).
 - Listen uses one shared `<audio>` element with `preload="none"` and source swapping for mutual
   exclusion.
-- Motion uses `panelSettle` (the menu sheet and the mode switcher's panels) and `rise` (the hero's
-  one-time entrance), with `--ease-standard`; inside a revealed section its facts and tiles follow
-  in turn (`--i`). Animate only opacity, transform, border-color, and box-shadow, never layout
-  properties. The hero animates in CSS, so it plays without JavaScript; the reduced-motion block
-  removes every animation.
-- Preserve the single `prefers-reduced-motion: reduce` block.
-- Every image needs meaningful alt text or deliberate decorative handling.
-- External `target="_blank"` links require `rel="noreferrer"`; internal targets must resolve.
-- Maintain semantic heading order, keyboard-operable controls, focus visibility, and sufficient
-  contrast across all breakpoints. `npm run lint` (`scripts/site-contract.mjs`) holds every text
-  token (`--fg-primary`, `--fg-secondary`, `--fg-tertiary`) at WCAG AA 4.5:1 or more on every
-  surface token in both themes.
+- Motion uses `panelSettle` (menu sheet, mode switcher panels) and `rise` (hero one-time entrance)
+  with `--ease-standard` and staggered `--i` reveals; animate only `opacity`, `transform`,
+  `border-color`, and `box-shadow`. Preserve the single `prefers-reduced-motion: reduce` block.
+- Every image needs meaningful alt text or deliberate decorative handling; external `target="_blank"`
+  links require `rel="noreferrer"`; internal targets must resolve.
+- Maintain semantic heading order, keyboard operability, focus visibility, and contrast: `npm run
+  lint` (`scripts/site-contract.mjs`) enforces WCAG AA ≥ 4.5:1 for `--fg-primary`, `--fg-secondary`,
+  and `--fg-tertiary` on every surface token in both themes.
 - Do not hide product limitations or replace precise copy with vague marketing language.
 
 ## Definition of done

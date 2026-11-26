@@ -17,7 +17,7 @@ witness, and analyze retained `.trace` bundles with `axiom_xcprof_analyze`); thi
 headless, not a native UI driver.
 
 Use a quiet committed checkpoint for measured `bench`, `lang-bench`, `memory`, and `profile` lanes
-(all build `-O wholemodule` in the optimized iOS arena), after joining all subagents
+(all build `-O wholemodule` in the shared `ios-device` arena), after joining all subagents
 (`manage_subagents list`, `swarm status`) and confirming no other host sessions are active, passing
 `--lead-only` (or `QVOICE_LEAD_ONLY=1`) when worker tracking is unavailable. No new models or
 downloads, distribution-candidate install/launch or external publication without specific

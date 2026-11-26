@@ -70,8 +70,10 @@ lenses = [
         "type_name": "research",
         "model": "flash",
         "prompt": (
-            "Read-only analysis — edit nothing, run no models. Remember: QC v2 is report-only, "
-            "no automated score is a listening verdict, and nobody listens for 3.x (maintainer decision 2026-10-13).\n"
+            "Read-only analysis — edit nothing, run no models. Remember: QC v2 and any RF-72 "
+            "multimodal advisory receipts (`scripts/qc.py multimodal`, strictly outside QC v2 "
+            "SCORING_SOURCES and Fast QC) are offline and report-only, no automated score is a "
+            "release-gating listening verdict, and nobody listens for 3.x (maintainer decision 2026-10-13).\n"
             f"Hypothesis: {hypothesis}\n"
             f"Inspect these retained artifact files with read_file and summarize per-cell / per-language "
             "deltas, refusals, EOS/duration anomalies, and Fast QC vs QC v2 outcomes. Never quote raw prompts or transcripts.\n"

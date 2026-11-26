@@ -33,8 +33,8 @@ The copy follows `website/PRODUCT.md`:
 - it uses sentence case;
 - it has no em dashes, hype or first-person plural.
 
-Every claim below traces to a source listed above. Counts in parentheses are characters against
-Apple's limit.
+Every claim below traces to a source listed above. Counts in parentheses are Apple's limits
+(UTF-8 bytes for App Review notes; characters for store-listing fields).
 
 ## App information
 
@@ -114,21 +114,21 @@ Vocello 3.2 runs on a local engine shared with the Mac app with one improved mod
 
 ## App Review notes (4000)
 
-For App Review Information → Notes. No demo account is needed. The download requirement is
-spelled out so the app is not judged non-functional under Guideline 2.1.
+For App Review Information → Notes (limit: **4,000 UTF-8 bytes**). No demo account is needed. The
+download requirement is spelled out so the app is not judged non-functional under Guideline 2.1.
 
 ```text
-Vocello generates speech locally on your device. It ships with no bundled model weights, to keep the app small, and needs no account or login.
+Vocello generates speech locally on your device. It ships with no bundled model weights to keep the app small and needs no account or login.
 
-Please review on an iPhone 15 Pro or later, or on an eligible Apple silicon or A17 Pro iPad with 8 GB+ memory (runs in portrait compatibility mode). Unsupported devices with less memory show a localized unsupported-device screen.
+Please review on an iPhone 15 Pro or later, or on an eligible Apple silicon or A17 Pro iPad with 8 GB+ memory (portrait compatibility mode). Unsupported devices show a localized unsupported-device screen. Demo video (RF-66): [paste URL before submit].
 
-1. On first launch, go through the three onboarding pages (Page 3 notes local AI speech, AudioSeal watermarking, and links to Privacy Policy and Terms of Use).
-2. Open Settings → Models & Files → Voice Models and tap Install for the mode you want to review, then Download in the confirmation that shows the download's size. Built-in Voice is 2,225,870,484 bytes, Voice Design 2,225,869,991 bytes and Voice Cloning 2,249,887,307 bytes; one model is enough for its mode. Downloads use Wi-Fi unless Download over cellular is turned on. Each model needs at least 5 GB of free space and can take several minutes. Progress shows exact bytes downloaded, followed by SHA-256 verification and activation. Downloads can be cancelled and resumed across launches. Once Ready, the mode works completely offline.
-3. In Studio, type a short line, pick a voice where applicable, and tap Generate. Voice Design needs a voice description first: tap the Voice Brief chip (or the inline setup prompt above the chips) and enter e.g. "a warm, deep narrator". Speed depends on hardware: iPhone 17 Pro generates faster than audio length, while iPhone 15 Pro takes roughly 1.5x to 2x audio length so live preview may pause while catching up; this is expected and the saved take plays smoothly.
-4. Voice Cloning: the first time you record, import, save, or clone a voice, an inline permission sheet confirms you own or have permission to clone the voices you use and links to Terms of Use. The same permission toggle lives in Settings → Privacy & Permissions and can be turned off at any time without deleting saved voices or history. Microphone and Speech Recognition are requested only to record and transcribe a reference clip locally.
-5. In-app purchase: Design & Clone Export (non-consumable) unlocks exporting Voice Design and Voice Cloning audio via the share sheet (with a one-tap Export Now button after unlocking from a take). Generation, listening, History, Saved Voices, and Built-in Voice export are free. Reach it via Settings → Design & Clone Export or by tapping Share on a Voice Design or Voice Cloning take; Restore Purchases is on the same sheet.
+1. Onboarding: Page 3 notes local AI speech, AudioSeal watermarking, and links to Privacy Policy and Terms of Use.
+2. Models: open Settings → Models & Files → Voice Models, tap Install for one mode, then Download in the size confirmation. Exact sizes: Built-in Voice 2,225,870,484 bytes, Voice Design 2,225,869,991 bytes, Voice Cloning 2,249,887,307 bytes (one model suffices for its mode). Downloads use Wi-Fi unless cellular is enabled, need at least 5 GB free, show exact bytes, verify SHA-256 before activation, and cancel/resume across launches. Once Ready, generation works offline.
+3. Studio: enter a short line, pick a voice, and tap Generate. For Voice Design, tap the Voice Brief chip (or inline setup prompt) and enter e.g. "a warm, deep narrator". iPhone 17 Pro generates faster than real time; iPhone 15 Pro runs ~1.5x-2x audio length so live preview may pause while catching up while the saved take plays smoothly.
+4. Voice Cloning: the first Record, Import, Save, or Generate shows a one-time inline permission sheet confirming voice ownership/permission with a Terms of Use link. The toggle also lives in Settings → Privacy & Permissions and can be revoked anytime without deleting saved voices or history. Microphone and Speech Recognition are used locally only.
+5. In-app purchase: Design & Clone Export (non-consumable) unlocks exporting Voice Design and Voice Cloning audio via the share sheet (with one-tap Export Now after unlocking from a take). Generation, listening, History, Saved Voices, and Built-in Voice export are free. Reach it via Settings → Design & Clone Export or tapping Share on a Design/Clone take; Restore Purchases is on the same sheet.
 
-Safeguards and Guideline 5.1.2(i). Vocello is a single-user local tool with no accounts, no feed, no posting, and no third-party AI inference APIs. Hugging Face serves immutable static model files verified against bundled SHA-256 digests before use; zero scripts, voice descriptions, recordings, transcripts, or generated audio ever leave the device unless exported by the user or backed up by iOS. Voice Design descriptions and Built-in delivery instructions that request celebrity imitation or voice impersonation are refused across all 10 supported languages. Spoken scripts themselves are intentionally unfiltered because Vocello is a private local text-to-speech editor, not a chatbot or UGC platform. Every generated WAV take carries a mandatory inaudible AudioSeal watermark (fixed non-identifying Vocello payload) and WAV LIST/INFO provenance metadata inspectable with open-source AudioSeal tools (external transcoding after export may degrade it), disclosed in Settings → Privacy & Permissions alongside Privacy Policy and Terms of Use (https://vocello.vercel.app/terms/). Settings → About provides Help & Support (https://vocello.vercel.app/support/) and Report an Issue (https://vocello.vercel.app/support/#report, privacy-first with zero automatic upload).
+Safeguards, privacy (5.1.2(i)), and rights (5.2). Vocello is a single-user local tool with no accounts, feed, posting, or third-party AI inference APIs. Hugging Face serves immutable static model files verified by bundled SHA-256 digests; zero scripts, voice descriptions, recordings, transcripts, or generated audio leave the device unless exported by the user or backed up by iOS. Shipping builds compile out internal diagnostics and debug env reads (2.5.19). Voice Design descriptions and Built-in delivery instructions requesting celebrity imitation or voice impersonation are refused across all 10 languages; spoken scripts stay unfiltered as a private local TTS editor. Every generated WAV take carries a mandatory inaudible AudioSeal watermark (fixed non-identifying payload) and WAV LIST/INFO provenance inspectable with open-source AudioSeal tools (external transcoding after export may degrade it), disclosed in Settings → Privacy & Permissions with Privacy Policy and Terms of Use (https://vocello.vercel.app/terms/). Settings → About provides Help & Support (https://vocello.vercel.app/support/), Report an Issue (https://vocello.vercel.app/support/#report, zero automatic upload), and Open Source & Licenses. Third-party content (5.2): Qwen3-TTS (Apache-2.0) and Meta AudioSeal (MIT) weights, plus original artwork and generated previews.
 ```
 
 Before pasting, recheck the three byte counts against the candidate's catalog, and close ASR-09's

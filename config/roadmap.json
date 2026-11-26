@@ -616,12 +616,12 @@
     {
       "id": "RF-63",
       "plan": "release-first-3-0-2026-09",
-      "title": "Fit the 3.2 App Review notes into what is left of the 4,000 characters",
+      "title": "Fit the 3.2 App Review notes into 4,000 UTF-8 bytes",
       "status": "planned",
       "blockedBy": [
         "RF-73"
       ],
-      "gate": "The review notes in docs/reference/app-store-listing.md describe the 3.2 candidate (one model per mode and exact sizes, stripped Release diagnostics under 2.5.19, iPhone 15 Pro preview-pause note, portrait iPad compatibility under RF-42, demo video RF-66), clearly document 100% offline single-user local TTS with A1-D2 safeguards (consent, zero-tolerance terms at Settings > Privacy & Permissions > Terms of Use, mandatory AudioSeal + LIST/INFO + open verification, jurisdiction-neutral deployer disclosure reminder, 10-language impersonation guardrail, Settings > About > Report an Issue opening vocello.vercel.app/support/#report), explicitly clarify Hugging Face is a static read-only weight host with zero third-party AI APIs (5.1.2(i)), and proactively list Qwen3-TTS (Apache-2.0), AudioSeal (MIT), original artwork and generated previews (5.2 / USES_THIRD_PARTY_CONTENT); all <= 4,000 characters and read back from ASC byte-identical.",
+      "gate": "The review notes in docs/reference/app-store-listing.md describe the 3.2 candidate (one model per mode and exact sizes, stripped Release diagnostics under 2.5.19, iPhone 15 Pro preview-pause note, portrait iPad compatibility under RF-42, demo video RF-66), clearly document 100% offline single-user local TTS with A1-D2 safeguards (consent, zero-tolerance terms at Settings > Privacy & Permissions > Terms of Use, mandatory AudioSeal + LIST/INFO + open verification, jurisdiction-neutral deployer disclosure reminder, 10-language impersonation guardrail, Settings > About > Report an Issue opening vocello.vercel.app/support/#report), explicitly clarify Hugging Face is a static read-only weight host with zero third-party AI APIs (5.1.2(i)), and proactively list Qwen3-TTS (Apache-2.0), AudioSeal (MIT), original artwork and generated previews (5.2 / USES_THIRD_PARTY_CONTENT); all <= 4,000 UTF-8 bytes and read back from ASC byte-identical.",
       "sourceOfTruth": [
         "docs/reference/app-store-listing.md",
         "docs/reference/ios-appstore-submission.md"
@@ -629,8 +629,8 @@
       "needs": [
         "keyboard"
       ],
-      "updated": "2026-11-25",
-      "notes": "Opened 2026-11-16. 2026-11-25: drafted 3.2.0 App Review notes in docs/reference/app-store-listing.md (3,784 / 4,000 chars) covering all locked RF-73/A1-F1 points (Guideline 1.2 offline TTS, Settings > Privacy & Permissions > Terms of Use, Settings > About > Report an Issue, 2.4.1 iPad compatibility, 2.5.19 stripped diagnostics, 5.1.2(i) static Hugging Face CDN, 5.2 Apache-2.0/MIT attribution, RF-66 video link). ASC entry needs explicit authorization.",
+      "updated": "2026-11-26",
+      "notes": "Opened 2026-11-16. 2026-11-26: reconciled 3.2.0 App Review notes in docs/reference/app-store-listing.md (3425 chars / 3437 UTF-8 bytes, 563 bytes headroom for RF-66 demo video URL) covering all locked RF-73/A1-F1 points (Guideline 1.2 offline TTS, Settings > Privacy & Permissions > Terms of Use, Settings > About > Report an Issue, 2.4.1 iPad compatibility, 2.5.19 stripped diagnostics, 5.1.2(i) static Hugging Face CDN, 5.2 Qwen3-TTS Apache-2.0 / Meta AudioSeal MIT attribution, and RF-66 demo video slot). ASC entry needs explicit authorization.",
       "legacyIds": [
         "RF-64"
       ]

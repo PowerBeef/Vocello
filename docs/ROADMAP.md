@@ -140,7 +140,7 @@ Needs the maintainer present: a permission prompt, a keychain or password, a rel
 - `RF-23` (parked) The Mac app offers new versions and installs them through Sparkle
 - `RF-48` (planned) Core overhaul, stage 4: finalization, preview and the heat pause (also: iPhone)
 - `RF-62` (planned) Set initial Age Rating to 13+ and answer Nov 16 descriptors when filing 3.2.0
-- `RF-63` (planned) Fit the 3.2 App Review notes into what is left of the 4,000 characters
+- `RF-63` (planned) Fit the 3.2 App Review notes into 4,000 UTF-8 bytes
 - `RF-71` (planned) Ship Vocello and the vocello CLI 3.2 on the Mac (also: Mac, remotely)
 
 ### iPhone (62)
@@ -252,7 +252,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-55` | planned | Quality remediation, stage 5: model precision and the hybrid model | `RF-50` |
 | `RF-59` | planned | One model: the attn hybrid replaces Speed and Quality, and the model selector is retired | `RF-55` |
 | `RF-62` | planned | Set initial Age Rating to 13+ and answer Nov 16 descriptors when filing 3.2.0 | — |
-| `RF-63` | planned | Fit the 3.2 App Review notes into what is left of the 4,000 characters | `RF-73` |
+| `RF-63` | planned | Fit the 3.2 App Review notes into 4,000 UTF-8 bytes | `RF-73` |
 | `RF-65` | planned | Measure the shipped hybrid on an iPhone 15 Pro | — |
 | `RF-66` | planned | Record a demo video of the shipping flow on a physical iPhone | — |
 | `RF-68` | in-flight | Engine Pack B (part 1): sample-preserving MLX/Metal safety, memory and hot-loop performance | — |
@@ -361,8 +361,8 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-62`** (planned) — Set initial Age Rating to 13+ and answer Nov 16 descriptors when filing 3.2.0.
   gate: In App Store Connect before initial 3.2.0 submission (and well before the January 12, 2027 deadline), raise the initial Age Rating from 4+ to 13+ (2026-11-25 decision D3/AI-D4) and answer Apple's Nov 16, 2026 descriptors (Shared Location = No, Dating and Relationships = No), with the read-back recorded in ASR-11.
 
-- **`RF-63`** (planned) — Fit the 3.2 App Review notes into what is left of the 4,000 characters.
-  gate: The review notes in docs/reference/app-store-listing.md describe the 3.2 candidate (one model per mode and exact sizes, stripped Release diagnostics under 2.5.19, iPhone 15 Pro preview-pause note, portrait iPad compatibility under RF-42, demo video RF-66), clearly document 100% offline single-user local TTS with A1-D2 safeguards (consent, zero-tolerance terms at Settings > Privacy & Permissions > Terms of Use, mandatory AudioSeal + LIST/INFO + open verification, jurisdiction-neutral deployer disclosure reminder, 10-language impersonation guardrail, Settings > About > Report an Issue opening vocello.vercel.app/support/#report), explicitly clarify Hugging Face is a static read-only weight host with zero third-party AI APIs (5.1.2(i)), and proactively list Qwen3-TTS (Apache-2.0), AudioSeal (MIT), original artwork and generated previews (5.2 / USES_THIRD_PARTY_CONTENT); all <= 4,000 characters and read back from ASC byte-identical.
+- **`RF-63`** (planned) — Fit the 3.2 App Review notes into 4,000 UTF-8 bytes.
+  gate: The review notes in docs/reference/app-store-listing.md describe the 3.2 candidate (one model per mode and exact sizes, stripped Release diagnostics under 2.5.19, iPhone 15 Pro preview-pause note, portrait iPad compatibility under RF-42, demo video RF-66), clearly document 100% offline single-user local TTS with A1-D2 safeguards (consent, zero-tolerance terms at Settings > Privacy & Permissions > Terms of Use, mandatory AudioSeal + LIST/INFO + open verification, jurisdiction-neutral deployer disclosure reminder, 10-language impersonation guardrail, Settings > About > Report an Issue opening vocello.vercel.app/support/#report), explicitly clarify Hugging Face is a static read-only weight host with zero third-party AI APIs (5.1.2(i)), and proactively list Qwen3-TTS (Apache-2.0), AudioSeal (MIT), original artwork and generated previews (5.2 / USES_THIRD_PARTY_CONTENT); all <= 4,000 UTF-8 bytes and read back from ASC byte-identical.
 
 - **`RF-65`** (planned) — Measure the shipped hybrid on an iPhone 15 Pro.
   gate: On an iPhone 15 Pro, with the shipped hybrid and a memory-qualified run: real-time factor rested and heat-soaked, a long-form run's heat-pause behavior, and peak memory against the device's budget; the result is recorded whichever way it falls, and a poor one becomes a listing or review-notes statement decided before submission.

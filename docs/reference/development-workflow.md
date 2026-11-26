@@ -282,6 +282,10 @@ Two checks only advise. Each returns a warning, never a block, and a message the
   every commit after the freeze, said before the commit exists; the plan's open and archived items
   and their legacy ids count.
 
+For non-trivial commits, include a concise structured commit body (`Why / Verified / Known limits`)
+alongside any `Reviewed-by:` trailer so `git log` carries the verification trail without bloating
+`docs/development-progress.md`.
+
 Two more guards (`policy_guard.sh` and `generated_file_guard.sh`) block Simulator destinations,
 whole-cache deletion, force pushes, pushes of any ref but `main`, hand-made branches, broad staging,
 `git commit -a`, stashing, `project.pbxproj` writes and hand edits of generated files. Staging is

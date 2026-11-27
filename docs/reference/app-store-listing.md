@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-26
+reviewed: 2026-11-27
 summary: App Store listing draft for Vocello for iPhone 3.2.0 (en-US), reconciled from the 2026-11-01/10 App Store Connect 3.0.0 entry against the shipped attn hybrid baseline (retained unchanged for 3.2 under RF-70) and RF-73 App Store readiness safeguards. Pushing remaining updates to App Store Connect needs a separate explicit request.
 sourceOfTruth:
   - config/public-product-facts.json
@@ -14,7 +14,7 @@ sourceOfTruth:
 ---
 # App Store listing: Vocello for iPhone 3.2.0 (en-US)
 
-**Status: 3.2.0 target draft reconciled with `main`'s shipped `attn` hybrid baseline (`RF-70` closed keeping `artifactVersion` `2026.11.13.1` unchanged). On 2026-11-25, authorized App Store Connect prep applied Age Rating `13+`, `147` territories (app and export IAP), and the Privacy Policy URL; the version record still holds the 2026-11-10 `3.0.0` entry until an explicit 3.2.0 metadata update request.**
+**Status: 3.2.0 target draft reconciled with `main`'s shipped `attn` hybrid baseline (`RF-70` closed keeping `artifactVersion` `2026.11.13.1` unchanged). On 2026-11-25, authorized App Store Connect prep applied Age Rating `13+`, `147` territories (app and export IAP), and the Privacy Policy URL; on 2026-11-27, `RF-62` closed (Nov 16 descriptors `Shared Location = No` and `Dating and Relationships = No` completed and API-verified) and Paid Apps / tax / banking became Active. The version record still holds the 2026-11-10 `3.0.0` entry until an explicit 3.2.0 metadata update request.**
 On 2026-11-01 (ASR-05), at the maintainer's request, the subtitle "Local AI voice studio", the
 promotional text, description, keywords and marketing URL, and the App Review contact and notes were
 entered in App Store Connect on version 3.0.0 and read back byte-identical. On 2026-11-02 (iPhone 15
@@ -44,7 +44,7 @@ Every claim below traces to a source listed above. Counts in parentheses are App
 | Subtitle (30) | Local AI voice studio | 21. Alternatives: "Text to speech, made locally" (28), "Private AI text to speech" (25). |
 | Privacy Policy URL | https://vocello.vercel.app/privacy/ | Matches the website canonical URL and in-app Settings link. |
 | Terms of Use URL | https://vocello.vercel.app/terms/ | Linked from onboarding, inline cloning consent, Export Purchase, and Settings → Privacy & Permissions. |
-| Age Rating | 13+ (applied 2026-11-25) | Raised from 4+ and verified via readback in App Store Connect on 2026-11-25 (`RF-62`/`RF-73`); Nov 16 descriptors `Shared Location = No` and `Dating and Relationships = No` remain pending web-portal completion. |
+| Age Rating | 13+ (`RF-62` closed 2026-11-27) | Raised from 4+ on 2026-11-25 (`THIRTEEN_PLUS`) and completed on 2026-11-27 with Apple's Nov 16 descriptors (`Shared Location = No`, `Dating and Relationships = No`), verified via read-only `asc age-rating view` readback. |
 | Territories | 147 of 175 (applied 2026-11-25) | Applied and verified via readback on both app and export IAP: excludes the 27 EU territories (`BKL-41`) and China Mainland (`CN`, `RF-73`), keeping South Korea (`KR`) enabled. |
 
 ## Version 3.2.0
@@ -167,8 +167,9 @@ on the phone (RF-12), and one account step is RF-02's.
   such as "Vocello runs the open-source Qwen3-TTS models with Apple's MLX" may be added on request.
 - **Speaker names:** none appear here; ASR-04's confirmation 13 (2026-11-01) covers presenting them
   in the app.
-- **The purchase line:** it describes Design & Clone Export as offered, which holds only once
-  RF-02's Paid Apps agreement is accepted and the product is submitted with the version.
+- **The purchase line:** it describes Design & Clone Export as offered; `RF-02`'s Paid Apps
+  agreement became Active on 2026-11-27, and the product ships once attached to the 3.2.0 version
+  submission with its review screenshot (`RF-12`).
 - **The limitations paragraph:** kept short, in line with the release notes' known limitations.
 
 ## Not drafted here
@@ -178,8 +179,8 @@ on the phone (RF-12), and one account step is RF-02's.
   6.5-inch size required when no 6.9-inch set is present, so the media manager settles it at upload.
   [`ios-appstore-submission.md`](ios-appstore-submission.md) §3 owns the rule.
 - The copyright line (entered during the explicit 3.2.0 App Store Connect metadata update). Category
-  (Productivity / Utilities) was set under RF-02 (2026-10-12 / 2026-11-04) and age rating was raised
-  to `13+` on 2026-11-25 (`RF-62`/`RF-73`; Nov 16 `Shared Location` and `Dating and Relationships`
-  descriptors remain pending web-portal completion).
+  (Productivity / Utilities) was set under RF-02 (2026-10-12 / 2026-11-04) and age rating is
+  complete at `13+` (`RF-62` closed 2026-11-27 with `Shared Location = No` and `Dating and
+  Relationships = No` verified via API readback).
 - Other localizations. The listing is en-US only so far; the export purchase already has en-US,
   fr-CA and fr-FR names and descriptions.

@@ -185,7 +185,7 @@
         "keyboard"
       ],
       "updated": "2026-11-27",
-      "notes": "2026-10-12, with the maintainer's approval: version 3.0.0 replaced the unreleased 1.0 draft; category Productivity (secondary Music -> Utilities on 2026-11-04); free and iPhone only; App Privacy Data Not Collected; export purchase (com.patricedery.vocello.design_clone_export, USD 19.99 base, automatic regional prices, Family Sharing off) has en-US, fr-CA and fr-FR text. 2026-10-27: EU excluded (BKL-41). 2026-11-25 maintainer decisions: target version 3.2.0; initial age rating raised from 4+ to 13+ (RF-62); China Mainland (CN) excluded and South Korea (KR) kept (147 of 175 territories, ASR-11). Left for Phase 5 (2026-11-26): maintainer App Store Connect portal activation of the Paid Apps agreement + tax/banking (must be Active 24h+ before RF-16 submit) and the export IAP review screenshot from the processed 3.2.0 TestFlight build (RF-12). Also enroll in the Apple Small Business Program (15% vs 30% fee on the USD 19.99 IAP) alongside Paid Apps activation."
+      "notes": "2026-10-12: version 3.0.0 replaced 1.0 draft; Productivity/Utilities; free, iPhone only; App Privacy Data Not Collected; export IAP (com.patricedery.vocello.design_clone_export, USD 19.99 base, auto regional prices, Family Sharing off, en-US/fr-CA/fr-FR). 2026-10-27: EU excluded (BKL-41). 2026-11-25: 3.2.0 target; 13+ age rating; China Mainland excluded, South Korea kept (147 of 175 territories, ASR-11). 2026-11-27: Paid Apps agreement, tax forms and banking are Active in App Store Connect (redacted; private receipts off-Git), Apple Small Business Program enrollment (15% commission) is submitted, and RF-62 closed. Remaining for RF-02: export IAP review screenshot from processed 3.2.0 TestFlight build (RF-12) and Small Business Program approval email."
     },
     {
       "id": "RF-06",
@@ -598,22 +598,6 @@
       "notes": "Opened 2026-11-13: attn hybrid replaces Speed and Quality. Published 2026-11-13 (PowerBeef02/*-hybrid-attn); implemented 41693f7f..dbe59080, shipped on Mac/CLI 3.1.0 (RF-61). Pack A delivery hardening (RB-06..RB-12, f269200d) landed 2026-11-21; Wave 5 on iPhone 17 Pro passed model-download queue (ff88637e) and upgrade Make Room (cdcd6211), benchmark 29/29 (f1e8631c) and memory 9/9 (c2b75046). 2026-11-21: no more 3.1 TestFlight; final candidate-tag iPhone memory/speed checks move to 3.2.0 (and any Pack C model update is tracked in RF-70)."
     },
     {
-      "id": "RF-62",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Set initial Age Rating to 13+ and answer Nov 16 descriptors when filing 3.2.0",
-      "status": "planned",
-      "blockedBy": [],
-      "gate": "In App Store Connect before initial 3.2.0 submission (and well before the January 12, 2027 deadline), raise the initial Age Rating from 4+ to 13+ (2026-11-25 decision D3/AI-D4) and answer Apple's Nov 16, 2026 descriptors (Shared Location = No, Dating and Relationships = No), with the read-back recorded in ASR-11.",
-      "sourceOfTruth": [
-        "docs/reference/ios-appstore-submission.md"
-      ],
-      "needs": [
-        "keyboard"
-      ],
-      "updated": "2026-11-26",
-      "notes": "Opened 2026-11-16 (Nov 16 descriptors due 2027-01-12). 2026-11-25 authorized ASC write & readback: raised ageRatingOverride and ageRatingOverrideV2 from NONE to THIRTEEN_PLUS (territoryAgeRatings read back THIRTEEN_PLUS; legacy appStoreAgeRating maps to TWELVE_PLUS, Brazil SELF_RATED_TWELVE). Left for Phase 5 portal step (2026-11-26): answer Apple's two Nov 16 descriptors (Shared Location = No, Dating and Relationships = No) in App Store Connect web portal (both currently read back null; asc v7.4.0 has no CLI flags for them) and record readback under ASR-11."
-    },
-    {
       "id": "RF-63",
       "plan": "release-first-3-0-2026-09",
       "title": "Fit the 3.2 App Review notes into 4,000 UTF-8 bytes",
@@ -724,7 +708,7 @@
         "keyboard"
       ],
       "updated": "2026-11-27",
-      "notes": "Opened 2026-10-12 as the plan's explicit end; lifting the focus lock follows it. 2026-11-26: RF-68, RF-69, RF-70 (attn kept), RF-71 (Mac/CLI v3.2.0 live at 33e65c15), RF-72 and RF-73 are closed; live ASC set to 13+, 147 territories on app & IAP (27 EU + CHN excluded, KOR kept), and /privacy/ URL. Phase 5 order to RF-16: (1) ASC portal Paid Apps + tax/banking (RF-02, Active 24h+ ahead) and Nov 16 Shared Location=No / Dating=No descriptors (RF-62); (2) cut v3.2.0-ios.1 via ios_candidate_tag.py (RF-12); (3) grouped iPhone window for RF-12/RF-15/RF-17/ASR-05/ASR-06/RF-66 + AWS Device Farm iPhone 15 Pro (RF-65); (4) ASC 3.2.0 metadata/IAP/RF-63 notes + ASR-09 24h proof -> submit. 2026-11-26 (X audit): stripped all 72 remaining QVOICE_*/QWENVOICE_* literals from shipping iOS + VocelloQwen3Core and hardened verify_ios_release_artifacts.py (2.5.19); runbook updated for 2026 ASC draft-submission IAP order (Add version -> add IAP to same submission -> Submit with Manual Release) and in-review discipline."
+      "notes": "Opened 2026-10-12 as the plan's explicit end; lifting focus lock follows it. 2026-11-26: RF-68, RF-69, RF-70 (attn kept), RF-71 (Mac/CLI v3.2.0 live at 33e65c15), RF-72 and RF-73 closed; 2.5.19 binary hygiene hardened (10d98182) and 3.2.0 listing/runbook updated (7ccacbc6, CI 45955907729 green). 2026-11-27: RF-62 closed (13+, sharedLocation=false, datingAndRelationships=false verified via asc readback); RF-02 Paid Apps agreement, tax forms and banking Active and Apple Small Business Program submitted. Remaining Phase 5 order to RF-16: (1) cut v3.2.0-ios.1 via ios_candidate_tag.py (RF-12); (2) grouped iPhone window for RF-12/RF-15/RF-17/ASR-05/ASR-06/RF-66 + AWS Device Farm iPhone 15 Pro (RF-65) + IAP review screenshot (RF-02); (3) ASC 3.2.0 metadata/IAP/RF-63 notes + ASR-09 24h proof -> submit with Manual Release using 2026 draft-submission IAP order."
     },
     {
       "id": "DA-02",
@@ -1207,8 +1191,8 @@
         "doc:docs/reference/ios-appstore-submission.md",
         "doc:docs/reference/content-rights-review.md"
       ],
-      "updated": "2026-11-25",
-      "notes": "Read-only audit & redacted post-write readback (2026-11-25 via asc): bundle com.patricedery.vocello, categories PRODUCTIVITY/UTILITIES, USES_THIRD_PARTY_CONTENT, Made for Kids false; en-US Privacy Policy URL updated & read back as https://vocello.vercel.app/privacy/ (Support URL https://vocello.vercel.app/support/, Marketing URL https://vocello.vercel.app); China Mainland (CHN) excluded on both app and export IAP (com.patricedery.vocello.design_clone_export) -> exact parity at 147 of 175 territories (27 EU + CHN excluded, South Korea KOR kept, availableInNewTerritories true on both); Age Rating raised 4+ -> 13+ (THIRTEEN_PLUS across territories; Nov 16 sharedLocation & datingAndRelationships still null, web portal pending under RF-62). Still open: bump ASC version 3.0.0 -> 3.2.0, iPhone screenshots (0 sets), export IAP review screenshot (0 uploaded; state MISSING_METADATA, USD 19.99 base, en-US/fr-CA/fr-FR present, familySharable false) + version attachment, RF-02 active Paid Apps, RF-63 Review Notes, and App Privacy web readback."
+      "updated": "2026-11-27",
+      "notes": "Read-only audit & redacted post-write readback (2026-11-25 & 2026-11-27 via asc): bundle com.patricedery.vocello, PRODUCTIVITY/UTILITIES, USES_THIRD_PARTY_CONTENT, Made for Kids false; en-US Privacy Policy https://vocello.vercel.app/privacy/ (Support https://vocello.vercel.app/support/, Marketing https://vocello.vercel.app); 147 of 175 territories on app & export IAP (27 EU + CHN excluded, KOR kept, availableInNewTerritories true). 2026-11-27: Age Rating read back THIRTEEN_PLUS (ageRatingOverride & ageRatingOverrideV2) with sharedLocation false and datingAndRelationships false (RF-62 closed); Paid Apps agreement, tax forms and banking Active in ASC portal and Apple Small Business Program submitted. Still open: bump ASC version 3.0.0 -> 3.2.0, iPhone screenshots (0 sets), export IAP review screenshot (0 uploaded; state MISSING_METADATA, USD 19.99, familySharable false) + version attachment, RF-63 Review Notes, and App Privacy web readback."
     },
     {
       "id": "ASR-12",

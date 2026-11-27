@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-26
+reviewed: 2026-11-27
 summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store — account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.
 sourceOfTruth:
   - project.yml
@@ -25,26 +25,29 @@ XCUITest evidence. External TestFlight distribution, App Review submission, and 
 release require the exact-tag iOS manifest in
 [`quality-promotion.md`](quality-promotion.md).
 
-**Current state (2026-11-25):** Mac and `vocello` CLI shipped **3.1.0** (`v3.1.0`, `RF-61`) on
-2026-11-17. By the maintainer's 2026-11-21 decision, there are **no more 3.1 TestFlight builds** and
-no iPhone 3.0 or 3.1 App Store release: **3.2.0** (`v3.2.0-ios.N` candidates) is the target for the
-iOS App Store submission. `RF-72`, Pack B (`RF-69` done; `RF-68` Mac work complete, iPhone proof
-pending), Pack C (`RF-70`, `RF-54`, `RF-57`, closed retaining the shipped `attn` hybrid baseline
-unchanged), and `RF-73` (App Store safeguards, 8 GB+ iPad portrait compatibility admission superseding
-`RF-42`'s refusal, binary hygiene, 10-language impersonation guardrails, and website Terms/Privacy/Support
-updates) have landed on `main` (`project.yml` remains at `3.1.0` until the 3.2 version bump under
-`RF-71` / `RF-12`). `release.yml` archived, verified and uploaded the historical 3.0.0 train (ASR-10
-closed on build 24; builds 26 and 27 remain in the 3.0 Public Beta under the maintainer's RF-17
-waiver; build 30 `v3.0.0-ios.9` is superseded) and internal 3.1.0 candidates (`v3.1.0-ios.1` through
-`v3.1.0-ios.3`, build 33 `VALID` in TestFlight, now superseded). On 2026-11-25, authorized App Store
-Connect prep applied Age Rating `13+`, `147` territories (excluding `CHN` alongside the 27 EU
-territories on both app and export IAP), and Privacy Policy URL readback. The checkpoint
-([`../development-progress.md`](../development-progress.md), Resume now) owns the live candidate
-state. The App Review submission waits for Mac/CLI 3.2.0 (`RF-71`), the 3.2.0 candidate upload
-(`RF-12`), the grouped iPhone-window checks (`RF-68` iPhone proof, `RF-15`, `RF-35`, `RF-41`,
-exact-tag iOS promotion `RF-17`, `RF-66`, `ASR-05` screenshots), `RF-65`, `RF-62` Nov 16 web-portal
-descriptors, `ASR-09`, `ASR-11`, `RF-02`, and the maintainer's go (`RF-16`). The App Review readiness
-audit (`2026-11-04-app-review-readiness.md`, archived in git history) is the historical 3.0 review
+**Current state (2026-11-27):** Mac and `vocello` CLI shipped **3.1.0** (`v3.1.0`, `RF-61`) on
+2026-11-17 and **3.2.0** (`v3.2.0`, `RF-71`, `33e65c15`) on 2026-11-26. By the maintainer's
+2026-11-21 decision, there are **no more 3.1 TestFlight builds** and no iPhone 3.0 or 3.1 App Store
+release: **3.2.0** (`v3.2.0-ios.N` candidates) is the target for the iOS App Store submission.
+`RF-72`, Pack B (`RF-68`, `RF-69`), Pack C (`RF-70`, `RF-54`, `RF-57`, closed retaining the shipped
+`attn` hybrid baseline unchanged), `RF-71`, `RF-73` (App Store safeguards, 8 GB+ iPad portrait
+compatibility admission superseding `RF-42`'s refusal, binary hygiene, 10-language impersonation
+guardrails, and website Terms/Privacy/Support updates), and `RF-62` have landed/closed (`project.yml`
+is at `3.2.0` build `32`). `release.yml` archived, verified and uploaded the historical 3.0.0 train
+(ASR-10 closed on build 24; builds 26 and 27 remain in the 3.0 Public Beta under the maintainer's
+RF-17 waiver; build 30 `v3.0.0-ios.9` is superseded) and internal 3.1.0 candidates (`v3.1.0-ios.1`
+through `v3.1.0-ios.3`, build 33 `VALID` in TestFlight, now superseded). On 2026-11-25, authorized
+App Store Connect prep applied Age Rating `13+`, `147` territories (excluding `CHN` alongside the 27
+EU territories on both app and export IAP), and Privacy Policy URL readback; on 2026-11-27, `RF-62`
+closed (Nov 16 descriptors `sharedLocation: false`, `datingAndRelationships: false` completed and
+verified via read-only `asc age-rating view` readback) and the Paid Apps Agreement, tax forms, and
+banking became **Active** in App Store Connect with Apple Small Business Program enrollment
+submitted. The checkpoint ([`../development-progress.md`](../development-progress.md), Resume now)
+owns the live candidate state. The App Review submission waits for the 3.2.0 candidate upload
+(`RF-12`), the grouped iPhone-window checks (`RF-15`, `RF-35`, `RF-41`, exact-tag iOS promotion
+`RF-17`, `RF-66`, `ASR-05` screenshots, and the `RF-02` IAP review screenshot), `RF-65`, `ASR-09`,
+`ASR-11`, and the maintainer's go (`RF-16`). The App Review readiness audit
+(`2026-11-04-app-review-readiness.md`, archived in git history) is the historical 3.0 review
 baseline. Any App Store Connect metadata change (including bumping the App Store Connect version
 record from 3.0.0 to 3.2.0 and pasting the reconciled [`app-store-listing.md`](app-store-listing.md)
 copy), upload or submission still needs its own explicit authorization.
@@ -105,8 +108,10 @@ download it automatically.
 Built-in output export. The StoreKit entitlement owner and output-provenance export boundary are
 implemented, and the local StoreKit exports scenario passed (RF-13). The product has en-US,
 fr-CA and fr-FR names and descriptions. Still open:
-- the Paid Apps agreement and its banking and tax steps, which are the maintainer's (RF-02); 3.2
-  ships outside the EU initially, so the EU trader step waits for the EU release (BKL-41);
+- Paid Apps agreement, tax forms, and banking became **Active** on 2026-11-27 and Apple Small
+  Business Program enrollment was submitted (RF-02; details remain in the maintainer's private
+  record, never in Git); 3.2 ships outside the EU initially, so the EU trader step waits for the EU
+  release (BKL-41);
 - the product's review screenshot and the purchase checks on the processed TestFlight build (RF-12);
 - review, which happens with the first submission.
 Monetization and App Store submission apply only to iOS. The macOS app remains distributed through
@@ -169,12 +174,13 @@ for the release acceptance (RF-15) or the 201-take campaign.
       in the local StoreKit session (RF-13, `ios-xcui-purchase-20261016-175234-5cbdbead`; the
       lane has since added AUD-07's unverified purchase).
 - [ ] Repeat the owned-export check on the processed TestFlight build in Airplane Mode (RF-12).
-- [ ] Accept the updated Apple Developer Program License Agreement (the Account Holder, at
-      developer.apple.com/account; it blocks new submissions), then the Paid Apps agreement, and
-      complete tax and banking — and enroll in the **Apple Small Business Program** (`15%` vs `30%`
-      commission from day one on the USD 19.99 one-time IAP) before testing live StoreKit. These
-      steps are the maintainer's (RF-02); their status stays in the maintainer's private record,
-      never in Git.
+- [x] Accept the updated Apple Developer Program License Agreement, activate the Paid Apps agreement
+      with tax and banking, and enroll in the **Apple Small Business Program** (`15%` vs `30%`
+      commission on the USD 19.99 one-time IAP): Paid Apps agreement, banking, and tax forms are
+      **Active** and Small Business Program enrollment was submitted on 2026-11-27 (RF-02; private
+      receipts and tax records stay in the maintainer's private off-Git record). Wait for Small
+      Business Program approval email and verify live StoreKit Sandbox fetches the product before
+      submitting `3.2.0`.
 - [ ] Capture the IAP review screenshot from the processed TestFlight build at the live USD 19.99
       (decision 2026-10-13), and submit the first IAP in the **same App Store Connect draft
       submission** as version 3.2.0 (2026 ASC flow: click **Add for Review** on version 3.2.0, add
@@ -186,28 +192,32 @@ Apple references: [purchase types](https://developer.apple.com/help/app-store-co
 [review rules](https://developer.apple.com/app-store/review/guidelines/#in-app-purchase).
 
 Current account state (2026-10-12 baseline set in the web portal under RF-02; refreshed via
-authorized `asc` read/write readback on 2026-11-25):
+authorized `asc` read/write readback on 2026-11-25 and 2026-11-27):
 - version 3.0.0 (`PREPARE_FOR_SUBMISSION`, 0 screenshot sets), which replaced the unreleased 1.0
   draft (will bump to `3.2.0` on explicit request ahead of submission);
 - category Productivity, secondary Utilities (changed from Music on 2026-11-04, maintainer decision);
 - free and iPhone only (Apple-silicon Mac and Vision Pro availability off), in **147 territories**
   on both app and export IAP (`availableInNewTerritories: true`): 27 EU territories excluded
   2026-10-27 (BKL-41) and China Mainland (`CHN`) excluded 2026-11-25, with South Korea (`KOR`) kept;
-- age rating raised from `4+` to **`13+`** on 2026-11-25 (`ageRatingOverrideV2: THIRTEEN_PLUS`,
-  territory age ratings read back `THIRTEEN_PLUS`; legacy `appStoreAgeRating` enum maps to
-  `TWELVE_PLUS`, Brazil `SELF_RATED_TWELVE`); Apple's two Nov 16 descriptors (`sharedLocation`,
-  `datingAndRelationships`) still read back `null` and need a 2-click web-portal finish (`RF-62`);
+- age rating complete at **`13+`** (`RF-62` closed 2026-11-27): `ageRatingOverride` and
+  `ageRatingOverrideV2` read back `THIRTEEN_PLUS` (territory age ratings `THIRTEEN_PLUS`, legacy
+  enum `TWELVE_PLUS`, Brazil `SELF_RATED_TWELVE`), and Apple's two Nov 16 descriptors
+  (`sharedLocation: false`, `datingAndRelationships: false`) were completed in the web portal and
+  verified via read-only `asc age-rating view` readback on 2026-11-27;
 - App Privacy published as Data Not Collected, with the `en-US` Privacy Policy URL updated and read
   back on 2026-11-25 as `https://vocello.vercel.app/privacy/`;
-- the export purchase entered as above (`state: MISSING_METADATA`; 0 review screenshot uploaded,
-  Paid Apps agreement still open under RF-02);
+- Paid Apps agreement, tax forms, and banking are **Active** in App Store Connect and Apple Small
+  Business Program enrollment was submitted on 2026-11-27 (redacted; private details off-Git); the
+  export purchase remains `state: MISSING_METADATA` until its review screenshot is uploaded from the
+  processed 3.2.0 TestFlight build (RF-12) and attached to the version;
 - EU Digital Services Act status set on 2026-10-27 (details in the maintainer's private record);
 - export compliance answered: build 30, attached to version 3.0.0 since 2026-11-10, reads back
   VALID with `usesNonExemptEncryption` false, as build 29 did on 2026-11-01, and App Store
   Connect asked no further question.
 
 The `en-US` Support URL and the `USES_THIRD_PARTY_CONTENT` declaration remain configured. Still open:
-- RF-02's account steps (agreements, banking and tax; status in the maintainer's private record);
+- `RF-02`'s export IAP review screenshot from processed `3.2.0` TestFlight (`RF-12`) and Small
+  Business Program approval email;
 - the accessibility declaration, which is voluntary and cannot be published before a version is
   live (see the row below).
 
@@ -239,13 +249,12 @@ is complete.
       CryptoKit SHA-256 for download integrity). The processed build 30 reads back `VALID` with
       `usesNonExemptEncryption` false and asks for no further export-compliance information
       (2026-11-10; build 29 read the same on 2026-11-01). Repeat the read for any later candidate.
-- [ ] **Age rating**: raised from `4+` to **`13+`** on 2026-11-25 (`ageRatingOverrideV2:
-      THIRTEEN_PLUS`, territory ratings `THIRTEEN_PLUS`, authorized `asc` write & readback under
-      `RF-62`/`RF-73`). Still open to close `RF-62`: complete Apple's two Nov 16 descriptors
-      (`Shared Location = No`, `Dating and Relationships = No`) in the App Store Connect web portal
-      (`asc` v7.4.0 does not yet expose CLI flags for those two fields; both currently read back
-      `null`) and verify readback. Every write to App Store Connect requires an explicit maintainer
-      request.
+- [x] **Age rating**: raised from `4+` to **`13+`** on 2026-11-25 (`ageRatingOverride` and
+      `ageRatingOverrideV2: THIRTEEN_PLUS`, territory ratings `THIRTEEN_PLUS`), and Apple's two Nov
+      16 descriptors (`sharedLocation: false`, `datingAndRelationships: false`) were completed in
+      the App Store Connect web portal and verified via read-only `asc age-rating view` readback on
+      2026-11-27 (`RF-62` closed). Every future write to App Store Connect requires an explicit
+      maintainer request.
 - [ ] **Accessibility declaration** (Accessibility Nutrition Labels): none is entered. It does not
       block the submission. Apple's App Store Connect help (read 2026-11-10) says the labels are
       voluntary for now, and that support can be published only for a device with a live App Store
@@ -522,16 +531,15 @@ permission prompts, calls and VoiceOver stay the maintainer's.
 
 ## 6. Submit & in-review discipline
 
-1. **2026 App Store Connect submission sequence:** ensure Paid Apps (`RF-02`), Age Rating (`RF-62` —
-   re-open and save Apple's Nov 16 descriptors first, because incomplete age-rating fields can
-   silently block submission with `422 ENTITY_UNPROCESSABLE`), Privacy Policy URL, `ASR-05`
-   real-device screenshots (genuine `3.2.0` UI captures only, zero stylized fake UI or celebrity
-   voice hints under `2.3.3` / `1.2`), `RF-66` **App Review Information → Attachment** video, and
-   `Design & Clone Export` review screenshot are complete. Select **Manual Release** (`Pending
-   Developer Release`), attach the processed 3.2.0 build, click **Add for Review** on version 3.2.0,
-   add the `Design & Clone Export` IAP into that **same draft submission**, and click **Submit to
-   App Review** together — **never submit the first IAP standalone**, and prefer US Pacific daytime
-   submission hours (submit one app at a time).
+1. **2026 App Store Connect submission sequence:** Paid Apps (`RF-02`, Active 2026-11-27), Age
+   Rating (`RF-62`, closed 2026-11-27 with Nov 16 descriptors verified), and Privacy Policy URL are
+   set; ensure `ASR-05` real-device screenshots (genuine `3.2.0` UI captures only, zero stylized
+   fake UI or celebrity voice hints under `2.3.3` / `1.2`), `RF-66` **App Review Information →
+   Attachment** video, and `Design & Clone Export` review screenshot are complete. Select **Manual
+   Release** (`Pending Developer Release`), attach the processed 3.2.0 build, click **Add for
+   Review** on version 3.2.0, add the `Design & Clone Export` IAP into that **same draft
+   submission**, and click **Submit to App Review** together — **never submit the first IAP
+   standalone**, and prefer US Pacific daytime submission hours (submit one app at a time).
 2. **Account & signing hygiene (`3.2(f)`):**
    - Never sign in to the Apple Developer account on shared rented cloud Macs (hardware
      fingerprinting can associate the account with previously banned tenants); keep interactive

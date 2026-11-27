@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 61/96 (64%) |
+| `release-first-3-0-2026-09` | active | release-qa | 62/96 (65%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 13/17 (76%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -119,7 +119,7 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `RF-52` (planned) Quality remediation, stage 2: clone conditioning parity (also: iPhone)
 - `UIF-08` (parked) Native acceptance of the iOS-derived screens on current source
 
-### At the keyboard (17)
+### At the keyboard (16)
 
 Needs the maintainer present: a permission prompt, a keychain or password, a release or account action only they may perform.
 
@@ -138,7 +138,6 @@ Needs the maintainer present: a permission prompt, a keychain or password, a rel
 - `RF-16` (planned) Submit 3.2.0 for App Review on the maintainer's explicit go
 - `RF-23` (parked) The Mac app offers new versions and installs them through Sparkle
 - `RF-48` (planned) Core overhaul, stage 4: finalization, preview and the heat pause (also: iPhone)
-- `RF-62` (planned) Set initial Age Rating to 13+ and answer Nov 16 descriptors when filing 3.2.0
 - `RF-63` (planned) Fit the 3.2 App Review notes into 4,000 UTF-8 bytes
 
 ### iPhone (61)
@@ -248,7 +247,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-52` | planned | Quality remediation, stage 2: clone conditioning parity | `RF-50` |
 | `RF-55` | planned | Quality remediation, stage 5: model precision and the hybrid model | `RF-50` |
 | `RF-59` | planned | One model: the attn hybrid replaces Speed and Quality, and the model selector is retired | `RF-55` |
-| `RF-62` | planned | Set initial Age Rating to 13+ and answer Nov 16 descriptors when filing 3.2.0 | — |
 | `RF-63` | planned | Fit the 3.2 App Review notes into 4,000 UTF-8 bytes | `RF-73` |
 | `RF-65` | planned | Measure the shipped hybrid on an iPhone 15 Pro | — |
 | `RF-66` | planned | Record a demo video of the shipping flow on a physical iPhone | — |
@@ -352,9 +350,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-59`** (planned) — One model: the attn hybrid replaces Speed and Quality, and the model selector is retired.
   gate: The maintainer publishes the three hybrid artifacts and receipts pin them with exact sizes and SHA-256 digests; the catalog offers one model per mode on both platforms, and neither app shows a Speed/Quality choice; every mode's installed Speed and Quality folders are removed once any mode's model verifies (maintainer decision 2026-11-13); vocello accepts --variant quality, models use and prefer-lower-memory with a notice; memory bands follow the hybrid's measured peak; the formal speed lane and the iPhone's memory and speed (a farm run or an announced phone window) are recorded before the iOS submission; public facts, the README, website copy and benchmark baselines (a new lineage) follow with the release.
-
-- **`RF-62`** (planned) — Set initial Age Rating to 13+ and answer Nov 16 descriptors when filing 3.2.0.
-  gate: In App Store Connect before initial 3.2.0 submission (and well before the January 12, 2027 deadline), raise the initial Age Rating from 4+ to 13+ (2026-11-25 decision D3/AI-D4) and answer Apple's Nov 16, 2026 descriptors (Shared Location = No, Dating and Relationships = No), with the read-back recorded in ASR-11.
 
 - **`RF-63`** (planned) — Fit the 3.2 App Review notes into 4,000 UTF-8 bytes.
   gate: The review notes in docs/reference/app-store-listing.md describe the 3.2 candidate (one model per mode and exact sizes, stripped Release diagnostics under 2.5.19, iPhone 15 Pro preview-pause note, portrait iPad compatibility under RF-42, demo video RF-66), clearly document 100% offline single-user local TTS with A1-D2 safeguards (consent, zero-tolerance terms at Settings > Privacy & Permissions > Terms of Use, mandatory AudioSeal + LIST/INFO + open verification, jurisdiction-neutral deployer disclosure reminder, 10-language impersonation guardrail, Settings > About > Report an Issue opening vocello.vercel.app/support/#report), explicitly clarify Hugging Face is a static read-only weight host with zero third-party AI APIs (5.1.2(i)), and proactively list Qwen3-TTS (Apache-2.0), AudioSeal (MIT), original artwork and generated previews (5.2 / USES_THIRD_PARTY_CONTENT); all <= 4,000 UTF-8 bytes and read back from ASC byte-identical.

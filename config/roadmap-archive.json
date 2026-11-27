@@ -6968,6 +6968,22 @@
         "run:45914974565",
         "run:45933267704"
       ]
+    },
+    {
+      "id": "RF-62",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Set initial Age Rating to 13+ and answer Nov 16 descriptors when filing 3.2.0",
+      "status": "done",
+      "blockedBy": [],
+      "gate": "In App Store Connect before initial 3.2.0 submission (and well before the January 12, 2027 deadline), raise the initial Age Rating from 4+ to 13+ (2026-11-25 decision D3/AI-D4) and answer Apple's Nov 16, 2026 descriptors (Shared Location = No, Dating and Relationships = No), with the read-back recorded in ASR-11.",
+      "sourceOfTruth": [
+        "docs/reference/ios-appstore-submission.md"
+      ],
+      "updated": "2026-11-27",
+      "notes": "Opened 2026-11-16 (Nov 16 descriptors due 2027-01-12). 2026-11-25 authorized ASC write & readback: raised ageRatingOverride and ageRatingOverrideV2 from NONE to THIRTEEN_PLUS (territoryAgeRatings read back THIRTEEN_PLUS; legacy appStoreAgeRating maps to TWELVE_PLUS, Brazil SELF_RATED_TWELVE). Left for Phase 5 portal step (2026-11-26): answer Apple's two Nov 16 descriptors (Shared Location = No, Dating and Relationships = No) in App Store Connect web portal (both currently read back null; asc v7.4.0 has no CLI flags for them) and record readback under ASR-11. 2026-11-27: completed Apple Nov 16 descriptors in App Store Connect (Shared Location = No, Dating and Relationships = No) keeping ageRatingOverride and ageRatingOverrideV2 at THIRTEEN_PLUS; verified via read-only asc age-rating view readback (zero null required descriptors) and recorded under ASR-11.",
+      "evidence": [
+        "doc:docs/reference/ios-appstore-submission.md"
+      ]
     }
   ]
 }

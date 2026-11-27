@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-26
+reviewed: 2026-11-27
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -54,9 +54,13 @@ closed (`done`). Next focus is **Phase 5 (`v3.2.0-ios.1` → `RF-16` iOS App Sto
 
 **Next — Phase 5 (`v3.2.0-ios.1` → `RF-16` iOS 3.2.0 App Store Submission):**
 
-1. **Maintainer web-portal prerequisites (App Store Connect):** activate Paid Apps Agreement +
-   tax/banking (`RF-02`, active 24h+ before submit) and set Age Rating `13+` with `Shared Location =
-   No` / `Dating and Relationships = No` (`RF-62`).
+1. **Completed 2026-11-27 (`RF-62` CLOSED; `RF-02` account prerequisites Active):** Paid Apps
+   Agreement, tax forms, and banking are now **Active** in App Store Connect and Apple Small
+   Business Program enrollment is submitted (redacted; private receipts off-Git). `RF-62` is closed:
+   Apple's Nov 16 descriptors (`Shared Location = No`, `Dating and Relationships = No`) were saved
+   keeping Age Rating `13+` (`THIRTEEN_PLUS`), verified via read-only `asc age-rating view`
+   readback. Only the `Design & Clone Export` IAP review screenshot from processed `3.2.0`
+   TestFlight (`RF-12`) remains on `RF-02`.
 2. **Cut & upload `v3.2.0-ios.1` (`RF-12`):** run `python3 scripts/ios_candidate_tag.py` (when ready)
    → approve `archive-ios` in `release.yml` → install processed TestFlight build on paired iPhone.
 3. **Grouped iPhone acceptance & submission (`RF-15`, `RF-17`, `ASR-05`, `RF-66`, `RF-65`, `RF-63`, `ASR-09`, `RF-16`):**

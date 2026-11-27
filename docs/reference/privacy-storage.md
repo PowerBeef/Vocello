@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-25
+reviewed: 2026-11-27
 summary: Local-first privacy and on-disk storage layout on both platforms — app transfers, operating-system backups, deletion semantics, diagnostics, and the repository's build-output ownership.
 sourceOfTruth:
   - Sources/SharedSupport
@@ -221,7 +221,7 @@ Maintained iPhone subtrees:
   `Sources/iOS/Info.plist` and is banned by `verify_ios_release_artifacts.py` under `RF-73`);
   existing personal files are unchanged. StoreKit handles billing; verified access is held in app memory, without an app
   server, receipt logging or preference unlock. App Privacy is published as Data Not Collected
-  (2026-10-12, RF-02); the Paid Apps agreement remains RF-02 work. Storage-failure and original-reference recovery remain free. New generated
+  (2026-10-12, RF-02); Paid Apps agreement, tax forms, and banking became Active on 2026-11-27 (RF-02; IAP review screenshot waits for RF-12). Storage-failure and original-reference recovery remain free. New generated
   Saved Voices retain source mode in enrollment metadata; legacy references are not reclassified.
   When that metadata cannot be read, the voice's own Vocello provenance decides, so a generated
   voice stays locked and a recording stays free.
@@ -504,9 +504,12 @@ cannot recognize an unquoted prompt. The persisted boundaries that use it:
 telemetry keeps only a failure message's length and digest. Unified-log calls (`os_log`, `Logger`)
 mark only code-owned identifiers and numbers public, and the crash observer's write failure logs a
 typed summary. The app does not persist console output (`print`, standard error). Only the
-internal device-diagnostics runners and writers (compiled out of shipping iOS Release binaries
-behind `#if QVOICE_DEVICE_DIAGNOSTICS` alongside shipping `QWENVOICE_*` environment-variable reads
-under `RF-73`, enforced by `verify_ios_release_artifacts.py`) and the iPhone app's lifecycle and
+internal device-diagnostics runners, recorders, and bench harness types (`IOSDeviceDiagnosticsRunner`,
+`IOSDeviceDiagnosticsRecorder`, `IOSPullableDiagnosticsMirror` body, `IOSStartupReliabilityRunner`,
+`IOSStartupReliabilityPlan`, `debug_force_critical_once`, `BenchRunContext`/`BenchSeedPolicy` —
+compiled out of shipping iOS Release binaries behind `#if !os(iOS) || QVOICE_DEVICE_DIAGNOSTICS`
+alongside all shipping `QVOICE_*` and `QWENVOICE_*` environment-variable reads/literals under `RF-73`,
+enforced by `PROHIBITED_RELEASE_STRING_PATTERNS` in `verify_ios_release_artifacts.py`) and the iPhone app's lifecycle and
 bootstrap lines (`QVoiceiOSApp`, `IOSAppBootstrap`, including the `[bootstrap] clone gate` line
 `ios-engine-optimization.md` cites) still print: their lines are the stream
 `scripts/ios_device.sh console` and `logs` capture, with typed summaries. The engine's

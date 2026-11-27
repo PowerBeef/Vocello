@@ -127,10 +127,14 @@ lenses = [
         "model": "flash",
         "prompt": (
             "Read-only audit — edit nothing. Check these Swift changes for: "
-            "(1) Release-only violations (any #if DEBUG, ungated debug knob missing "
-            "VOCELLO_INTERNAL_DIAGNOSTICS / QWENVOICE_DEBUG=1, or Guideline 2.5.19 regressions "
-            "leaking dormant iOS device/perf runners outside QVOICE_DEVICE_DIAGNOSTICS or "
-            "shipping iOS QWENVOICE_* env-var reads), "
+            "(1) Release-only & Guideline 2.5.19 violations (any #if DEBUG, ungated debug knob "
+            "missing VOCELLO_INTERNAL_DIAGNOSTICS / QWENVOICE_DEBUG=1, dormant iOS device/perf "
+            "runners or diagnostics/bench harness symbols such as IOSDeviceDiagnosticsRecorder, "
+            "IOSPullableDiagnosticsMirror, IOSStartupReliabilityPlan, debug_force_critical_once, "
+            "BenchRunContext/BenchSeedPolicy leaked outside !os(iOS) || QVOICE_DEVICE_DIAGNOSTICS, "
+            "any unguarded shipping iOS QVOICE_* or QWENVOICE_* env-var reads/literals including "
+            "in VocelloQwen3Core, UIFileSharingEnabled, bundled .storekit fixtures, or missing "
+            "iCloud Backup exclusion on large downloaded iOS files), "
             "(2) Privacy leaks (prompts, transcripts, private host paths, credentials logged outside "
             "DiagnosticPrivacy), "
             "(3) Unregistered @unchecked Sendable / nonisolated(unsafe) missing from "

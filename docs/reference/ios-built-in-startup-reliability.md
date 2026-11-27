@@ -74,10 +74,11 @@ requires exactly attempt zero or the contiguous sequence zero then one.
 
 ## Physical-device runner
 
-The diagnostics-compiled app extends the existing `IOSDeviceDiagnosticsRunner` (both
-`IOSStartupReliabilityRunner` and `IOSDeviceDiagnosticsRunner` are compiled only under
-`#if QVOICE_DEVICE_DIAGNOSTICS` and stripped from shipping iOS Release binaries under `RF-73`,
-enforced by `scripts/verify_ios_release_artifacts.py`); it is not a
+The diagnostics-compiled app extends the existing `IOSDeviceDiagnosticsRunner` (it,
+`IOSDeviceDiagnosticsRecorder`, `IOSStartupReliabilityRunner`, `IOSStartupReliabilityPlan`, and
+codec-replay hooks are compiled out of shipping iOS Release binaries behind
+`#if !os(iOS) || QVOICE_DEVICE_DIAGNOSTICS` under `RF-73`, enforced by
+`scripts/verify_ios_release_artifacts.py`); it is not a
 second engine or UI driver. A plan contains 1–128 ordered takes and one exact script digest and
 character count. Each take fixes speaker, strict `<preset>.<intensity>` delivery ID, language,
 seed, variation, streaming, predecessor, and one preparation mode: production state, full runtime

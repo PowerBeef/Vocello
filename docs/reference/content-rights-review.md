@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-25
+reviewed: 2026-11-27
 summary: The maintainer's recorded privacy, region and content-rights decisions for the 3.2 App Store submission, with the evidence behind them for model artifacts, built-in voice previews, marketing audio, product artwork and the App Store Connect declarations.
 sourceOfTruth:
   - config/third-party-attribution-policy.json
@@ -204,7 +204,7 @@ and is not duplicated here.
 | Model redistribution, notices, previews, marketing audio and artwork — ASR-04 | Maintainer / asset owner | **Done 2026-11-01:** attestation `ASR04-2026-11-01` (above), reflected in `config/third-party-attribution-policy.json` (`RF-73` added `auxiliaryModelWeights` for Meta AudioSeal `MIT`). |
 | Source/account version and build — ASR-08 | Release maintainer | **Done 2026-10-14** (initial version record replaced 1.0 draft). Live version/build state and the pre-archive read-only unused-build check live in [`ios-appstore-submission.md` §1 & §4](ios-appstore-submission.md#1-privacy--compliance-app-store-connect). |
 | Distribution profile and entitlements — ASR-10 | Signing / release owner | **Done 2026-10-24:** first verified signed IPA (build 24); every later candidate repeats `verify_ios_release_artifacts.py`. |
-| Age rating, content declaration, encryption, territories, and account agreements — ASR-11 / RF-02 | Account holder / maintainer | `USES_THIRD_PARTY_CONTENT` declared (2026-08-27); `ITSAppUsesNonExemptEncryption=false` declared in source; Paid Apps agreement, tax, and banking stay in the maintainer's private record (never in Git). Live ASC age rating, territories, export compliance, and remaining `RF-62`/`ASR-11` checks live in [`ios-appstore-submission.md` §1](ios-appstore-submission.md#1-privacy--compliance-app-store-connect). |
+| Age rating, content declaration, encryption, territories, and account agreements — ASR-11 / RF-02 | Account holder / maintainer | `USES_THIRD_PARTY_CONTENT` declared (2026-08-27); `ITSAppUsesNonExemptEncryption=false` declared in source; `RF-62` closed 2026-11-27 (`13+`, `sharedLocation: false`, `datingAndRelationships: false` API-verified); Paid Apps agreement, tax forms, and banking became Active on 2026-11-27 with Apple Small Business Program submitted (private receipts stay off-Git). Live ASC state and remaining `ASR-11` checks live in [`ios-appstore-submission.md` §1](ios-appstore-submission.md#1-privacy--compliance-app-store-connect). |
 
 Apple's [privacy definitions](https://developer.apple.com/app-store/app-privacy-details/) require
 considering third-party practices and retention beyond real-time request service. Hugging Face's

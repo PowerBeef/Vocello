@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-25
+reviewed: 2026-11-27
 summary: System architecture — engine core, the in-process request lifecycle on macOS and iOS, model management, telemetry layers, and the engine invariants each surface must preserve.
 sourceOfTruth:
   - project.yml
@@ -873,8 +873,11 @@ concrete type. Key iOS behaviors:
   CLI, which has no progress line, does not.
 - **Interruption recorder & device-diagnostics compile guard** (2026-07-02; `RF-73` Guideline
   2.5.19): `IOSInterruptionRecorder` (`CXCallObserver` + `UIApplication` lifecycle),
-  `IOSDeviceDiagnosticsRunner`, and `IOSStartupReliabilityRunner` are compiled into iOS only when
-  `QVOICE_DEVICE_DIAGNOSTICS` is defined (omitted from shipping builds, verified by
+  `IOSDeviceDiagnosticsRunner`, `IOSDeviceDiagnosticsRecorder`, `IOSPullableDiagnosticsMirror` body,
+  `IOSStartupReliabilityRunner`, `IOSStartupReliabilityPlan` (+ codec-replay hooks and
+  `StartupReliabilityDiagnosticEvidence` persistence), `debug_force_critical_once`, and
+  `BenchRunContext`/`BenchSeedPolicy` are compiled out of shipping iOS builds unless
+  `QVOICE_DEVICE_DIAGNOSTICS` is defined (enforced by `PROHIBITED_RELEASE_STRING_PATTERNS` in
   `scripts/verify_ios_release_artifacts.py`); during headless device diagnostics, interruption events
   land in `device-diagnostics-done.json` as `interruptions` so doomed runs self-report
   calls/backgrounding.
@@ -1312,9 +1315,11 @@ supported key and classifies production-affecting overrides, bounded observabili
 test-target-only device diagnostics. Production-affecting values are read only through
 `RuntimeDebugGate` and require both the `VOCELLO_INTERNAL_DIAGNOSTICS` compile capability and
 `QWENVOICE_DEBUG`; distribution routes omit the capability. Under Guideline 2.5.19 (`RF-73`),
-shipping iOS builds additionally compile out dormant device/perf runners (`QVOICE_DEVICE_DIAGNOSTICS`)
-and `QWENVOICE_*` environment-variable reads in `RuntimeDebugGate` and `TelemetryGate` (enforced by
-`scripts/verify_ios_release_artifacts.py`). The owned package cannot see that
+shipping iOS builds additionally compile out dormant device/perf runners and residual
+diagnostics/bench harness symbols (`#if !os(iOS) || QVOICE_DEVICE_DIAGNOSTICS`) and all `QVOICE_*`
+and `QWENVOICE_*` environment-variable reads/literals across `RuntimeDebugGate`, `TelemetryGate`,
+`Sources/iOS*`, `Sources/QwenVoiceCore`, and `Packages/VocelloQwen3Core` (enforced by
+`PROHIBITED_RELEASE_STRING_PATTERNS` in `scripts/verify_ios_release_artifacts.py`). The owned package cannot see that
 compile condition, so the product attests it on every load
 (`VocelloQwen3LoadBehavior.internalDiagnosticsAvailable`, default false) and the package's
 `VocelloQwen3ImplementationDebugGate` refuses its load-time overrides without it. Bounded observability remains

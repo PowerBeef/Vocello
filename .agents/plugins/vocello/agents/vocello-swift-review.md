@@ -15,11 +15,16 @@ diff against, ask for them. You never edit, build, run models or devices, stage,
 change settings; the lead owns integration and validation.
 
 Check, and cite the rule for each finding:
-1. Release-only: no `#if DEBUG`, no Debug-only behavior; diagnostics gated by
+1. Release-only & Guideline 2.5.19: no `#if DEBUG`, no Debug-only behavior; diagnostics gated by
    `VOCELLO_INTERNAL_DIAGNOSTICS`, `QWENVOICE_DEBUG` and a knob registered in
-   `config/runtime-debug-knobs.json`. Under Guideline 2.5.19 (`RF-73`), dormant iOS device/perf
-   runners stay behind `QVOICE_DEVICE_DIAGNOSTICS` and shipping iOS builds must not add unguarded
-   `QWENVOICE_*` environment-variable reads (`scripts/verify_ios_release_artifacts.py`).
+   `config/runtime-debug-knobs.json`. Shipping iOS builds must compile out dormant device/perf
+   runners and residual diagnostics/bench harness symbols (`IOSInterruptionRecorder`,
+   `IOSDeviceDiagnosticsRunner`/`Recorder`, `IOSPullableDiagnosticsMirror` body,
+   `IOSStartupReliabilityRunner`/`Plan` + codec-replay hooks, `debug_force_critical_once`,
+   `BenchRunContext`/`BenchSeedPolicy`) behind `#if !os(iOS) || QVOICE_DEVICE_DIAGNOSTICS`, and
+   must not leak unguarded `QVOICE_*` or `QWENVOICE_*` env-var reads/literals anywhere compiled
+   into `VocelloiOS` including `Packages/VocelloQwen3Core` (`PROHIBITED_RELEASE_STRING_PATTERNS` in
+   `scripts/verify_ios_release_artifacts.py`).
 2. Concurrency: every new `@unchecked Sendable` or `nonisolated(unsafe)` is registered in
    `config/concurrency-safety.json`; no MLX array crosses an isolation boundary; actor-owned
    reservations and typed cancellation barriers hold, and every acquired slot or reservation is
@@ -38,8 +43,11 @@ Check, and cite the rule for each finding:
    History ownership and cleanup preserved; a cancelled take never lands in History.
 5. UI: accessibility identifiers stable and matching `config/ios-control-audit.json`; localization through
    the owned catalogs; Reduce Motion and Dynamic Type respected; no hidden test UI in shippable targets.
-6. iOS boundaries: one StoreKit owner and export boundary; `IOSAppLanguage` owns interface language;
-   never mutate `AppleLanguages`; no paywall in macOS or CLI paths.
+6. iOS boundaries & App Store conformance: one StoreKit owner and export boundary (no `.storekit`
+   fixture or mock/bypass unlock in shipping targets; Guideline 3.1.1); `IOSAppLanguage` owns
+   interface language; never mutate `AppleLanguages`; no paywall in macOS or CLI paths; keep
+   `UIFileSharingEnabled` absent, `LSSupportsGameMode` off, and `isExcludedFromBackup = true` on
+   downloaded model/cache roots (Guideline 2.23).
 7. Privacy: no PII, prompts, transcripts, private paths or credentials in logs, telemetry or tests;
    persisted failures use `DiagnosticPrivacy` summaries.
 8. Generated project: `project.yml` edited rather than the `.xcodeproj`; new files sit in an existing

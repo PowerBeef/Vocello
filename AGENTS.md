@@ -146,12 +146,17 @@ Lane notes:
   `config/concurrency-safety.json`.
 - **Release-only:** no Debug config or generic `DEBUG`. Overrides need registered knobs,
   `VOCELLO_INTERNAL_DIAGNOSTICS` and `QWENVOICE_DEBUG=1`. Shipping iOS builds also compile out
-  dormant device/perf runners (`QVOICE_DEVICE_DIAGNOSTICS`) and `QWENVOICE_*` env reads (Guideline
-  2.5.19; `verify_ios_release_artifacts.py`).
+  dormant device/perf runners, diagnostics/bench harness types (`IOSDeviceDiagnosticsRecorder`,
+  `IOSPullableDiagnosticsMirror` body, `IOSStartupReliabilityPlan` + codec-replay hooks,
+  `debug_force_critical_once`, `BenchRunContext`/`BenchSeedPolicy` behind
+  `!os(iOS) || QVOICE_DEVICE_DIAGNOSTICS`) and all `QVOICE_*`/`QWENVOICE_*` env reads, including
+  in `VocelloQwen3Core` (Guideline 2.5.19; `verify_ios_release_artifacts.py`).
 - **Generated project:** edit `project.yml` and source membership, never `project.pbxproj`; shared
   generation signature controls regeneration.
-- **iOS:** one StoreKit owner and export boundary; `IOSAppLanguage` owns interface language apart
-  from speech; no macOS/CLI paywall; preserve accessibility identifiers and localization.
+- **iOS:** one StoreKit owner and export boundary (no bundled `.storekit` fixture or mock unlock);
+  `IOSAppLanguage` owns interface language apart from speech; no macOS/CLI paywall; preserve
+  accessibility identifiers and localization; keep `UIFileSharingEnabled` absent, `LSSupportsGameMode=NO`,
+  and iCloud Backup exclusion (`2.23`) on downloaded models/caches (`docs/reference/ios-appstore-submission.md`).
 - **Evidence:** committed checkpoints, fixed seeds, compatible baselines, optimized-build receipts
   and memory qualification. Keep failed evidence; reruns need a new ID and reason
   (`docs/reference/tooling-and-evidence.md`).
@@ -183,7 +188,8 @@ ask matrix (guardrails, not authorization). Full matrix and routing:
   discovery/coverage only (no `persist: true`, Simulator, build, LLDB or UI tools); `cua-driver` is
   allowed on the lead checkout for maintainer-requested host GUI tasks (denied in linked worktrees;
   never for Vocello UI checks); `axiom` supplies Apple skills, read-only auditors, `xcsym`, `xcprof`
-  and `xclog` (no `xcui`/simulator agents); `vercel-plugin` does not authorize CLI deploys.
+  and `xclog` (no `xcui`/simulator agents); the global `ios-app-store-conformance` skill provides
+  read-only iOS App Store conformance guidance; `vercel-plugin` does not authorize CLI deploys.
 - **Artifacts, chat and maintainer commands:** keep raw diagnostics, private paths, prompts,
   transcripts, reference audio and credentials out of artifacts, screenshots and chat. Give
   interactive/maintainer-run commands (logins, model installs, publication) in a plain `sh` block;

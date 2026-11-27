@@ -9,10 +9,15 @@ Before editing Swift sources, packages, tests, `project.yml`, or native runtime/
 contracts, read `docs/reference/native-engineering.md` (the authoritative native engineering rule).
 
 Non-negotiable invariants enforced here:
-- **Release-only:** no `#if DEBUG`; diagnostics use `VOCELLO_INTERNAL_DIAGNOSTICS`, `QWENVOICE_DEBUG=1`,
-  and knobs registered in `config/runtime-debug-knobs.json`. Shipping iOS builds also compile out
-  dormant device/perf runners (`QVOICE_DEVICE_DIAGNOSTICS`) and `QWENVOICE_*` env-var reads
-  (Guideline 2.5.19; `scripts/verify_ios_release_artifacts.py`).
+- **Release-only & App Store 2.5.19:** no `#if DEBUG`; diagnostics use
+  `VOCELLO_INTERNAL_DIAGNOSTICS`, `QWENVOICE_DEBUG=1`, and knobs registered in
+  `config/runtime-debug-knobs.json`. Shipping iOS builds compile out dormant device/perf runners,
+  diagnostics/bench harness symbols (`IOSDeviceDiagnosticsRecorder`, `IOSPullableDiagnosticsMirror`
+  body, `IOSStartupReliabilityPlan` + codec-replay hooks, `debug_force_critical_once`,
+  `BenchRunContext`/`BenchSeedPolicy` behind `!os(iOS) || QVOICE_DEVICE_DIAGNOSTICS`) and all
+  `QVOICE_*`/`QWENVOICE_*` env reads including in `VocelloQwen3Core`
+  (`scripts/verify_ios_release_artifacts.py`). Keep `UIFileSharingEnabled` absent, `.storekit`
+  fixtures unbundled, and downloaded models/caches excluded from iCloud Backup (Guideline 2.23).
 - **Swift 6 & concurrency:** register any `@unchecked Sendable` or `nonisolated(unsafe)` in
   `config/concurrency-safety.json`; never pass MLX arrays across isolation boundaries; honor
   `NonisolatedNonsendingByDefault`, `InferIsolatedConformances`, `MemberImportVisibility`, and strict

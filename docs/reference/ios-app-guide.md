@@ -1,7 +1,7 @@
 ---
 status: active
 owner: ios
-reviewed: 2026-11-25
+reviewed: 2026-11-27
 summary: Consolidated iPhone app map — every screen, element, and option from the user view, and how XCUITest drives each via stable identifiers on the paired physical device.
 sourceOfTruth:
   - Sources/iOS
@@ -771,9 +771,10 @@ Generation, listening, internal History and voice enrollment remain free. One iO
 unlocks outward Design/Clone audio export. Built-in exports remain free; macOS and CLI are unchanged.
 The product exists in App Store Connect with its USD 19.99 US base and automatic regional prices,
 and its en-US, fr-CA and fr-FR names and descriptions (RF-02, 2026-10-12). The local StoreKit
-acceptance passed (RF-13, closed 2026-10-16). The Paid Apps agreement (RF-02) and the
-processed-build purchase checks (RF-12) remain, so this is not yet an available or reviewed
-purchase.
+acceptance passed (RF-13, closed 2026-10-16). Paid Apps agreement, tax forms, and banking became
+**Active** on 2026-11-27 (RF-02, with Apple Small Business Program enrollment submitted); the IAP
+review screenshot, processed-build purchase checks (RF-12), and App Review submission (RF-16)
+remain, so this is not yet a live reviewed purchase.
 
 This is the official iOS app's export purchase, not a restriction on the MIT-licensed source.
 Self-built forks may change the checks; they do not acquire an official Apple entitlement by doing

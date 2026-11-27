@@ -8,15 +8,19 @@ description: Read-only assessment of a tag or candidate against exact-source CI,
 Apply this procedure to the tag or candidate (for example `v3.2.0` or `v3.2.0-ios.1`) the user asked for.
 
 Read `docs/reference/quality-promotion.md`, `docs/reference/macos-release-qa.md`,
-`docs/reference/ios-appstore-submission.md` and `docs/reference/tooling-and-evidence.md`. Require or
+`docs/reference/ios-appstore-submission.md` and `docs/reference/tooling-and-evidence.md` (and
+consult the global `ios-app-store-conformance` skill for read-only iOS App Review checks). Require or
 infer the exact tag or candidate; inspect existing Git metadata, GitHub checks and release assets
 through read-only tools. Candidate production and public promotion are separate decisions; this skill
 authorizes neither. No `release.sh`, workflow dispatch, signing, upload, metadata change, push,
 deployment or App Store write.
 
 Validate existing source-authority inputs with `python3 scripts/release_source_authority.py` and
-quality evidence with `python3 scripts/quality_promotion.py validate`; consult `--help` for required
-arguments. Curated notes use `python3 scripts/check_release_notes.py <tag>`. Read-only GitHub GETs
+quality evidence with `python3 scripts/quality_promotion.py validate`; for iOS archives/IPAs also
+verify `scripts/verify_ios_release_artifacts.py` (`PROHIBITED_RELEASE_STRING_PATTERNS` / Guideline
+2.5.19 binary hygiene, entitlements, privacy manifest, attribution manifest, and `UIFileSharingEnabled`
+absence); consult `--help` for required arguments. Curated notes use
+`python3 scripts/check_release_notes.py <tag>`. Read-only GitHub GETs
 may save fetched JSON to governed scratch, never into frozen evidence. The source-authority script has
 no network route: save the tag ref (`gh api --method GET repos/<owner>/<repo>/git/ref/tags/<tag>`),
 the annotated tag object, the tagged commit's check runs (`.../commits/<sha>/check-runs?filter=all`)

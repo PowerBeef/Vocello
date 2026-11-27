@@ -2,7 +2,7 @@
 status: active
 owner: backend-and-platform
 summary: Native engineering rule for the engine, macOS app and iOS app; Antigravity loads it on demand through .agents/plugins/vocello/rules/native.md when matching files are touched.
-reviewed: 2026-11-25
+reviewed: 2026-11-27
 ---
 # Native rule — engine, macOS app, iOS app
 
@@ -63,11 +63,15 @@ physical-device or macOS XCUITest lane at a coherent checkpoint.
   status; do not restate it in prose.
 - **Diagnostics fail closed.** Every production-affecting environment key is registered in
   `config/runtime-debug-knobs.json` and needs the internal-diagnostics build plus `QWENVOICE_DEBUG`.
-  Under Guideline 2.5.19 (`RF-73`), dormant iOS device/perf runners (`IOSInterruptionRecorder`,
-  `IOSDeviceDiagnosticsRunner`, `IOSStartupReliabilityRunner`) compile out unless
-  `QVOICE_DEVICE_DIAGNOSTICS` is defined, and shipping iOS builds compile out `QWENVOICE_*`
-  environment-variable reads in `RuntimeDebugGate` and `TelemetryGate`
-  (`scripts/verify_ios_release_artifacts.py` enforces both).
+  Under Guideline 2.5.19 (`RF-73`), dormant iOS device/perf runners and diagnostics/bench harness
+  symbols (`IOSInterruptionRecorder`, `IOSDeviceDiagnosticsRunner`, `IOSDeviceDiagnosticsRecorder`,
+  `IOSPullableDiagnosticsMirror` body, `IOSStartupReliabilityRunner`, `IOSStartupReliabilityPlan`,
+  codec-replay hooks, `StartupReliabilityDiagnosticEvidence` persistence, `debug_force_critical_once`,
+  `BenchRunContext`/`BenchSeedPolicy`) compile out of shipping iOS unless `QVOICE_DEVICE_DIAGNOSTICS`
+  is defined, and shipping iOS builds compile out all `QVOICE_*` and `QWENVOICE_*` environment-variable
+  reads/literals across `RuntimeDebugGate`, `TelemetryGate`, `Sources/iOS*`, `Sources/QwenVoiceCore`,
+  and `Packages/VocelloQwen3Core` (`PROHIBITED_RELEASE_STRING_PATTERNS` in
+  `scripts/verify_ios_release_artifacts.py` enforces all of them).
   Every `@unchecked Sendable` and `nonisolated(unsafe)` is justified in
   `config/concurrency-safety.json`; `scripts/runtime_security_contract.py` checks both.
 - **Catalog activation fails closed.** The generated schema-v2 catalog is complete for the three
@@ -172,9 +176,11 @@ physical-device or macOS XCUITest lane at a coherent checkpoint.
   and `Localizable.xcstrings` with plural rules; formatted copy goes through `VocelloLocalization.format`
   or `IOSAppLanguage.format` so plural rules follow the interface language;
   `scripts/localization_contract.py` rejects new direct literals. Never mutate `AppleLanguages`.
-- **Monetization.** Export eligibility uses output provenance, one StoreKit owner
+- **Monetization & App Store hygiene.** Export eligibility uses output provenance, one StoreKit owner
   (`IOSStoreKitClient`), one export boundary (`IOSExportGate`); generation, listening and internal
-  History stay free in every mode.
+  History stay free in every mode. Never bundle `.storekit` fixtures or mock unlocks in shipping
+  targets, keep `UIFileSharingEnabled` absent and `LSSupportsGameMode` off, and keep downloaded model
+  weights and caches excluded from iCloud Backup (Guideline 2.23).
 - **Device campaigns are source-bound.** Pause only between completed scenarios; never merge a prior
   failure with a later pass or resume across a source, build, device or plan identity change.
 

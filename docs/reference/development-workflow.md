@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-25
+reviewed: 2026-11-27
 summary: Setting up a new Mac, the local edit loop, the commit lint and how push CI routes lanes; scripts/dev.sh is the interface and CI on main is the gate.
 sourceOfTruth:
   - scripts/dev.sh
@@ -684,7 +684,7 @@ the Antigravity harness configured.
 | Build/crash/trace diagnosis | Raw logs, crash reports, existing traces | `axiom` MCP `xcsym`, `xcprof` and `xclog` tools, with script-only fallback |
 | Website | `npm --prefix website run check` | Local Vite dev/preview (`IsDaemon: true`) + Antigravity `browser` subagent or `chrome-devtools` skills; Vercel deploys from Git (`vercel` CLI asks) |
 | Repository/CI | Exact-commit checks and repository release scripts | `gh` CLI reads; `gh run watch` in the background after an authorized push |
-| App Store/deployment/publication | Explicitly requested release workflow | `asc` plugin skills over Homebrew `/opt/homebrew/bin/asc`, and `vercel` CLI (both ask on writes) |
+| App Store/deployment/publication | Explicitly requested release workflow and `scripts/verify_ios_release_artifacts.py` | Global `ios-app-store-conformance` skill (read-only conformance/binary audit guidance), `asc` plugin skills over Homebrew `/opt/homebrew/bin/asc`, and `vercel` CLI (none authorize writes; writes ask) |
 | Model research | Receipts, exact pins and maintenance contracts | `huggingface` MCP reads (`hf_fs`, `hub_repo_search`, `hub_repo_details`, `hf_whoami`) and `hf` CLI reads; downloads, Space runs and writes ask |
 | Audio quality | `scripts/qc.py` machine screens and report-only QC v2 (`docs/reference/qc.md`); nobody listens for 3.x (maintainer decision 2026-10-13) | Hugging Face discovery for candidate models; rendered evidence images; separate offline report-only `RF-72` multimodal advisory complement (`scripts/qc.py multimodal`, `vocello-audio-qc`, blinded two-pass and dual-order `AB`/`BA` listening on Gemini 4 Neon via `read_file` + `run_workflow`, strictly outside QC v2 `SCORING_SOURCES` and Fast QC, blocking personal audio by default — never a CI/release gate or human-listening substitute) |
 | Antigravity configuration | Tracked `.agents/`, `AGENTS.md`, `website/AGENTS.md` and `scripts/tests/test_agent_hooks.py` | Built-in `agy-customizations` skill |

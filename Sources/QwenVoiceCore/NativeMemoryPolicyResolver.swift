@@ -39,7 +39,9 @@ public enum NativeMemoryPolicyResolver {
 
     /// The diagnostic key that turns the per-chunk MLX cache clear on or off
     /// on any tier (RF-45).
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
     static let streamChunkCacheClearKey = "QWENVOICE_STREAM_CHUNK_CACHE_CLEAR"
+    #endif
 
     /// `on` or `off` for `QWENVOICE_STREAM_CHUNK_CACHE_CLEAR`; nil, leaving
     /// the tier's own setting, when unset or unrecognized.
@@ -64,13 +66,18 @@ public enum NativeMemoryPolicyResolver {
         mode: GenerationMode,
         isBatch: Bool
     ) -> NativeMemoryPolicy {
-        policy(
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        let streamChunkCacheClearOverride: Bool? = nil
+        #else
+        let streamChunkCacheClearOverride = parseStreamChunkCacheClear(
+            RuntimeDebugGate.value(for: streamChunkCacheClearKey)
+        )
+        #endif
+        return policy(
             deviceClass: deviceClass,
             mode: mode,
             isBatch: isBatch,
-            streamChunkCacheClearOverride: parseStreamChunkCacheClear(
-                RuntimeDebugGate.value(for: streamChunkCacheClearKey)
-            )
+            streamChunkCacheClearOverride: streamChunkCacheClearOverride
         )
     }
 
@@ -143,12 +150,18 @@ public enum NativeMemoryPolicyResolver {
                 unloadAfterIdleSeconds: 1_800
             )
         case .iPhonePro:
+            let defaultCacheLimitBytes = 128 * 1_024 * 1_024
+            #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+            let cacheLimitBytes = defaultCacheLimitBytes
+            let memoryLimitBytes: Int? = nil
+            #else
             let cacheLimitBytes = debugMegabytesOverride(
                 "QVOICE_IOS_MLX_CACHE_LIMIT_MB"
-            ) ?? 128 * 1_024 * 1_024
+            ) ?? defaultCacheLimitBytes
             let memoryLimitBytes = debugMegabytesOverride(
                 "QVOICE_IOS_MLX_MEMORY_LIMIT_MB"
             )
+            #endif
             return NativeMemoryPolicy(
                 name: "iphone_pro_\(mode.rawValue)_\(isBatch ? "batch" : "single")",
                 deviceClass: deviceClass,
@@ -194,16 +207,20 @@ public enum NativeMemoryPolicyResolver {
     /// Free-form notes describing the active MLX/Metal memory policy so each
     /// telemetry row self-identifies the substrate it ran under.
     public static func currentPolicyNotes(for policy: NativeMemoryPolicy) -> [String: String] {
-        let environment = ProcessInfo.processInfo.environment
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        let talkerKVWindow = "default"
+        #else
+        let talkerKVWindow = RuntimeDebugGate.value(
+            for: "QVOICE_TALKER_KV_WINDOW",
+            environment: ProcessInfo.processInfo.environment
+        ) ?? "default"
+        #endif
         var notes: [String: String] = [
             "mlxCacheLimitMB": String(policy.cacheLimitBytes / (1_024 * 1_024)),
             "mlxTokenMemoryClearCadence": String(policy.mlxTokenMemoryClearCadence),
             "mlxClearCacheAfterGeneration": String(policy.clearCacheAfterGeneration),
             "mlxClearCacheOnStreamChunkEmit": String(policy.clearMLXCacheOnStreamChunkEmit),
-            "talkerKVWindow": RuntimeDebugGate.value(
-                for: "QVOICE_TALKER_KV_WINDOW",
-                environment: environment
-            ) ?? "default"
+            "talkerKVWindow": talkerKVWindow
         ]
         if let memoryLimitBytes = policy.memoryLimitBytes {
             notes["mlxMemoryLimitMB"] = String(memoryLimitBytes / (1_024 * 1_024))
@@ -218,6 +235,10 @@ public enum NativeMemoryPolicyResolver {
     public static func resolvedTalkerKVGeneratedWindow(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> Int? {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        _ = environment
+        return nil
+        #else
         guard let raw = RuntimeDebugGate.value(
             for: "QVOICE_TALKER_KV_WINDOW",
             environment: environment
@@ -228,6 +249,7 @@ public enum NativeMemoryPolicyResolver {
             return nil
         }
         return window
+        #endif
     }
 
     public static func minimumStreamingInterval(
@@ -308,8 +330,13 @@ public enum NativeMemoryPolicyResolver {
     /// microseconds, and the gate compares the per-request peak exactly (seeded
     /// runs repeat it to the megabyte), so default evidence keeps MLX's own
     /// uninterrupted counter.
-    public static let stagePeaksEnabled: Bool =
+    public static let stagePeaksEnabled: Bool = {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        return false
+        #else
         RuntimeDebugGate.value(for: "QWENVOICE_MLX_STAGE_PEAKS") == "1"
+        #endif
+    }()
 
     private struct StagePeakState: Sendable {
         var cumulativePeakBytes = 0
@@ -359,9 +386,10 @@ public enum NativeMemoryPolicyResolver {
         Double(bytes) / Double(1_024 * 1_024)
     }
 
-    // Runtime experimentation override (off unless the env var is set). Now available on
-    // the Release device build too (project rule: debug capabilities are runtime-gated, not
-    // compiled out) so MLX cache / memory-limit tuning can be exercised on hardware.
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
+    // Runtime experimentation override (off unless the env var is set). Available on
+    // internal-diagnostics builds under QWENVOICE_DEBUG so MLX cache / memory-limit
+    // tuning can be exercised on hardware while shipping iOS binaries omit the keys.
     private static func debugMegabytesOverride(
         _ key: String,
         environment: [String: String] = ProcessInfo.processInfo.environment
@@ -374,6 +402,7 @@ public enum NativeMemoryPolicyResolver {
         }
         return megabytes * 1_024 * 1_024
     }
+    #endif
 
 }
 

@@ -462,21 +462,26 @@ final class VocelloiOSLogicTests: XCTestCase {
         XCTAssertEqual(actions, [.cancellation(.memoryPressure)])
     }
 
+    private let appSupportOverrideKey = "QVOICE_APP_SUPPORT_DIR"
+
     func testAppSupportOverrideRequiresExplicitDebugGateAndConfinedPath() {
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
+        XCTAssertEqual(appSupportOverrideKey, AppPaths.appSupportOverrideEnvironmentKey)
+        #endif
         let override = FileManager.default.temporaryDirectory
             .appendingPathComponent("vocello-ios-logic", isDirectory: true)
             .standardizedFileURL
 
         XCTAssertNotEqual(
             AppPaths.resolvedAppSupportDir(environment: [
-                AppPaths.appSupportOverrideEnvironmentKey: override.path,
+                appSupportOverrideKey: override.path,
             ]),
             override
         )
         XCTAssertNotEqual(
             AppPaths.resolvedAppSupportDir(environment: [
                 "QWENVOICE_DEBUG": "1",
-                AppPaths.appSupportOverrideEnvironmentKey: "relative/path",
+                appSupportOverrideKey: "relative/path",
             ]),
             URL(fileURLWithPath: "relative/path", isDirectory: true).standardizedFileURL
         )
@@ -485,7 +490,7 @@ final class VocelloiOSLogicTests: XCTestCase {
             XCTAssertEqual(
                 AppPaths.resolvedAppSupportDir(environment: [
                     "QWENVOICE_DEBUG": "1",
-                    AppPaths.appSupportOverrideEnvironmentKey: unsafeValue,
+                    appSupportOverrideKey: unsafeValue,
                 ]),
                 fallback
             )
@@ -493,7 +498,7 @@ final class VocelloiOSLogicTests: XCTestCase {
         XCTAssertEqual(
             AppPaths.resolvedAppSupportDir(environment: [
                 "QWENVOICE_DEBUG": "1",
-                AppPaths.appSupportOverrideEnvironmentKey: "model-download-acceptance",
+                appSupportOverrideKey: "model-download-acceptance",
             ]),
             AppPaths.managedAppSupportDir
                 .appendingPathComponent("model-download-acceptance", isDirectory: true)
@@ -502,7 +507,7 @@ final class VocelloiOSLogicTests: XCTestCase {
         XCTAssertEqual(
             AppPaths.resolvedAppSupportDir(environment: [
                 "QWENVOICE_DEBUG": "1",
-                AppPaths.appSupportOverrideEnvironmentKey: override.path,
+                appSupportOverrideKey: override.path,
             ]),
             override
         )
@@ -513,7 +518,7 @@ final class VocelloiOSLogicTests: XCTestCase {
     func testStorageRootNeedsTheAppGroupUnlessADiagnosticsRootReplacesIt() {
         let farmRoot = [
             "QWENVOICE_DEBUG": "1",
-            AppPaths.appSupportOverrideEnvironmentKey: "farm-smoke",
+            appSupportOverrideKey: "farm-smoke",
         ]
 
         XCTAssertTrue(AppPaths.hasUsableStorageRoot(environment: [:], sharedContainerAvailable: true))
@@ -530,19 +535,19 @@ final class VocelloiOSLogicTests: XCTestCase {
         // the App Group stays required.
         XCTAssertNil(AppPaths.diagnosticSupportRoot(environment: [:]))
         XCTAssertFalse(AppPaths.hasUsableStorageRoot(
-            environment: [AppPaths.appSupportOverrideEnvironmentKey: "farm-smoke"],
+            environment: [appSupportOverrideKey: "farm-smoke"],
             sharedContainerAvailable: false
         ))
         XCTAssertFalse(AppPaths.hasUsableStorageRoot(
             environment: [
                 "QWENVOICE_DEBUG": "1",
-                AppPaths.appSupportOverrideEnvironmentKey: FileManager.default.temporaryDirectory.path,
+                appSupportOverrideKey: FileManager.default.temporaryDirectory.path,
             ],
             sharedContainerAvailable: false
         ))
         for unsafeValue in ["../escape", ".", "nested/path", ""] {
             XCTAssertFalse(AppPaths.hasUsableStorageRoot(
-                environment: ["QWENVOICE_DEBUG": "1", AppPaths.appSupportOverrideEnvironmentKey: unsafeValue],
+                environment: ["QWENVOICE_DEBUG": "1", appSupportOverrideKey: unsafeValue],
                 sharedContainerAvailable: false
             ), unsafeValue)
         }
@@ -735,7 +740,7 @@ final class VocelloiOSLogicTests: XCTestCase {
             bundleIdentifier: bundleIdentifier,
             environment: [
                 "QWENVOICE_DEBUG": "1",
-                AppPaths.appSupportOverrideEnvironmentKey: "model-download-acceptance",
+                appSupportOverrideKey: "model-download-acceptance",
             ]
         )
 
@@ -772,7 +777,7 @@ final class VocelloiOSLogicTests: XCTestCase {
         for override in rejectedOverrides {
             var environment = [
                 "QWENVOICE_DEBUG": "1",
-                AppPaths.appSupportOverrideEnvironmentKey: override,
+                appSupportOverrideKey: override,
             ]
             if override == "model-download-acceptance" {
                 environment.removeValue(forKey: "QWENVOICE_DEBUG")

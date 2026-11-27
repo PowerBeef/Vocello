@@ -2886,9 +2886,11 @@ struct StreamingExecutionContext: Sendable {
             // Restriction-simulation rows must self-identify — a simulated
             // iPhone-15-Pro run must never read as a real-device proof.
             tierNotes["simulatedProcessLimitMB"] = String(simLimit / 1_048_576)
+            #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
             if let profile = RuntimeDebugGate.value(for: "QVOICE_IOS_MEMORY_PROFILE") {
                 tierNotes["memoryProfile"] = profile
             }
+            #endif
         }
         if let emulation = NativeHostMemoryEmulation.current {
             // Emulated-floor rows (audit #11) say which machine policy judged
@@ -2901,9 +2903,11 @@ struct StreamingExecutionContext: Sendable {
         // the summarizer can segregate instruct-bearing takes from the plain matrix.
         // Read via getenv (not ProcessInfo) because the in-process CLI updates it per
         // take; only the id is recorded, never user text.
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
         if let delivery = RuntimeDebugGate.observabilityValue(for: "QWENVOICE_BENCH_DELIVERY") {
             if !delivery.isEmpty { tierNotes["delivery"] = delivery }
         }
+        #endif
         // MLX/Metal memory policy notes so each row self-identifies the substrate
         // it ran under (cache limit, memory limit, clear cadence, KV window).
         let policyNotes = NativeMemoryPolicyResolver.currentPolicyNotes(for: memoryPolicy)

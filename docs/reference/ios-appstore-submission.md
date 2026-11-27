@@ -1,7 +1,7 @@
 ---
 status: active
 owner: release-qa
-reviewed: 2026-11-25
+reviewed: 2026-11-26
 summary: Operator checklist for shipping Vocello for iPhone to TestFlight / the App Store — account prerequisites, App Store Connect privacy and compliance rows, App Review notes, and the credential-bound archive/upload steps.
 sourceOfTruth:
   - project.yml
@@ -92,8 +92,9 @@ download it automatically.
       refusal so App Review on iPad compatibility mode is never blocked by Guideline 2.1).
       Unsupported devices with less memory still show the localized unsupported-device screen.
       Deterministic source and archive/IPA verification (`verify_ios_release_artifacts.py`) reject
-      future eligibility drift (ASR-01) and verify zero dormant device-runner / `QWENVOICE_*`
-      debug strings or `UIFileSharingEnabled` in the shipping binary (`RF-73`).
+      future eligibility drift (ASR-01) and verify zero dormant device-runner, `QVOICE_*`, or
+      `QWENVOICE_*` diagnostic strings (including in `VocelloQwen3Core`) and no
+      `UIFileSharingEnabled` in the shipping binary (`RF-73`, Guideline 2.5.19).
       The bundle also sets `LSSupportsGameMode` to NO, because the gaming-tier capability otherwise
       shows the Game Mode banner at every launch; build 27 is the first candidate with it (RF-37).
 
@@ -170,11 +171,15 @@ for the release acceptance (RF-15) or the 201-take campaign.
 - [ ] Repeat the owned-export check on the processed TestFlight build in Airplane Mode (RF-12).
 - [ ] Accept the updated Apple Developer Program License Agreement (the Account Holder, at
       developer.apple.com/account; it blocks new submissions), then the Paid Apps agreement, and
-      complete tax and banking. These steps are the maintainer's (RF-02); their status stays in
-      the maintainer's private record, never in Git.
+      complete tax and banking — and enroll in the **Apple Small Business Program** (`15%` vs `30%`
+      commission from day one on the USD 19.99 one-time IAP) before testing live StoreKit. These
+      steps are the maintainer's (RF-02); their status stays in the maintainer's private record,
+      never in Git.
 - [ ] Capture the IAP review screenshot from the processed TestFlight build at the live USD 19.99
-      (decision 2026-10-13), and attach the first IAP to the app version for review. Explain the
-      free/paid boundary and the restore path in the reviewer notes.
+      (decision 2026-10-13), and submit the first IAP in the **same App Store Connect draft
+      submission** as version 3.2.0 (2026 ASC flow: click **Add for Review** on version 3.2.0, add
+      `Design & Clone Export` into that draft submission, then click **Submit to App Review**
+      together). Explain the free/paid boundary and the restore path in the reviewer notes.
 
 Apple references: [purchase types](https://developer.apple.com/help/app-store-connect/reference/in-app-purchases-and-subscriptions/in-app-purchase-types),
 [IAP configuration](https://developer.apple.com/help/app-store-connect/configure-in-app-purchase-settings/overview-for-configuring-in-app-purchases),
@@ -276,11 +281,17 @@ is complete.
       posture and the paid-launch gates (C2PA, Code of Practice, legal review). It is a
       historical, point-in-time assessment (2026-08-06), not current guidance.
 
-## 2. App Review demo notes (paste into "App Review Information → Notes")
+## 2. App Review demo notes & attachment (paste into "App Review Information")
 
-The notes text to paste is in [`app-store-listing.md`](app-store-listing.md#app-review-notes-4000),
-with the rest of the 3.2.0 listing draft. No demo account is needed (no login); the notes spell out
-the model download requirement so the app is not judged non-functional under Guideline 2.1.
+The notes text to paste into **App Review Information → Notes** is in
+[`app-store-listing.md`](app-store-listing.md#app-review-notes-4000), with the rest of the 3.2.0
+listing draft. No demo account is needed (no login); the notes spell out the model download
+requirement, developer ownership linkage (`PowerBeef/Vocello`, `PowerBeef02`, `vocello.vercel.app`),
+static external services, and 147-territory regional scope so the app is not bounced under
+Guideline 2.1, 4.1, or 5.2. Upload the physical-device `RF-66` end-to-end demo recording (covering
+onboarding, model install, generation, native Microphone & Speech Recognition permission prompts,
+voice-cloning consent, and the `Design & Clone Export` sheet at live USD 19.99) directly into
+**App Review Information → Attachment** (keeping an unlisted backup URL in Review Notes).
 
 Storage guidance is grounded in `IOSModelDeliverySupport.ensureSufficientDiskSpace`:
 `max(2 × bytes, bytes + 256 MiB)`. The coordinator supplies the bytes still to fetch, without
@@ -509,7 +520,20 @@ candidate](ios-device-testing.md#already-installed-distribution-candidate)). Wha
 goes to the maintainer ([Checks XCUITest does not cover](ios-device-testing.md#checks-xcuitest-does-not-cover));
 permission prompts, calls and VoiceOver stay the maintainer's.
 
-## 6. Submit
+## 6. Submit & in-review discipline
 
-App Store Connect → the version → attach the build → Submit for Review. For the first submission, the privacy
-URL, age rating, and screenshots must all be set or submission is blocked.
+1. **2026 App Store Connect submission sequence:** ensure Paid Apps (`RF-02`), Age Rating (`RF-62`),
+   Privacy Policy URL, `ASR-05` screenshots, `RF-66` **App Review Information → Attachment** video,
+   and `Design & Clone Export` review screenshot are complete. Select **Manual Release** (`Pending
+   Developer Release`), attach the processed 3.2.0 build, click **Add for Review** on version 3.2.0,
+   add the `Design & Clone Export` IAP into that **same draft submission**, and click **Submit to
+   App Review** together.
+2. **While in review:**
+   - **Never pull or cancel a build mid-review** for a minor polish; pulling resets queue position.
+   - **Reply in Resolution Center before uploading a new binary** whenever Apple asks a question or
+     clarification; a reply keeps your place while a new build restarts the queue.
+   - **Never leave a rejected submission thread abandoned**; resolve cleanly or withdraw formally.
+   - **Archive dated screenshots** of every submission, rejection notice, Resolution Center reply,
+     and notes from any App Review phone call in the maintainer's private (off-Git) record.
+   - If stuck >14 days in `Waiting for Review` or >7 days after a reply, submit a single polite App
+     Review status inquiry or request a callback via App Store Connect.

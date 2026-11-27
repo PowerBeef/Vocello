@@ -86,7 +86,9 @@ struct ResolvedCloneConditioning: Sendable {
 /// persisted prompt's metadata, so a prompt encoded under one convention is
 /// rebuilt, never adopted, under the other.
 enum CloneEncoderRotary {
+    #if !os(iOS)
     static let environmentKey = "QWENVOICE_ENCODER_ROTARY"
+    #endif
     static let splitHalfSuffix = "+mimi-encoder-rope-split-half"
 
     static let speakerFeatureSuffix = speakerFeatureSuffix(
@@ -96,18 +98,41 @@ enum CloneEncoderRotary {
 
     /// Read as the package reads it: trimmed and lowercased.
     static func speakerFeatureSuffix(environment: [String: String], internalDiagnosticsAvailable: Bool) -> String {
+        #if os(iOS)
+        _ = (environment, internalDiagnosticsAvailable)
+        return ""
+        #else
         let requested = RuntimeDebugGate.value(
             for: environmentKey,
             environment: environment,
             internalDiagnosticsAvailable: internalDiagnosticsAvailable
         )?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return requested == "split-half" ? splitHalfSuffix : ""
+        #endif
     }
 }
 
 /// Every clone-conditioning diagnostic key this process honours, as the
 /// suffix the clone prompt's speaker-feature version carries.
 enum CloneConditioningDiagnostics {
+    #if os(iOS) && VOCELLO_INTERNAL_DIAGNOSTICS
+    /// Package-side `VocelloQwen3Core` load-time overrides are compiled out on iOS
+    /// (Guideline 2.5.19), so internal-diagnostics iPhone runs never claim them active
+    /// in telemetry provenance.
+    static let inactiveOnIOSPackageOverrideKeys: Set<String> = [
+        "QVOICE_TALKER_KV_QUANT",
+        "QWENVOICE_TOKENIZER_RESIDENCY",
+        "QWENVOICE_ENCODER_ROTARY",
+        "QWENVOICE_REFERENCE_PADDING",
+        "QWENVOICE_DECODER_WINDOW",
+        "QWENVOICE_CLONE_DECODER_HISTORY",
+        "QWENVOICE_CODE_PREDICTOR_BITS",
+        "QWENVOICE_MIXED_PRECISION",
+        "QWENVOICE_ICL_TARGET_SPACE",
+        "QWENVOICE_REFERENCE_EDGES",
+    ]
+    #endif
+
     static let speakerFeatureSuffix = speakerFeatureSuffix(
         environment: ProcessInfo.processInfo.environment,
         internalDiagnosticsAvailable: RuntimeDebugGate.internalDiagnosticsAvailable
@@ -130,17 +155,24 @@ enum CloneConditioningDiagnostics {
 /// (`Qwen3LoadTimeDiagnosticOverrides.referenceEdgesTrimmed`); the host folds it
 /// into the speaker-feature version, as for the rotary and the padding.
 public enum CloneReferenceEdges {
+    #if !os(iOS)
     static let environmentKey = "QWENVOICE_REFERENCE_EDGES"
+    #endif
     static let asGivenSuffix = "+icl-ref-edges-as-given"
 
     /// Read as the package reads it: trimmed and lowercased.
     static func speakerFeatureSuffix(environment: [String: String], internalDiagnosticsAvailable: Bool) -> String {
+        #if os(iOS)
+        _ = (environment, internalDiagnosticsAvailable)
+        return ""
+        #else
         let requested = RuntimeDebugGate.value(
             for: environmentKey,
             environment: environment,
             internalDiagnosticsAvailable: internalDiagnosticsAvailable
         )?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return requested == "as-given" ? asGivenSuffix : ""
+        #endif
     }
 
     /// A reference's samples as this process's conditioning reads them, for
@@ -169,7 +201,9 @@ public enum CloneReferenceEdges {
 /// same key at load (`Qwen3LoadTimeDiagnosticOverrides.referenceTrailingSilenceSamples`);
 /// the host folds it into the speaker-feature version, as for the rotary.
 public enum CloneReferencePadding {
+    #if !os(iOS)
     static let environmentKey = "QWENVOICE_REFERENCE_PADDING"
+    #endif
     static let halfSecondSuffix = "+icl-ref-silence500ms"
 
     /// How the codec encoder's input was made in this process, for evidence
@@ -188,12 +222,17 @@ public enum CloneReferencePadding {
 
     /// Read as the package reads it: trimmed and lowercased.
     static func speakerFeatureSuffix(environment: [String: String], internalDiagnosticsAvailable: Bool) -> String {
+        #if os(iOS)
+        _ = (environment, internalDiagnosticsAvailable)
+        return ""
+        #else
         let requested = RuntimeDebugGate.value(
             for: environmentKey,
             environment: environment,
             internalDiagnosticsAvailable: internalDiagnosticsAvailable
         )?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return requested == "half-second" ? halfSecondSuffix : ""
+        #endif
     }
 }
 

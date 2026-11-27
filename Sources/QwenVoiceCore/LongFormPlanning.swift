@@ -137,9 +137,13 @@ extension LongFormPlanningConfiguration {
     /// `QWENVOICE_LONG_FORM_DELIVERY_BUDGET`. Inert without the diagnostics gate,
     /// and only values from 60 to 300 apply.
     static var deliveryBudgetDiagnosticOverride: Int? {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        return nil
+        #else
         guard let raw = RuntimeDebugGate.value(for: "QWENVOICE_LONG_FORM_DELIVERY_BUDGET"),
               let value = Int(raw), (60 ... 300).contains(value) else { return nil }
         return value
+        #endif
     }
 }
 

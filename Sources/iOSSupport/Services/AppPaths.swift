@@ -13,7 +13,9 @@ import QwenVoiceCore
 /// are accepted for diagnostics; a single safe relative component is resolved
 /// beneath the app's managed Application Support root for hermetic XCUITest.
 enum AppPaths {
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
     static let appSupportOverrideEnvironmentKey = "QVOICE_APP_SUPPORT_DIR"
+    #endif
     private static let defaultSharedAppGroupIdentifier = "group.com.patricedery.vocello.shared"
 
     static var sharedAppGroupIdentifier: String {
@@ -100,6 +102,10 @@ enum AppPaths {
     }
 
     private static func debugAppSupportOverride(environment: [String: String]) -> String? {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        _ = environment
+        return nil
+        #else
         guard let value = RuntimeDebugGate.value(
             for: appSupportOverrideEnvironmentKey,
             environment: environment
@@ -109,6 +115,7 @@ enum AppPaths {
             return nil
         }
         return value
+        #endif
     }
 
     private static func isSafeManagedSupportChild(_ value: String) -> Bool {

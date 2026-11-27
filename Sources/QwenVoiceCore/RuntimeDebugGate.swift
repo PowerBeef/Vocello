@@ -129,9 +129,16 @@ public enum RuntimeDebugGate {
             internalDiagnosticsAvailable: internalDiagnosticsAvailable
         )
         let keys = active
-            ? environment.keys.filter {
-                $0 != "QWENVOICE_DEBUG"
-                    && ($0.hasPrefix("QWENVOICE_") || $0.hasPrefix("QVOICE_"))
+            ? environment.keys.filter { key in
+                guard key != "QWENVOICE_DEBUG",
+                      key.hasPrefix("QWENVOICE_") || key.hasPrefix("QVOICE_") else {
+                    return false
+                }
+                #if os(iOS) && VOCELLO_INTERNAL_DIAGNOSTICS
+                return !CloneConditioningDiagnostics.inactiveOnIOSPackageOverrideKeys.contains(key)
+                #else
+                return true
+                #endif
             }.sorted()
             : []
         let digest: String? = keys.isEmpty ? nil : {

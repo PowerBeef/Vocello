@@ -158,6 +158,9 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
     /// behavior of the smaller device cannot be simulated (see
     /// docs/reference/ios-engine-optimization.md §9).
     public static let simulatedProcessLimitBytes: UInt64? = {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        return nil
+        #else
         let environment = ProcessInfo.processInfo.environment
         if let raw = RuntimeDebugGate.value(
             for: "QVOICE_IOS_SIMULATED_PROCESS_LIMIT_MB",
@@ -185,6 +188,7 @@ public struct IOSMemorySnapshot: Hashable, Codable, Sendable {
         default:
             return nil
         }
+        #endif
     }()
 
     private static let defaultMetalDevice = MTLCreateSystemDefaultDevice()

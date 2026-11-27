@@ -7,6 +7,20 @@ import VocelloQwen3Core
 /// value crosses the package boundary once and no process-global request state
 /// remains in the runtime.
 enum Qwen3TalkerSamplingOverride {
+    #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+    static let envTemperature: Float? = nil
+    static let envTopP: Float? = nil
+    static let envTopK: Int? = nil
+    static let envMinP: Float? = nil
+    static let envSubtalkerTemperature: Float? = nil
+    static let envSubtalkerTopP: Float? = nil
+    static let envSubtalkerTopK: Int? = nil
+    static let envRepetitionPenalty: Float? = nil
+    static let envEOSSuppressionFrames: Int? = nil
+    static let envFullTextConditioning: String? = nil
+    static let envFiltersEOS: String? = nil
+    static let envFloat32Sampling: String? = nil
+    #else
     static let envTemperature: Float? = floatValue("QWENVOICE_TALKER_TEMP")
     static let envTopP: Float? = floatValue("QWENVOICE_TALKER_TOPP")
     static let envTopK: Int? = intValue("QWENVOICE_TALKER_TOPK")
@@ -34,6 +48,7 @@ enum Qwen3TalkerSamplingOverride {
     static let envFullTextConditioning = RuntimeDebugGate.value(for: "QWENVOICE_FULL_TEXT_CONDITIONING")
     static let envFiltersEOS = RuntimeDebugGate.value(for: "QWENVOICE_TALKER_FILTER_EOS")
     static let envFloat32Sampling = RuntimeDebugGate.value(for: "QWENVOICE_SAMPLER_FLOAT32")
+    #endif
 
     /// The arms a request takes, or nil (the production path) when they match
     /// production. A long-form segment keeps trailing text: RF-18's screen
@@ -78,6 +93,7 @@ enum Qwen3TalkerSamplingOverride {
         return value
     }
 
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
     private static func floatValue(_ key: String) -> Float? {
         guard let raw = RuntimeDebugGate.value(for: key),
               let value = Float(raw), value > 0 else { return nil }
@@ -95,6 +111,7 @@ enum Qwen3TalkerSamplingOverride {
               let value = Int(raw), value > 0 else { return nil }
         return value
     }
+    #endif
 
     /// A generation request's policy: its seed, and what its kind of take keeps
     /// (a long-form segment keeps trailing text).

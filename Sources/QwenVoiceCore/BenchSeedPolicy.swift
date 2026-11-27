@@ -24,8 +24,10 @@ import os
 /// the benchmark's take identity (`QVOICE_MAC_BENCH_CELL` and the current-take
 /// file, otherwise observability-only) select output: the seed.
 public enum BenchSeedPolicy {
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
     public static let policyEnvironmentKey = "QWENVOICE_BENCH_SEED_POLICY"
     public static let cellScheduleEnvironmentKey = "QWENVOICE_BENCH_SEED_CELLS"
+    #endif
     /// seed = the first eight bytes, big-endian, of
     /// SHA-256("vocello-ui-bench-seed-v1" NUL <cell ID>).
     public static let cellHashV1 = "cell-hash-v1"
@@ -65,12 +67,17 @@ public enum BenchSeedPolicy {
         environment: [String: String],
         internalDiagnosticsAvailable: Bool = RuntimeDebugGate.internalDiagnosticsAvailable
     ) -> String? {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        _ = (environment, internalDiagnosticsAvailable)
+        return nil
+        #else
         let raw = RuntimeDebugGate.value(
             for: policyEnvironmentKey,
             environment: environment,
             internalDiagnosticsAvailable: internalDiagnosticsAvailable
         )?.trimmingCharacters(in: .whitespacesAndNewlines)
         return raw.flatMap { cellHashDomains[$0] == nil ? nil : $0 }
+        #endif
     }
 
     /// The launch schedule of cells, in generation order, or nil without one.
@@ -78,6 +85,10 @@ public enum BenchSeedPolicy {
         environment: [String: String],
         internalDiagnosticsAvailable: Bool = RuntimeDebugGate.internalDiagnosticsAvailable
     ) -> [String]? {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        _ = (environment, internalDiagnosticsAvailable)
+        return nil
+        #else
         guard let raw = RuntimeDebugGate.value(
             for: cellScheduleEnvironmentKey,
             environment: environment,
@@ -87,6 +98,7 @@ public enum BenchSeedPolicy {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         return cells.isEmpty ? nil : cells
+        #endif
     }
 
     /// The request with the active policy's seed, or unchanged when no policy

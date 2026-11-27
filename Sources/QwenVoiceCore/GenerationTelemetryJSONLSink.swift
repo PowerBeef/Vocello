@@ -66,11 +66,17 @@ public actor GenerationTelemetryJSONLSink {
     ///   scales this (per-log MB); unset ⇒ 8 MB.
     /// - Verbose sidecars (`samples-<id>.jsonl`): newest `sidecarBudget.maxFiles` kept,
     ///   total capped at `sidecarBudget.maxTotalBytes` (`GenerationTelemetrySidecarBudget`).
+    private static let defaultMaxLogMB = 8
+
     public static let maxLogBytes: Int = {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        return defaultMaxLogMB * 1_024 * 1_024
+        #else
         let mb = RuntimeDebugGate.observabilityValue(for: "QWENVOICE_DIAGNOSTICS_MAX_MB")
             .flatMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
-            .map { max(1, $0) } ?? 8
+            .map { max(1, $0) } ?? defaultMaxLogMB
         return mb * 1_024 * 1_024
+        #endif
     }()
     private var sidecarBudget = GenerationTelemetrySidecarBudget.adHoc
 

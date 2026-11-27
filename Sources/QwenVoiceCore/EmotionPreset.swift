@@ -291,9 +291,13 @@ public struct EmotionPreset: Identifiable, Sendable {
     }
 
     private static let experimentalInstructionSet: String? = {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        return nil
+        #else
         RuntimeDebugGate.value(for: "QWENVOICE_DELIVERY_INSTRUCTION_SET")?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
+        #endif
     }()
 
     public static let angryBilingualV3Version = "angry-bilingual-v3"

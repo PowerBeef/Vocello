@@ -147,7 +147,13 @@ final class IOSModelUpdateAutoStartPolicyTests: XCTestCase {
         XCTAssertEqual(decide([candidate(failure: .network)], consented: true), .none, "another failure waits for Retry")
     }
 
+    private let simulatedAvailableBytesKey = "QVOICE_IOS_SIMULATED_AVAILABLE_BYTES"
+    private let seedRetiredModelsKey = "QVOICE_IOS_SEED_RETIRED_MODELS"
+
     func testSimulatedAvailableBytesRespectsRuntimeDebugGateAndValidatesInput() {
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
+        XCTAssertEqual(simulatedAvailableBytesKey, Policy.simulatedAvailableBytesKey)
+        #endif
         let systemBytes: Int64 = 50 * gigabyte
         let overrideBytes: Int64 = 500_000_000
 
@@ -159,7 +165,7 @@ final class IOSModelUpdateAutoStartPolicyTests: XCTestCase {
         XCTAssertEqual(
             Policy.resolvedAvailableBytes(
                 systemAvailableBytes: systemBytes,
-                environment: [Policy.simulatedAvailableBytesKey: "\(overrideBytes)"]
+                environment: [simulatedAvailableBytesKey: "\(overrideBytes)"]
             ),
             systemBytes,
             "Without QWENVOICE_DEBUG=1 the override must remain inert"
@@ -168,7 +174,7 @@ final class IOSModelUpdateAutoStartPolicyTests: XCTestCase {
         // With internalDiagnosticsAvailable == false (distribution builds), override stays inert.
         let armed = [
             "QWENVOICE_DEBUG": "1",
-            Policy.simulatedAvailableBytesKey: " \(overrideBytes) ",
+            simulatedAvailableBytesKey: " \(overrideBytes) ",
         ]
         XCTAssertEqual(
             Policy.resolvedAvailableBytes(
@@ -201,7 +207,7 @@ final class IOSModelUpdateAutoStartPolicyTests: XCTestCase {
             XCTAssertEqual(
                 Policy.resolvedAvailableBytes(
                     systemAvailableBytes: systemBytes,
-                    environment: ["QWENVOICE_DEBUG": "1", Policy.simulatedAvailableBytesKey: invalid]
+                    environment: ["QWENVOICE_DEBUG": "1", simulatedAvailableBytesKey: invalid]
                 ),
                 systemBytes,
                 "Invalid override \(invalid) must fall back to system free space"
@@ -210,6 +216,9 @@ final class IOSModelUpdateAutoStartPolicyTests: XCTestCase {
     }
 
     func testSeedRetiredModelsRequiresIsolatedRootAndContractAllowlistAndIsIdempotent() throws {
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
+        XCTAssertEqual(seedRetiredModelsKey, Policy.seedRetiredModelsKey)
+        #endif
         let tempRoot = FileManager.default.temporaryDirectory
             .appendingPathComponent("IOSModelUpdateSeed-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
@@ -225,7 +234,7 @@ final class IOSModelUpdateAutoStartPolicyTests: XCTestCase {
         for badSupport in [nil, "", ".", "..", "../escape", "a/b", "/tmp/canonical"] {
             var env = [
                 "QWENVOICE_DEBUG": "1",
-                Policy.seedRetiredModelsKey: "reset:Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+                seedRetiredModelsKey: "reset:Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
             ]
             if let badSupport {
                 env["QVOICE_APP_SUPPORT_DIR"] = badSupport
@@ -246,7 +255,7 @@ final class IOSModelUpdateAutoStartPolicyTests: XCTestCase {
                 allowedRetiredFolders: allowed,
                 environment: [
                     "QVOICE_APP_SUPPORT_DIR": "upgrade-test",
-                    Policy.seedRetiredModelsKey: "Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+                    seedRetiredModelsKey: "Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
                 ]
             ),
             .none
@@ -258,7 +267,7 @@ final class IOSModelUpdateAutoStartPolicyTests: XCTestCase {
                 environment: [
                     "QWENVOICE_DEBUG": "1",
                     "QVOICE_APP_SUPPORT_DIR": "upgrade-test",
-                    Policy.seedRetiredModelsKey: "Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+                    seedRetiredModelsKey: "Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
                 ],
                 internalDiagnosticsAvailable: false
             ),
@@ -275,7 +284,7 @@ final class IOSModelUpdateAutoStartPolicyTests: XCTestCase {
             environment: [
                 "QWENVOICE_DEBUG": "1",
                 "QVOICE_APP_SUPPORT_DIR": "upgrade-test",
-                Policy.seedRetiredModelsKey: "../escape,unknown-folder,Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+                seedRetiredModelsKey: "../escape,unknown-folder,Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
             ]
         )
         XCTAssertEqual(
@@ -305,7 +314,7 @@ final class IOSModelUpdateAutoStartPolicyTests: XCTestCase {
                 environment: [
                     "QWENVOICE_DEBUG": "1",
                     "QVOICE_APP_SUPPORT_DIR": "upgrade-test",
-                    Policy.seedRetiredModelsKey: "reset:../escape,unknown-folder",
+                    seedRetiredModelsKey: "reset:../escape,unknown-folder",
                 ]
             ),
             .none
@@ -318,7 +327,7 @@ final class IOSModelUpdateAutoStartPolicyTests: XCTestCase {
             environment: [
                 "QWENVOICE_DEBUG": "1",
                 "QVOICE_APP_SUPPORT_DIR": "upgrade-test",
-                Policy.seedRetiredModelsKey: "Qwen3-TTS-12Hz-1.7B-Base-4bit",
+                seedRetiredModelsKey: "Qwen3-TTS-12Hz-1.7B-Base-4bit",
             ]
         )
         XCTAssertEqual(secondPass, .none)
@@ -336,7 +345,7 @@ final class IOSModelUpdateAutoStartPolicyTests: XCTestCase {
             environment: [
                 "QWENVOICE_DEBUG": "1",
                 "QVOICE_APP_SUPPORT_DIR": "upgrade-test",
-                Policy.seedRetiredModelsKey: "reset:Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
+                seedRetiredModelsKey: "reset:Qwen3-TTS-12Hz-1.7B-CustomVoice-4bit",
             ]
         )
         XCTAssertEqual(resetExisting, Policy.SeedResult(didResetLedger: true, seededFolders: []))

@@ -972,6 +972,7 @@ final class IOSModelDownloadCoordinator {
         // QWENVOICE_DEBUG) keeps `legacy` as the regression-comparison arm.
         engineConfig.chunkLargeFiles = true
         engineConfig.chunkTargetSize = 128 * 1024 * 1024
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
         switch RuntimeDebugGate.value(for: "QVOICE_DOWNLOAD_ENGINE_PROFILE")?
             .trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
         case "legacy":
@@ -987,6 +988,7 @@ final class IOSModelDownloadCoordinator {
         default:
             break
         }
+        #endif
 
         let sessionConfig = URLSessionConfiguration.background(
             withIdentifier: configuration.backgroundSessionIdentifier

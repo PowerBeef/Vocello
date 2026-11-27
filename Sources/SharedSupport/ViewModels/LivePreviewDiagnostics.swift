@@ -16,12 +16,17 @@ import QwenVoiceCore
 /// Enable by setting `QWENVOICE_LIVE_PREVIEW_DIAGNOSTICS=1`, then grep stdout
 /// for `[live-preview-diag]`.
 enum LivePreviewDiagnostics {
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
     private static let environmentKey = "QWENVOICE_LIVE_PREVIEW_DIAGNOSTICS"
+    #endif
 
     /// Read once per process: the launch environment cannot change, and the
     /// chunk path calls this per event, where rebuilding the environment
     /// dictionary each time was pure overhead (audit #83).
     static let isEnabled: Bool = {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        return false
+        #else
         let value = RuntimeDebugGate.value(for: environmentKey)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
@@ -29,6 +34,7 @@ enum LivePreviewDiagnostics {
         case "1", "true", "yes", "on": return true
         default: return false
         }
+        #endif
     }()
 
     /// Record a lifecycle event on a chunk URL (enter / decode_failed /

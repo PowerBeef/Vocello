@@ -587,10 +587,14 @@ public enum GenerationSemantics {
     /// in `config/runtime-debug-knobs.json` and inert without the `QWENVOICE_DEBUG`
     /// master gate, so production always resolves `.labeled`.
     static let designMergeForm: DesignMergeForm = {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        return .labeled
+        #else
         let raw = RuntimeDebugGate.value(for: "QWENVOICE_DESIGN_MERGE_FORM")?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         return raw.flatMap(DesignMergeForm.init(rawValue:)) ?? .labeled
+        #endif
     }()
 
     public static func normalizedConditioningCacheKeyText(_ text: String) -> String {
@@ -774,10 +778,14 @@ public enum GenerationSemantics {
     /// adherence; an optional listening note may supplement that evidence.
     /// Resolved once; production default is unchanged (reinforcement on).
     private static let englishDictionReinforcementDisabled: Bool = {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        return false
+        #else
         let raw = RuntimeDebugGate.value(for: "QWENVOICE_ENGLISH_DICTION_REINFORCEMENT")?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         return raw == "off" || raw == "0" || raw == "false" || raw == "no"
+        #endif
     }()
 
     /// Words whose presence means the base instruction already asks for clarity,
@@ -868,9 +876,15 @@ public enum GenerationSemantics {
     /// Eric) takes its dialect token, as in the reference. Registered in
     /// `config/runtime-debug-knobs.json` and inert without the `QWENVOICE_DEBUG`
     /// master gate, so production always falls back to English.
-    static let customUndetectedLanguage = resolvedCustomUndetectedLanguage(
-        RuntimeDebugGate.value(for: "QWENVOICE_CUSTOM_AUTO_LANGUAGE")
-    )
+    static let customUndetectedLanguage: String = {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        return canonicalCustomWarmLanguage
+        #else
+        resolvedCustomUndetectedLanguage(
+            RuntimeDebugGate.value(for: "QWENVOICE_CUSTOM_AUTO_LANGUAGE")
+        )
+        #endif
+    }()
 
     static func resolvedCustomUndetectedLanguage(_ raw: String?) -> String {
         let value = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()

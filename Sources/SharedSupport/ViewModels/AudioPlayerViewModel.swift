@@ -190,12 +190,22 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
     typealias FinalPlaybackHandoff = LivePreviewFinalHandoff
 
     private struct LivePreviewConfiguration {
+        private static let defaultPrebufferThreshold = 3
+        private static let defaultMinimumBufferedDuration: TimeInterval = 3.25
+
         let prebufferThreshold: Int
         let minimumBufferedDuration: TimeInterval
 
         static func current(
             environment: [String: String] = ProcessInfo.processInfo.environment
         ) -> LivePreviewConfiguration {
+            #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+            _ = environment
+            return LivePreviewConfiguration(
+                prebufferThreshold: defaultPrebufferThreshold,
+                minimumBufferedDuration: defaultMinimumBufferedDuration
+            )
+            #else
             let rawThreshold = RuntimeDebugGate.value(
                 for: "QWENVOICE_LIVE_PREVIEW_PREBUFFER_CHUNKS",
                 environment: environment
@@ -207,9 +217,10 @@ final class AudioPlayerViewModel: NSObject, AVAudioPlayerDelegate {
             )
             let parsedDuration = rawDuration.flatMap(Double.init).map { min(max($0, 0), 8) }
             return LivePreviewConfiguration(
-                prebufferThreshold: parsedThreshold ?? 3,
-                minimumBufferedDuration: parsedDuration ?? 3.25
+                prebufferThreshold: parsedThreshold ?? defaultPrebufferThreshold,
+                minimumBufferedDuration: parsedDuration ?? defaultMinimumBufferedDuration
             )
+            #endif
         }
     }
 

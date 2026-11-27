@@ -39,10 +39,8 @@ PROHIBITED_RELEASE_STRING_PATTERNS = (
     re.compile(r"/Users/"),
     re.compile(r"/private/var/folders/"),
     re.compile(r"VOCELLO_INTERNAL_DIAGNOSTICS"),
-    re.compile(r"QVOICE_DEVICE_DIAGNOSTICS"),
-    re.compile(r"QVOICE_IOS_DEVICE_"),
-    re.compile(r"QWENVOICE_UIPERF_"),
-    re.compile(r"QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE"),
+    re.compile(r"QVOICE_"),
+    re.compile(r"QWENVOICE_"),
     re.compile(r"IOSDeviceDiagnosticsRunner"),
     re.compile(r"IOSStartupReliabilityRunner"),
 )

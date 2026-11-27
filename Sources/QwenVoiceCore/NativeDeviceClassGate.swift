@@ -19,12 +19,18 @@ import Foundation
 /// `deviceClass()` returns the real, physical-memory-derived tier (no behavior
 /// change).
 public enum NativeDeviceClassGate {
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
     private static let environmentKey = "QWENVOICE_FORCE_MEMORY_CLASS"
+    #endif
 
     /// The forced class for this process, parsed from the environment once per
     /// process. `nil` when unset or unrecognized ⇒ use the real tier.
     public static let resolvedForcedClass: NativeDeviceMemoryClass? = {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        return nil
+        #else
         parse(RuntimeDebugGate.value(for: environmentKey))
+        #endif
     }()
 
     /// Accepts the `NativeDeviceMemoryClass` rawValues
@@ -81,7 +87,9 @@ public enum NativeDeviceClassGate {
 /// every production-affecting override it needs the internal-diagnostics
 /// build plus `QWENVOICE_DEBUG` (`RuntimeDebugGate`).
 public struct NativeHostMemoryEmulation: Hashable, Sendable {
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
     public static let environmentKey = "QWENVOICE_SIMULATED_PHYSICAL_MEMORY_GB"
+    #endif
     private static let bytesPerGiB: UInt64 = 1_073_741_824
     private static let bytesPerMiB: UInt64 = 1_048_576
 

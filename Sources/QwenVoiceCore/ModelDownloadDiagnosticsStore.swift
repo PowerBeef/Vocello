@@ -211,13 +211,18 @@ public final class ModelDownloadDiagnosticsStore: @unchecked Sendable {
         mirrorDirectory: URL? = nil,
         fileManager: FileManager = .default
     ) {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        let diagnosticTraceRunID: String? = nil
+        #else
+        let diagnosticTraceRunID = RuntimeDebugGate.observabilityValue(
+            for: "QVOICE_IOS_MODEL_MANAGEMENT_RUN_ID"
+        )
+        #endif
         self.init(
             directory: directory,
             mirrorDirectory: mirrorDirectory,
             fileManager: fileManager,
-            diagnosticTraceRunID: RuntimeDebugGate.observabilityValue(
-                for: "QVOICE_IOS_MODEL_MANAGEMENT_RUN_ID"
-            )
+            diagnosticTraceRunID: diagnosticTraceRunID
         )
     }
 

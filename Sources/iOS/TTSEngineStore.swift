@@ -200,9 +200,11 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
     }
 
     private var thermalAllowsProactiveWarm: Bool {
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
         if RuntimeDebugGate.value(for: "QVOICE_IOS_THERMAL_GATE") == "off" {
             return true
         }
+        #endif
         switch latestThermalState {
         case .serious, .critical: return false
         default: return true
@@ -889,6 +891,7 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
         // increased-memory entitlement + the band guard, warm when the band is healthy on
         // all build configs. `QVOICE_IOS_DISABLE_PROACTIVE_PREFETCH=1` is an
         // optional escape hatch to force it off (A/B / battery testing).
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
         if RuntimeDebugGate.value(for: "QVOICE_IOS_DISABLE_PROACTIVE_PREFETCH") == "1" {
             diagnosticsRecorder?.recordAction(
                 event: "proactive_warm_blocked",
@@ -898,6 +901,7 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
             )
             return false
         }
+        #endif
         // Sustained-load thermal gate (roadmap P3): don't add prewarm/priming heat
         // when the device is already serious/critical — generation still runs.
         if !thermalAllowsProactiveWarm {
@@ -1134,8 +1138,8 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
         )
     }
 
-    // Env-forced memory-band test knobs (below). Runtime-gated (no #if DEBUG) so they work
-    // on the Release device build; both are inert unless their env var is set.
+    // Env-forced memory-band test knobs (below). Compiled out of shipping iOS builds unless
+    // VOCELLO_INTERNAL_DIAGNOSTICS is set, and runtime-gated behind QWENVOICE_DEBUG=1.
     private func contextApplyingDebugForcedBand(_ context: IOSMemoryContext) -> IOSMemoryContext {
         guard let forcedBand = Self.debugForcedMemoryBand(),
               forcedBand.severityRank > context.pressureBand.severityRank else {
@@ -1186,6 +1190,10 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
     private static func debugForcedMemoryBand(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> IOSMemoryPressureBand? {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        _ = environment
+        return nil
+        #else
         switch RuntimeDebugGate.value(
             for: "QVOICE_IOS_MEMORY_GUARD_FORCE_BAND",
             environment: environment
@@ -1197,11 +1205,16 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
         default:
             return nil
         }
+        #endif
     }
 
     private static func debugForceCriticalOnceEnabled(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> Bool {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        _ = environment
+        return false
+        #else
         switch RuntimeDebugGate.value(
             for: "QVOICE_IOS_MEMORY_GUARD_FORCE_CRITICAL_ONCE",
             environment: environment
@@ -1213,6 +1226,7 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
         default:
             return false
         }
+        #endif
     }
 
     private static func megabytesString(_ bytes: UInt64) -> String {

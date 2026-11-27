@@ -3,10 +3,12 @@ import Synchronization
 
 /// Bench metadata stamped into telemetry `notes` when the macOS bench env vars are set.
 public enum BenchRunContext {
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
     private static let runIDKey = "QVOICE_MAC_BENCH_RUN_ID"
     private static let takeIndexKey = "QVOICE_MAC_BENCH_TAKE_INDEX"
     private static let cellKey = "QVOICE_MAC_BENCH_CELL"
     private static let warmStateKey = "QVOICE_MAC_BENCH_WARM_STATE"
+    #endif
 
     /// The take a bench driver in this process last announced through
     /// `writeCurrentTakeFile`, until `clearCurrentTakeFile`. A process that
@@ -15,12 +17,20 @@ public enum BenchRunContext {
     private static let announcedTake = Mutex<[String: String]?>(nil)
 
     public static var isActive: Bool {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        return false
+        #else
         guard TelemetryGate.resolvedEnabled else { return false }
         return RuntimeDebugGate.observabilityValue(for: runIDKey)?.isEmpty == false
+        #endif
     }
 
     public static var runID: String? {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        return nil
+        #else
         trimmedEnv(runIDKey)
+        #endif
     }
 
     /// Notes merged into every telemetry row for the current bench take.
@@ -107,12 +117,18 @@ public enum BenchRunContext {
 
     private static func notesFromEnvironment(intendedWarmState: String?) -> [String: String] {
         var notes: [String: String] = [:]
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        if let warm = intendedWarmState {
+            notes["benchWarmState"] = warm
+        }
+        #else
         if let runID = trimmedEnv(runIDKey) { notes["benchRunID"] = runID }
         if let take = trimmedEnv(takeIndexKey) { notes["benchTakeIndex"] = take }
         if let cell = trimmedEnv(cellKey) { notes["benchCell"] = cell }
         if let warm = intendedWarmState ?? trimmedEnv(warmStateKey) {
             notes["benchWarmState"] = warm
         }
+        #endif
         return notes
     }
 
@@ -130,14 +146,20 @@ public enum BenchRunContext {
         cell: String,
         intendedWarmState: String
     ) -> [String: String] {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        _ = (runID, takeIndex, cell, intendedWarmState)
+        return [:]
+        #else
         [
             runIDKey: runID,
             takeIndexKey: String(takeIndex),
             cellKey: cell,
             warmStateKey: intendedWarmState,
         ]
+        #endif
     }
 
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
     private static func trimmedEnv(_ key: String) -> String? {
         guard let raw = RuntimeDebugGate.observabilityValue(for: key)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
@@ -146,6 +168,7 @@ public enum BenchRunContext {
         }
         return raw
     }
+    #endif
 }
 
 private enum BenchRunContextError: LocalizedError {

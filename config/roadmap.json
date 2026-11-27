@@ -184,8 +184,8 @@
       "needs": [
         "keyboard"
       ],
-      "updated": "2026-11-26",
-      "notes": "2026-10-12, with the maintainer's approval: version 3.0.0 replaced the unreleased 1.0 draft; category Productivity (secondary Music -> Utilities on 2026-11-04); free and iPhone only; App Privacy Data Not Collected; export purchase (com.patricedery.vocello.design_clone_export, USD 19.99 base, automatic regional prices, Family Sharing off) has en-US, fr-CA and fr-FR text. 2026-10-27: EU excluded (BKL-41). 2026-11-25 maintainer decisions: target version 3.2.0; initial age rating raised from 4+ to 13+ (RF-62); China Mainland (CN) excluded and South Korea (KR) kept (147 of 175 territories, ASR-11). Left for Phase 5 (2026-11-26): maintainer App Store Connect portal activation of the Paid Apps agreement + tax/banking (must be Active 24h+ before RF-16 submit) and the export IAP review screenshot from the processed 3.2.0 TestFlight build (RF-12)."
+      "updated": "2026-11-27",
+      "notes": "2026-10-12, with the maintainer's approval: version 3.0.0 replaced the unreleased 1.0 draft; category Productivity (secondary Music -> Utilities on 2026-11-04); free and iPhone only; App Privacy Data Not Collected; export purchase (com.patricedery.vocello.design_clone_export, USD 19.99 base, automatic regional prices, Family Sharing off) has en-US, fr-CA and fr-FR text. 2026-10-27: EU excluded (BKL-41). 2026-11-25 maintainer decisions: target version 3.2.0; initial age rating raised from 4+ to 13+ (RF-62); China Mainland (CN) excluded and South Korea (KR) kept (147 of 175 territories, ASR-11). Left for Phase 5 (2026-11-26): maintainer App Store Connect portal activation of the Paid Apps agreement + tax/banking (must be Active 24h+ before RF-16 submit) and the export IAP review screenshot from the processed 3.2.0 TestFlight build (RF-12). Also enroll in the Apple Small Business Program (15% vs 30% fee on the USD 19.99 IAP) alongside Paid Apps activation."
     },
     {
       "id": "RF-06",
@@ -629,8 +629,8 @@
       "needs": [
         "keyboard"
       ],
-      "updated": "2026-11-26",
-      "notes": "Opened 2026-11-16. 2026-11-26: reconciled 3.2.0 App Review notes in docs/reference/app-store-listing.md (3425 chars / 3437 UTF-8 bytes, 563 bytes headroom for RF-66 demo video URL) covering all locked RF-73/A1-F1 points (Guideline 1.2 offline TTS, Settings > Privacy & Permissions > Terms of Use, Settings > About > Report an Issue, 2.4.1 iPad compatibility, 2.5.19 stripped diagnostics, 5.1.2(i) static Hugging Face CDN, 5.2 Qwen3-TTS Apache-2.0 / Meta AudioSeal MIT attribution, and RF-66 demo video slot). ASC entry needs explicit authorization.",
+      "updated": "2026-11-27",
+      "notes": "Opened 2026-11-16. 2026-11-26: reconciled 3.2.0 App Review notes in docs/reference/app-store-listing.md (3425 chars / 3437 UTF-8 bytes, 563 bytes headroom for RF-66 demo video URL) covering all locked RF-73/A1-F1 points (Guideline 1.2 offline TTS, Settings > Privacy & Permissions > Terms of Use, Settings > About > Report an Issue, 2.4.1 iPad compatibility, 2.5.19 stripped diagnostics, 5.1.2(i) static Hugging Face CDN, 5.2 Qwen3-TTS Apache-2.0 / Meta AudioSeal MIT attribution, and RF-66 demo video slot). ASC entry needs explicit authorization. 2026-11-26 (X audit): added developer ownership link (PowerBeef/PowerBeef02/vocello.vercel.app, 4.1/5.2), App Review Attachment ref + 147-territory regional scope (2.1 bot), tightened 2.5.19 binary claim, and one-pass feedback ask (3,834 UTF-8 bytes, 166 bytes headroom).",
       "legacyIds": [
         "RF-64"
       ]
@@ -666,8 +666,8 @@
       "needs": [
         "iphone"
       ],
-      "updated": "2026-11-16",
-      "notes": "Opened 2026-11-16 from two external audits of the 3.1.0 tree, each claim re-checked against the code and Apple's current pages. No demo video exists (gap G5 of the 2026-11-04 audit). It pre-empts the most likely Guideline 2.1 round, a reviewer who cannot see the model download or the consent gate. The screenshots from the same build stay under ASR-05."
+      "updated": "2026-11-27",
+      "notes": "Opened 2026-11-16 from two external audits of the 3.1.0 tree, each claim re-checked against the code and Apple's current pages. No demo video exists (gap G5 of the 2026-11-04 audit). It pre-empts the most likely Guideline 2.1 round, a reviewer who cannot see the model download or the consent gate. The screenshots from the same build stay under ASR-05. 2026-11-26 (X audit): also capture native Mic & Speech Recognition prompts and upload the clip directly to App Store Connect -> App Review Information -> Attachment (plus backup URL in Review Notes) to pre-empt the 2026 automated 2.1 Information Needed bot."
     },
     {
       "id": "RF-16",
@@ -723,8 +723,8 @@
       "needs": [
         "keyboard"
       ],
-      "updated": "2026-11-26",
-      "notes": "Opened 2026-10-12 as the plan's explicit end; lifting the focus lock follows it. 2026-11-26: RF-68, RF-69, RF-70 (attn kept), RF-71 (Mac/CLI v3.2.0 live at 33e65c15), RF-72 and RF-73 are closed; live ASC set to 13+, 147 territories on app & IAP (27 EU + CHN excluded, KOR kept), and /privacy/ URL. Phase 5 order to RF-16: (1) ASC portal Paid Apps + tax/banking (RF-02, Active 24h+ ahead) and Nov 16 Shared Location=No / Dating=No descriptors (RF-62); (2) cut v3.2.0-ios.1 via ios_candidate_tag.py (RF-12); (3) grouped iPhone window for RF-12/RF-15/RF-17/ASR-05/ASR-06/RF-66 + AWS Device Farm iPhone 15 Pro (RF-65); (4) ASC 3.2.0 metadata/IAP/RF-63 notes + ASR-09 24h proof -> submit."
+      "updated": "2026-11-27",
+      "notes": "Opened 2026-10-12 as the plan's explicit end; lifting the focus lock follows it. 2026-11-26: RF-68, RF-69, RF-70 (attn kept), RF-71 (Mac/CLI v3.2.0 live at 33e65c15), RF-72 and RF-73 are closed; live ASC set to 13+, 147 territories on app & IAP (27 EU + CHN excluded, KOR kept), and /privacy/ URL. Phase 5 order to RF-16: (1) ASC portal Paid Apps + tax/banking (RF-02, Active 24h+ ahead) and Nov 16 Shared Location=No / Dating=No descriptors (RF-62); (2) cut v3.2.0-ios.1 via ios_candidate_tag.py (RF-12); (3) grouped iPhone window for RF-12/RF-15/RF-17/ASR-05/ASR-06/RF-66 + AWS Device Farm iPhone 15 Pro (RF-65); (4) ASC 3.2.0 metadata/IAP/RF-63 notes + ASR-09 24h proof -> submit. 2026-11-26 (X audit): stripped all 72 remaining QVOICE_*/QWENVOICE_* literals from shipping iOS + VocelloQwen3Core and hardened verify_ios_release_artifacts.py (2.5.19); runbook updated for 2026 ASC draft-submission IAP order (Add version -> add IAP to same submission -> Submit with Manual Release) and in-review discipline."
     },
     {
       "id": "DA-02",

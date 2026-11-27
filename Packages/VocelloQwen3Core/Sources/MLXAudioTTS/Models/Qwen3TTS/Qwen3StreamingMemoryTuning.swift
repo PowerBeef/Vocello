@@ -194,6 +194,10 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
         internalDiagnosticsAvailable: Bool,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> Qwen3LoadTimeDiagnosticOverrides {
+        #if os(iOS)
+        _ = (internalDiagnosticsAvailable, environment)
+        return .production
+        #else
         func gatedValue(_ key: String) -> String? {
             VocelloQwen3ImplementationDebugGate.value(
                 for: key,
@@ -230,5 +234,6 @@ struct Qwen3LoadTimeDiagnosticOverrides: Sendable, Equatable {
             iclTargetSpaceOnlyBeforeSpacedScripts: gatedValue("QWENVOICE_ICL_TARGET_SPACE") != "every-target",
             referenceEdgesTrimmed: gatedValue("QWENVOICE_REFERENCE_EDGES") != "as-given"
         )
+        #endif
     }
 }

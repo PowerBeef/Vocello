@@ -64,10 +64,14 @@ final class ReferenceClipRecorder: NSObject {
     /// registered in `config/runtime-debug-knobs.json` and ignored unless
     /// `QWENVOICE_DEBUG` enables the master gate.
     static var virtualMicrophoneURL: URL? {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        return nil
+        #else
         guard let path = RuntimeDebugGate.value(for: "QWENVOICE_FAKE_MIC_WAV"),
               !path.isEmpty else { return nil }
         let url = URL(fileURLWithPath: path)
         return FileManager.default.fileExists(atPath: url.path) ? url : nil
+        #endif
     }
 
     /// ~80 ms/sample × 48 ≈ a 3.8 s scrolling window.

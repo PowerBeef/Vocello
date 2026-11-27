@@ -762,6 +762,21 @@ env = {
 # fails the launch rather than dropping a tuning key.
 with open(os.environ["QV_KNOBS"], encoding="utf-8") as handle:
     registered = {key for group in json.load(handle)["groups"] for key in group["keys"]}
+# VocelloQwen3Core load-time overrides are compiled out on iOS (Guideline 2.5.19),
+# so never forward dead macOS-only package knobs to the phone.
+macos_only_package_keys = {
+    "QVOICE_TALKER_KV_QUANT",
+    "QWENVOICE_TOKENIZER_RESIDENCY",
+    "QWENVOICE_ENCODER_ROTARY",
+    "QWENVOICE_REFERENCE_PADDING",
+    "QWENVOICE_DECODER_WINDOW",
+    "QWENVOICE_CLONE_DECODER_HISTORY",
+    "QWENVOICE_CODE_PREDICTOR_BITS",
+    "QWENVOICE_MIXED_PRECISION",
+    "QWENVOICE_ICL_TARGET_SPACE",
+    "QWENVOICE_REFERENCE_EDGES",
+}
+registered -= macos_only_package_keys
 # MLX reads these three itself, before the app code runs: the command-buffer
 # limits (performance-guide.md, 12.1) and the float32 mode.
 mlx_keys = ("MLX_MAX_OPS_PER_BUFFER", "MLX_MAX_MB_PER_BUFFER", "MLX_ENABLE_TF32")

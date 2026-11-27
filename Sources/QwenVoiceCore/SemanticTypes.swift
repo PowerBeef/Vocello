@@ -1248,6 +1248,10 @@ public enum NativeStreamingOutputPolicy: String, Hashable, Codable, Sendable {
     case pcmPreviewAndFileArtifacts = "pcm_preview_and_file_artifacts"
 
     public static func current(environment: [String: String] = ProcessInfo.processInfo.environment) -> NativeStreamingOutputPolicy {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        _ = environment
+        return .pcmPreview
+        #else
         switch RuntimeDebugGate.value(
             for: "QWENVOICE_STREAMING_OUTPUT_POLICY",
             environment: environment
@@ -1257,6 +1261,7 @@ public enum NativeStreamingOutputPolicy: String, Hashable, Codable, Sendable {
         default:
             return .pcmPreview
         }
+        #endif
     }
 }
 
@@ -1273,6 +1278,10 @@ public enum NativeStreamingPreviewDataPolicy: String, Hashable, Codable, Sendabl
     case skip
 
     public static func current(environment: [String: String] = ProcessInfo.processInfo.environment) -> NativeStreamingPreviewDataPolicy {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        _ = environment
+        return .emit
+        #else
         switch RuntimeDebugGate.value(
             for: "QWENVOICE_STREAMING_PREVIEW_DATA",
             environment: environment
@@ -1284,6 +1293,7 @@ public enum NativeStreamingPreviewDataPolicy: String, Hashable, Codable, Sendabl
         default:
             return .emit
         }
+        #endif
     }
 }
 

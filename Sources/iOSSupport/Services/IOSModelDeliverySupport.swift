@@ -33,8 +33,10 @@ final class IOSModelDeliveryBackgroundEventHandlerStore {
 }
 
 struct IOSModelDeliveryConfiguration: Sendable {
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
     static let catalogURLEnvironmentKey = "QVOICE_IOS_MODEL_CATALOG_URL"
     static let allowedHostsEnvironmentKey = "QVOICE_IOS_MODEL_ALLOWED_HOSTS"
+    #endif
     static let catalogURLInfoPlistKey = "QVoiceModelCatalogURL"
     static let defaultCatalogURLString = "bundle://vocello/ios/catalog/v1/models.json"
     static let bundledCatalogResourceName = "qwenvoice_ios_model_catalog"
@@ -65,6 +67,9 @@ struct IOSModelDeliveryConfiguration: Sendable {
         bundle: Bundle = .main,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> IOSModelDeliveryConfiguration {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        let overrideURL: URL? = nil
+        #else
         let rawOverride = RuntimeDebugGate.value(
             for: catalogURLEnvironmentKey,
             environment: environment
@@ -72,17 +77,22 @@ struct IOSModelDeliveryConfiguration: Sendable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedOverride = rawOverride.flatMap(normalizedCatalogOverrideString(_:))
         let overrideURL = normalizedOverride.flatMap(URL.init(string:))
+        #endif
         let bundleDefault = (bundle.object(forInfoDictionaryKey: catalogURLInfoPlistKey) as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let normalizedBundleDefault = bundleDefault.flatMap(normalizedCatalogOverrideString(_:))
         let bundleURL = normalizedBundleDefault.flatMap(URL.init(string:))
         let catalogURL = overrideURL ?? bundleURL ?? URL(string: defaultCatalogURLString)!
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        let overrideHosts: Set<String> = []
+        #else
         let overrideHosts = Set(
             RuntimeDebugGate.value(for: allowedHostsEnvironmentKey, environment: environment)?
                 .split(separator: ",")
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
                 .filter { !$0.isEmpty } ?? []
         )
+        #endif
         let defaultHost: Set<String>
         if catalogURL.isBundledModelCatalog {
             defaultHost = ["huggingface.co"]

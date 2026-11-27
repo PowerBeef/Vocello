@@ -6,7 +6,9 @@ import Synchronization
 /// is enabled (`TelemetryGate`, which an explicit telemetry-off mode keeps off even under
 /// `QWENVOICE_DEBUG`) and the explicit runtime master gate is active.
 public enum BenchForceColdPolicy {
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
     private static let environmentKey = "QWENVOICE_BENCH_FORCE_COLD"
+    #endif
     private static let consumed = Mutex(false)
 
     public static var shouldUnloadBeforeGeneration: Bool {
@@ -32,10 +34,15 @@ public enum BenchForceColdPolicy {
         environment: [String: String],
         telemetryEnabled: Bool
     ) -> Bool {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        _ = (environment, telemetryEnabled)
+        return false
+        #else
         guard telemetryEnabled else { return false }
         let value = RuntimeDebugGate.value(for: environmentKey, environment: environment)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         return value.map { ["1", "true", "on", "yes"].contains($0) } ?? false
+        #endif
     }
 }

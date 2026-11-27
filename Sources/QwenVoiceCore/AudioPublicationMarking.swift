@@ -55,10 +55,15 @@ public enum AudioMarkingPolicy {
     public static func resolvedEnabled(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> Bool {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        _ = environment
+        return true
+        #else
         let raw = RuntimeDebugGate.value(for: "QWENVOICE_MARKING", environment: environment)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
         return !(raw == "off" || raw == "false" || raw == "0" || raw == "no")
+        #endif
     }
 }
 

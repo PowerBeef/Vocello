@@ -407,6 +407,13 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
             "VOCELLO_INTERNAL_DIAGNOSTICS",
             "QVOICE_DEVICE_DIAGNOSTICS",
             "QVOICE_IOS_DEVICE_DIAGNOSTICS_SPEC",
+            "QVOICE_IOS_MODEL_CATALOG_URL",
+            "QVOICE_APP_SUPPORT_DIR",
+            "QVOICE_TALKER_KV_QUANT",
+            "QWENVOICE_DEBUG",
+            "QWENVOICE_FAKE_MIC_WAV",
+            "QWENVOICE_MARKING",
+            "QWENVOICE_MIXED_PRECISION",
             "QWENVOICE_UIPERF_FRAME_PROBE",
             "QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE",
             "IOSDeviceDiagnosticsRunner",
@@ -414,6 +421,11 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
         ]:
             with self.assertRaisesRegex(module.VerificationError, "prohibited release"):
                 module._validate_release_strings(leaked, "export")
+        # Legitimate Info.plist keys and module names use camelCase, never uppercase env prefixes.
+        module._validate_release_strings(
+            "QVoiceModelCatalogURL\nQVoiceSharedAppGroupIdentifier\nQwenVoiceCore\n",
+            "export",
+        )
         with self.assertRaisesRegex(module.VerificationError, r"dynamic-loading APIs \(_dlopen\)"):
             module._validate_undefined_symbols(["U _dlopen", "U _dlsym"], "export")
         # Lookups in images already loaded (metal-cpp's dlsym, MLX's dladdr) cannot load code.

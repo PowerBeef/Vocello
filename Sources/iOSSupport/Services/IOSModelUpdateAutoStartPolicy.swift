@@ -9,8 +9,10 @@ import QwenVoiceCore
 /// Low Data Mode; one that failed for want of space while earlier models hold some is offered again,
 /// with their removal first. Pure, so both iOS test bundles drive it.
 enum IOSModelUpdateAutoStartPolicy {
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
     static let simulatedAvailableBytesKey = "QVOICE_IOS_SIMULATED_AVAILABLE_BYTES"
     static let seedRetiredModelsKey = "QVOICE_IOS_SEED_RETIRED_MODELS"
+    #endif
 
     struct SeedResult: Equatable, Sendable {
         let didResetLedger: Bool
@@ -31,6 +33,10 @@ enum IOSModelUpdateAutoStartPolicy {
         environment: [String: String] = ProcessInfo.processInfo.environment,
         internalDiagnosticsAvailable: Bool = RuntimeDebugGate.internalDiagnosticsAvailable
     ) -> Int64? {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        _ = (environment, internalDiagnosticsAvailable)
+        return systemAvailableBytes
+        #else
         guard internalDiagnosticsAvailable,
               let raw = RuntimeDebugGate.value(for: simulatedAvailableBytesKey, environment: environment)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
@@ -39,6 +45,7 @@ enum IOSModelUpdateAutoStartPolicy {
             return systemAvailableBytes
         }
         return override
+        #endif
     }
 
     /// Seeds tiny earlier-Vocello retired model folders into an explicitly
@@ -55,6 +62,10 @@ enum IOSModelUpdateAutoStartPolicy {
         fileManager: FileManager = .default,
         internalDiagnosticsAvailable: Bool = RuntimeDebugGate.internalDiagnosticsAvailable
     ) -> SeedResult {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        _ = (modelsDirectory, allowedRetiredFolders, environment, fileManager, internalDiagnosticsAvailable)
+        return .none
+        #else
         guard internalDiagnosticsAvailable,
               AppPaths.isolatedModelDeliverySupportRoot(environment: environment) != nil,
               let raw = RuntimeDebugGate.value(for: seedRetiredModelsKey, environment: environment) else {
@@ -120,6 +131,7 @@ enum IOSModelUpdateAutoStartPolicy {
             }
         }
         return SeedResult(didResetLedger: didResetLedger, seededFolders: seeded)
+        #endif
     }
 
     struct Candidate: Equatable, Sendable {

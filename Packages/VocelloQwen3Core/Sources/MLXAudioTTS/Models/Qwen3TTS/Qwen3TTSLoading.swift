@@ -1186,7 +1186,7 @@ extension Qwen3TTSModel {
         guard mixedRecipe != nil else { return }
         guard !isHybridCheckpoint(modelDir: modelDir, config: config) else {
             throw AudioGenerationError.modelNotInitialized(
-                "QWENVOICE_MIXED_PRECISION cannot be applied to an already-hybrid checkpoint"
+                "Mixed-precision override cannot be applied to an already-hybrid checkpoint"
             )
         }
     }

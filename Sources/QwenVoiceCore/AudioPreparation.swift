@@ -257,7 +257,9 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
         /// reader's own path mixes inside the reader.
         var mixdown: Mixdown { self == .singleCallAveraged ? .average : .sumOverRootTwo }
 
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
         static let environmentKey = "QWENVOICE_REFERENCE_PREPARATION"
+        #endif
 
         /// What every build does without the diagnostic key, since 2026-11-11:
         /// `singleCall` (adopted by the clone screen's rule
@@ -285,12 +287,17 @@ public struct NativeAudioPreparationService: AudioPreparationService, Hashable, 
             environment: [String: String],
             internalDiagnosticsAvailable: Bool
         ) -> Resampling {
+            #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+            _ = (environment, internalDiagnosticsAvailable)
+            return production
+            #else
             let requested = RuntimeDebugGate.value(
                 for: environmentKey,
                 environment: environment,
                 internalDiagnosticsAvailable: internalDiagnosticsAvailable
             )
             return requested.flatMap(Resampling.init(diagnosticValue:)) ?? production
+            #endif
         }
 
         init?(diagnosticValue: String) {

@@ -14,6 +14,10 @@ enum VocelloQwen3ImplementationDebugGate {
         internalDiagnosticsAvailable: Bool,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> String? {
+        #if os(iOS)
+        _ = (key, internalDiagnosticsAvailable, environment)
+        return nil
+        #else
         guard internalDiagnosticsAvailable else { return nil }
         guard let raw = environment["QWENVOICE_DEBUG"]?
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -22,5 +26,6 @@ enum VocelloQwen3ImplementationDebugGate {
             return nil
         }
         return environment[key]
+        #endif
     }
 }

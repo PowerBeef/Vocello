@@ -184,8 +184,8 @@
       "needs": [
         "keyboard"
       ],
-      "updated": "2026-11-25",
-      "notes": "2026-10-12, with the maintainer's approval: version 3.0.0 replaced the unreleased 1.0 draft; category Productivity (secondary Music -> Utilities on 2026-11-04); free and iPhone only; App Privacy Data Not Collected; export purchase (com.patricedery.vocello.design_clone_export, USD 19.99 base, automatic regional prices, Family Sharing off) has en-US, fr-CA and fr-FR text. 2026-10-27: EU excluded (BKL-41). 2026-11-25 maintainer decisions: target version 3.2.0; initial age rating raised from 4+ to 13+ (RF-62); China Mainland (CN) excluded and South Korea (KR) kept (147 of 175 territories, ASR-11). Left: the maintainer's account steps that activate the Paid Apps agreement (status stays in the maintainer's private record; must be Active 24h+ before submit) and the purchase's review screenshot from the phone (RF-12)."
+      "updated": "2026-11-26",
+      "notes": "2026-10-12, with the maintainer's approval: version 3.0.0 replaced the unreleased 1.0 draft; category Productivity (secondary Music -> Utilities on 2026-11-04); free and iPhone only; App Privacy Data Not Collected; export purchase (com.patricedery.vocello.design_clone_export, USD 19.99 base, automatic regional prices, Family Sharing off) has en-US, fr-CA and fr-FR text. 2026-10-27: EU excluded (BKL-41). 2026-11-25 maintainer decisions: target version 3.2.0; initial age rating raised from 4+ to 13+ (RF-62); China Mainland (CN) excluded and South Korea (KR) kept (147 of 175 territories, ASR-11). Left for Phase 5 (2026-11-26): maintainer App Store Connect portal activation of the Paid Apps agreement + tax/banking (must be Active 24h+ before RF-16 submit) and the export IAP review screenshot from the processed 3.2.0 TestFlight build (RF-12)."
     },
     {
       "id": "RF-06",
@@ -297,8 +297,8 @@
         "keyboard",
         "iphone"
       ],
-      "updated": "2026-11-25",
-      "notes": "2026-10-24: candidates are cut by python3 scripts/ios_candidate_tag.py (a v<version>-ios.N push archives and uploads only the iPhone app). Historical 3.0 builds 24-30 and internal 3.1.0 builds 31-33 are superseded. 2026-10-27: TestFlight upgrade over dev preserved History and Saved Voices (ios-xcui-candidate-smoke-20261027-135949-5fe567b6). 2026-11-25: RF-69/70/72/73 closed and RF-68 Mac work landed, so v3.2.0-ios.1 cuts after RF-71 (3.2.0 version bump) ahead of the Phase 5 iPhone window (which closes RF-68 on-device); still open: upload/install processed 3.2.0 build and Airplane Mode owned-export check (waiting on RF-02)."
+      "updated": "2026-11-26",
+      "notes": "2026-10-24: candidates are cut by force_ask-gated python3 scripts/ios_candidate_tag.py (a signed v<version>-ios.N tag archives and uploads only the iPhone app). Historical 3.0 builds 24-30 and 3.1.0 tags v3.1.0-ios.1..3 (build 31) are superseded. 2026-10-27: TestFlight upgrade over dev preserved History and Saved Voices (ios-xcui-candidate-smoke-20261027-135949-5fe567b6). 2026-11-26: RF-68, RF-69, RF-70, RF-71 (Mac/CLI v3.2.0 live at 33e65c15), RF-72 and RF-73 are all closed; next step on maintainer go is ios_candidate_tag.py --dry-run (verifying green CI required on origin/main and unused ASC build 32) then cutting v3.2.0-ios.1, approving archive-ios, installing the processed TestFlight build on the paired iPhone, and verifying Airplane Mode owned export (after RF-02)."
     },
     {
       "id": "RF-15",
@@ -317,8 +317,8 @@
       "needs": [
         "iphone"
       ],
-      "updated": "2026-11-21",
-      "notes": "Opened 2026-10-12 (risk-based gate). Candidate rows run with --candidate-origin-attestation; with-purchase export, Restore and Cancel wait for RF-02; startup Retry and unverified purchase use dev evidence (08eddecc, ad3c8846). Earlier build 24-29 runs are in git log -p. DA-04, F-01, F-16 closed. 2026-11-21 (Wave 5 on c0750fe7 dev build, Pack A RB-01..RB-12): full smoke 4/4 PASS (ios-xcui-smoke-20261122-030658-6da29045), benchmark 29/29 PASS, memory 9/9 PASS, perf 3x12/12 PASS, model-download queue+upgrade PASS, lang-bench 23/23 spoken PASS. Maintainer decision 2026-11-21: no more 3.1 TestFlight; processed-candidate rows now run on 3.2.0 (RF-12) after RF-68..RF-70, plus attended AUD-01/AUD-02/VoiceOver/offline checks and the ~30-take screen."
+      "updated": "2026-11-26",
+      "notes": "Opened 2026-10-12 (risk-based gate). Candidate rows run with --candidate-origin-attestation; with-purchase export, Restore and Cancel wait for RF-02; startup Retry and unverified purchase use dev evidence (08eddecc, ad3c8846). Earlier build 24-29 and Wave 5 runs are in git log -p; DA-04, F-01, F-16 closed. 2026-11-26 (3.2.0 build 32 dev window on iPhone 17 Pro): benchmark 29/29 PASS (141ece72), retained memory 9/9 PASS (6d5ced96, closing RF-68), UI perf 12/12 PASS (2f1ecfc4), localization 35/35 PASS (b396df56), studio-layout smoke PASS (ca32c92b). Remaining for Phase 5: run processed-candidate smoke, onboarding/download, EN/FR mode takes, sandbox purchase/Restore/Cancel (after RF-02), attended AUD-01/AUD-02/VoiceOver/AX-XXXL/offline checks and the ~30-take screen on processed v3.2.0-ios.1 (RF-12)."
     },
     {
       "id": "RF-17",
@@ -350,8 +350,8 @@
       "needs": [
         "iphone"
       ],
-      "updated": "2026-11-21",
-      "notes": "Opened 2026-10-12. Gates App Review (RF-16); iPhone delivery evaluation is declared not applicable (e7377511): six iOS records. Earlier build 26-29 history is in git log -p (build 29 records expired 2026-11-10). 2026-11-21 (Wave 5 on c0750fe7 dev build): ui-benchmark (f1e8631c), memory (c2b75046), 3x ui-perf (AV-14 closed, bc350530), model-download queue/upgrade and lang-bench (23/23 spoken PASS; 6 locales lack iOS Speech packs) ran clean. Maintainer decision 2026-11-21: no more 3.1 TestFlight; all exact-tag promotion records now run on the 3.2.0 submission candidate tag (v3.2.0-ios.N) after RF-68..RF-70 land."
+      "updated": "2026-11-26",
+      "notes": "Opened 2026-10-12. Gates App Review (RF-16); iPhone delivery evaluation is declared not applicable (e7377511): six iOS records. Earlier build 26-29 and Wave 5 history is in git log -p. 2026-11-26: RF-68..RF-72 closed and Mac/CLI v3.2.0 shipped (RF-71); 3.2.0 build 32 dev window on iPhone 17 Pro passed ui-benchmark (141ece72), retained memory (6d5ced96) and ui-perf (2f1ecfc4). Remaining for Phase 5: record all six exact-tag iOS promotion classes (< 7 days old) on the frozen v3.2.0-ios.N submission candidate tag once RF-12 cuts."
     },
     {
       "id": "RF-35",
@@ -610,8 +610,8 @@
       "needs": [
         "keyboard"
       ],
-      "updated": "2026-11-25",
-      "notes": "Opened 2026-11-16 (Nov 16 descriptors due 2027-01-12). 2026-11-25 authorized ASC write & readback: raised ageRatingOverride and ageRatingOverrideV2 from NONE to THIRTEEN_PLUS (territoryAgeRatings read back THIRTEEN_PLUS; legacy appStoreAgeRating maps to TWELVE_PLUS, Brazil SELF_RATED_TWELVE). Remaining to close RF-62: answer Apple's two Nov 16 descriptors (Shared Location = No, Dating and Relationships = No) in App Store Connect web portal (both currently read back null; asc v7.4.0 has no CLI flags for them) and confirm readback."
+      "updated": "2026-11-26",
+      "notes": "Opened 2026-11-16 (Nov 16 descriptors due 2027-01-12). 2026-11-25 authorized ASC write & readback: raised ageRatingOverride and ageRatingOverrideV2 from NONE to THIRTEEN_PLUS (territoryAgeRatings read back THIRTEEN_PLUS; legacy appStoreAgeRating maps to TWELVE_PLUS, Brazil SELF_RATED_TWELVE). Left for Phase 5 portal step (2026-11-26): answer Apple's two Nov 16 descriptors (Shared Location = No, Dating and Relationships = No) in App Store Connect web portal (both currently read back null; asc v7.4.0 has no CLI flags for them) and record readback under ASR-11."
     },
     {
       "id": "RF-63",
@@ -723,8 +723,8 @@
       "needs": [
         "keyboard"
       ],
-      "updated": "2026-11-25",
-      "notes": "Opened 2026-10-12 as the plan's explicit end; lifting the focus lock follows it. 2026-11-21 decision: no more 3.1 TestFlight; 3.2.0 (v3.2.0-ios.N) is the App Review target. 2026-11-25: RF-69, RF-70 (attn kept), RF-72, and RF-73 closed; live ASC updated to 13+ (2 Nov 16 web clicks left for RF-62), 147 territories on app & IAP (27 EU + CHN excluded, KOR kept), and /privacy/ URL. Historical 2026-11-04 App Review readiness audit archived in git history."
+      "updated": "2026-11-26",
+      "notes": "Opened 2026-10-12 as the plan's explicit end; lifting the focus lock follows it. 2026-11-26: RF-68, RF-69, RF-70 (attn kept), RF-71 (Mac/CLI v3.2.0 live at 33e65c15), RF-72 and RF-73 are closed; live ASC set to 13+, 147 territories on app & IAP (27 EU + CHN excluded, KOR kept), and /privacy/ URL. Phase 5 order to RF-16: (1) ASC portal Paid Apps + tax/banking (RF-02, Active 24h+ ahead) and Nov 16 Shared Location=No / Dating=No descriptors (RF-62); (2) cut v3.2.0-ios.1 via ios_candidate_tag.py (RF-12); (3) grouped iPhone window for RF-12/RF-15/RF-17/ASR-05/ASR-06/RF-66 + AWS Device Farm iPhone 15 Pro (RF-65); (4) ASC 3.2.0 metadata/IAP/RF-63 notes + ASR-09 24h proof -> submit."
     },
     {
       "id": "DA-02",

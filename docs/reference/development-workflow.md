@@ -579,7 +579,7 @@ the agent's `cwd`). Opening a session installs nothing and never builds or touch
 | SessionStart | — | `session-start` (`session_start.sh`) | Bounded local Git/status/cache-health/checkpoint `injectSteps` banner, plus agent rules and best-effort worker lease when starting in a linked worktree |
 | PreToolUse | `run_command` | `pre-command` (`policy_guard.sh`, `commit_lint.sh`, in-process `agent_guard`, command policy) | Checkout-aware Git, staging, whitespace, privacy, cache, generated-project and physical-device hard denies; subagent worktree limits; `force_ask` (uncacheable by Always Allow) on pushes, live `release_tag.py` / `ios_candidate_tag.py` / `upload_promotion_manifest.py`, destructive Git, `sudo`, `asc`, `vercel`, `gh`/`hf` writes and `failure_issue.py`; `ask` on local/reversible resets, installs and downloads |
 | PreToolUse | `edit_file\|write_file` | `pre-edit` (`generated_file_guard.sh`, in-process `agent_guard`) | Refuses hand edits of generated and frozen files, naming the generator; subagents never edit the roadmap or checkpoint |
-| PreToolUse | `call_mcp_tool` | `pre-mcp` | Hard-denies `cua-driver`, Simulator MCP routes, MobileBuildMCP build/UI/clean/`persist: true` calls and Axiom `xcui`/simulator agents; `force_ask` on Hugging Face Space runs (`dynamic_space`, `gr*`) and GitHub connector writes (denied in worktrees) |
+| PreToolUse | `call_mcp_tool` | `pre-mcp` | Hard-denies Simulator MCP routes, MobileBuildMCP build/UI/clean/`persist: true` calls, Axiom `xcui`/simulator agents, and `cua-driver` in linked worktrees (`cua-driver` is allowed on the lead checkout for maintainer-requested host GUI tasks, never for Vocello UI checks); `force_ask` on Hugging Face Space runs (`dynamic_space`, `gr*`) and GitHub connector writes (denied in worktrees) |
 | PostInvocation | — | `post-invocation` | Main checkout only, silent unless drift exists: injects one concise notice when Swift membership under `Sources/`/`Tests/` changes without `project.pbxproj` or when `config/roadmap*.json` drifts from `docs/ROADMAP.md` |
 | Stop | — | `stop` | Releases linked-worktree worker leases when `fullyIdle`; on the main checkout (only when `terminationReason == "NO_TOOL_CALL"`, `fullyIdle == true`, and `continuationActive == false` so it never loops), returns `continue` if `git diff --cached --check` finds staged whitespace or conflict markers |
 
@@ -669,7 +669,7 @@ For a fresh-session smoke check, start a new Antigravity conversation at the rep
 the `SessionStart` banner ("AGENTS.md: Start here"); `AGENTS.md` loaded (and no `CLAUDE.md`); the seven
 `vocello-*` skills and both read-only subagents discoverable; harmless guard fixtures denied
 (`git switch -c smoke`, an `edit_file` on `docs/ROADMAP.md`, `call_mcp_tool` to `mobilebuildmcp`
-`list_sims` or `cua-driver_cua-driver` `list_apps`); an external write (`git push --dry-run` or
+`list_sims`); an external write (`git push --dry-run` or
 `huggingface` `dynamic_space`) triggering a `force_ask` prompt; and `scripts/dev.sh doctor --json` reporting
 the Antigravity harness configured.
 
@@ -693,17 +693,21 @@ Detect capabilities in the current session rather than assuming installation mea
 `mobilebuildmcp` reads `.mobilebuildmcp/config.yaml`, which enables only its project-discovery and
 coverage workflows; if global MCP environment variables expose Simulator, build or UI tools anyway,
 `.agents/hooks.json` hard-denies them as a backstop. Never persist session defaults (`persist: true`
-writes the tracked file and is denied by the hook). Never use `cua-driver`, Axiom `xcui`, or Axiom's
-simulator/test-runner agents. Keep raw native logs, original exit status, optimization flags and
+writes the tracked file and is denied by the hook). Never use Axiom `xcui` or Axiom's
+simulator/test-runner agents, and never use `cua-driver` for Vocello UI checks (`cua-driver` is
+allowed on the lead checkout for maintainer-requested host GUI tasks and is denied in linked
+worktrees). Keep raw native logs, original exit status, optimization flags and
 evidence manifests; compact helper output cannot replace their contracts. Missing optional tools never
 block the script workflow; personal plugins, skills, accounts and credentials are not CI dependencies.
 Never install or change global configuration simply to satisfy a routing table.
 
 ### UI checks, waiting and privacy in Antigravity
 
-- **UI checks are XCUITest lanes** (maintainer decision 2026-11-17, retiring computer-use and iPhone
-  Mirroring routes). Every Mac and iPhone UI check runs through `scripts/ui_test.sh`; a check no lane
-  covers gets its own scenario. Never use `cua-driver`. The iOS `ui-preflight` refuses a lane while
+- **Vocello UI checks are XCUITest lanes** (maintainer decision 2026-11-17, retiring computer-use
+  and iPhone Mirroring routes for Vocello testing). Every Mac and iPhone UI check runs through
+  `scripts/ui_test.sh`; a check no lane covers gets its own scenario. Never use `cua-driver` for
+  Vocello UI verification (`cua-driver` is allowed on the lead checkout only for
+  maintainer-requested host GUI tasks, 2026-11-26). The iOS `ui-preflight` refuses a lane while
   iPhone Mirroring is open (`scripts/ios_device.sh mirroring stop`, then the maintainer unlocks the
   phone). What XCUITest cannot drive stays the maintainer's, by hand (iPhone system settings,
   permission prompts, passcode/Face ID, audio routing, VoiceOver, app deletion, purchase confirmations,

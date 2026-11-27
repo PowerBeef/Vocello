@@ -507,16 +507,18 @@ def handle_pre_mcp(payload: dict, root: Path) -> dict:
     cwd = _resolve_cwd(payload, root)
     in_worktree = cwd.is_absolute() and adapter.linked_worktree(cwd)
 
-    # 1. Retire computer-use / GUI driving (maintainer decision 2026-11-17).
+    # 1. Computer use (`cua-driver`): allowed on the lead checkout for maintainer-requested
+    #    host GUI tasks (maintainer decision 2026-11-26; Vocello app/iPhone UI checks remain
+    #    XCUITest-only via `scripts/ui_test.sh`), but still denied in linked worktrees.
     if "cua-driver" in server_lower:
-        return {
-            "decision": "deny",
-            "reason": (
-                "Computer use (`cua-driver`) is retired in Vocello (maintainer decision 2026-11-17): "
-                "every Mac and iPhone UI check is an XCUITest lane via `scripts/ui_test.sh`, and website "
-                "inspection uses the `browser` subagent."
-            ),
-        }
+        if in_worktree:
+            return {
+                "decision": "deny",
+                "reason": (
+                    "Subagents never drive the host GUI via `cua-driver` from a linked worktree (AGENTS.md)."
+                ),
+            }
+        return {"decision": "allow"}
 
     # 2. Physical iPhone only: block Simulator tools on any MCP server.
     canonical = f"mcp__{server_lower}__{tool_lower}"

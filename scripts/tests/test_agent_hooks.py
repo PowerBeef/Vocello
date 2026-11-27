@@ -464,7 +464,7 @@ class HooksWiringTests(unittest.TestCase):
                 ("pre-edit", {"name": "edit_file", "args": {"Path": f"{prefix}docs/ROADMAP.md"}}, "deny"),
                 ("pre-edit", {"name": "write_file", "args": {"Path": f"{prefix}docs/note.md"}}, "allow"),
                 ("pre-mcp", {"name": "call_mcp_tool", "args": {"ServerName": "mobilebuildmcp", "ToolName": "build" + SIM_SUFFIX}}, "deny"),
-                ("pre-mcp", {"name": "call_mcp_tool", "args": {"ServerName": "cua-driver_cua-driver", "ToolName": "list_apps"}}, "deny"),
+                ("pre-mcp", {"name": "call_mcp_tool", "args": {"ServerName": "cua-driver_cua-driver", "ToolName": "list_apps"}}, "allow"),
                 ("pre-mcp", {"name": "call_mcp_tool", "args": {"ServerName": "mobilebuildmcp", "ToolName": "list_schemes"}}, "allow"),
             ]
             for mode, tool_call, expected in cases:
@@ -799,7 +799,7 @@ class AntigravityPolicyTests(unittest.TestCase):
         for tool in ("dynamic_space", "gr1_z_image_turbo_generate"):
             self.assertEqual(self.mcp("huggingface", tool), "force_ask")
 
-    def test_mcp_guard_denies_simulators_cua_driver_and_mobilebuild_writes(self):
+    def test_mcp_guard_denies_simulators_worktree_cua_driver_and_mobilebuild_writes(self):
         for tool in (f"boot{SIM_SUFFIX}", f"build{SIM_SUFFIX}", f"build_run{SIM_SUFFIX}",
                      f"test{SIM_SUFFIX}", f"list{SIM_SUFFIX}s", f"record{SIM_SUFFIX}_video",
                      f"get{SIM_SUFFIX}_app_path", f"install_app{SIM_SUFFIX}",
@@ -814,8 +814,16 @@ class AntigravityPolicyTests(unittest.TestCase):
             with self.subTest(allowed_mobilebuild=tool):
                 self.assertEqual(self.mcp("mobilebuildmcp", tool), "allow")
         for tool in ("list_apps", "click", "get_desktop_state", "browser_navigate"):
-            with self.subTest(denied_cua=tool):
-                self.assertEqual(self.mcp("cua-driver_cua-driver", tool), "deny")
+            with self.subTest(allowed_lead_cua=tool):
+                self.assertEqual(self.mcp("cua-driver_cua-driver", tool), "allow")
+        with tempfile.TemporaryDirectory(prefix="vocello cua worktree ") as tmp:
+            repo = Path(tmp).resolve() / "repo"
+            worktree = Path(tmp).resolve() / "subagent-cua"
+            initialize_repo(repo)
+            subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "subagent-cua", str(worktree)], check=True)
+            for tool in ("list_apps", "click", "get_desktop_state", "browser_navigate"):
+                with self.subTest(denied_worktree_cua=tool):
+                    self.assertEqual(self.mcp("cua-driver_cua-driver", tool, cwd=worktree), "deny")
         self.assertEqual(self.mcp("axiom", "axiom_xcui_tap"), "deny")
         for agent in (f"{SIM.lower()}-tester", "test-runner", "test-debugger"):
             self.assertEqual(self.mcp("axiom", "axiom_get_agent", {"name": agent}), "deny")

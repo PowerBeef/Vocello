@@ -137,10 +137,10 @@ Lane notes:
   compile is phone-free and Simulator routes are unsupported. After Xcode updates, iPhone builds
   need the matching iOS platform component (ask first; `scripts/lib/ios_platform_preflight.py check`)
   and UI automation re-enabled on the phone.
-- **Every UI check is an XCUITest lane** via `scripts/ui_test.sh` (2026-11-17): genuine controls, no
-  hidden test UI/coordinates, never `cua-driver`, quit iPhone Mirroring before phone lanes, review
-  `<run>/screenshots/index.json`; system prompts/settings/purchases stay maintainer-by-hand
-  (`docs/reference/development-workflow.md`).
+- **Every Vocello UI check is an XCUITest lane** via `scripts/ui_test.sh` (2026-11-17): genuine
+  controls, no hidden test UI/coordinates, never `cua-driver` for Vocello UI checks, quit iPhone
+  Mirroring before phone lanes, review `<run>/screenshots/index.json`; system
+  prompts/settings/purchases stay maintainer-by-hand (`docs/reference/development-workflow.md`).
 - **Runtime:** MLX only, in-process, actor-owned lifecycle, typed cancellation barrier, serialized
   prewarm, request-local sampling/memory, suspending bounded audio. Register unsafe concurrency in
   `config/concurrency-safety.json`.
@@ -181,8 +181,9 @@ ask matrix (guardrails, not authorization). Full matrix and routing:
   (`run_workflow`; no external-write authority).
 - **Tool routing:** repo scripts own builds, tests and evidence. `mobilebuildmcp` runs
   discovery/coverage only (no `persist: true`, Simulator, build, LLDB or UI tools); `cua-driver` is
-  denied; `axiom` supplies Apple skills, read-only auditors, `xcsym`, `xcprof` and `xclog` (no
-  `xcui`/simulator agents); `vercel-plugin` does not authorize CLI deploys.
+  allowed on the lead checkout for maintainer-requested host GUI tasks (denied in linked worktrees;
+  never for Vocello UI checks); `axiom` supplies Apple skills, read-only auditors, `xcsym`, `xcprof`
+  and `xclog` (no `xcui`/simulator agents); `vercel-plugin` does not authorize CLI deploys.
 - **Artifacts, chat and maintainer commands:** keep raw diagnostics, private paths, prompts,
   transcripts, reference audio and credentials out of artifacts, screenshots and chat. Give
   interactive/maintainer-run commands (logins, model installs, publication) in a plain `sh` block;

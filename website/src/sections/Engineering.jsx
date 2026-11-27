@@ -6,9 +6,10 @@ import React from "react";
     over up to five canonical records that share the comparison key and app build of the newest
     one (the anchor). The provenance line below mirrors the chart footer, as the generator prints
     it: "Record <anchor>" for one record, "Median of N records through <anchor>" for more. Today
-    the pool is two records of app 3.2.0 build 32,
-    benchmarks/runs/ui-generation/macos-xcui-benchmark-20261126-092027-a9057aef.json and the
-    anchor, macos-xcui-benchmark-20261126-154113-ea3610e8.json (a new app build resets the pool);
+    the pool is three records of app 3.2.0 build 32,
+    benchmarks/runs/ui-generation/macos-xcui-benchmark-20261126-092027-a9057aef.json,
+    macos-xcui-benchmark-20261126-154113-ea3610e8.json, and the anchor,
+    macos-xcui-benchmark-20261127-001032-9759f6b1.json (a new app build resets the pool);
     the generator's `--check` fails when a new canonical record changes the charts.
     RTF is the standard real-time factor: seconds of generation per second of audio, lower is
     faster, below 1.0 audio is produced quicker than it plays. This record was published after the
@@ -158,7 +159,7 @@ export const EngineeringDetail = () => (
         </dl>
       </div>
       <p className="perf-provenance">
-        Median of 2 records through <span className="perf-mono">ea3610e8</span> in{" "}
+        Median of 3 records through <span className="perf-mono">9759f6b1</span> in{" "}
         <a href="https://github.com/PowerBeef/Vocello/blob/main/benchmarks/HISTORY.md" target="_blank" rel="noreferrer">
           benchmarks/HISTORY.md
         </a>

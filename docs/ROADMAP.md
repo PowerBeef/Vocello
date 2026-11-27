@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 60/96 (62%) |
+| `release-first-3-0-2026-09` | active | release-qa | 61/96 (64%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 13/17 (76%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -39,7 +39,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 Every open item is tagged with what it needs; an untagged item is not shown here. An item that needs more than one appears under each, with the others named. Each item's plan and gate are in its plan's section below.
 
-### Mac, remotely (76)
+### Mac, remotely (75)
 
 Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes that run unattended once the Mac is handed over.
 
@@ -117,10 +117,9 @@ Doable on the Mac with nobody at the keyboard: tests and scripts here, and lanes
 - `RF-46` (planned) Core overhaul, stage 2a: the frame pipeline, identity-preserving
 - `RF-47` (planned) Core overhaul, stage 3: memory (also: iPhone)
 - `RF-52` (planned) Quality remediation, stage 2: clone conditioning parity (also: iPhone)
-- `RF-71` (in-flight) Ship Vocello and the vocello CLI 3.2 on the Mac (also: At the keyboard)
 - `UIF-08` (parked) Native acceptance of the iOS-derived screens on current source
 
-### At the keyboard (18)
+### At the keyboard (17)
 
 Needs the maintainer present: a permission prompt, a keychain or password, a release or account action only they may perform.
 
@@ -141,7 +140,6 @@ Needs the maintainer present: a permission prompt, a keychain or password, a rel
 - `RF-48` (planned) Core overhaul, stage 4: finalization, preview and the heat pause (also: iPhone)
 - `RF-62` (planned) Set initial Age Rating to 13+ and answer Nov 16 descriptors when filing 3.2.0
 - `RF-63` (planned) Fit the 3.2 App Review notes into 4,000 UTF-8 bytes
-- `RF-71` (in-flight) Ship Vocello and the vocello CLI 3.2 on the Mac (also: Mac, remotely)
 
 ### iPhone (61)
 
@@ -254,7 +252,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-63` | planned | Fit the 3.2 App Review notes into 4,000 UTF-8 bytes | `RF-73` |
 | `RF-65` | planned | Measure the shipped hybrid on an iPhone 15 Pro | — |
 | `RF-66` | planned | Record a demo video of the shipping flow on a physical iPhone | — |
-| `RF-71` | in-flight | Ship Vocello and the vocello CLI 3.2 on the Mac | `RF-69`, `RF-70`, `RF-72`, `RF-73` |
 
 ### Open items in detail
 
@@ -367,9 +364,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-66`** (planned) — Record a demo video of the shipping flow on a physical iPhone.
   gate: A screen recording from a signed candidate on a physical iPhone shows first launch, the download size prompt, the download, a take, the cloning consent screen and the export purchase, with no claim the status bar contradicts, and it is attached or linked for App Review.
-
-- **`RF-71`** (in-flight) — Ship Vocello and the vocello CLI 3.2 on the Mac.
-  gate: Vocello and the vocello CLI 3.2.0 are public on the Mac. Before the tag: MARKETING_VERSION 3.2.0 with a build number above the last release tag's; Mac benchmark, memory, language and UI-perf lanes recorded on the 3.2 engine (and reseeded baselines/lineage if RF-70 updates model artifacts or alters samples); docs/releases/v3.2.0.md passes check_release_notes.py; README charts, website copy/numbers and config/public-product-facts.json describe 3.2; push CI, release rehearsal, full macOS smoke and engine bench pass on the release commit. Then the maintainer's signed v3.2.0 tag builds a verified draft through release.yml; the macOS promotion lanes and signed CLI qualification pass on the tag checkout; the maintainer promotes the release and the website deploys with it.
 
 ## Specialist-audit remediation
 

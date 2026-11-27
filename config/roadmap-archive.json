@@ -6941,6 +6941,33 @@
         "benchmark:ios-xcui-benchmark-20261126-185008-141ece72",
         "benchmark:ios-memory-qualification-20261126-191012-6d5ced96"
       ]
+    },
+    {
+      "id": "RF-71",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Ship Vocello and the vocello CLI 3.2 on the Mac",
+      "status": "done",
+      "blockedBy": [
+        "RF-69",
+        "RF-70",
+        "RF-72",
+        "RF-73"
+      ],
+      "gate": "Vocello and the vocello CLI 3.2.0 are public on the Mac. Before the tag: MARKETING_VERSION 3.2.0 with a build number above the last release tag's; Mac benchmark, memory, language and UI-perf lanes recorded on the 3.2 engine (and reseeded baselines/lineage if RF-70 updates model artifacts or alters samples); docs/releases/v3.2.0.md passes check_release_notes.py; README charts, website copy/numbers and config/public-product-facts.json describe 3.2; push CI, release rehearsal, full macOS smoke and engine bench pass on the release commit. Then the maintainer's signed v3.2.0 tag builds a verified draft through release.yml; the macOS promotion lanes and signed CLI qualification pass on the tag checkout; the maintainer promotes the release and the website deploys with it.",
+      "sourceOfTruth": [
+        "docs/reference/macos-release-qa.md",
+        "docs/reference/quality-promotion.md",
+        "docs/reference/hybrid-model.md",
+        "project.yml",
+        "config/public-product-facts.json"
+      ],
+      "updated": "2026-11-26",
+      "notes": "2026-11-26: Vocello and vocello CLI 3.2.0 (build 32) shipped public from signed tag v3.2.0 at 33e65c15 (Release 45914974565 PASS; Promote 45933267704 PASS). All 7 exact-tag Mac promotion lanes at 33e65c15 passed (9759f6b1 29/29 max stall 212ms, ddd74c0d 12/12, 3eb709aa 2.23 GB, 611b9e40, 77299416, 0c1e793d 23/23, 141b516b 5/5), quality-promotion.json validated (963c57ff), and signed CLI cli_package.py qualify passed.",
+      "evidence": [
+        "commit:33e65c15",
+        "run:45914974565",
+        "run:45933267704"
+      ]
     }
   ]
 }

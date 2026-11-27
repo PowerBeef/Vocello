@@ -670,32 +670,6 @@
       "notes": "Opened 2026-11-16 from two external audits of the 3.1.0 tree, each claim re-checked against the code and Apple's current pages. No demo video exists (gap G5 of the 2026-11-04 audit). It pre-empts the most likely Guideline 2.1 round, a reviewer who cannot see the model download or the consent gate. The screenshots from the same build stay under ASR-05."
     },
     {
-      "id": "RF-71",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Ship Vocello and the vocello CLI 3.2 on the Mac",
-      "status": "in-flight",
-      "blockedBy": [
-        "RF-69",
-        "RF-70",
-        "RF-72",
-        "RF-73"
-      ],
-      "gate": "Vocello and the vocello CLI 3.2.0 are public on the Mac. Before the tag: MARKETING_VERSION 3.2.0 with a build number above the last release tag's; Mac benchmark, memory, language and UI-perf lanes recorded on the 3.2 engine (and reseeded baselines/lineage if RF-70 updates model artifacts or alters samples); docs/releases/v3.2.0.md passes check_release_notes.py; README charts, website copy/numbers and config/public-product-facts.json describe 3.2; push CI, release rehearsal, full macOS smoke and engine bench pass on the release commit. Then the maintainer's signed v3.2.0 tag builds a verified draft through release.yml; the macOS promotion lanes and signed CLI qualification pass on the tag checkout; the maintainer promotes the release and the website deploys with it.",
-      "sourceOfTruth": [
-        "docs/reference/macos-release-qa.md",
-        "docs/reference/quality-promotion.md",
-        "docs/reference/hybrid-model.md",
-        "project.yml",
-        "config/public-product-facts.json"
-      ],
-      "needs": [
-        "mac",
-        "keyboard"
-      ],
-      "updated": "2026-11-26",
-      "notes": "2026-11-26: Pre-tag 3.2.0 build 32 Mac/CLI qualification complete on local main (Xcode 27.2): gate fa2d5c2c, memory c3f4d2b1, lang-bench 51d3f1ff, delivery fc1f5bbc, live-preview playhead fix 072d1bd7, UI benchmark ea3610e8 (29/29, 0 refused, warm RTF 0.308), UI perf 3e754107 (12/12), UI smoke d223bac9 (16/16 with live-preview playhead assertions/screenshots), release-readiness-20261126-114535 (39/39 contracts, full Python, signed app, Core/Runtime tests, 0 crashes), and publication flip (v3.2.0.md, public-product-facts, 23 README SVGs, README, website 52/52 Playwright). Pending maintainer push -> CI -> signed v3.2.0 tag -> release.yml draft -> exact-tag 7-lane promotion + CLI qualify -> promote-release.yml."
-    },
-    {
       "id": "RF-16",
       "plan": "release-first-3-0-2026-09",
       "title": "Submit 3.2.0 for App Review on the maintainer's explicit go",

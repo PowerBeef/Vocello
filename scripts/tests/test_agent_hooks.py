@@ -154,10 +154,15 @@ AGENT_REFUSED = (
     "./scripts/release_tag.py", '"$(python3 scripts/select_python.py)" scripts/release_tag.py',
     "timeout 600 python3 scripts/release_tag.py", "cd scripts && python3 release_tag.py",
     "python3 -m release_tag", "python3 scripts/release_tag.py --help; python3 scripts/release_tag.py",
+    "python3 scripts/upload_promotion_manifest.py --tag v3.2.0",
+    "python3 scripts/upload_promotion_manifest.py --tag v3.2.0 --dry-run",
+    "./scripts/upload_promotion_manifest.py --tag v3.2.0",
+    "python3 -m upload_promotion_manifest",
 )
 AGENT_ALLOWED = (
     "git status --short", "git diff -- scripts/ui_test.sh", "scripts/dev.sh py scripts/tests/test_a.py",
     "scripts/dev.sh py scripts/tests/test_release_tag.py",
+    "scripts/dev.sh py scripts/tests/test_upload_promotion_manifest.py",
     "scripts/dev.sh lint", "scripts/dev.sh check --dry-run --json", "scripts/dev.sh status",
     "scripts/dev.sh triage build/artifacts/x --json", "scripts/dev.sh regen",
     "./scripts/regenerate_project.sh --fast", "python3 -m pytest scripts/tests/test_x.py -k foo",
@@ -168,6 +173,7 @@ AGENT_ALLOWED = (
     # Known false positives: the usage text the skills send agents to, and xcodebuild's reports.
     "scripts/ui_test.sh help", "scripts/ui_test.sh --help", "scripts/ui_test.sh -h", "scripts/macos_test.sh help",
     "python3 scripts/ios_candidate_tag.py --help", "python3 scripts/release_tag.py --help",
+    "python3 scripts/upload_promotion_manifest.py --help",
     "./scripts/macos_test.sh --help", "bash scripts/ios_device.sh -h", "scripts/ios_device.sh help 2>&1 | head -40",
     "scripts/dev.sh help", "scripts/dev.sh --help", "bash scripts/dev.sh check --dry-run --json",
     "scripts/dead_code_report.sh help", "./scripts/dead_code_report.sh --help",
@@ -715,10 +721,13 @@ class AntigravityPolicyTests(unittest.TestCase):
         self.assertEqual(self.cmd("python3 scripts/ios_candidate_tag.py"), "force_ask")
         self.assertEqual(self.cmd("python3 scripts/release_tag.py"), "force_ask")
         self.assertEqual(self.cmd("python3 scripts/release_tag.py --replace-unpublished"), "force_ask")
+        self.assertEqual(self.cmd("python3 scripts/upload_promotion_manifest.py --tag v3.2.0"), "force_ask")
         for allowed in ("python3 scripts/ios_candidate_tag.py --dry-run", "python3 scripts/ios_candidate_tag.py --help",
                         "python3 scripts/release_tag.py --dry-run",
                         "python3 scripts/release_tag.py --dry-run --replace-unpublished",
                         "python3 scripts/release_tag.py --help",
+                        "python3 scripts/upload_promotion_manifest.py --tag v3.2.0 --dry-run",
+                        "python3 scripts/upload_promotion_manifest.py --help",
                         "scripts/dev.sh check", "git status --short", "git stash list"):
             with self.subTest(allowed=allowed):
                 self.assertEqual(self.cmd(allowed), "allow")

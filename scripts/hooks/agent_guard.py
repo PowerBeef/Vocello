@@ -94,12 +94,15 @@ def _xcodebuild_reports_only(args: list[str]) -> bool:
     return reports
 
 
-# The release/candidate tag scripts sign and push a release tag. Wrappers such as `timeout 600` or
-# `cd scripts &&` hide them from the word parser below, so any text naming either is refused unless
-# it is exactly the usage text. `(?<![A-Za-z0-9_])` excludes unit tests such as `test_release_tag.py`.
-TAG_SCRIPT = re.compile(r"(?:ios_candidate_tag|(?<![A-Za-z0-9_])release_tag)")
+# The release/candidate tag and draft-promotion upload scripts mutate remote release state. Wrappers
+# such as `timeout 600` or `cd scripts &&` hide them from the word parser below, so any text naming
+# them is refused unless it is exactly the usage text. `(?<![A-Za-z0-9_])` excludes unit tests such
+# as `test_release_tag.py` and `test_upload_promotion_manifest.py`.
+TAG_SCRIPT = re.compile(
+    r"(?:ios_candidate_tag|(?<![A-Za-z0-9_])release_tag|(?<![A-Za-z0-9_])upload_promotion_manifest)"
+)
 TAG_SCRIPT_HELP = re.compile(
-    r"\s*python3 (?:\./)?scripts/(?:ios_candidate_tag|release_tag)\.py (?:--help|-h)\s*"
+    r"\s*python3 (?:\./)?scripts/(?:ios_candidate_tag|release_tag|upload_promotion_manifest)\.py (?:--help|-h)\s*"
 )
 
 
@@ -108,7 +111,7 @@ def command_violation(command: str, depth: int = 0) -> str:
     if depth > 3:
         return ""
     if depth == 0 and TAG_SCRIPT.search(command) and not TAG_SCRIPT_HELP.fullmatch(command):
-        return "`scripts/release_tag.py` and `scripts/ios_candidate_tag.py` sign and push release tags; agents never tag or push"
+        return "`scripts/release_tag.py`, `scripts/ios_candidate_tag.py`, and `scripts/upload_promotion_manifest.py` mutate remote release state; agents never tag or push"
     stripped, bodies = adapter.shell_fed_bodies(command)
     for body in bodies:
         reason = command_violation(body, depth + 1)

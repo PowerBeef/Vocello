@@ -522,16 +522,28 @@ permission prompts, calls and VoiceOver stay the maintainer's.
 
 ## 6. Submit & in-review discipline
 
-1. **2026 App Store Connect submission sequence:** ensure Paid Apps (`RF-02`), Age Rating (`RF-62`),
-   Privacy Policy URL, `ASR-05` screenshots, `RF-66` **App Review Information → Attachment** video,
-   and `Design & Clone Export` review screenshot are complete. Select **Manual Release** (`Pending
+1. **2026 App Store Connect submission sequence:** ensure Paid Apps (`RF-02`), Age Rating (`RF-62` —
+   re-open and save Apple's Nov 16 descriptors first, because incomplete age-rating fields can
+   silently block submission with `422 ENTITY_UNPROCESSABLE`), Privacy Policy URL, `ASR-05`
+   real-device screenshots (genuine `3.2.0` UI captures only, zero stylized fake UI or celebrity
+   voice hints under `2.3.3` / `1.2`), `RF-66` **App Review Information → Attachment** video, and
+   `Design & Clone Export` review screenshot are complete. Select **Manual Release** (`Pending
    Developer Release`), attach the processed 3.2.0 build, click **Add for Review** on version 3.2.0,
    add the `Design & Clone Export` IAP into that **same draft submission**, and click **Submit to
-   App Review** together.
-2. **While in review:**
+   App Review** together — **never submit the first IAP standalone**, and prefer US Pacific daytime
+   submission hours (submit one app at a time).
+2. **Account & signing hygiene (`3.2(f)`):**
+   - Never sign in to the Apple Developer account on shared rented cloud Macs (hardware
+     fingerprinting can associate the account with previously banned tenants); keep interactive
+     signing on the maintainer's own Mac and CI archive signing on isolated GitHub Actions runners
+     via App Store Connect API keys.
+   - Never ad-hoc sign or sideload IPAs for friends' devices outside official TestFlight.
+3. **While in review:**
    - **Never pull or cancel a build mid-review** for a minor polish; pulling resets queue position.
    - **Reply in Resolution Center before uploading a new binary** whenever Apple asks a question or
      clarification; a reply keeps your place while a new build restarts the queue.
+   - **Use formal App Review Appeals** (with archived evidence) rather than blind duplicate
+     resubmissions if a reviewer repeatedly ignores Review Notes.
    - **Never leave a rejected submission thread abandoned**; resolve cleanly or withdraw formally.
    - **Archive dated screenshots** of every submission, rejection notice, Resolution Center reply,
      and notes from any App Review phone call in the maintainer's private (off-Git) record.

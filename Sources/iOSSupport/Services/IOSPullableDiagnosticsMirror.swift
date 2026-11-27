@@ -1,6 +1,8 @@
 import Foundation
+#if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
 import OSLog
 import QwenVoiceCore
+#endif
 
 /// Copies App-Group `diagnostics/<layer>/generations.jsonl` into the app's own
 /// container at `Library/Caches/Vocello/diagnostics/<layer>/generations.jsonl`.
@@ -8,7 +10,40 @@ import QwenVoiceCore
 /// devicectl can pull appDataContainer but NOT the App Group, so on-device
 /// bench/gate lanes read telemetry from the Caches mirror (see
 /// `scripts/ios_device.sh pull` and `IOSDeviceDiagnosticsRunner`).
+/// Shipping iOS distribution builds omit internal and device diagnostics
+/// (`Guideline 2.5.19`) and compile out the mirror implementation.
 enum IOSPullableDiagnosticsMirror {
+    #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+    static var pullableRoot: URL? { nil }
+
+    static func syncEngineTelemetryIfEnabled() {}
+
+    static func syncGenerationTelemetryIfEnabled(generationID: UUID, publishedAudioURL: URL? = nil) {
+        _ = (generationID, publishedAudioURL)
+    }
+
+    static func captureAuditOutput(
+        from source: URL, generationID: UUID, environment: [String: String],
+        telemetryEnabled: Bool, pullableRoot: URL
+    ) throws -> URL? {
+        _ = (source, generationID, environment, telemetryEnabled, pullableRoot)
+        return nil
+    }
+
+    enum AuditCaptureError: Error { case outOfBounds, identityCollision }
+
+    static func syncGenerationTelemetry(
+        generationID: String,
+        from sourceRoot: URL,
+        into pullableRoot: URL
+    ) {
+        _ = (generationID, sourceRoot, pullableRoot)
+    }
+
+    static func syncEngineTelemetry(from sourceRoot: URL, into pullableRoot: URL) {
+        _ = (sourceRoot, pullableRoot)
+    }
+    #else
     private static let logger = Logger(
         subsystem: "com.patricedery.vocello",
         category: "pullable-diagnostics-mirror"
@@ -238,5 +273,6 @@ enum IOSPullableDiagnosticsMirror {
             logger.error("could not export startup evidence: \(summary, privacy: .public)")
         }
     }
+    #endif
 
 }

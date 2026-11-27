@@ -91,7 +91,9 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
     private let backend: AnyTTSEngineBackend
     private let memoryBudgetPolicy: IOSMemoryBudgetPolicy
     private let memorySnapshotProvider: @Sendable () -> IOSMemorySnapshot
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
     private let diagnosticsRecorder: IOSDeviceDiagnosticsRecorder?
+    #endif
     private(set) var latestMemoryContext: IOSMemoryContext
     private var changeObserver: AnyCancellable?
     /// Single authority for generation admission, completion, the post-cancellation release and
@@ -106,7 +108,9 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
     private var activeGenerationMemoryGuardTask: Task<Void, Never>?
     private var activeGenerationPeakMemoryContext: IOSMemoryContext?
     private var lastLoggedMemoryBand: IOSMemoryPressureBand?
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
     private var debugForceCriticalOnceArmed = false
+    #endif
     /// Sustained-load thermal policy (roadmap P3): serious/critical thermal state
     /// gates PROACTIVE warm work (prewarm, clone priming) so the device can cool
     /// between takes. A take itself is never thermally blocked here. A
@@ -128,11 +132,14 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
         self.backend = backend
         self.memoryBudgetPolicy = memoryBudgetPolicy
         self.memorySnapshotProvider = memorySnapshotProvider
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
         self.diagnosticsRecorder = IOSDeviceDiagnosticsRecorder.makeIfEnabled()
-        // Runtime test knob (off unless QVOICE_IOS_MEMORY_GUARD_FORCE_CRITICAL_ONCE is set),
-        // now available on the Release device build too (project rule: debug capabilities are
-        // runtime-gated, not compiled out) so the memory guard can be exercised on hardware.
+        #endif
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
+        // Runtime test knob (off unless QVOICE_IOS_MEMORY_GUARD_FORCE_CRITICAL_ONCE is set).
+        // Compiled out of shipping iOS builds (Guideline 2.5.19).
         self.debugForceCriticalOnceArmed = Self.debugForceCriticalOnceEnabled()
+        #endif
         let initialAppSnapshot = memorySnapshotProvider()
         self.latestMemoryContext = memoryBudgetPolicy.context(
             appSnapshot: initialAppSnapshot,
@@ -179,16 +186,19 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
                 let previous = self.latestThermalState
                 self.latestThermalState = state
                 guard state != previous else { return }
+                #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
                 self.diagnosticsRecorder?.recordAction(
                     event: "thermal_state_changed",
                     reason: Self.thermalLabel(state),
                     context: self.latestMemoryContext,
                     message: "thermal \(Self.thermalLabel(previous)) → \(Self.thermalLabel(state))"
                 )
+                #endif
             }
         }
     }
 
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
     private static func thermalLabel(_ state: ProcessInfo.ThermalState) -> String {
         switch state {
         case .nominal: return "nominal"
@@ -198,6 +208,7 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
         @unknown default: return "unknown"
         }
     }
+    #endif
 
     private var thermalAllowsProactiveWarm: Bool {
         #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
@@ -291,11 +302,13 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
 
     func unloadModel() async throws {
         try await backend.unloadModel()
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
         diagnosticsRecorder?.recordAction(
             event: "unload_model",
             reason: "explicit_unload",
             context: latestMemoryContext
         )
+        #endif
         syncFromBackend()
         notifyMemoryContextDidChange()
     }
@@ -365,11 +378,13 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
     /// prebuild in flight.
     func setForegroundActive(_ active: Bool) async {
         guard updateForegroundPermit(active), !active else { return }
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
         diagnosticsRecorder?.recordAction(
             event: "proactive_work_cancelled",
             reason: "not_foreground",
             context: latestMemoryContext
         )
+        #endif
         await cancelProactiveModelWork()
     }
 
@@ -405,6 +420,7 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
 
     func cancelActiveGeneration(reason: GenerationCancellationReason = .user) async throws {
         try await backend.cancelActiveGeneration(reason: reason)
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
         // Run-scoped device diagnostics only (inert otherwise): the typed
         // reason once the barrier has returned, which the foreground-exit
         // proof reads back.
@@ -413,6 +429,7 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
             reason: reason.rawValue,
             context: nil
         )
+        #endif
         // The backend call is the terminal barrier. Keep ownership intact if
         // it throws so no observer can mistake a cancellation request for
         // proven compute termination and begin trimming live MLX state.
@@ -508,12 +525,14 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
         let postGenerationContext = await refreshMemoryContext(reason: "post_generation", source: "store")
         let postGenerationBand = postGenerationContext.pressureBand
         if let trimLevel = memoryBudgetPolicy.postGenerationTrimLevel(for: postGenerationBand) {
+            #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
             diagnosticsRecorder?.recordAction(
                 event: "post_generation_trim",
                 reason: "post_generation_\(postGenerationBand.rawValue)",
                 context: postGenerationContext,
                 trimLevel: trimLevel
             )
+            #endif
             await backend.trimMemory(
                 level: trimLevel,
                 reason: "post_generation_\(postGenerationBand.rawValue)"
@@ -647,6 +666,7 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
         latestMemoryContext
     }
 
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
     /// Gated diagnostic snapshot for the startup reliability runner. The
     /// returned value contains only bounded state and memory scalars.
     func startupReliabilityQuiescenceSample(
@@ -689,6 +709,7 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
         syncFromBackend()
         return result
     }
+    #endif
 
     @discardableResult
     func refreshMemoryContext(reason: String, source: String = "store") async -> IOSMemoryContext {
@@ -729,23 +750,27 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
 
     func trimMemory(level: NativeMemoryTrimLevel, reason: String) async {
         await backend.trimMemory(level: level, reason: reason)
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
         diagnosticsRecorder?.recordAction(
             event: "trim_memory",
             reason: reason,
             context: latestMemoryContext,
             trimLevel: level
         )
+        #endif
         syncFromBackend()
         notifyMemoryContextDidChange()
     }
 
     func recordApplicationMemoryWarning(reason: String) async {
         await backend.recordApplicationMemoryWarning(reason: reason)
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
         diagnosticsRecorder?.recordAction(
             event: "application_memory_warning",
             reason: reason,
             context: latestMemoryContext
         )
+        #endif
     }
 
     private func notifyMemoryContextDidChange() {
@@ -858,13 +883,17 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
 
     private func guardModelAdmission(shouldSurfaceError: Bool, reason: String) async throws {
         let context = await refreshMemoryContext(reason: reason, source: "admission")
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
         diagnosticsRecorder?.recordMemoryContext(context, event: "model_admission_observed")
+        #endif
         guard memoryBudgetPolicy.allowsModelAdmission(for: context) else {
+            #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
             diagnosticsRecorder?.recordAction(
                 event: "model_admission_blocked",
                 reason: reason,
                 context: context
             )
+            #endif
             let message = memoryBudgetPolicy.modelAdmissionBlockMessage(
                 for: context,
                 perProcessAdmissionBand: context.pressureBand,
@@ -877,11 +906,13 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
     private func allowsProactiveWarmOperations(reason: String) async -> Bool {
         // BG-01: no proactive GPU work unless the scene is active.
         guard isForegroundActive else {
+            #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
             diagnosticsRecorder?.recordAction(
                 event: "proactive_warm_blocked",
                 reason: "\(reason)_not_foreground",
                 context: latestMemoryContext
             )
+            #endif
             return false
         }
         // Proactive warm + clone-reference priming are otherwise gated by the live memory band
@@ -905,22 +936,26 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
         // Sustained-load thermal gate (roadmap P3): don't add prewarm/priming heat
         // when the device is already serious/critical — generation still runs.
         if !thermalAllowsProactiveWarm {
+            #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
             diagnosticsRecorder?.recordAction(
                 event: "proactive_warm_blocked",
                 reason: "\(reason)_thermal_\(Self.thermalLabel(latestThermalState))",
                 context: latestMemoryContext,
                 message: "Proactive warm blocked by thermal state \(Self.thermalLabel(latestThermalState))."
             )
+            #endif
             return false
         }
         let context = await refreshMemoryContext(reason: reason, source: "warm_gate")
         let allowed = memoryBudgetPolicy.allowsProactiveWarmOperations(for: context.pressureBand)
         if !allowed {
+            #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
             diagnosticsRecorder?.recordAction(
                 event: "proactive_warm_blocked",
                 reason: reason,
                 context: context
             )
+            #endif
         }
         return allowed
     }
@@ -937,6 +972,7 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
             isForegroundActive && memoryBudgetPolicy.allowsProactiveWarmOperations(for: band)
         )
         recordActiveGenerationPeakIfNeeded(context)
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
         diagnosticsRecorder?.recordMemoryContext(context, event: "memory_context")
         if previousBand != band {
             diagnosticsRecorder?.recordMemoryContext(
@@ -945,6 +981,9 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
                 previousBand: previousBand
             )
         }
+        #else
+        _ = previousBand
+        #endif
         logMemoryContextTransitionIfNeeded(context)
         if notify {
             notifyMemoryContextDidChange()
@@ -998,11 +1037,13 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
         Self.memoryLogger.fault(
             "Critical iOS memory context during \(context.reason, privacy: .public); aggregate=\(context.aggregatePressureBand.rawValue, privacy: .public), worst=\(context.worstProcessRole?.rawValue ?? "unknown", privacy: .public), headroomMB=\(context.minimumHeadroomBytes.map(Self.megabytesString) ?? "unknown", privacy: .public), combinedFootprintMB=\(context.combinedPhysFootprintBytes.map(Self.megabytesString) ?? "unknown", privacy: .public)"
         )
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
         diagnosticsRecorder?.recordAction(
             event: "critical_memory_action",
             reason: context.reason,
             context: context
         )
+        #endif
 
         if !requiresCancellation {
             await applyCriticalFullUnload(context)
@@ -1010,20 +1051,26 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
             return .completed
         }
 
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
         var cancellationFailureMessage: String?
+        #endif
         let outcome = await CriticalMemoryReliefExecutor.execute(
             cancel: { reason in
                 do {
                     try await self.backend.cancelActiveGeneration(reason: reason)
                 } catch {
+                    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
                     cancellationFailureMessage = DiagnosticPrivacy.summary(of: error).description
+                    #endif
                     throw error
                 }
+                #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
                 self.diagnosticsRecorder?.recordAction(
                     event: "critical_generation_cancel",
                     reason: GenerationCancellationReason.memoryPressure.rawValue,
                     context: context
                 )
+                #endif
             },
             applyRelief: {
                 await self.applyCriticalFullUnload(context)
@@ -1035,12 +1082,14 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
 
         if outcome == .cancellationFailed {
             backend.setVisibleError(nil)
+            #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
             diagnosticsRecorder?.recordAction(
                 event: "critical_generation_cancel_failed",
                 reason: context.reason,
                 context: context,
                 message: cancellationFailureMessage
             )
+            #endif
             // Never race a full unload against compute whose termination could
             // not be proven. Leave generation ownership intact, but release
             // the action claim so the still-running guard can retry later.
@@ -1061,6 +1110,7 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
                 )
             },
             recordUnloadCompleted: {
+                #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
                 // This event is a completion boundary: it is written only after the
                 // awaited full unload returns.
                 diagnosticsRecorder?.recordAction(
@@ -1069,6 +1119,9 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
                     context: context,
                     trimLevel: .fullUnload
                 )
+                #else
+                _ = context
+                #endif
             },
             clearGenerationActivity: { backend.clearGenerationActivity() }
         )
@@ -1096,9 +1149,11 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
     private func shouldEnforceCriticalMemoryContext(_ context: IOSMemoryContext) -> Bool {
         // Critical pressure during an active generation cancels the generation and fully
         // unloads the model. The env-forced test path is retained for diagnostics.
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
         if context.reason.contains("debug_force_critical_once") {
             return true
         }
+        #endif
         return context.pressureBand == .critical
     }
 
@@ -1132,7 +1187,9 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
 
     private func logActiveGenerationPeakMemoryContext() {
         guard let context = activeGenerationPeakMemoryContext else { return }
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
         diagnosticsRecorder?.recordMemoryContext(context, event: "active_generation_peak")
+        #endif
         Self.memoryLogger.notice(
             "iOS generation peak memory \(context.pressureBand.rawValue, privacy: .public); aggregate=\(context.aggregatePressureBand.rawValue, privacy: .public), worst=\(context.worstProcessRole?.rawValue ?? "unknown", privacy: .public), appFootprintMB=\(context.appSnapshot.physFootprintBytes.map(Self.megabytesString) ?? "unknown", privacy: .public), combinedFootprintMB=\(context.combinedPhysFootprintBytes.map(Self.megabytesString) ?? "unknown", privacy: .public), minHeadroomMB=\(context.minimumHeadroomBytes.map(Self.megabytesString) ?? "unknown", privacy: .public)"
         )
@@ -1141,6 +1198,9 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
     // Env-forced memory-band test knobs (below). Compiled out of shipping iOS builds unless
     // VOCELLO_INTERNAL_DIAGNOSTICS is set, and runtime-gated behind QWENVOICE_DEBUG=1.
     private func contextApplyingDebugForcedBand(_ context: IOSMemoryContext) -> IOSMemoryContext {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        return context
+        #else
         guard let forcedBand = Self.debugForcedMemoryBand(),
               forcedBand.severityRank > context.pressureBand.severityRank else {
             return context
@@ -1150,9 +1210,13 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
             overridingBand: forcedBand,
             reason: "\(context.reason)_debug_force_\(forcedBand.rawValue)"
         )
+        #endif
     }
 
     private func contextApplyingDebugCriticalOnceIfNeeded(_ context: IOSMemoryContext) -> IOSMemoryContext {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
+        return context
+        #else
         guard debugForceCriticalOnceArmed else { return context }
         debugForceCriticalOnceArmed = false
         let forcedContext = Self.context(
@@ -1167,8 +1231,10 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
             context: forcedContext
         )
         return forcedContext
+        #endif
     }
 
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS)
     private static func context(
         _ context: IOSMemoryContext,
         overridingBand band: IOSMemoryPressureBand,
@@ -1190,10 +1256,6 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
     private static func debugForcedMemoryBand(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> IOSMemoryPressureBand? {
-        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
-        _ = environment
-        return nil
-        #else
         switch RuntimeDebugGate.value(
             for: "QVOICE_IOS_MEMORY_GUARD_FORCE_BAND",
             environment: environment
@@ -1205,16 +1267,11 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
         default:
             return nil
         }
-        #endif
     }
 
     private static func debugForceCriticalOnceEnabled(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> Bool {
-        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS
-        _ = environment
-        return false
-        #else
         switch RuntimeDebugGate.value(
             for: "QVOICE_IOS_MEMORY_GUARD_FORCE_CRITICAL_ONCE",
             environment: environment
@@ -1226,8 +1283,8 @@ final class TTSEngineStore: nonisolated ObservableObject, TTSEngine {
         default:
             return false
         }
-        #endif
     }
+    #endif
 
     private static func megabytesString(_ bytes: UInt64) -> String {
         unsafe String(format: "%.1f", Double(bytes) / 1_048_576)

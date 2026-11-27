@@ -1,3 +1,4 @@
+#if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
 import CryptoKit
 import Foundation
 
@@ -176,3 +177,4 @@ public enum IOSStartupReliabilityPlanError: LocalizedError, Equatable, Sendable 
         }
     }
 }
+#endif

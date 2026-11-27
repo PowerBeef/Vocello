@@ -245,6 +245,7 @@ public struct StartupReliabilityRuntimeOwnershipSnapshot: Hashable, Codable, Sen
     }
 }
 
+#if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
 /// Diagnostics-only runtime ownership probe. It exposes only booleans and does
 /// not grant access to the operation, reservation, model, or MLX state.
 @MainActor
@@ -264,6 +265,7 @@ public protocol StartupReliabilityCodecReplaying: AnyObject {
         incrementalRanges: [StartupReliabilityCodecFrameRange]
     ) async throws -> StartupReliabilityCodecReplayResult
 }
+#endif
 
 @MainActor
 public protocol TTSEngineRuntimeControlling: TTSEngine {

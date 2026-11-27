@@ -42,7 +42,13 @@ PROHIBITED_RELEASE_STRING_PATTERNS = (
     re.compile(r"QVOICE_"),
     re.compile(r"QWENVOICE_"),
     re.compile(r"IOSDeviceDiagnosticsRunner"),
+    re.compile(r"IOSDeviceDiagnosticsRecorder"),
     re.compile(r"IOSStartupReliabilityRunner"),
+    re.compile(r"IOSStartupReliabilityPlan"),
+    re.compile(r"debug_force_critical_once"),
+    re.compile(r"pullable-diagnostics-mirror"),
+    re.compile(r"vocello-bench-current-take"),
+    re.compile(r"vocello-ui-bench-seed"),
 )
 # dlopen loads code at run time, which an App Store app may not do with code it
 # did not ship. dlsym and dladdr only look up symbols in images already loaded:

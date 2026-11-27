@@ -214,12 +214,17 @@ public enum StartupReliabilityDiagnosticEvidence {
         runID: String,
         generationID: UUID
     ) throws -> URL {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        _ = (appSupportDirectory, runID, generationID)
+        throw EvidenceError.invalidIdentity
+        #else
         guard isSafeIdentifier(runID) else { throw EvidenceError.invalidIdentity }
         return appSupportDirectory
             .appendingPathComponent("diagnostics", isDirectory: true)
             .appendingPathComponent("startup-reliability-evidence", isDirectory: true)
             .appendingPathComponent(runID, isDirectory: true)
             .appendingPathComponent(generationID.uuidString, isDirectory: true)
+        #endif
     }
 
     public static func persistRejectedAudio(
@@ -229,6 +234,10 @@ public enum StartupReliabilityDiagnosticEvidence {
         generationID: UUID,
         durationSeconds: Double
     ) throws -> StartupReliabilityArtifactEvidence {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        _ = (stagedURL, appSupportDirectory, runID, generationID, durationSeconds)
+        throw EvidenceError.invalidIdentity
+        #else
         let directory = try evidenceDirectory(
             appSupportDirectory: appSupportDirectory,
             runID: runID,
@@ -244,6 +253,7 @@ public enum StartupReliabilityDiagnosticEvidence {
             byteCount: data.count,
             durationSeconds: durationSeconds
         )
+        #endif
     }
 
     public static func persistCodecTrace(
@@ -253,6 +263,10 @@ public enum StartupReliabilityDiagnosticEvidence {
         runID: String,
         generationID: UUID
     ) throws -> StartupReliabilityArtifactEvidence {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        _ = (trace, codecChunkRanges, appSupportDirectory, runID, generationID)
+        throw EvidenceError.invalidIdentity
+        #else
         guard trace.frames.count <= maximumCodecFrames,
               trace.frames.allSatisfy({ !$0.isEmpty && $0.count <= 64 }) else {
             throw EvidenceError.traceOutOfBounds
@@ -286,6 +300,7 @@ public enum StartupReliabilityDiagnosticEvidence {
             codecChunkRanges: codecChunkRanges,
             complete: trace.isComplete
         )
+        #endif
     }
 
     public static func loadCodecTrace(
@@ -293,12 +308,17 @@ public enum StartupReliabilityDiagnosticEvidence {
         runID: String,
         generationID: UUID
     ) throws -> VocelloQwen3CodecTrace {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        _ = (appSupportDirectory, runID, generationID)
+        throw EvidenceError.invalidIdentity
+        #else
         let directory = try evidenceDirectory(
             appSupportDirectory: appSupportDirectory,
             runID: runID,
             generationID: generationID
         )
         return try decode(Data(contentsOf: directory.appendingPathComponent("codec-trace-v1.bin")))
+        #endif
     }
 
     /// Authenticate a collected trace against its original take before replaying
@@ -338,6 +358,10 @@ public enum StartupReliabilityDiagnosticEvidence {
         generationID: UUID,
         expectedPauseCount: Int
     ) throws -> (StartupReliabilityArtifactEvidence, AudioQCReport) {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        _ = (samples, sampleRate, kind, appSupportDirectory, runID, generationID, expectedPauseCount)
+        throw EvidenceError.invalidIdentity
+        #else
         guard kind == .incrementalReplayAudio || kind == .fullReplayAudio,
               !samples.isEmpty, sampleRate > 0 else {
             throw EvidenceError.invalidReplay
@@ -374,6 +398,7 @@ public enum StartupReliabilityDiagnosticEvidence {
             ),
             report
         )
+        #endif
     }
 
     public static func encode(_ trace: VocelloQwen3CodecTrace) -> Data {
@@ -447,12 +472,17 @@ public enum StartupReliabilityDiagnosticEvidence {
         appSupportDirectory: URL,
         runID: String
     ) throws {
+        #if os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS
+        _ = (appSupportDirectory, runID)
+        throw EvidenceError.invalidIdentity
+        #else
         guard isSafeIdentifier(runID) else { throw EvidenceError.invalidIdentity }
         let url = appSupportDirectory
             .appendingPathComponent("diagnostics", isDirectory: true)
             .appendingPathComponent("startup-reliability-evidence", isDirectory: true)
             .appendingPathComponent(runID, isDirectory: true)
         try? FileManager.default.removeItem(at: url)
+        #endif
     }
 
     private static func append<T: FixedWidthInteger>(_ value: T, to data: inout Data) {
@@ -464,12 +494,14 @@ public enum StartupReliabilityDiagnosticEvidence {
         SHA256.hash(data: data).map { unsafe String(format: "%02x", $0) }.joined()
     }
 
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
     private static func isSafeIdentifier(_ value: String) -> Bool {
         value != "." && value != ".."
             && (1...96).contains(value.count) && value.unicodeScalars.allSatisfy {
             CharacterSet.alphanumerics.contains($0) || $0 == "." || $0 == "_" || $0 == "-"
         }
     }
+    #endif
 
     public enum EvidenceError: Error, Equatable {
         case invalidIdentity

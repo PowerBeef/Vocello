@@ -108,7 +108,7 @@ enum SavedVoiceStoreFailureCategory: String, Equatable, Sendable {
 }
 
 @MainActor
-public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReporting, nonisolated TTSEngineEventStreaming, ActiveGenerationCancellable, StartupReliabilityCodecReplaying, StartupReliabilityRuntimeOwnershipReporting {
+public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReporting, nonisolated TTSEngineEventStreaming, ActiveGenerationCancellable {
     private static let lightweightWarmupText = "Hi."
     public static var lightweightWarmupTextForUI: String { lightweightWarmupText }
 
@@ -616,8 +616,10 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         case proactiveLoad
         case proactivePrewarm
         case clonePriming
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
         case diagnosticCodecReplay
         case diagnosticCodecRoundTrip
+        #endif
         /// A saved voice's files are being removed; no prime or prebuild of it
         /// may run meanwhile (U26).
         case savedVoiceDeletion
@@ -627,8 +629,12 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             case .generation:
                 return true
             case .explicitLoad, .explicitUnload, .proactiveLoad, .proactivePrewarm, .clonePriming,
-                 .diagnosticCodecReplay, .diagnosticCodecRoundTrip, .savedVoiceDeletion:
+                 .savedVoiceDeletion:
                 return false
+            #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
+            case .diagnosticCodecReplay, .diagnosticCodecRoundTrip:
+                return false
+            #endif
             }
         }
     }
@@ -1471,6 +1477,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
         }
     }
 
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
     public func replayStartupReliabilityCodecTrace(
         request: GenerationRequest,
         frames: [[Int32]],
@@ -1544,6 +1551,7 @@ public final class MLXTTSEngine: TTSEngineRuntimeControlling, NativeMemoryReport
             generationReservationInFlight: await activeGenerationCoordinator.hasActiveGeneration
         )
     }
+    #endif
 
     private func performGenerate(
         _ request: GenerationRequest,
@@ -3000,3 +3008,7 @@ final class ProactiveTaskChain {
         await tail?.value
     }
 }
+
+#if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
+extension MLXTTSEngine: StartupReliabilityCodecReplaying, StartupReliabilityRuntimeOwnershipReporting {}
+#endif

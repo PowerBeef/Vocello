@@ -417,7 +417,13 @@ class IOSReleaseArtifactVerificationTests(unittest.TestCase):
             "QWENVOICE_UIPERF_FRAME_PROBE",
             "QVOICE_IOS_FORCE_STARTUP_FAILURE_ONCE",
             "IOSDeviceDiagnosticsRunner",
+            "IOSDeviceDiagnosticsRecorder",
             "IOSStartupReliabilityRunner",
+            "IOSStartupReliabilityPlan",
+            "debug_force_critical_once",
+            "pullable-diagnostics-mirror",
+            "vocello-bench-current-take",
+            "vocello-ui-bench-seed",
         ]:
             with self.assertRaisesRegex(module.VerificationError, "prohibited release"):
                 module._validate_release_strings(leaked, "export")

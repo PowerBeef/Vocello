@@ -40,6 +40,7 @@ public final class AnyTTSEngineBackend {
     private let cancelProactiveModelWorkBlock: @concurrent () async -> Void
     private let cancelActiveGenerationBlock: @concurrent (GenerationCancellationReason) async throws -> Void
     private let generateBlock: @concurrent (GenerationRequest) async throws -> GenerationResult
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
     private let replayStartupReliabilityCodecTraceBlock: @concurrent (
         GenerationRequest,
         [[Int32]],
@@ -47,6 +48,7 @@ public final class AnyTTSEngineBackend {
     ) async throws -> StartupReliabilityCodecReplayResult
     private let startupReliabilityRuntimeOwnershipSnapshotBlock:
         @concurrent () async -> StartupReliabilityRuntimeOwnershipSnapshot
+    #endif
     private let listPreparedVoicesBlock: @concurrent () async throws -> [PreparedVoice]
     private let preparePreparedVoiceCandidateBlock: @concurrent (
         String,
@@ -144,6 +146,7 @@ public final class AnyTTSEngineBackend {
             }
         }
         self.generateBlock = { try await engine.generate($0) }
+        #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
         if let engine = engine as? any StartupReliabilityCodecReplaying {
             self.replayStartupReliabilityCodecTraceBlock = { request, frames, ranges in
                 try await engine.replayStartupReliabilityCodecTrace(
@@ -171,6 +174,7 @@ public final class AnyTTSEngineBackend {
                 )
             }
         }
+        #endif
         self.listPreparedVoicesBlock = { try await engine.listPreparedVoices() }
         self.preparePreparedVoiceCandidateBlock = {
             try await engine.preparePreparedVoiceCandidate(
@@ -295,6 +299,7 @@ public final class AnyTTSEngineBackend {
         try admitVoiceCloning(for: request)
         return try await generateBlock(request)
     }
+    #if !(os(iOS) && !VOCELLO_INTERNAL_DIAGNOSTICS && !QVOICE_DEVICE_DIAGNOSTICS)
     public func replayStartupReliabilityCodecTrace(
         request: GenerationRequest,
         frames: [[Int32]],
@@ -306,6 +311,7 @@ public final class AnyTTSEngineBackend {
         async -> StartupReliabilityRuntimeOwnershipSnapshot {
         await startupReliabilityRuntimeOwnershipSnapshotBlock()
     }
+    #endif
     public func listPreparedVoices() async throws -> [PreparedVoice] { try await listPreparedVoicesBlock() }
     public func preparePreparedVoiceCandidate(
         name: String,

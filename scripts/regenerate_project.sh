@@ -29,11 +29,48 @@ vocello_use_selected_python "$PROJECT_DIR"
 GENERATION_CACHE_DIR="$QVOICE_XCODE_SOURCE_PACKAGES/.qwenvoice-cache"
 GENERATION_STAMP="$GENERATION_CACHE_DIR/project-generation.sha256"
 
+if [[ -n "${HOME:-}" && -x "$HOME/.qwenvoice-pinned-tools/bin/xcodegen" ]]; then
+    export PATH="$HOME/.qwenvoice-pinned-tools/bin:$PATH"
+fi
+
 if ! command -v xcodegen >/dev/null 2>&1; then
     echo "error: xcodegen is required to regenerate the project." >&2
     echo "Install the pinned version with ./scripts/install_pinned_tools.sh and put" >&2
     echo "\$HOME/.qwenvoice-pinned-tools/bin on PATH (docs/reference/development-workflow.md, New Mac setup)." >&2
     exit 1
+fi
+
+if [[ -f "$PROJECT_DIR/config/toolchain.json" ]]; then
+    xcodegen_path="$(command -v xcodegen)"
+    xcodegen_observed="$(xcodegen --version 2>&1 || true)"
+    if ! python3 - "$PROJECT_DIR/config/toolchain.json" "$xcodegen_observed" "$xcodegen_path" <<'PY'
+import json
+from pathlib import Path
+import re
+import sys
+
+manifest_path, observed, tool_path = sys.argv[1:4]
+manifest = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+expected = str(manifest.get("native", {}).get("xcodegen", {}).get("version", "")).strip()
+if not expected:
+    sys.exit(0)
+if not re.search(rf"(?<![0-9.]){re.escape(expected)}(?![0-9])", observed):
+    first = observed.splitlines()[0] if observed.splitlines() else "<empty>"
+    print(
+        f"error: xcodegen version mismatch: expected {expected} (config/toolchain.json), "
+        f"observed {first!r} from {tool_path}.",
+        file=sys.stderr,
+    )
+    print(
+        "Install/use the pinned binary via ./scripts/install_pinned_tools.sh and ensure "
+        "$HOME/.qwenvoice-pinned-tools/bin is accessible and first on PATH.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+PY
+    then
+        exit 1
+    fi
 fi
 
 ENTITLEMENTS="Sources/QwenVoice.entitlements"

@@ -230,3 +230,56 @@ class RegenerateScriptTests(unittest.TestCase):
         self.assertNotIn("Restoring entitlements", completed.stdout)
         self.assertEqual(list(self.temporary.iterdir()), [])
         self.assertEqual(self.sandbox.calls_to("xcodegen"), [])
+
+    def _write_toolchain_pin(self, version: str = "2.46.0") -> None:
+        toolchain = self.sandbox.root / "config/toolchain.json"
+        toolchain.parent.mkdir(parents=True, exist_ok=True)
+        toolchain.write_text(json.dumps({"native": {"xcodegen": {"version": version}}}), encoding="utf-8")
+
+    def test_mismatched_xcodegen_version_refuses_before_running_generate(self):
+        self._write_toolchain_pin("2.46.0")
+        self.sandbox.tool(
+            "xcodegen",
+            'if [[ "${1:-}" == "--version" ]]; then echo "Version: 2.48.0"; exit 0; fi\n'
+            'printf overwritten > Sources/QwenVoice.entitlements',
+        )
+        completed = self.regenerate()
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("expected 2.46.0", completed.stderr)
+        self.assertIn("2.48.0", completed.stderr)
+        self.assertEqual(self.entitlements.read_text(encoding="utf-8"), self.KEPT)
+        self.assertEqual(list(self.temporary.iterdir()), [])
+        self.assertEqual(self.sandbox.calls_to("xcodegen", "generate"), [])
+        self.assertEqual(self.sandbox.calls_to("scripts/project_generation.py"), [])
+
+    def test_matching_xcodegen_version_runs_generate_and_restores_entitlements(self):
+        self._write_toolchain_pin("2.46.0")
+        self.sandbox.tool(
+            "xcodegen",
+            'if [[ "${1:-}" == "--version" ]]; then echo "Version: 2.46.0"; exit 0; fi\n'
+            'printf overwritten > Sources/QwenVoice.entitlements',
+        )
+        completed = self.regenerate()
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertEqual(self.entitlements.read_text(encoding="utf-8"), self.KEPT)
+        self.assertEqual(self.sandbox.calls_to("xcodegen", "generate"), [["generate"]])
+
+    def test_pinned_tools_xcodegen_takes_precedence_over_unpinned_path_xcodegen(self):
+        self._write_toolchain_pin("2.46.0")
+        self.sandbox.tool(
+            "xcodegen",
+            'if [[ "${1:-}" == "--version" ]]; then echo "Version: 2.48.0"; exit 0; fi\nexit 99',
+        )
+        pinned = self.sandbox.home / ".qwenvoice-pinned-tools/bin/xcodegen"
+        pinned.parent.mkdir(parents=True, exist_ok=True)
+        pinned.write_text(
+            "#!/usr/bin/env bash\n"
+            'if [[ "${1:-}" == "--version" ]]; then echo "Version: 2.46.0"; exit 0; fi\n'
+            "printf overwritten > Sources/QwenVoice.entitlements\n",
+            encoding="utf-8",
+        )
+        pinned.chmod(0o755)
+        completed = self.regenerate()
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertEqual(self.entitlements.read_text(encoding="utf-8"), self.KEPT)
+        self.assertEqual(self.sandbox.calls_to("xcodegen"), [])

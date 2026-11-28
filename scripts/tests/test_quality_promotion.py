@@ -781,6 +781,38 @@ class QualityPromotionTests(unittest.TestCase):
                 datetime(2026, 8, 19, 12, 2, tzinfo=timezone.utc),
             )
 
+    def test_uiperf_cadence_family_is_allowlisted_without_opening_hitch_or_maxgap(self) -> None:
+        contract = PROMOTION.load_contract(self.root)
+        self.assertEqual(
+            PROMOTION.warning_acceptance_name(contract, "uiperf.cadence:ios-tab-navigation(54/55-65)"),
+            "uiperf.cadence:",
+        )
+        self.assertIsNone(PROMOTION.warning_acceptance_name(contract, "uiperf.hitch:ios-history-scroll(109/104)"))
+        self.assertIsNone(PROMOTION.warning_acceptance_name(contract, "uiperf.maxgap:ios-sheet-present-dismiss(117/110)"))
+
+    def test_receipt_accepts_tag_contract_only_for_additive_warning_family_amendment(self) -> None:
+        PROMOTION.git(self.root, "add", "config/quality-promotion-contract.json")
+        PROMOTION.git(self.root, "commit", "-m", "pin contract at tag")
+        tag_commit = PROMOTION.resolve_commit(self.root, "HEAD")
+        tag_contract = PROMOTION.load_contract(self.root)
+        tag_digest = PROMOTION.digest_value(tag_contract)
+
+        additive = json.loads(json.dumps(tag_contract))
+        additive.setdefault("allowedWarningFamilies", {})["extra.advisory:"] = "Recorded advisory family."
+        self.assertIn(tag_digest, PROMOTION.accepted_receipt_contract_digests(self.root, tag_commit, additive))
+
+        mutated_existing = json.loads(json.dumps(tag_contract))
+        mutated_existing["allowedWarningFamilies"]["cadence:excess"] = "Changed reason."
+        self.assertNotIn(
+            tag_digest, PROMOTION.accepted_receipt_contract_digests(self.root, tag_commit, mutated_existing)
+        )
+
+        mutated_other = json.loads(json.dumps(tag_contract))
+        mutated_other["maxEvidenceAgeSeconds"] = tag_contract["maxEvidenceAgeSeconds"] + 60
+        self.assertNotIn(
+            tag_digest, PROMOTION.accepted_receipt_contract_digests(self.root, tag_commit, mutated_other)
+        )
+
 
 class LanguageBenchCoverageTests(unittest.TestCase):
     def test_the_full_language_matrix_covers_every_required_language_cell(self) -> None:

@@ -321,39 +321,6 @@
       "notes": "Opened 2026-10-12 (risk-based gate). Candidate rows run with --candidate-origin-attestation; with-purchase export, Restore and Cancel wait for RF-02; startup Retry and unverified purchase use dev evidence (08eddecc, ad3c8846). Earlier build 24-29 and Wave 5 runs are in git log -p; DA-04, F-01, F-16 closed. 2026-11-26 (3.2.0 build 32 dev window on iPhone 17 Pro): benchmark 29/29 PASS (141ece72), retained memory 9/9 PASS (6d5ced96, closing RF-68), UI perf 12/12 PASS (2f1ecfc4), localization 35/35 PASS (b396df56), studio-layout smoke PASS (ca32c92b). Remaining for Phase 5: run processed-candidate smoke, onboarding/download, EN/FR mode takes, sandbox purchase/Restore/Cancel (after RF-02), attended AUD-01/AUD-02/VoiceOver/AX-XXXL/offline checks and the ~30-take screen on processed v3.2.0-ios.1 (RF-12)."
     },
     {
-      "id": "RF-17",
-      "plan": "release-first-3-0-2026-09",
-      "title": "Exact-tag iOS quality promotion",
-      "status": "planned",
-      "blockedBy": [
-        "RF-09",
-        "RF-45",
-        "RF-46",
-        "RF-47",
-        "RF-48",
-        "RF-50",
-        "RF-51",
-        "RF-52",
-        "RF-53",
-        "RF-54",
-        "RF-55",
-        "RF-68",
-        "RF-69",
-        "RF-70",
-        "RF-72"
-      ],
-      "gate": "scripts/quality_promotion.py validates exact-tag iOS promotion evidence under config/quality-promotion-contract.json before any external TestFlight group or the App Review submission: the platform minimum (ios-ui-benchmark) plus every class the paths changed since the previous release route to, each recorded on the frozen source and younger than the contract's seven-day limit.",
-      "sourceOfTruth": [
-        "config/quality-promotion-contract.json",
-        "scripts/quality_promotion.py"
-      ],
-      "needs": [
-        "iphone"
-      ],
-      "updated": "2026-11-26",
-      "notes": "Opened 2026-10-12. Gates App Review (RF-16); iPhone delivery evaluation is declared not applicable (e7377511): six iOS records. Earlier build 26-29 and Wave 5 history is in git log -p. 2026-11-26: RF-68..RF-72 closed and Mac/CLI v3.2.0 shipped (RF-71); 3.2.0 build 32 dev window on iPhone 17 Pro passed ui-benchmark (141ece72), retained memory (6d5ced96) and ui-perf (2f1ecfc4). Remaining for Phase 5: record all six exact-tag iOS promotion classes (< 7 days old) on the frozen v3.2.0-ios.N submission candidate tag once RF-12 cuts."
-    },
-    {
       "id": "RF-35",
       "plan": "release-first-3-0-2026-09",
       "title": "iPhone model downloads may use cellular data, off by default with an opt-in switch",

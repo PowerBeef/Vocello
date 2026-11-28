@@ -710,9 +710,42 @@ def validate_record(
     }
 
 
+def accepted_receipt_contract_digests(
+    root: Path, commit: str, contract: dict[str, Any],
+) -> set[str]:
+    """Contract digests a managed-command receipt captured on `commit` may carry.
+
+    Normally only the current contract's digest is accepted. When a maintainer later adds a new
+    advisory prefix to `allowedWarningFamilies` on `main` without altering any other contract
+    field or existing family entry, a clean tag receipt captured before that additive warning
+    decision stays valid for the exact frozen tag commit.
+    """
+    accepted = {digest_value(contract)}
+    try:
+        tag_contract = json.loads(git(root, "show", f"{commit}:{CONTRACT_PATH.as_posix()}"))
+    except (PromotionError, json.JSONDecodeError):
+        return accepted
+    if not isinstance(tag_contract, dict):
+        return accepted
+    current_other = {k: v for k, v in contract.items() if k != "allowedWarningFamilies"}
+    tag_other = {k: v for k, v in tag_contract.items() if k != "allowedWarningFamilies"}
+    if current_other != tag_other:
+        return accepted
+    current_families = contract.get("allowedWarningFamilies") or {}
+    tag_families = tag_contract.get("allowedWarningFamilies") or {}
+    if (
+        isinstance(current_families, dict)
+        and isinstance(tag_families, dict)
+        and all(current_families.get(prefix) == reason for prefix, reason in tag_families.items())
+    ):
+        accepted.add(digest_value(tag_contract))
+    return accepted
+
+
 def validate_receipt(
     identity: str, receipt: dict[str, Any], definition: dict[str, Any], commit: str,
     contract_digest: str, max_age_seconds: int, now: datetime,
+    *, accepted_contract_digests: set[str] | None = None,
 ) -> dict[str, Any]:
     expected_keys = {
         "schemaVersion", "evidenceID", "platform", "sourceCommit", "sourceDirty",
@@ -725,6 +758,7 @@ def validate_receipt(
     claimed = unsigned.pop("digest")
     if claimed != digest_value(unsigned):
         raise PromotionError(f"{identity} managed-command receipt digest is invalid")
+    valid_contract_digests = accepted_contract_digests if accepted_contract_digests is not None else {contract_digest}
     if (
         receipt.get("evidenceID") != identity
         or receipt.get("platform") != definition["platform"]
@@ -732,7 +766,7 @@ def validate_receipt(
         or receipt.get("sourceDirty") is not False
         or receipt.get("command") != definition["command"]
         or receipt.get("commandDigest") != digest_value(definition["command"])
-        or receipt.get("contractDigest") != contract_digest
+        or receipt.get("contractDigest") not in valid_contract_digests
         or receipt.get("exitCode") != 0
         or DIGEST_RE.fullmatch(str(receipt.get("outputDigest", ""))) is None
     ):
@@ -787,6 +821,7 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
         raise PromotionError("accepted warnings exceed the promotion allowlist")
     now = datetime.now(timezone.utc).replace(microsecond=0)
     contract_digest = digest_value(contract)
+    receipt_contract_digests = accepted_receipt_contract_digests(root, commit, contract)
     difference_reason = getattr(args, "accept_toolchain_difference", None)
     if difference_reason is not None:
         difference_reason = toolchain_difference_reason(difference_reason)
@@ -809,6 +844,7 @@ def create(args: argparse.Namespace) -> dict[str, Any]:
             lanes[identity] = validate_receipt(
                 identity, read_json(path), definition, commit, contract_digest,
                 contract["maxEvidenceAgeSeconds"], now,
+                accepted_contract_digests=receipt_contract_digests,
             )
     manifest: dict[str, Any] = {
         "schemaVersion": SCHEMA_VERSION,
@@ -919,6 +955,7 @@ def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
             raise PromotionError("quality promotion toolchain difference is malformed or names another release")
         toolchain_difference_reason(declared_difference["reason"])
     differences: dict[str, dict[str, Any]] | None = {} if declared_difference is not None else None
+    receipt_contract_digests = accepted_receipt_contract_digests(root, commit, contract)
     for identity in required:
         lane = lanes[identity]
         definition = contract["evidence"][identity]
@@ -933,6 +970,7 @@ def validate_manifest(args: argparse.Namespace) -> dict[str, Any]:
             expected = validate_receipt(
                 identity, lane.get("receipt"), definition, commit, digest_value(contract),
                 contract["maxEvidenceAgeSeconds"], now,
+                accepted_contract_digests=receipt_contract_digests,
             )
         if lane != expected:
             raise PromotionError(f"{identity} lane wrapper differs from its evidence")

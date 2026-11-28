@@ -6984,6 +6984,45 @@
       "evidence": [
         "doc:docs/reference/ios-appstore-submission.md"
       ]
+    },
+    {
+      "id": "RF-17",
+      "plan": "release-first-3-0-2026-09",
+      "title": "Exact-tag iOS quality promotion",
+      "status": "done",
+      "blockedBy": [
+        "RF-09",
+        "RF-45",
+        "RF-46",
+        "RF-47",
+        "RF-48",
+        "RF-50",
+        "RF-51",
+        "RF-52",
+        "RF-53",
+        "RF-54",
+        "RF-55",
+        "RF-68",
+        "RF-69",
+        "RF-70",
+        "RF-72"
+      ],
+      "gate": "scripts/quality_promotion.py validates exact-tag iOS promotion evidence under config/quality-promotion-contract.json before any external TestFlight group or the App Review submission: the platform minimum (ios-ui-benchmark) plus every class the paths changed since the previous release route to, each recorded on the frozen source and younger than the contract's seven-day limit.",
+      "sourceOfTruth": [
+        "config/quality-promotion-contract.json",
+        "scripts/quality_promotion.py"
+      ],
+      "updated": "2026-11-28",
+      "notes": "Opened 2026-10-12. Gates App Review (RF-16); iPhone delivery evaluation is declared not applicable (e7377511): six iOS records. Earlier build 26-29 and Wave 5 history is in git log -p. 2026-11-26: RF-68..RF-72 closed and Mac/CLI v3.2.0 shipped (RF-71); 3.2.0 build 32 dev window on iPhone 17 Pro passed ui-benchmark (141ece72), retained memory (6d5ced96) and ui-perf (2f1ecfc4). Remaining for Phase 5: record all six exact-tag iOS promotion classes (< 7 days old) on the frozen v3.2.0-ios.N submission candidate tag once RF-12 cuts. 2026-11-28: 6/6 exact-tag v3.2.0-ios.2 (e530fd43, Xcode 27.2, dirty=False) iOS promotion classes PASS (9b9f559c model-download receipt d10a5b81, dff4b30e ui-benchmark 29/29, 01602575 ui-perf 12/12 cool-down, d8b1154e retained-memory 9/9, ee5112d6 engine RTF 0.56, 68b41bb9 10-language 23/23 independent 2-family ASR). Maintainer recorded uiperf.cadence: in allowedWarningFamilies; quality-promotion.json validated PASS (digest c09292a2dd65).",
+      "evidence": [
+        "commit:e530fd43",
+        "commit:36dae40b",
+        "benchmark:ios-xcui-benchmark-20261128-080836-dff4b30e",
+        "benchmark:ios-xcui-perf-20261128-092600-01602575",
+        "benchmark:ios-memory-qualification-20261128-084623-d8b1154e",
+        "benchmark:ios-engine-20261128-085212-ee5112d6",
+        "benchmark:ios-lang-bench-20261128-091203-68b41bb9"
+      ]
     }
   ]
 }

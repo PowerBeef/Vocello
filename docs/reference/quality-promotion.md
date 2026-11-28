@@ -220,10 +220,15 @@ Warning acceptance is explicit and restricted by the checked-in allowlist. Omit
 warning by its exact name (`allowedWarnings`) or, for a warning whose name carries measured
 values, by the prefix of its family with the reason it is advisory (`allowedWarningFamilies`:
 `cadence:excess` covers the audio check's `cadence:excess2(2/0)`, more pauses than the script's
-punctuation predicts in a take that passed). A family is accepted by its prefix
-(`--accept-warning cadence:excess`), and a refusal names the flags to add. A record with any
-other warning is refused whatever is accepted: a new family is a recorded maintainer decision
-in the contract, never an operator's choice at assembly. Add
+punctuation predicts in a take that passed; `uiperf.cadence:` covers interactive iOS UI performance
+scenarios where ProMotion re-pacing reports main-thread cadence below `55-65 Hz` while
+`ios-idle-baseline` remains enforced fail-closed at `55-65 Hz`, maintainer decision 2026-11-28). A
+family is accepted by its prefix (`--accept-warning cadence:excess`, `--accept-warning
+uiperf.cadence:`), and a refusal names the flags to add. A record with any other warning is refused
+whatever is accepted: a new family is a recorded maintainer decision in the contract, never an
+operator's choice at assembly. When a maintainer records a strictly additive `allowedWarningFamilies`
+entry after a tag was cut without changing any other contract field or existing family, managed-command
+receipts captured on that exact tag remain valid. Add
 `--accept-toolchain-difference "REASON"` to `create` only when the records were built with another
 Xcode than the release's and the maintainer accepts that (above). For iOS, whose release
 evidence binds no metadata file, add `--release-toolchain <json>` to both commands.

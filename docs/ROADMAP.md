@@ -17,7 +17,7 @@ Only this plan may hold planned or in-flight work, at most 3 items in flight.
 
 | Plan | Status | Owner | Progress |
 | --- | --- | --- | --- |
-| `release-first-3-0-2026-09` | active | release-qa | 62/96 (65%) |
+| `release-first-3-0-2026-09` | active | release-qa | 63/96 (66%) |
 | `audit-remediation-2026-09` | parked | backend-and-platform | 3/8 (38%) |
 | `autonomous-validation-remediation-2026-08` | parked | release-qa | 13/17 (76%) |
 | `benchmark-telemetry-audit-2026-09` | parked | backend-and-platform | 2/6 (33%) |
@@ -140,7 +140,7 @@ Needs the maintainer present: a permission prompt, a keychain or password, a rel
 - `RF-48` (planned) Core overhaul, stage 4: finalization, preview and the heat pause (also: iPhone)
 - `RF-63` (planned) Fit the 3.2 App Review notes into 4,000 UTF-8 bytes
 
-### iPhone (61)
+### iPhone (60)
 
 Needs the paired iPhone, in a window the maintainer announces.
 
@@ -190,7 +190,6 @@ Needs the paired iPhone, in a window the maintainer announces.
 - `PA-30` (parked) Leftovers from PA-21, PA-22 and AUD-05 (also: Mac, remotely)
 - `RF-12` (in-flight) Upload the verified 3.2.0 IPA to internal TestFlight and install the processed candidate (also: At the keyboard)
 - `RF-15` (planned) Risk-based acceptance of the processed 3.2.0 candidate on the iPhone
-- `RF-17` (planned) Exact-tag iOS quality promotion
 - `RF-35` (planned) iPhone model downloads may use cellular data, off by default with an opt-in switch
 - `RF-41` (planned) iPhone model downloads show their size and ask before they start
 - `RF-42` (planned) Admit the 13 eligible 8 GB+ iPads in portrait iPhone compatibility mode
@@ -231,7 +230,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `RF-12` | in-flight | Upload the verified 3.2.0 IPA to internal TestFlight and install the processed candidate | `ASR-07`, `RF-69`, `RF-70`, `RF-72`, `RF-73` |
 | `RF-15` | planned | Risk-based acceptance of the processed 3.2.0 candidate on the iPhone | `RF-12` |
 | `RF-16` | planned | Submit 3.2.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `RF-35`, `RF-36`, `RF-41`, `RF-42`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04`, `RF-45`, `RF-46`, `RF-47`, `RF-48`, `RF-50`, `RF-51`, `RF-52`, `RF-53`, `RF-54`, `RF-55`, `RF-57`, `RF-62`, `RF-63`, `RF-65`, `RF-66`, `RF-68`, `RF-69`, `RF-70`, `RF-72`, `RF-73` |
-| `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09`, `RF-45`, `RF-46`, `RF-47`, `RF-48`, `RF-50`, `RF-51`, `RF-52`, `RF-53`, `RF-54`, `RF-55`, `RF-68`, `RF-69`, `RF-70`, `RF-72` |
 | `RF-23` | parked | The Mac app offers new versions and installs them through Sparkle | — |
 | `RF-30` | parked | Cross-process History for the app and the CLI | — |
 | `RF-31` | parked | CLI parity record, documentation and qualification | — |
@@ -299,9 +297,6 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 
 - **`RF-16`** (planned) — Submit 3.2.0 for App Review on the maintainer's explicit go.
   gate: Every other item of this plan is closed and App Store Connect is complete: metadata, screenshots, privacy answers, content rights, age rating, export compliance, reviewer notes and the export purchase attached to the version. The maintainer explicitly authorizes and submits; approval is not guaranteed, and a rejection reopens only the cited issue.
-
-- **`RF-17`** (planned) — Exact-tag iOS quality promotion.
-  gate: scripts/quality_promotion.py validates exact-tag iOS promotion evidence under config/quality-promotion-contract.json before any external TestFlight group or the App Review submission: the platform minimum (ios-ui-benchmark) plus every class the paths changed since the previous release route to, each recorded on the frozen source and younger than the contract's seven-day limit.
 
 - **`RF-23`** (parked) — The Mac app offers new versions and installs them through Sparkle.
   gate: Maintainer request 2026-10-20, for the Mac 3.0 release (RF-10); no iPhone change. Sparkle 2.10.0 pinned exactly through SwiftPM (MIT) with the supply-chain, attribution and license inventories updated, and the release tool pin tied to it. One SPUStandardUpdaterController: Vocello > Check for Updates… and a Settings > Updates category; Sparkle's own permission prompt on the second launch, no system profile, no silent installs (SUAllowsAutomaticUpdates off), a signed feed required (SURequireSignedFeed) and updates verified before extraction. SUFeedURL is the latest GitHub release's appcast.xml; SUPublicEDKey comes from the maintainer's EdDSA key, the private half the release environment's secret. The release workflow signs the notarized DMG and the feed in a minimal job from the shipped app; the privacy page names the check. Deterministic tests cover the pipeline, the Mac layout lane covers the menu item and Settings, and one end-to-end update between two signed builds proves download, verification, install and relaunch before the first public Mac release with Sparkle.

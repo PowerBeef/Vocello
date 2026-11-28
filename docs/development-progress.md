@@ -1,7 +1,7 @@
 ---
 status: active
 owner: backend-and-platform
-reviewed: 2026-11-27
+reviewed: 2026-11-28
 summary: Current resume checkpoint; config/roadmap.json owns open work, config/roadmap-archive.json holds finished work, and older narrative lives in git history.
 sourceOfTruth:
   - config/roadmap.json
@@ -18,15 +18,15 @@ through November 15, `20533a12` holds October 23 to 25, and `a0597deb` every che
 
 ## Resume now
 
-### November 27 (`RF-12` IN-FLIGHT — `v3.2.0-ios.2` build `32` `VALID` in TestFlight; `RF-62` CLOSED; `RF-71` CLOSED): ready for iPhone TestFlight install & acceptance (`RF-12` → `RF-16`)
+### November 28 (`RF-17` CLOSED — 6/6 exact-tag `v3.2.0-ios.2` iOS promotion PASS; `RF-12` IN-FLIGHT — build `32` `VALID` in TestFlight): ready for TestFlight install & `RF-15` → `RF-16`
 
 **Workspace & Git state:** **Vocello & `vocello` CLI 3.2.0 (build `32`) are live and public** from
 signed tag `v3.2.0` at `33e65c15` (`Release` `45914974565` PASS, `Promote verified release`
-`45933267704` PASS). **`v3.2.0-ios.2` (`3.2.0`, build `32`) is uploaded, attested, and `VALID` in
-TestFlight** from signed tag `v3.2.0-ios.2` at `e530fd43` (`Release` `46064527012` PASS). `RF-71`,
-`RF-68`, `RF-69`, `RF-70`, `RF-54`, `RF-57`, `RF-62`, and `RF-73` are all closed (`done`). Next
-focus when the paired iPhone is available is finishing **`RF-12` → `RF-15` → `RF-16` iOS App Store
-submission**.
+`45933267704` PASS). **`v3.2.0-ios.2` (`3.2.0`, build `32`) is uploaded, attested, `VALID` in
+TestFlight**, and **exact-tag `RF-17` iOS quality promotion is CLOSED** (6/6 classes PASS on
+`e530fd43`, validated `quality-promotion.json` digest `c09292a2dd65`). `RF-71`, `RF-68`, `RF-69`,
+`RF-70`, `RF-54`, `RF-57`, `RF-62`, `RF-73`, and **`RF-17`** are all closed (`done`). Next focus is
+installing **TestFlight build `32`** on the paired iPhone to finish **`RF-12` → `RF-15` → `RF-16`**.
 
 **Shipped `3.2.0` (build `32`) milestones (2026-11-26, Xcode `27.2` / Swift `6.4.2`):**
 
@@ -73,10 +73,18 @@ submission**.
      evidence, IPA provenance attestation, and `Upload to TestFlight`). Read-only `asc builds list`
      confirms build **`32`** (`3.2.0`) is **`VALID`** and **`APP_STORE_ELIGIBLE`**
      (`usesNonExemptEncryption: false`, `minOsVersion: 26.0`, expires `2027-02-25`).
-2. **Finish `RF-12` when paired iPhone is available:** install processed TestFlight build **`32`**
-   (`3.2.0`) over the existing app (confirming History and Saved Voices survive the upgrade) and
-   verify that an owned export unlock saves and shares Design and Clone audio in **Airplane Mode**.
-3. **Grouped iPhone acceptance & submission (`RF-15`, `RF-17`, `ASR-05`, `RF-66`, `RF-65`, `RF-63`, `ASR-09`, `RF-16`):**
-   run `RF-15` TestFlight acceptance + `RF-17` exact-tag iOS promotion + 6.3-inch screenshots +
+   - **Completed 2026-11-28 (`RF-17` CLOSED — 6/6 exact-tag `v3.2.0-ios.2` iOS promotion PASS):**
+     all 6 required classes passed on clean `v3.2.0-ios.2` (`e530fd43`, Xcode `27.2`, `dirty=False`):
+     `ios-model-download-lifecycle` (`9b9f559c`, receipt `d10a5b81`), `ios-ui-benchmark` (`dff4b30e`,
+     29/29, 0 refused), `ios-ui-performance` (`01602575`, 12/12 cool-down), `ios-retained-memory`
+     (`d8b1154e`, 9/9), `ios-engine-benchmark` (`ee5112d6`, cold RTF `0.56`), and
+     `ios-language-benchmark` (`68b41bb9`, 23/23 across 10 languages via Qwen3-ASR + Whisper).
+     Recorded `uiperf.cadence:` in `config/quality-promotion-contract.json` (`allowedWarningFamilies`);
+     validated `build/artifacts/quality-promotion/v3.2.0-ios.2/quality-promotion.json` (`c09292a2dd65`).
+2. **Finish `RF-12`:** install processed TestFlight build **`32`** (`3.2.0`) over the existing app
+   (confirming History and Saved Voices survive the upgrade) and verify that an owned export unlock
+   saves and shares Design and Clone audio in **Airplane Mode**.
+3. **Grouped iPhone acceptance & submission (`RF-15`, `ASR-05`, `RF-66`, `RF-65`, `RF-63`, `ASR-09`, `RF-16`):**
+   run `RF-15` TestFlight black-box acceptance (`--preinstalled-candidate`) + 6.3-inch screenshots +
    `RF-66` demo video + `RF-02` IAP review screenshot → AWS Device Farm iPhone 15 Pro (`RF-65`) →
    ASC metadata/IAP/review notes updates → `ASR-09` 24h proof → `RF-16` App Review submission.

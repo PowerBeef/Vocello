@@ -12,7 +12,8 @@
     "written-output-warn"
   ],
   "allowedWarningFamilies": {
-    "cadence:excess": "The audio check counted more pauses in a passing take than its script's punctuation predicts. Advisory: unusual, not defective (maintainer decision 2026-11-16). The name carries the counts, so it is accepted by this prefix."
+    "cadence:excess": "The audio check counted more pauses in a passing take than its script's punctuation predicts. Advisory: unusual, not defective (maintainer decision 2026-11-16). The name carries the counts, so it is accepted by this prefix.",
+    "uiperf.cadence:": "Interactive iOS UI performance scenarios record warn-only main-thread cadence below 55-65 Hz where ProMotion system re-pacing conflates with interactive transitions (ios-idle-baseline stays enforced fail-closed at 55-65 Hz; AV-14 and maintainer decision 2026-11-28). Each warning carries the scenario and observed Hz, so it is accepted by this prefix."
   },
   "platformMinimumEvidence": {
     "macos": [

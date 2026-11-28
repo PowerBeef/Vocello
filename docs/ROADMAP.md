@@ -134,7 +134,7 @@ Needs the maintainer present: a permission prompt, a keychain or password, a rel
 - `ER-07` (parked) iPhone memory budget from measured limits
 - `PA-10` (parked) Release signing is isolated from dispatch and build inputs (also: Mac, remotely)
 - `RF-02` (planned) complete Apple prerequisites and the consolidated qualified-decision packet
-- `RF-12` (planned) Upload the verified 3.2.0 IPA to internal TestFlight and install the processed candidate (also: iPhone)
+- `RF-12` (in-flight) Upload the verified 3.2.0 IPA to internal TestFlight and install the processed candidate (also: iPhone)
 - `RF-16` (planned) Submit 3.2.0 for App Review on the maintainer's explicit go
 - `RF-23` (parked) The Mac app offers new versions and installs them through Sparkle
 - `RF-48` (planned) Core overhaul, stage 4: finalization, preview and the heat pause (also: iPhone)
@@ -188,7 +188,7 @@ Needs the paired iPhone, in a window the maintainer announces.
 - `PA-18` (parked) Public claims match what each download ships
 - `PA-20` (parked) Accessibility and localization reach every surface (also: Mac, remotely)
 - `PA-30` (parked) Leftovers from PA-21, PA-22 and AUD-05 (also: Mac, remotely)
-- `RF-12` (planned) Upload the verified 3.2.0 IPA to internal TestFlight and install the processed candidate (also: At the keyboard)
+- `RF-12` (in-flight) Upload the verified 3.2.0 IPA to internal TestFlight and install the processed candidate (also: At the keyboard)
 - `RF-15` (planned) Risk-based acceptance of the processed 3.2.0 candidate on the iPhone
 - `RF-17` (planned) Exact-tag iOS quality promotion
 - `RF-35` (planned) iPhone model downloads may use cellular data, off by default with an opt-in switch
@@ -228,7 +228,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 | `DW-03` | parked | Development workflow: product-side quality (audit Phase 2) | — |
 | `DW-04` | parked | Development workflow: longer-term modernization (audit Phase 3) | — |
 | `RF-02` | planned | complete Apple prerequisites and the consolidated qualified-decision packet | `RF-01` |
-| `RF-12` | planned | Upload the verified 3.2.0 IPA to internal TestFlight and install the processed candidate | `ASR-07`, `RF-69`, `RF-70`, `RF-72`, `RF-73` |
+| `RF-12` | in-flight | Upload the verified 3.2.0 IPA to internal TestFlight and install the processed candidate | `ASR-07`, `RF-69`, `RF-70`, `RF-72`, `RF-73` |
 | `RF-15` | planned | Risk-based acceptance of the processed 3.2.0 candidate on the iPhone | `RF-12` |
 | `RF-16` | planned | Submit 3.2.0 for App Review on the maintainer's explicit go | `RF-15`, `RF-17`, `RF-35`, `RF-36`, `RF-41`, `RF-42`, `ASR-05`, `ASR-06`, `ASR-11`, `RF-02`, `ASR-02`, `ASR-04`, `ASR-09`, `AUD-01`, `AUD-02`, `AUD-07`, `AUD-09`, `F-01`, `F-16`, `DA-04`, `RF-45`, `RF-46`, `RF-47`, `RF-48`, `RF-50`, `RF-51`, `RF-52`, `RF-53`, `RF-54`, `RF-55`, `RF-57`, `RF-62`, `RF-63`, `RF-65`, `RF-66`, `RF-68`, `RF-69`, `RF-70`, `RF-72`, `RF-73` |
 | `RF-17` | planned | Exact-tag iOS quality promotion | `RF-09`, `RF-45`, `RF-46`, `RF-47`, `RF-48`, `RF-50`, `RF-51`, `RF-52`, `RF-53`, `RF-54`, `RF-55`, `RF-68`, `RF-69`, `RF-70`, `RF-72` |
@@ -291,7 +291,7 @@ Narrative authority: [`docs/reference/release-first-execution-2026-09.md`](refer
 - **`RF-02`** (planned) — complete Apple prerequisites and the consolidated qualified-decision packet.
   gate: Under ASR-02/ASR-04/ASR-08/ASR-10/ASR-11, complete bounded read-only account, distribution-key/profile/entitlement, agreement and version checks and a confirmed-unused build number. Reuse support and bundled attribution; consolidate provider metadata/retention, model distribution, previews, marketing audio/artwork, privacy, content rights, age rating, export, and regional decisions. Every field has evidence or a named external dependency; the maintainer's own privacy and rights decisions are recorded before closure (2026-10-12: no paid counsel), including the Paid Apps agreement, tax and banking the export purchase needs. Authentication failures remain failures.
 
-- **`RF-12`** (planned) — Upload the verified 3.2.0 IPA to internal TestFlight and install the processed candidate.
+- **`RF-12`** (in-flight) — Upload the verified 3.2.0 IPA to internal TestFlight and install the processed candidate.
   gate: After ASR-10 and ASR-07 pass, upload the verified IPA to internal TestFlight (the archive-ios dispatch with upload_to_testflight, separately authorized by the maintainer) and install the processed build on the paired iPhone, preserving personal data during the upgrade; a fresh install needs another phone or a verified backup and separate approval. Never substitute a diagnostics or development build for the processed candidate. On that build, an owned export unlock still saves and shares Design and Clone audio with the phone in Airplane Mode (moved from RF-13, 2026-10-16: only the live App Store's offline cache was left untested).
 
 - **`RF-15`** (planned) — Risk-based acceptance of the processed 3.2.0 candidate on the iPhone.

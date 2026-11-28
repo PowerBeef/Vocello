@@ -18,12 +18,15 @@ through November 15, `20533a12` holds October 23 to 25, and `a0597deb` every che
 
 ## Resume now
 
-### November 26 (`RF-71` CLOSED — Vocello & `vocello` CLI `3.2.0` live public release; `RF-68` CLOSED): ready for Phase 5 (`v3.2.0-ios.1` → `RF-16`)
+### November 27 (`RF-12` IN-FLIGHT — `v3.2.0-ios.2` build `32` `VALID` in TestFlight; `RF-62` CLOSED; `RF-71` CLOSED): ready for iPhone TestFlight install & acceptance (`RF-12` → `RF-16`)
 
 **Workspace & Git state:** **Vocello & `vocello` CLI 3.2.0 (build `32`) are live and public** from
 signed tag `v3.2.0` at `33e65c15` (`Release` `45914974565` PASS, `Promote verified release`
-`45933267704` PASS). `RF-71`, `RF-68`, `RF-69`, `RF-70`, `RF-54`, `RF-57`, and `RF-73` are all
-closed (`done`). Next focus is **Phase 5 (`v3.2.0-ios.1` → `RF-16` iOS App Store submission)**.
+`45933267704` PASS). **`v3.2.0-ios.2` (`3.2.0`, build `32`) is uploaded, attested, and `VALID` in
+TestFlight** from signed tag `v3.2.0-ios.2` at `e530fd43` (`Release` `46064527012` PASS). `RF-71`,
+`RF-68`, `RF-69`, `RF-70`, `RF-54`, `RF-57`, `RF-62`, and `RF-73` are all closed (`done`). Next
+focus when the paired iPhone is available is finishing **`RF-12` → `RF-15` → `RF-16` iOS App Store
+submission**.
 
 **Shipped `3.2.0` (build `32`) milestones (2026-11-26, Xcode `27.2` / Swift `6.4.2`):**
 
@@ -52,18 +55,28 @@ closed (`done`). Next focus is **Phase 5 (`v3.2.0-ios.1` → `RF-16` iOS App Sto
     **UI perf PASS** (`2f1ecfc4`, 12/12), **localization PASS** (`b396df56`, 35/35 screenshots),
     **studio-layout smoke PASS** (`ca32c92b`, 5/5 screenshots), 3-minute Auto-Lock restored (`56cd3e62`).
 
-**Next — Phase 5 (`v3.2.0-ios.1` → `RF-16` iOS 3.2.0 App Store Submission):**
+**Next — Phase 5 (`v3.2.0-ios.2` build `32` → `RF-16` iOS 3.2.0 App Store Submission):**
 
-1. **Completed 2026-11-27 (`RF-62` CLOSED; `RF-02` account prerequisites Active):** Paid Apps
-   Agreement, tax forms, and banking are now **Active** in App Store Connect and Apple Small
-   Business Program enrollment is submitted (redacted; private receipts off-Git). `RF-62` is closed:
-   Apple's Nov 16 descriptors (`Shared Location = No`, `Dating and Relationships = No`) were saved
-   keeping Age Rating `13+` (`THIRTEEN_PLUS`), verified via read-only `asc age-rating view`
-   readback. Only the `Design & Clone Export` IAP review screenshot from processed `3.2.0`
-   TestFlight (`RF-12`) remains on `RF-02`.
-2. **Cut & upload `v3.2.0-ios.1` (`RF-12`):** run `python3 scripts/ios_candidate_tag.py` (when ready)
-   → approve `archive-ios` in `release.yml` → install processed TestFlight build on paired iPhone.
+1. **Completed 2026-11-27 (`RF-62` CLOSED; `RF-02` account prerequisites Active; `v3.2.0-ios.2` build `32` `VALID` in TestFlight):**
+   - Paid Apps Agreement, tax forms, and banking are **Active** in App Store Connect and Apple Small
+     Business Program enrollment is submitted (redacted; private receipts off-Git). `RF-62` is closed:
+     Apple's Nov 16 descriptors (`Shared Location = No`, `Dating and Relationships = No`) were saved
+     keeping Age Rating `13+` (`THIRTEEN_PLUS`), verified via read-only `asc age-rating view`
+     readback. Only the `Design & Clone Export` IAP review screenshot from processed `3.2.0`
+     TestFlight (`RF-12`) remains on `RF-02`.
+   - `v3.2.0-ios.1` (`c1200714`, `Release` `45992302801`) passed archive, IPA export, and Guideline
+     2.5.19 binary hygiene verification but tripped `release_evidence` clean-tree validation due to
+     XcodeGen `2.48.0` vs pinned `2.46.0` `.xcscheme` drift; `e530fd43` regenerated the 6 shared
+     schemes with pinned `2.46.0` and added a fail-closed version guard to `scripts/regenerate_project.sh`.
+   - Signed tag **`v3.2.0-ios.2`** at `e530fd43` (`Release` `46064527012`, deployment `8120062919`)
+     passed all gates (`CodeQL`, `iOS compile-safety`, `iOS archive + App Store export`, release
+     evidence, IPA provenance attestation, and `Upload to TestFlight`). Read-only `asc builds list`
+     confirms build **`32`** (`3.2.0`) is **`VALID`** and **`APP_STORE_ELIGIBLE`**
+     (`usesNonExemptEncryption: false`, `minOsVersion: 26.0`, expires `2027-02-25`).
+2. **Finish `RF-12` when paired iPhone is available:** install processed TestFlight build **`32`**
+   (`3.2.0`) over the existing app (confirming History and Saved Voices survive the upgrade) and
+   verify that an owned export unlock saves and shares Design and Clone audio in **Airplane Mode**.
 3. **Grouped iPhone acceptance & submission (`RF-15`, `RF-17`, `ASR-05`, `RF-66`, `RF-65`, `RF-63`, `ASR-09`, `RF-16`):**
    run `RF-15` TestFlight acceptance + `RF-17` exact-tag iOS promotion + 6.3-inch screenshots +
-   `RF-66` demo video → AWS Device Farm iPhone 15 Pro (`RF-65`) → ASC metadata/IAP/review notes
-   updates → `ASR-09` 24h proof → `RF-16` App Review submission.
+   `RF-66` demo video + `RF-02` IAP review screenshot → AWS Device Farm iPhone 15 Pro (`RF-65`) →
+   ASC metadata/IAP/review notes updates → `ASR-09` 24h proof → `RF-16` App Review submission.

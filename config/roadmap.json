@@ -280,7 +280,7 @@
       "id": "RF-12",
       "plan": "release-first-3-0-2026-09",
       "title": "Upload the verified 3.2.0 IPA to internal TestFlight and install the processed candidate",
-      "status": "planned",
+      "status": "in-flight",
       "blockedBy": [
         "ASR-07",
         "RF-69",
@@ -297,8 +297,8 @@
         "keyboard",
         "iphone"
       ],
-      "updated": "2026-11-26",
-      "notes": "2026-10-24: candidates are cut by force_ask-gated python3 scripts/ios_candidate_tag.py (a signed v<version>-ios.N tag archives and uploads only the iPhone app). Historical 3.0 builds 24-30 and 3.1.0 tags v3.1.0-ios.1..3 (build 31) are superseded. 2026-10-27: TestFlight upgrade over dev preserved History and Saved Voices (ios-xcui-candidate-smoke-20261027-135949-5fe567b6). 2026-11-26: RF-68, RF-69, RF-70, RF-71 (Mac/CLI v3.2.0 live at 33e65c15), RF-72 and RF-73 are all closed; next step on maintainer go is ios_candidate_tag.py --dry-run (verifying green CI required on origin/main and unused ASC build 32) then cutting v3.2.0-ios.1, approving archive-ios, installing the processed TestFlight build on the paired iPhone, and verifying Airplane Mode owned export (after RF-02)."
+      "updated": "2026-11-27",
+      "notes": "2026-10-24: candidates are cut by force_ask-gated python3 scripts/ios_candidate_tag.py. Historical 3.0 builds 24-30 and 3.1.0 tags v3.1.0-ios.1..3 (build 31) are superseded. 2026-10-27: TestFlight upgrade over dev preserved History and Saved Voices (ios-xcui-candidate-smoke-20261027-135949-5fe567b6). 2026-11-27: v3.2.0-ios.1 (c1200714, run 45992302801) passed archive/IPA/2.5.19 verification but tripped release_evidence source-tree check on XcodeGen 2.48.0 vs pinned 2.46.0 .xcscheme drift; fixed and guarded in e530fd43. Signed tag v3.2.0-ios.2 at e530fd43 (Release run 46064527012, deployment 8120062919) passed all gates and uploaded build 32 (3.2.0) to TestFlight; ASC readback confirms processingState=VALID, APP_STORE_ELIGIBLE, usesNonExemptEncryption=false. Remaining to close RF-12 when iPhone is available: install processed build 32 from TestFlight (preserving History/Saved Voices) and verify Airplane Mode owned export."
     },
     {
       "id": "RF-15",
